@@ -417,6 +417,7 @@ class ChatViewModel @Inject constructor(
             loadSession()
             loadMessages()
             loadPendingQuestions()
+            loadPendingPermissions()
         }
         loadProviders()
         loadAgents()
@@ -536,6 +537,38 @@ class ChatViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load pending questions: ${e.javaClass.simpleName}: ${e.message}", e)
+        }
+    }
+
+    /** Load pending permissions from the server REST API on session open (REST recovery). */
+    private suspend fun loadPendingPermissions() {
+        try {
+            val allPermissions = api.listPendingPermissions(conn, directory = sessionDirectory)
+            if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingPermissions: ${allPermissions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
+            val sessionPermissions = allPermissions
+                .filter { it.sessionId == sessionId }
+                .map { req ->
+                    SseEvent.PermissionAsked(
+                        id = req.id,
+                        sessionId = req.sessionId,
+                        permission = req.permission,
+                        patterns = req.patterns,
+                        metadata = req.metadata?.mapValues { (_, v) ->
+                            // JsonElement → String: primitives use content, others use toString
+                            v.jsonPrimitive.contentOrNull ?: v.toString()
+                        },
+                        always = req.always.isNotEmpty(), // List<String> → Boolean: non-empty means "always"
+                        tool = req.tool
+                    )
+                }
+            if (sessionPermissions.isNotEmpty()) {
+                eventReducer.setPermissions(sessionId, sessionPermissions)
+                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessionPermissions.size} pending permissions for session $sessionId")
+            } else {
+                if (BuildConfig.DEBUG) Log.d(TAG, "No pending permissions for session $sessionId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load pending permissions: ${e.javaClass.simpleName}: ${e.message}", e)
         }
     }
 
