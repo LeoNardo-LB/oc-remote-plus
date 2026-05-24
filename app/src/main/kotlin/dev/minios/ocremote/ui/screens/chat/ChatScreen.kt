@@ -1387,7 +1387,7 @@ fun ChatScreen(
     val pendingCount = uiState.pendingPermissions.size + uiState.pendingQuestions.size
     val isBusy = uiState.sessionStatus is SessionStatus.Busy
     LaunchedEffect(messageCount, lastPartCount, lastContentLength, pendingCount, isBusy) {
-        if (messageCount > 0 && autoScrollEnabled) {
+        if (messageCount > 0 && (autoScrollEnabled || pendingCount > 0)) {
             val lastIndex = listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1
             listState.scrollToItem(lastIndex)
             // scrollToItem goes to the TOP of the last item; when a message is
