@@ -5472,15 +5472,12 @@ private fun TaskToolCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 6.dp)
-                        .heightIn(max = 300.dp)
+                        .heightIn(max = 600.dp)
                 ) {
-                    Text(
-                        text = output.take(5000),
-                        style = CodeTypography.copy(fontSize = 12.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .codeHorizontalScroll()
-                            .verticalScroll(rememberScrollState())
+                    MarkdownContent(
+                        markdown = output,
+                        textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
+                        isUser = false
                     )
                 }
             }
