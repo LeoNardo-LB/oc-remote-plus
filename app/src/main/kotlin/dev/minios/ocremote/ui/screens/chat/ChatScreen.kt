@@ -225,6 +225,10 @@ private val agentColorCycle = listOf(
     Color(0xFF56B6C2)  // info (cyan)
 )
 
+/** QUEUED badge colors */
+private val QueuedBadgeColor = Color(0xFFFFD700)      // Gold background
+private val QueuedBadgeTextColor = Color(0xFF1A1A1A)  // Dark text on gold
+
 private fun agentColor(agentName: String, agents: List<AgentInfo> = emptyList()): Color {
     val index = agents.indexOfFirst { it.name == agentName }
     return if (index >= 0) {
@@ -1452,7 +1456,7 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "子会话",
+                                    text = stringResource(R.string.chat_child_session),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                 )
@@ -3658,14 +3662,14 @@ private fun ChatMessageBubble(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = Color(0xFFFFD700),  // Gold
+                                color = QueuedBadgeColor,
                                 modifier = Modifier.padding(end = 8.dp)
                             ) {
                                 Text(
-                                    text = "QUEUED",
+                                    text = stringResource(R.string.chat_queued),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.Black
+                                        color = QueuedBadgeTextColor
                                     ),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
@@ -5494,7 +5498,7 @@ private fun TaskToolCard(
                     )
                 ) {
                     Text(
-                        text = "查看详情",
+                        text = stringResource(R.string.chat_view_details),
                         style = MaterialTheme.typography.labelMedium
                     )
                     Icon(
