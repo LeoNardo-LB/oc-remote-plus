@@ -4061,7 +4061,40 @@ private fun PartContent(
         }
         // Ignore less relevant parts
         is Part.Snapshot, is Part.Subtask, is Part.Compaction,
-        is Part.Agent, is Part.SessionTurn, is Part.Unknown -> { /* skip */ }
+        is Part.SessionTurn, is Part.Unknown -> { /* skip */ }
+        is Part.Agent -> {
+            val displayName = part.name.ifBlank { "Agent" }
+            val displaySource = part.source?.jsonPrimitive?.contentOrNull ?: ""
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Android,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (displaySource.isNotBlank()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = displaySource,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        }
     }
 }
 
