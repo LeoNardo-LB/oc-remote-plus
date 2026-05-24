@@ -18,6 +18,7 @@ import dev.minios.ocremote.data.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventReducer
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.*
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -556,7 +557,7 @@ class ChatViewModel @Inject constructor(
                         metadata = req.metadata?.mapValues { (_, v) ->
                             // JsonElement → String: primitives use content, others use toString
                             when (v) {
-                                is JsonPrimitive -> v.contentOrNull ?: v.toString()
+                                is JsonPrimitive -> v.content
                                 else -> v.toString()
                             }
                         },
