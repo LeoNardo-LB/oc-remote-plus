@@ -555,7 +555,10 @@ class ChatViewModel @Inject constructor(
                         patterns = req.patterns,
                         metadata = req.metadata?.mapValues { (_, v) ->
                             // JsonElement → String: primitives use content, others use toString
-                            v.jsonPrimitive.contentOrNull ?: v.toString()
+                            when (v) {
+                                is JsonPrimitive -> v.contentOrNull ?: v.toString()
+                                else -> v.toString()
+                            }
                         },
                         always = req.always.isNotEmpty(), // List<String> → Boolean: non-empty means "always"
                         tool = req.tool
