@@ -18,8 +18,8 @@ android {
         applicationId = "dev.minios.ocremote"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20
-        versionName = "1.6.7"
+        versionCode = 200
+        versionName = "2.0.0-beta.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -46,8 +46,8 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
-            manifestPlaceholders["appLabel"] = "OC Remote Dev"
+            applicationIdSuffix = ".v2"
+            manifestPlaceholders["appLabel"] = "OC Remote v2"
         }
         release {
             manifestPlaceholders["appLabel"] = "@string/app_name"
@@ -143,7 +143,19 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("io.mockk:mockk:1.14.0")
+    testImplementation("app.cash.turbine:turbine:1.2.1")
+
+    // Force consistent Kotlin stdlib version to avoid compiler internal errors
+    // (some transitive deps pull in kotlin-stdlib 2.2.x which is incompatible with Kotlin 2.0.x)
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+            force("org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.21")
+            force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.21")
+        }
+    }
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(composeBom)
