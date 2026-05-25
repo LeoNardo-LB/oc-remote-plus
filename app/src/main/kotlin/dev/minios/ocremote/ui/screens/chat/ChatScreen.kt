@@ -118,6 +118,7 @@ import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.coil2.Coil2ImageTransformerImpl
 import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
+import com.mikepenz.markdown.model.markdownDimens
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.data.api.AgentInfo
 import dev.minios.ocremote.data.api.CommandInfo
@@ -166,7 +167,7 @@ import dev.minios.ocremote.ui.components.ProviderIcon
 val LocalChatFontSize = compositionLocalOf { "medium" }
 
 /** Whether code blocks use word wrap instead of horizontal scroll. */
-val LocalCodeWordWrap = compositionLocalOf { false }
+val LocalCodeWordWrap = compositionLocalOf { true }
 
 /** Whether compact message spacing is enabled. */
 val LocalCompactMessages = compositionLocalOf { false }
@@ -4261,9 +4262,20 @@ private fun MarkdownContent(
         )
     )
 
-    val components = markdownComponents(
-        codeBlock = highlightedCodeBlock,
-        codeFence = highlightedCodeFence
+    val wordWrap = LocalCodeWordWrap.current
+    val components = if (wordWrap) {
+        markdownComponents()
+    } else {
+        markdownComponents(
+            codeBlock = highlightedCodeBlock,
+            codeFence = highlightedCodeFence
+        )
+    }
+
+    val dimens = markdownDimens(
+        tableCellPadding = 6.dp,
+        tableCellWidth = 120.dp,
+        tableCornerSize = 4.dp
     )
 
     SelectionContainer {
@@ -4272,6 +4284,7 @@ private fun MarkdownContent(
             colors = colors,
             typography = typography,
             components = components,
+            dimens = dimens,
             imageTransformer = Coil2ImageTransformerImpl,
             modifier = Modifier.fillMaxWidth()
         )
