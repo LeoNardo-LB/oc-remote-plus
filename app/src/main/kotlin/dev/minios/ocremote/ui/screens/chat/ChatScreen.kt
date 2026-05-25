@@ -1374,6 +1374,10 @@ fun ChatScreen(
     // Disabled when user manually scrolls up; re-enabled when user scrolls back to bottom.
     var autoScrollEnabled by remember { mutableStateOf(true) }
 
+    // Track whether initial load scroll has been performed.
+    // Prevents re-scrolling to bottom when navigating back from a sub-session.
+    var hasPerformedInitialScroll by rememberSaveable { mutableStateOf(false) }
+
     // True when the very bottom of the list is visible (accounting for offset within tall items)
     val isAtBottom by remember {
         derivedStateOf {
@@ -1441,7 +1445,7 @@ fun ChatScreen(
     // Also auto-scroll when first loading
     LaunchedEffect(uiState.isLoading) {
         if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@LaunchedEffect
-        if (!uiState.isLoading && messageCount > 0) {
+        if (!uiState.isLoading && messageCount > 0 && !hasPerformedInitialScroll) {
             val lastIndex = listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1
             listState.scrollToItem(lastIndex)
             val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
@@ -1453,6 +1457,7 @@ fun ChatScreen(
                 }
             }
             autoScrollEnabled = true
+            hasPerformedInitialScroll = true
         }
     }
 
@@ -4643,6 +4648,34 @@ private fun ToolCallCard(tool: Part.Tool) {
                     modifier = Modifier.padding(top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Show input parameters
+                    if (input.isNotEmpty()) {
+                        val inputText = input.entries
+                            .filter { (_, v) -> v.toString().length <= 500 }
+                            .joinToString("\n") { (k, v) ->
+                                val value = v.jsonPrimitive.contentOrNull ?: v.toString().take(200)
+                                "$k: $value"
+                            }
+                        if (inputText.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = toolOutputContainerColor(isAmoled),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = inputText.take(2000),
+                                    style = CodeTypography.copy(
+                                        fontSize = 11.sp,
+                                        color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    ),
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .codeHorizontalScroll()
+                                )
+                            }
+                        }
+                    }
+
                     val output = when (val s = tool.state) {
                         is ToolState.Completed -> s.output
                         is ToolState.Error -> s.error
@@ -4788,9 +4821,13 @@ private fun resolveToolDisplay(
             )
         }
         else -> {
+            // MCP tools and other unknown tools
+            // Convert snake_case like "search_graph" → "Search Graph"
             val fallbackName = toolName.ifBlank { "Tool" }
+                .replace("_", " ").replace("-", " ")
+                .replaceFirstChar { it.uppercase() }
             ToolDisplayInfo(
-                title = serverTitle ?: fallbackName,
+                title = serverTitle?.takeIf { it.isNotBlank() } ?: fallbackName,
                 subtitle = null,
                 icon = Icons.Default.Build
             )
@@ -5214,6 +5251,7 @@ private fun BashToolCard(tool: Part.Tool) {
     val input = extractToolInput(tool)
     val command = input["command"]?.jsonPrimitive?.contentOrNull ?: ""
     val description = input["description"]?.jsonPrimitive?.contentOrNull
+    val agentName = input["agent"]?.jsonPrimitive?.contentOrNull
     val output = extractToolOutput(tool)
     val cleanedOutput = output.replace(Regex("\u001B\\[[0-9;]*[a-zA-Z]"), "")
     val displayText = buildString {
@@ -5345,7 +5383,7 @@ private fun BashToolCard(tool: Part.Tool) {
 }
 
 /**
- * Read tool card — shows file path only, no expandable content (like WebUI).
+ * Read tool card — shows "读取" title, file name subtitle, expandable for details.
  */
 @Composable
 private fun ReadToolCard(tool: Part.Tool) {
@@ -5357,12 +5395,6 @@ private fun ReadToolCard(tool: Part.Tool) {
     val offset = input["offset"]?.jsonPrimitive?.contentOrNull
     val limit = input["limit"]?.jsonPrimitive?.contentOrNull
 
-    val serverTitle = when (val s = tool.state) {
-        is ToolState.Running -> s.title
-        is ToolState.Completed -> s.title
-        else -> null
-    }
-
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
 
@@ -5372,6 +5404,12 @@ private fun ReadToolCard(tool: Part.Tool) {
         limit?.let { add("limit=$it") }
     }.takeIf { it.isNotEmpty() }?.joinToString(", ", "[", "]")
 
+    val autoExpand = LocalCollapseTools.current
+    val hapticView = LocalView.current
+    val hapticOn = LocalHapticFeedbackEnabled.current
+    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val isCompleted = tool.state is ToolState.Completed
+
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
@@ -5379,56 +5417,111 @@ private fun ReadToolCard(tool: Part.Tool) {
         tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column(modifier = Modifier.padding(8.dp)) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { mod ->
+                        if (isCompleted || isError) mod.clickable { performHaptic(hapticView, hapticOn); expanded = !expanded } else mod
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isError) Icons.Default.Error else Icons.Default.Description,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = serverTitle ?: stringResource(R.string.tool_read),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = if (isError) Icons.Default.Error else Icons.Default.Description,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (shortPath.isNotBlank()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.tool_read),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (shortPath.isNotBlank()) {
+                                Text(
+                                    text = shortPath,
+                                    style = CodeTypography.copy(fontSize = 11.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (args != null) {
+                                Text(
+                                    text = args,
+                                    style = CodeTypography.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+                if (isRunning) {
+                    PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
+                } else if (isCompleted || isError) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (filePath.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = toolOutputContainerColor(isAmoled),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
-                                text = shortPath,
-                                style = CodeTypography.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                text = filePath,
+                                style = CodeTypography.copy(
+                                    fontSize = 11.sp,
+                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                ),
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .codeHorizontalScroll()
                             )
                         }
-                        if (args != null) {
+                    }
+                    if (args != null) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = toolOutputContainerColor(isAmoled),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
                                 text = args,
-                                style = CodeTypography.copy(fontSize = 10.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                maxLines = 1
+                                style = CodeTypography.copy(
+                                    fontSize = 11.sp,
+                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                ),
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .codeHorizontalScroll()
                             )
                         }
                     }
                 }
-            }
-            if (isRunning) {
-                PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
             }
         }
     }
@@ -5580,6 +5673,7 @@ private fun TaskToolCard(
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val description = input["description"]?.jsonPrimitive?.contentOrNull
+    val agentName = input["agent"]?.jsonPrimitive?.contentOrNull
     val output = extractToolOutput(tool)
 
     val serverTitle = when (val s = tool.state) {
@@ -5637,7 +5731,9 @@ private fun TaskToolCard(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = serverTitle ?: stringResource(R.string.tool_sub_agent),
+                            text = serverTitle?.takeIf { it.isNotBlank() }
+                                ?: agentName?.let { "Agent: $it" }
+                                ?: stringResource(R.string.tool_sub_agent),
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
