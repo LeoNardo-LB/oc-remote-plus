@@ -1440,7 +1440,7 @@ fun ChatScreen(
 
     // Also auto-scroll when first loading
     LaunchedEffect(uiState.isLoading) {
-        if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@LaunchedEffect
         if (!uiState.isLoading && messageCount > 0) {
             val lastIndex = listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1
             listState.scrollToItem(lastIndex)
@@ -3735,12 +3735,14 @@ private fun ChatMessageBubble(
 
                     // Render remaining parts
                     for (part in renderableOtherParts) {
-                        PartContent(
-                            part = part,
-                            textColor = textColor,
-                            isUser = true,
-                            onViewSubSession = onViewSubSession
-                        )
+                        key(part.id) {
+                            PartContent(
+                                part = part,
+                                textColor = textColor,
+                                isUser = true,
+                                onViewSubSession = onViewSubSession
+                            )
+                        }
                     }
 
                     if (imageFiles.isEmpty() && renderableOtherParts.isEmpty() && userCommandLabel != null) {
@@ -3902,25 +3904,27 @@ private fun AssistantTurnBubble(
     }
 
     // Collect all renderable content from all messages in the turn
-    val allContent = messages.mapNotNull { msg ->
-        val parts = msg.parts
-        val assistantMsg = msg.message as? Message.Assistant ?: return@mapNotNull null
-        val errorText = formatAssistantErrorMessage(assistantMsg.error)
+    val allContent = remember(messages) {
+        messages.mapNotNull { msg ->
+            val parts = msg.parts
+            val assistantMsg = msg.message as? Message.Assistant ?: return@mapNotNull null
+            val errorText = formatAssistantErrorMessage(assistantMsg.error)
 
-        // Split into content and step parts (same logic as ChatMessageBubble)
-        val contentParts = parts.filter { part ->
-            part is Part.Text || part is Part.Reasoning || part is Part.Patch ||
-                    part is Part.File || part is Part.Permission || part is Part.Question ||
-                    part is Part.Abort || part is Part.Retry
-        }
-        val stepParts = parts.filter { part ->
-            part is Part.Tool || part is Part.StepStart || part is Part.StepFinish
-        }
+            // Split into content and step parts (same logic as ChatMessageBubble)
+            val contentParts = parts.filter { part ->
+                part is Part.Text || part is Part.Reasoning || part is Part.Patch ||
+                        part is Part.File || part is Part.Permission || part is Part.Question ||
+                        part is Part.Abort || part is Part.Retry
+            }
+            val stepParts = parts.filter { part ->
+                part is Part.Tool || part is Part.StepStart || part is Part.StepFinish
+            }
 
-        if (contentParts.isEmpty() && stepParts.isEmpty() && errorText == null) {
-            null
-        } else {
-            Triple(contentParts, stepParts, errorText to assistantMsg)
+            if (contentParts.isEmpty() && stepParts.isEmpty() && errorText == null) {
+                null
+            } else {
+                Triple(contentParts, stepParts, errorText to assistantMsg)
+            }
         }
     }
 
@@ -4004,12 +4008,14 @@ private fun AssistantTurnBubble(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             for (part in stepParts) {
-                                PartContent(
-                                    part = part,
-                                    textColor = textColor,
-                                    isUser = false,
-                                    onViewSubSession = onViewSubSession
-                                )
+                                key(part.id) {
+                                    PartContent(
+                                        part = part,
+                                        textColor = textColor,
+                                        isUser = false,
+                                        onViewSubSession = onViewSubSession
+                                    )
+                                }
                             }
                         }
                     }
@@ -4027,12 +4033,14 @@ private fun AssistantTurnBubble(
                     }
 
                     for (part in renderableOtherParts) {
-                        PartContent(
-                            part = part,
-                            textColor = textColor,
-                            isUser = false,
-                            onViewSubSession = onViewSubSession
-                        )
+                        key(part.id) {
+                            PartContent(
+                                part = part,
+                                textColor = textColor,
+                                isUser = false,
+                                onViewSubSession = onViewSubSession
+                            )
+                        }
                     }
 
                     // Error display
@@ -4337,15 +4345,17 @@ private fun MarkdownContent(
         lineHeight = bodyLineHeight
     )
 
+    val linkColor = when {
+        isAmoled -> MaterialTheme.colorScheme.primary
+        isUser -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.primary
+    }
+
     val colors = markdownColor(
         text = textColor,
         codeText = codeBlockFg,
         inlineCodeText = inlineCodeFg,
-        linkText = when {
-            isAmoled -> MaterialTheme.colorScheme.primary
-            isUser -> MaterialTheme.colorScheme.onPrimaryContainer
-            else -> MaterialTheme.colorScheme.primary
-        },
+        linkText = linkColor,
         codeBackground = codeBlockBg,
         inlineCodeBackground = Color.Transparent,
         dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -4395,7 +4405,7 @@ private fun MarkdownContent(
         bullet = bodyStyle,
         list = bodyStyle,
         link = bodyStyle.copy(
-            color = MaterialTheme.colorScheme.primary,
+            color = linkColor,
             fontWeight = FontWeight.Medium
         )
     )
@@ -5603,7 +5613,13 @@ private fun TaskToolCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .let { mod ->
-                        if (hasOutput && !isRunning) mod.clickable { performHaptic(hapticView, hapticOn); expanded = !expanded } else mod
+                        when {
+                            subSessionId != null && onViewSubSession != null && !isRunning ->
+                                mod.clickable { performHaptic(hapticView, hapticOn); onViewSubSession(subSessionId) }
+                            hasOutput && !isRunning ->
+                                mod.clickable { performHaptic(hapticView, hapticOn); expanded = !expanded }
+                            else -> mod
+                        }
                     },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -5638,6 +5654,13 @@ private fun TaskToolCard(
                 }
                 if (isRunning) {
                     PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
+                } else if (subSessionId != null && onViewSubSession != null) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 } else if (hasOutput) {
                     Icon(
                         imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -5667,29 +5690,6 @@ private fun TaskToolCard(
                             isUser = false
                         )
                     }
-                }
-            }
-
-            // "查看详情" button — only shown when sub-session exists and callback is provided
-            if (subSessionId != null && onViewSubSession != null) {
-                TextButton(
-                    onClick = { onViewSubSession(subSessionId) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = stringResource(R.string.chat_view_details),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
                 }
             }
         }
