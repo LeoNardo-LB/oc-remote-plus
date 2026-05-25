@@ -4664,8 +4664,9 @@ private fun resolveToolDisplay(
             )
         }
         else -> {
+            val fallbackName = toolName.ifBlank { "Tool" }
             ToolDisplayInfo(
-                title = serverTitle ?: toolName,
+                title = serverTitle ?: fallbackName,
                 subtitle = null,
                 icon = Icons.Default.Build
             )
