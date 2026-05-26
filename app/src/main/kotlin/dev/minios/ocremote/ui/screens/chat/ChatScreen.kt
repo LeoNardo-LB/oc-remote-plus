@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1393,6 +1394,17 @@ fun ChatScreen(
         }
     }
 
+    // 键盘弹出时，如果用户在底部（autoScrollEnabled），滚动到最新消息
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && autoScrollEnabled) {
+            delay(100)
+            val lastIndex = listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1
+            if (lastIndex >= 0) {
+                listState.animateScrollToItem(lastIndex)
+            }
+        }
+    }
+
 
     // Auto-scroll to bottom when new content arrives (only if auto-scroll is enabled)
     // Track message count, part count, and content length of the last part to catch streaming updates
@@ -1994,6 +2006,7 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
             when {
                 isTerminalMode -> {
@@ -3839,7 +3852,15 @@ private fun ChatMessageBubble(
                 bubbleContent()
             }
         } else {
-            bubbleContent()
+            // Provide pointer-input isolation boundary to prevent Markdown library's
+            // pointerInput handlers (link handling, code background) from leaking
+            // into LazyColumn's pointer scope and intercepting clicks on sibling
+            // tool cards. In main sessions, SwipeToDismissBox provides this isolation.
+            Box(modifier = Modifier.pointerInput(Unit) {
+                // Intentionally empty — only creates a pointer-input scope boundary
+            }) {
+                bubbleContent()
+            }
         }
     }
 }
@@ -4364,35 +4385,29 @@ private fun MarkdownContent(
         tableMaxWidth = screenWidthDp * 1.5f
     )
 
-    // NOTE: SelectionContainer intentionally removed for assistant messages.
+    // NOTE: SelectionContainer intentionally removed for ALL messages.
     // The selectableGroup() pointer-input handler inside SelectionContainer
     // interferes with click handling on subsequent sibling composables (tool
     // cards, expand/collapse rows) inside the same Column when the Markdown
-    // content undergoes async Loading→Success transitions.  Text can still be
-    // copied via the "Copy" button in the bubble header.
-    if (isUser) {
-        SelectionContainer {
-            Markdown(
-                content = normalizedMarkdown,
-                colors = colors,
-                typography = typography,
-                components = components,
-                dimens = dimens,
-                imageTransformer = Coil2ImageTransformerImpl,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    } else {
-        Markdown(
-            content = normalizedMarkdown,
-            colors = colors,
-            typography = typography,
-            components = components,
-            dimens = dimens,
-            imageTransformer = Coil2ImageTransformerImpl,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
+    // content undergoes async Loading→Success transitions.
+    //
+    // This was originally only removed for assistant messages, but the same
+    // interference occurs for user messages in sub-sessions where the
+    // SwipeToDismissBox wrapper is absent (onRevert == null). Without that
+    // isolation layer, the SelectionContainer's pointer-input handler leaks
+    // into the LazyColumn's pointer scope and blocks clicks on tool cards in
+    // adjacent AssistantTurnBubble items.
+    //
+    // Text can still be copied via the "Copy" button in the bubble header.
+    Markdown(
+        content = normalizedMarkdown,
+        colors = colors,
+        typography = typography,
+        components = components,
+        dimens = dimens,
+        imageTransformer = Coil2ImageTransformerImpl,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 private val HtmlDocumentHintRegex = Regex("(?is)<!doctype\\s+html\\b|<\\s*html\\b")
