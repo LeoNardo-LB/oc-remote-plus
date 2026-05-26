@@ -204,7 +204,7 @@ class EventReducer @Inject constructor() {
                 sessionMessages[existingIndex] = event.info
             } else {
                 sessionMessages.add(event.info)
-                sessionMessages.sortBy { it.time.toString() } // Sort by time
+                sessionMessages.sortByDescending { it.time.created } // Sort by time (newest first)
             }
             
             current + (sessionId to sessionMessages)
@@ -415,7 +415,7 @@ class EventReducer @Inject constructor() {
      * Load messages for a session
      */
     fun setMessages(sessionId: String, messages: List<MessageWithParts>) {
-        _messages.update { it + (sessionId to messages.map { msg -> msg.info }) }
+        _messages.update { it + (sessionId to messages.map { msg -> msg.info }.sortedByDescending { m -> m.time.created }) }
         
         val partsMap = messages.associate { msg ->
             msg.info.id to msg.parts

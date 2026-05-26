@@ -1370,7 +1370,7 @@ fun ChatScreen(
     var autoScrollEnabled by remember { mutableStateOf(true) }
 
     // Scroll anchor for restoring position after loading older messages.
-    var savedFirstVisibleIndex by remember { mutableIntStateOf(0) }
+    var savedFirstVisibleMessageId by remember { mutableStateOf<String?>(null) }
     var savedScrollOffset by remember { mutableIntStateOf(0) }
     var savedMessageCount by remember { mutableIntStateOf(0) }
     // Guard flag: true from the moment we save scroll position until restoration
@@ -1400,8 +1400,8 @@ fun ChatScreen(
     // Auto-scroll to bottom when new content arrives (only if auto-scroll is enabled)
     // Track message count, part count, and content length of the last part to catch streaming updates
     val messageCount = uiState.messages.size
-    val lastPartCount = uiState.messages.lastOrNull()?.parts?.size ?: 0
-    val lastContentLength = uiState.messages.lastOrNull()?.parts?.lastOrNull()?.let { part ->
+    val lastPartCount = uiState.messages.firstOrNull()?.parts?.size ?: 0
+    val lastContentLength = uiState.messages.firstOrNull()?.parts?.lastOrNull()?.let { part ->
         when (part) {
             is Part.Text -> part.text.length
             is Part.Reasoning -> part.text.length
@@ -1429,9 +1429,10 @@ fun ChatScreen(
     // Restore scroll position after loading older messages
     LaunchedEffect(uiState.isLoadingOlder) {
         if (!uiState.isLoadingOlder && savedMessageCount > 0) {
-            // With reverseLayout=true + reversed data, prepended old messages go to
-            // the END of the reversed list, so existing items keep their indices.
-            listState.scrollToItem(savedFirstVisibleIndex, savedScrollOffset)
+            val targetIndex = savedFirstVisibleMessageId?.let { id ->
+                groupMessages(uiState.messages).indexOfFirst { it.key == id }.coerceAtLeast(0)
+            } ?: 0
+            listState.scrollToItem(targetIndex, savedScrollOffset)
             savedMessageCount = 0
             isRestoringPosition = false
         }
@@ -2385,9 +2386,9 @@ fun ChatScreen(
                              }
                          }
 
-                         // Chat messages (reversed so index 0 = newest = at the bottom)
-                         items(
-                             chatItems.reversed(),
+                          // Chat messages (index 0 = newest = at the bottom with reverseLayout)
+                          items(
+                              chatItems,
                             key = { it.key },
                             contentType = { chatItem ->
                                 when (chatItem) {
@@ -2547,14 +2548,14 @@ fun ChatScreen(
                                              )
                                          }
                                      } else {
-                                         TextButton(onClick = {
-                                             // Save scroll position before loading older messages
-                                             savedFirstVisibleIndex = listState.firstVisibleItemIndex
-                                             savedScrollOffset = listState.firstVisibleItemScrollOffset
-                                             savedMessageCount = uiState.messages.size
-                                             isRestoringPosition = true
-                                             viewModel.loadOlderMessages()
-                                         }) {
+                                          TextButton(onClick = {
+                                              // Save scroll position before loading older messages
+                                              savedFirstVisibleMessageId = chatItems.getOrNull(listState.firstVisibleItemIndex)?.key
+                                              savedScrollOffset = listState.firstVisibleItemScrollOffset
+                                              savedMessageCount = uiState.messages.size
+                                              isRestoringPosition = true
+                                              viewModel.loadOlderMessages()
+                                          }) {
                                              Text(stringResource(R.string.chat_load_earlier))
                                          }
                                      }
@@ -2646,9 +2647,9 @@ fun ChatScreen(
                                     }
                                 }
 
-                                // Chat messages (reversed so index 0 = newest = at the bottom)
+                                // Chat messages (index 0 = newest = at the bottom with reverseLayout)
                                 items(
-                                    chatItems.reversed(),
+                                    chatItems,
                                     key = { it.key },
                                     contentType = { chatItem ->
                                         when (chatItem) {
@@ -2795,13 +2796,13 @@ fun ChatScreen(
                                                     )
                                                 }
                                             } else {
-                                                TextButton(onClick = {
-                                                    savedFirstVisibleIndex = listState.firstVisibleItemIndex
-                                                    savedScrollOffset = listState.firstVisibleItemScrollOffset
-                                                    savedMessageCount = uiState.messages.size
-                                                    isRestoringPosition = true
-                                                    viewModel.loadOlderMessages()
-                                                }) {
+                                                 TextButton(onClick = {
+                                                     savedFirstVisibleMessageId = chatItems.getOrNull(listState.firstVisibleItemIndex)?.key
+                                                     savedScrollOffset = listState.firstVisibleItemScrollOffset
+                                                     savedMessageCount = uiState.messages.size
+                                                     isRestoringPosition = true
+                                                     viewModel.loadOlderMessages()
+                                                 }) {
                                                     Text(stringResource(R.string.chat_load_earlier))
                                                 }
                                             }
@@ -6904,7 +6905,7 @@ private fun ChatInputBar(
         val showContext = contextWindow > 0 && lastContextTokens > 0
         if (isBusy || showContext) {
             val lastRunningTool = if (isBusy) {
-                messages.lastOrNull()?.parts
+                messages.firstOrNull()?.parts
                     ?.filterIsInstance<Part.Tool>()
                     ?.lastOrNull { it.state is ToolState.Running }
             } else null

@@ -32,7 +32,7 @@ internal fun groupMessages(messages: List<ChatMessage>): List<ChatItem> {
         if (currentAssistantGroup.isNotEmpty()) {
             items.add(ChatItem.AssistantTurn(
                 key = "turn_${currentAssistantGroup.first().message.id}",
-                messages = currentAssistantGroup.toList()
+                messages = currentAssistantGroup.reversed()
             ))
             currentAssistantGroup = mutableListOf()
         }

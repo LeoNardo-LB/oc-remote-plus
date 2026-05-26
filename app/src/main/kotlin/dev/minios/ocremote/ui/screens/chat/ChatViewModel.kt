@@ -273,7 +273,7 @@ class ChatViewModel @Inject constructor(
             // Likely only SSE-provided messages; wait for REST to complete
             emptyList()
         } else {
-            val sorted = sessionMessages.sortedBy { it.time.created }
+            val sorted = sessionMessages.sortedByDescending { it.time.created }
             // Filter out reverted messages (at or after revert point)
             val visible = if (revertState != null) {
                 sorted.filter { it.id < revertState.messageId }
@@ -296,7 +296,7 @@ class ChatViewModel @Inject constructor(
         if (!isModelExplicitlySelected) {
              val lastUserWithModel = sessionMessages
                 .filterIsInstance<Message.User>()
-                .lastOrNull { it.model != null }
+                .firstOrNull { it.model != null }
              if (lastUserWithModel?.model != null) {
                  effectiveProviderId = lastUserWithModel.model.providerId
                  effectiveModelId = lastUserWithModel.model.modelId
@@ -312,7 +312,7 @@ class ChatViewModel @Inject constructor(
         val effectiveAgent = if (!isAgentExplicitlySelected) {
             val lastUserAgent = sessionMessages
                 .filterIsInstance<Message.User>()
-                .lastOrNull { it.agent != null }
+                .firstOrNull { it.agent != null }
                 ?.agent
             lastUserAgent ?: selectedAgent
         } else {
@@ -330,7 +330,7 @@ class ChatViewModel @Inject constructor(
         val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
         val totalOutputTokens = assistantMessages.sumOf { it.tokens?.output ?: 0 }
         // Context usage: total tokens from the last assistant message with output > 0
-        val lastWithOutput = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
+        val lastWithOutput = assistantMessages.firstOrNull { (it.tokens?.output ?: 0) > 0 }
         val lastContextTokens = lastWithOutput?.tokens?.let { t ->
             t.input + t.output + t.reasoning + t.cache.read + t.cache.write
         } ?: 0
@@ -353,11 +353,11 @@ class ChatViewModel @Inject constructor(
         val availableVariants = currentModel?.variants?.keys?.toList()?.sorted() ?: emptyList()
 
         // Compute queued message IDs: messages sent while assistant is still generating
-        val pendingAssistantIndex = chatMessages.indexOfLast {
+        val pendingAssistantIndex = chatMessages.indexOfFirst {
             it.message is Message.Assistant && it.message.time.completed == null
         }
         val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-            chatMessages.drop(pendingAssistantIndex + 1)
+            chatMessages.take(pendingAssistantIndex)
                 .filter { it.isUser }
                 .map { it.message.id }
                 .toSet()
@@ -1052,7 +1052,7 @@ class ChatViewModel @Inject constructor(
             try {
                 // Find the last user message (before any existing revert point)
                 val messages = uiState.value.messages
-                val lastUser = messages.lastOrNull { it.isUser }
+                val lastUser = messages.firstOrNull { it.isUser }
                 if (lastUser == null) {
                     onResult(false)
                     return@launch
@@ -1076,7 +1076,7 @@ class ChatViewModel @Inject constructor(
                 api.revertSession(conn, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
                 val targetMessage = uiState.value.messages
-                    .lastOrNull { it.message.id == messageId && it.isUser }
+                    .firstOrNull { it.message.id == messageId && it.isUser }
                 val fallbackPayload = RevertedDraftPayload(text = revertedText.orEmpty())
                 restoreRevertedDraft(targetMessage?.let { extractRevertedDraft(it) } ?: fallbackPayload)
                 onResult(true)
@@ -1312,7 +1312,7 @@ class ChatViewModel @Inject constructor(
     /** Get the last assistant message text for copying. */
     fun getLastAssistantText(): String? {
         val msgs = uiState.value.messages
-        val last = msgs.lastOrNull { it.isAssistant } ?: return null
+        val last = msgs.firstOrNull { it.isAssistant } ?: return null
         return last.parts
             .filterIsInstance<Part.Text>()
             .joinToString("") { it.text }
