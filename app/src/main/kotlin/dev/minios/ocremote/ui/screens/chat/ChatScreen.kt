@@ -1493,7 +1493,7 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = uiState.sessionAgent?.let { "Agent: $it" } ?: stringResource(R.string.chat_child_session),
+                                    text = stringResource(R.string.chat_child_session),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                 )
@@ -3900,6 +3900,21 @@ private fun AssistantTurnBubble(
         }
     }
 
+    // Extract agent names from Part.Agent in each message's full parts list
+    // Map: part.id -> agentName (for task tools to look up sibling agent names)
+    val taskAgentNames = remember(messages) {
+        val result = mutableMapOf<String, String?>()
+        for (msg in messages) {
+            val agentParts = msg.parts.filterIsInstance<Part.Agent>()
+            val agentName = agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
+            // Find all task tool parts in this message and associate with agentName
+            msg.parts.filterIsInstance<Part.Tool>().filter { it.tool == "task" }.forEach { taskPart ->
+                result[taskPart.id] = agentName
+            }
+        }
+        result
+    }
+
     if (allContent.isEmpty()) return
 
     // Use the first message's assistant info for the header
@@ -3981,7 +3996,8 @@ private fun AssistantTurnBubble(
                                 part = part,
                                 textColor = textColor,
                                 isUser = false,
-                                onViewSubSession = onViewSubSession
+                                onViewSubSession = onViewSubSession,
+                                turnAgentName = if (part is Part.Tool && part.tool == "task") taskAgentNames[part.id] else null
                             )
                         }
                     }
@@ -4109,7 +4125,8 @@ private fun PartContent(
     part: Part,
     textColor: Color,
     isUser: Boolean = false,
-    onViewSubSession: ((String) -> Unit)? = null
+    onViewSubSession: ((String) -> Unit)? = null,
+    turnAgentName: String? = null
 ) {
     when (part) {
         is Part.Text -> {
@@ -4141,7 +4158,7 @@ private fun PartContent(
                     "bash" -> BashToolCard(tool = part)
                     "read" -> ReadToolCard(tool = part)
                     "glob", "grep" -> SearchToolCard(tool = part)
-                    "task" -> TaskToolCard(tool = part, onViewSubSession = onViewSubSession)
+                    "task" -> TaskToolCard(tool = part, onViewSubSession = onViewSubSession, turnAgentName = turnAgentName)
                     else -> ToolCallCard(tool = part)
                 }
             }
@@ -5605,7 +5622,8 @@ private fun SearchToolCard(tool: Part.Tool) {
 @Composable
 private fun TaskToolCard(
     tool: Part.Tool,
-    onViewSubSession: ((String) -> Unit)? = null
+    onViewSubSession: ((String) -> Unit)? = null,
+    turnAgentName: String? = null
 ) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
@@ -5616,7 +5634,7 @@ private fun TaskToolCard(
         is ToolState.Running -> s.metadata?.get("agent")?.jsonPrimitive?.contentOrNull
         else -> null
     }
-    val agentName = inputAgentName ?: metadataAgentName
+    val agentName = inputAgentName ?: metadataAgentName ?: turnAgentName
     val output = extractToolOutput(tool)
 
     val serverTitle = when (val s = tool.state) {
