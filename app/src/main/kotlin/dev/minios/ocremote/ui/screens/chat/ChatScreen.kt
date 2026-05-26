@@ -1697,7 +1697,8 @@ fun ChatScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
+                .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
             when {
                 isTerminalMode -> {
@@ -2333,6 +2334,7 @@ fun ChatScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
                             .navigationBarsPadding()
                             .imePadding()
                             .onSizeChanged { size -> inputBarHeightPx = size.height }

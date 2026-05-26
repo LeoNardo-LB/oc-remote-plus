@@ -14,13 +14,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.data.repository.ServerRepository
@@ -152,17 +148,6 @@ class MainActivity : ComponentActivity() {
             }
             
             OpenCodeTheme(darkTheme = darkTheme, dynamicColor = dynamicColor, amoledDark = amoledDark) {
-                
-                // Set status bar color based on theme
-                SideEffect {
-                    val window = this.window
-                    window.statusBarColor = Color.Transparent.toArgb()
-                    window.navigationBarColor = Color.Transparent.toArgb()
-                    
-                    val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-                    insetsController.isAppearanceLightStatusBars = !darkTheme
-                    insetsController.isAppearanceLightNavigationBars = !darkTheme
-                }
                 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
