@@ -879,24 +879,6 @@ fun ChatScreen(
     }
     val listState = rememberLazyListState()
 
-    // Preserve scroll position when loading older messages
-    val previousMessageCount = remember { mutableIntStateOf(0) }
-    val wasLoadingOlder = remember { mutableStateOf(false) }
-
-    LaunchedEffect(uiState.isLoadingOlder) {
-        if (uiState.isLoadingOlder) {
-            wasLoadingOlder.value = true
-            previousMessageCount.intValue = uiState.messages.size
-        } else if (wasLoadingOlder.value) {
-            wasLoadingOlder.value = false
-            val newCount = uiState.messages.size
-            val addedCount = newCount - previousMessageCount.intValue
-            if (addedCount > 0) {
-                listState.scrollToItem(listState.firstVisibleItemIndex + addedCount)
-            }
-        }
-    }
-
     var showModelPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -1441,7 +1423,8 @@ fun ChatScreen(
             val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
             if (lastItem != null) {
                 val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                val overflow = lastItem.size - viewport
+                val bottomPaddingPx = with(density) { 8.dp.roundToPx() }
+                val overflow = lastItem.size + bottomPaddingPx - viewport
                 if (overflow > 0) {
                     listState.scrollBy(overflow.toFloat())
                 }
@@ -1458,7 +1441,8 @@ fun ChatScreen(
             val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
             if (lastItem != null) {
                 val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                val overflow = lastItem.size - viewport
+                val bottomPaddingPx = with(density) { 8.dp.roundToPx() }
+                val overflow = lastItem.size + bottomPaddingPx - viewport
                 if (overflow > 0) {
                     listState.scrollBy(overflow.toFloat())
                 }
@@ -1509,7 +1493,7 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = stringResource(R.string.chat_child_session),
+                                    text = uiState.sessionAgent?.let { "Agent: $it" } ?: stringResource(R.string.chat_child_session),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                 )
@@ -1556,6 +1540,7 @@ fun ChatScreen(
                             )
                         }
                     }
+                    if (uiState.sessionParentId == null) {
                     IconButton(onClick = { isTerminalMode = true }) {
                         Icon(
                             imageVector = Icons.Default.Terminal,
@@ -1716,6 +1701,7 @@ fun ChatScreen(
                             )
                         }
                     }
+                    } // end if (sessionParentId == null)
                 }
             )
             }
@@ -2326,6 +2312,11 @@ fun ChatScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
+                uiState.isLoading && uiState.messages.isNotEmpty() && !hasPerformedInitialScroll -> {
+                    PulsingDotsIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
                 uiState.error != null && uiState.messages.isEmpty() -> {
                     Column(
                         modifier = Modifier
@@ -2608,7 +2599,8 @@ fun ChatScreen(
                                     val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
                                     if (lastItem != null) {
                                         val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                                        val overflow = lastItem.size - viewport
+                                        val bottomPaddingPx = with(density) { 8.dp.roundToPx() }
+                                        val overflow = lastItem.size + bottomPaddingPx - viewport
                                         if (overflow > 0) {
                                             listState.scrollBy(overflow.toFloat())
                                         }
@@ -5492,9 +5484,9 @@ private fun SearchToolCard(tool: Part.Tool) {
     }
 
     val title = when (tool.tool) {
-        "glob" -> serverTitle ?: stringResource(R.string.tool_find_files)
-        "grep" -> serverTitle ?: stringResource(R.string.tool_search_code)
-        else -> serverTitle ?: tool.tool
+        "glob" -> serverTitle?.takeIf { it.isNotBlank() } ?: stringResource(R.string.tool_find_files)
+        "grep" -> serverTitle?.takeIf { it.isNotBlank() } ?: stringResource(R.string.tool_search_code)
+        else -> serverTitle?.takeIf { it.isNotBlank() } ?: tool.tool
     }
 
     // Build args display
@@ -5676,20 +5668,13 @@ private fun TaskToolCard(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = serverTitle?.takeIf { it.isNotBlank() }
+                            text = agentName?.let { "Agent: $it" }
+                                ?: serverTitle?.takeIf { it.isNotBlank() }
                                 ?: stringResource(R.string.tool_sub_agent),
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
-                        if (agentName != null) {
-                            Text(
-                                text = "Agent: $agentName",
-                                style = CodeTypography.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        } else if (description != null) {
+                        if (agentName == null && description != null) {
                             Text(
                                 text = description,
                                 style = CodeTypography.copy(fontSize = 11.sp),
