@@ -1480,7 +1480,7 @@ fun ChatScreen(
                 title = {
                     Column {
                         Text(
-                            text = uiState.sessionTitle,
+                            text = uiState.sessionTitle.ifBlank { stringResource(R.string.chat_title_placeholder) },
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

@@ -366,7 +366,7 @@ class ChatViewModel @Inject constructor(
         }
 
         ChatUiState(
-            sessionTitle = session?.title ?: "Chat",
+            sessionTitle = session?.title ?: "",
             serverName = serverName,
             messages = chatMessages,
             revert = revertState,
@@ -456,6 +456,10 @@ class ChatViewModel @Inject constructor(
                 sessionDirectory = session.directory
                 if (BuildConfig.DEBUG) Log.d(TAG, "Session directory: ${session.directory}")
             }
+            // Inject the REST-loaded session into the reducer so that title, parentId,
+            // cost, tokens etc. are immediately available even before SSE delivers them.
+            // This is critical for sub-sessions which may not be in the SSE session list.
+            eventReducer.setSessions(serverId, listOf(session))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load session info", e)
         } finally {
