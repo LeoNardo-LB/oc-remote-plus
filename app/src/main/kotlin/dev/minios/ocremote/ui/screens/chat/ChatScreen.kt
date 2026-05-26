@@ -1713,7 +1713,7 @@ fun ChatScreen(
                 model?.name ?: uiState.selectedModelId ?: ""
             } else ""
 
-            if (!isTerminalMode) {
+            if (uiState.sessionParentId == null && !isTerminalMode) {
             ChatInputBar(
                 textFieldValue = inputText,
                 onTextFieldValueChange = { newValue ->
@@ -5610,7 +5610,13 @@ private fun TaskToolCard(
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val description = input["description"]?.jsonPrimitive?.contentOrNull
-    val agentName = input["agent"]?.jsonPrimitive?.contentOrNull
+    val inputAgentName = input["agent"]?.jsonPrimitive?.contentOrNull
+    val metadataAgentName = when (val s = tool.state) {
+        is ToolState.Completed -> s.metadata?.get("agent")?.jsonPrimitive?.contentOrNull
+        is ToolState.Running -> s.metadata?.get("agent")?.jsonPrimitive?.contentOrNull
+        else -> null
+    }
+    val agentName = inputAgentName ?: metadataAgentName
     val output = extractToolOutput(tool)
 
     val serverTitle = when (val s = tool.state) {
