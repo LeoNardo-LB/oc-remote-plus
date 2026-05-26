@@ -1693,308 +1693,11 @@ fun ChatScreen(
             )
             }
         },
-        bottomBar = {
-            val modelLabel = if (uiState.selectedModelId != null && uiState.providers.isNotEmpty()) {
-                val provider = uiState.providers.find { it.id == uiState.selectedProviderId }
-                val model = provider?.models?.get(uiState.selectedModelId)
-                model?.name ?: uiState.selectedModelId ?: ""
-            } else ""
-
-            if (uiState.sessionParentId == null && !isTerminalMode) {
-            ChatInputBar(
-                textFieldValue = inputText,
-                onTextFieldValueChange = { newValue ->
-                    val shouldAutoShell = !isShellMode && newValue.text.startsWith("!")
-                    val normalizedValue = if (shouldAutoShell) {
-                        val stripped = newValue.text.drop(1).trimStart()
-                        val newCursor = (newValue.selection.start - 1).coerceAtLeast(0)
-                        TextFieldValue(
-                            text = stripped,
-                            selection = TextRange(newCursor.coerceAtMost(stripped.length))
-                        )
-                    } else {
-                        newValue
-                    }
-
-                    if (shouldAutoShell) {
-                        inputMode = ChatInputMode.SHELL.name
-                    }
-
-                    inputText = normalizedValue
-                    viewModel.updateDraftText(normalizedValue.text)
-                    if (isShellMode || shouldAutoShell) {
-                        viewModel.clearFileSearch()
-                        return@ChatInputBar
-                    }
-                    // Detect @query before cursor for file mention
-                    val cursorPos = normalizedValue.selection.start
-                    val textBefore = normalizedValue.text.substring(0, cursorPos)
-                    val atMatch = Regex("@(\\S*)$").find(textBefore)
-                    if (atMatch != null) {
-                        val query = atMatch.groupValues[1]
-                        viewModel.searchFilesForMention(query)
-                    } else {
-                        viewModel.clearFileSearch()
-                    }
-                },
-                onSend = {
-                    val doSend = doSend@{
-                        if (hapticEnabled) {
-                            @Suppress("DEPRECATION")
-                            val flags = android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING or
-                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM, flags)
-                            } else {
-                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK, flags)
-                            }
-                        }
-                        val rawText = inputText.text
-                        val shellCommand = when {
-                            isShellMode -> rawText.trim()
-                            rawText.startsWith("!") -> rawText.drop(1).trimStart()
-                            else -> null
-                        }
-                        if (shellCommand != null) {
-                            if (shellCommand.isBlank()) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_shell_empty))
-                                }
-                                return@doSend
-                            }
-                            if (attachments.isNotEmpty()) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_shell_attachments_unsupported))
-                                }
-                                return@doSend
-                            }
-                            viewModel.runShellCommand(shellCommand) { ok ->
-                                if (!ok) {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_shell_failed))
-                                    }
-                                }
-                            }
-                            inputText = TextFieldValue("")
-                            if (isShellMode) {
-                                inputMode = ChatInputMode.NORMAL.name
-                            }
-                            viewModel.clearConfirmedPaths()
-                            viewModel.clearFileSearch()
-                            viewModel.clearDraft()
-                            return@doSend
-                        }
-                        // Detect slash commands (e.g., /skillname arguments)
-                        if (rawText.startsWith("/") && !rawText.startsWith("/ ") && confirmedFilePaths.isEmpty()) {
-                            val parts = rawText.trim().split("\\s+".toRegex(), 2)
-                            val commandName = parts[0].removePrefix("/")
-                            val commandArgs = parts.getOrElse(1) { "" }
-                            if (commandName.isNotBlank()) {
-                                viewModel.executeCommand(commandName, commandArgs) { ok ->
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            if (ok) context.getString(R.string.chat_command_executed, commandName)
-                                            else context.getString(R.string.chat_command_failed, commandName)
-                                        )
-                                    }
-                                }
-                                inputText = TextFieldValue("")
-                                if (isShellMode) {
-                                    inputMode = ChatInputMode.NORMAL.name
-                                }
-                                viewModel.clearConfirmedPaths()
-                                viewModel.clearFileSearch()
-                                viewModel.clearDraft()
-                                return@doSend
-                            }
-                        }
-                        // Build prompt parts: split text around confirmed @file mentions
-                        val allParts = buildPromptParts(rawText, confirmedFilePaths, viewModel.getSessionDirectory())
-                        // Add image attachments
-                        val attachmentParts = attachments.map { att ->
-                            PromptPart(
-                                type = "file",
-                                mime = att.mime,
-                                url = att.dataUrl,
-                                filename = att.filename
-                            )
-                        }
-                        viewModel.sendMessage(allParts, attachmentParts)
-                        inputText = TextFieldValue("")
-                        attachments.clear()
-                        viewModel.clearConfirmedPaths()
-                        viewModel.clearFileSearch()
-                        viewModel.clearDraft()
-                    }
-                    if (confirmBeforeSend) {
-                        pendingSendAction = doSend
-                        showSendConfirmDialog = true
-                    } else {
-                        doSend()
-                    }
-                },
-                inputMode = if (isShellMode) ChatInputMode.SHELL else ChatInputMode.NORMAL,
-                onInputModeChange = {
-                    inputMode = it.name
-                    if (it == ChatInputMode.SHELL) {
-                        viewModel.clearFileSearch()
-                    }
-                },
-                isSending = uiState.isSending,
-                isBusy = uiState.sessionStatus is SessionStatus.Busy,
-                messages = uiState.messages,
-                attachments = attachments,
-                onAttach = { imagePickerLauncher.launch("image/*") },
-                onRemoveAttachment = { index ->
-                    if (index in attachments.indices) {
-                        attachments.removeAt(index)
-                        viewModel.removeDraftAttachment(index)
-                    }
-                },
-                onSaveAttachment = { bytes, mime, filename ->
-                    requestSaveImage(bytes, mime, filename)
-                },
-                modelLabel = modelLabel,
-                selectedProviderId = uiState.selectedProviderId,
-                onModelClick = { showModelPicker = true },
-                agents = uiState.agents,
-                selectedAgent = uiState.selectedAgent,
-                onAgentSelect = { viewModel.selectAgent(it) },
-                variantNames = uiState.variantNames,
-                selectedVariant = uiState.selectedVariant,
-                onCycleVariant = { viewModel.cycleVariant() },
-                commands = uiState.commands,
-                fileSearchResults = fileSearchResults,
-                confirmedFilePaths = confirmedFilePaths,
-                onFileSelected = { path ->
-                    // Replace @query with @path in text
-                    val cursorPos = inputText.selection.start
-                    val textBefore = inputText.text.substring(0, cursorPos)
-                    val atMatch = Regex("@(\\S*)$").find(textBefore)
-                    if (atMatch != null) {
-                        val matchStart = atMatch.range.first
-                        val replacement = "@$path "
-                        val newText = inputText.text.substring(0, matchStart) + replacement +
-                                inputText.text.substring(cursorPos)
-                        val newCursor = matchStart + replacement.length
-                        inputText = TextFieldValue(
-                            text = newText,
-                            selection = TextRange(newCursor)
-                        )
-                    }
-                    viewModel.confirmFilePath(path)
-                    viewModel.clearFileSearch()
-                },
-                onSlashCommand = { cmd ->
-                    when (cmd.name) {
-                        "new" -> {
-                            // Create a new session and navigate to it
-                            viewModel.createNewSession { session ->
-                                if (session != null) {
-                                    onNavigateToSession(session.id)
-                                } else {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_session_create_failed))
-                                    }
-                                }
-                            }
-                        }
-                        "compact" -> {
-                            viewModel.compactSession { ok ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (ok) context.getString(R.string.chat_session_compacted) else context.getString(R.string.chat_session_compact_failed)
-                                    )
-                                }
-                            }
-                        }
-                        "fork" -> {
-                            viewModel.forkSession { session ->
-                                if (session != null) {
-                                    onNavigateToSession(session.id)
-                                } else {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_fork_failed))
-                                    }
-                                }
-                            }
-                        }
-                        "share" -> {
-                            viewModel.shareSession { url ->
-                                coroutineScope.launch {
-                                    if (url != null) {
-                                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(url))
-                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_share_url_copied))
-                                    } else {
-                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_share_failed))
-                                    }
-                                }
-                            }
-                        }
-                        "unshare" -> {
-                            viewModel.unshareSession { ok ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (ok) context.getString(R.string.chat_session_unshared) else context.getString(R.string.chat_session_unshare_failed)
-                                    )
-                                }
-                            }
-                        }
-                        "undo" -> {
-                            viewModel.undoMessage { ok ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (ok) context.getString(R.string.chat_message_undone) else context.getString(R.string.chat_message_undo_failed)
-                                    )
-                                }
-                            }
-                        }
-                        "redo" -> {
-                            viewModel.redoMessage { ok ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (ok) context.getString(R.string.chat_message_redone) else context.getString(R.string.chat_message_redo_failed)
-                                    )
-                                }
-                            }
-                        }
-                        "rename" -> {
-                            showRenameDialog = true
-                        }
-                        "shell" -> {
-                            inputMode = ChatInputMode.SHELL.name
-                        }
-                        "review" -> {
-                            viewModel.executeCommand("review") { ok ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (ok) context.getString(R.string.chat_command_executed, "review") else context.getString(R.string.chat_command_failed, "review")
-                                    )
-                                }
-                            }
-                        }
-                        else -> {
-                            // Server command — execute via API
-                            viewModel.executeCommand(cmd.name) { ok ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (ok) context.getString(R.string.chat_command_executed, cmd.name) else context.getString(R.string.chat_command_failed, cmd.name)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                contextWindow = uiState.contextWindow,
-                lastContextTokens = uiState.lastContextTokens
-            )
-            }
-        }
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(top = padding.calculateTopPadding())
         ) {
             when {
                 isTerminalMode -> {
@@ -2351,10 +2054,23 @@ fun ChatScreen(
                 else -> {
                      val messageSpacing = if (LocalCompactMessages.current) 4.dp else 12.dp
                      val chatItems = remember(uiState.messages) { groupMessages(uiState.messages) }
+                     var inputBarHeightPx by remember { mutableStateOf(0) }
+                     val inputBarHeightDp = with(density) { inputBarHeightPx.toDp() }
+                     val modelLabel = if (uiState.selectedModelId != null && uiState.providers.isNotEmpty()) {
+                         val provider = uiState.providers.find { it.id == uiState.selectedProviderId }
+                         val model = provider?.models?.get(uiState.selectedModelId)
+                         model?.name ?: uiState.selectedModelId ?: ""
+                     } else ""
+
                      LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(
+                            start = 12.dp,
+                            top = 8.dp,
+                            end = 12.dp,
+                            bottom = if (uiState.sessionParentId == null) inputBarHeightDp + 8.dp else 8.dp
+                        ),
                         verticalArrangement = Arrangement.spacedBy(messageSpacing)
                     ) {
                         // "Load earlier messages" button at the top
@@ -2599,7 +2315,7 @@ fun ChatScreen(
                             },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 8.dp),
+                                .padding(bottom = inputBarHeightDp + 8.dp),
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = MaterialTheme.colorScheme.onSurface
                         ) {
@@ -2609,6 +2325,306 @@ fun ChatScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+
+                    // ChatInputBar — anchored to bottom with imePadding
+                    if (uiState.sessionParentId == null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .onSizeChanged { size -> inputBarHeightPx = size.height }
+                    ) {
+                    ChatInputBar(
+                        textFieldValue = inputText,
+                        onTextFieldValueChange = { newValue ->
+                            val shouldAutoShell = !isShellMode && newValue.text.startsWith("!")
+                            val normalizedValue = if (shouldAutoShell) {
+                                val stripped = newValue.text.drop(1).trimStart()
+                                val newCursor = (newValue.selection.start - 1).coerceAtLeast(0)
+                                TextFieldValue(
+                                    text = stripped,
+                                    selection = TextRange(newCursor.coerceAtMost(stripped.length))
+                                )
+                            } else {
+                                newValue
+                            }
+
+                            if (shouldAutoShell) {
+                                inputMode = ChatInputMode.SHELL.name
+                            }
+
+                            inputText = normalizedValue
+                            viewModel.updateDraftText(normalizedValue.text)
+                            if (isShellMode || shouldAutoShell) {
+                                viewModel.clearFileSearch()
+                                return@ChatInputBar
+                            }
+                            // Detect @query before cursor for file mention
+                            val cursorPos = normalizedValue.selection.start
+                            val textBefore = normalizedValue.text.substring(0, cursorPos)
+                            val atMatch = Regex("@(\\S*)$").find(textBefore)
+                            if (atMatch != null) {
+                                val query = atMatch.groupValues[1]
+                                viewModel.searchFilesForMention(query)
+                            } else {
+                                viewModel.clearFileSearch()
+                            }
+                        },
+                        onSend = {
+                            val doSend = doSend@{
+                                if (hapticEnabled) {
+                                    @Suppress("DEPRECATION")
+                                    val flags = android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING or
+                                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM, flags)
+                                    } else {
+                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK, flags)
+                                    }
+                                }
+                                val rawText = inputText.text
+                                val shellCommand = when {
+                                    isShellMode -> rawText.trim()
+                                    rawText.startsWith("!") -> rawText.drop(1).trimStart()
+                                    else -> null
+                                }
+                                if (shellCommand != null) {
+                                    if (shellCommand.isBlank()) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(context.getString(R.string.chat_shell_empty))
+                                        }
+                                        return@doSend
+                                    }
+                                    if (attachments.isNotEmpty()) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(context.getString(R.string.chat_shell_attachments_unsupported))
+                                        }
+                                        return@doSend
+                                    }
+                                    viewModel.runShellCommand(shellCommand) { ok ->
+                                        if (!ok) {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_shell_failed))
+                                            }
+                                        }
+                                    }
+                                    inputText = TextFieldValue("")
+                                    if (isShellMode) {
+                                        inputMode = ChatInputMode.NORMAL.name
+                                    }
+                                    viewModel.clearConfirmedPaths()
+                                    viewModel.clearFileSearch()
+                                    viewModel.clearDraft()
+                                    return@doSend
+                                }
+                                // Detect slash commands (e.g., /skillname arguments)
+                                if (rawText.startsWith("/") && !rawText.startsWith("/ ") && confirmedFilePaths.isEmpty()) {
+                                    val parts = rawText.trim().split("\\s+".toRegex(), 2)
+                                    val commandName = parts[0].removePrefix("/")
+                                    val commandArgs = parts.getOrElse(1) { "" }
+                                    if (commandName.isNotBlank()) {
+                                        viewModel.executeCommand(commandName, commandArgs) { ok ->
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    if (ok) context.getString(R.string.chat_command_executed, commandName)
+                                                    else context.getString(R.string.chat_command_failed, commandName)
+                                                )
+                                            }
+                                        }
+                                        inputText = TextFieldValue("")
+                                        if (isShellMode) {
+                                            inputMode = ChatInputMode.NORMAL.name
+                                        }
+                                        viewModel.clearConfirmedPaths()
+                                        viewModel.clearFileSearch()
+                                        viewModel.clearDraft()
+                                        return@doSend
+                                    }
+                                }
+                                // Build prompt parts: split text around confirmed @file mentions
+                                val allParts = buildPromptParts(rawText, confirmedFilePaths, viewModel.getSessionDirectory())
+                                // Add image attachments
+                                val attachmentParts = attachments.map { att ->
+                                    PromptPart(
+                                        type = "file",
+                                        mime = att.mime,
+                                        url = att.dataUrl,
+                                        filename = att.filename
+                                    )
+                                }
+                                viewModel.sendMessage(allParts, attachmentParts)
+                                inputText = TextFieldValue("")
+                                attachments.clear()
+                                viewModel.clearConfirmedPaths()
+                                viewModel.clearFileSearch()
+                                viewModel.clearDraft()
+                            }
+                            if (confirmBeforeSend) {
+                                pendingSendAction = doSend
+                                showSendConfirmDialog = true
+                            } else {
+                                doSend()
+                            }
+                        },
+                        inputMode = if (isShellMode) ChatInputMode.SHELL else ChatInputMode.NORMAL,
+                        onInputModeChange = {
+                            inputMode = it.name
+                            if (it == ChatInputMode.SHELL) {
+                                viewModel.clearFileSearch()
+                            }
+                        },
+                        isSending = uiState.isSending,
+                        isBusy = uiState.sessionStatus is SessionStatus.Busy,
+                        messages = uiState.messages,
+                        attachments = attachments,
+                        onAttach = { imagePickerLauncher.launch("image/*") },
+                        onRemoveAttachment = { index ->
+                            if (index in attachments.indices) {
+                                attachments.removeAt(index)
+                                viewModel.removeDraftAttachment(index)
+                            }
+                        },
+                        onSaveAttachment = { bytes, mime, filename ->
+                            requestSaveImage(bytes, mime, filename)
+                        },
+                        modelLabel = modelLabel,
+                        selectedProviderId = uiState.selectedProviderId,
+                        onModelClick = { showModelPicker = true },
+                        agents = uiState.agents,
+                        selectedAgent = uiState.selectedAgent,
+                        onAgentSelect = { viewModel.selectAgent(it) },
+                        variantNames = uiState.variantNames,
+                        selectedVariant = uiState.selectedVariant,
+                        onCycleVariant = { viewModel.cycleVariant() },
+                        commands = uiState.commands,
+                        fileSearchResults = fileSearchResults,
+                        confirmedFilePaths = confirmedFilePaths,
+                        onFileSelected = { path ->
+                            // Replace @query with @path in text
+                            val cursorPos = inputText.selection.start
+                            val textBefore = inputText.text.substring(0, cursorPos)
+                            val atMatch = Regex("@(\\S*)$").find(textBefore)
+                            if (atMatch != null) {
+                                val matchStart = atMatch.range.first
+                                val replacement = "@$path "
+                                val newText = inputText.text.substring(0, matchStart) + replacement +
+                                        inputText.text.substring(cursorPos)
+                                val newCursor = matchStart + replacement.length
+                                inputText = TextFieldValue(
+                                    text = newText,
+                                    selection = TextRange(newCursor)
+                                )
+                            }
+                            viewModel.confirmFilePath(path)
+                            viewModel.clearFileSearch()
+                        },
+                        onSlashCommand = { cmd ->
+                            when (cmd.name) {
+                                "new" -> {
+                                    // Create a new session and navigate to it
+                                    viewModel.createNewSession { session ->
+                                        if (session != null) {
+                                            onNavigateToSession(session.id)
+                                        } else {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_session_create_failed))
+                                            }
+                                        }
+                                    }
+                                }
+                                "compact" -> {
+                                    viewModel.compactSession { ok ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (ok) context.getString(R.string.chat_session_compacted) else context.getString(R.string.chat_session_compact_failed)
+                                            )
+                                        }
+                                    }
+                                }
+                                "fork" -> {
+                                    viewModel.forkSession { session ->
+                                        if (session != null) {
+                                            onNavigateToSession(session.id)
+                                        } else {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_fork_failed))
+                                            }
+                                        }
+                                    }
+                                }
+                                "share" -> {
+                                    viewModel.shareSession { url ->
+                                        coroutineScope.launch {
+                                            if (url != null) {
+                                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(url))
+                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_share_url_copied))
+                                            } else {
+                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_share_failed))
+                                            }
+                                        }
+                                    }
+                                }
+                                "unshare" -> {
+                                    viewModel.unshareSession { ok ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (ok) context.getString(R.string.chat_session_unshared) else context.getString(R.string.chat_session_unshare_failed)
+                                            )
+                                        }
+                                    }
+                                }
+                                "undo" -> {
+                                    viewModel.undoMessage { ok ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (ok) context.getString(R.string.chat_message_undone) else context.getString(R.string.chat_message_undo_failed)
+                                            )
+                                        }
+                                    }
+                                }
+                                "redo" -> {
+                                    viewModel.redoMessage { ok ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (ok) context.getString(R.string.chat_message_redone) else context.getString(R.string.chat_message_redo_failed)
+                                            )
+                                        }
+                                    }
+                                }
+                                "rename" -> {
+                                    showRenameDialog = true
+                                }
+                                "shell" -> {
+                                    inputMode = ChatInputMode.SHELL.name
+                                }
+                                "review" -> {
+                                    viewModel.executeCommand("review") { ok ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (ok) context.getString(R.string.chat_command_executed, "review") else context.getString(R.string.chat_command_failed, "review")
+                                            )
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    // Server command — execute via API
+                                    viewModel.executeCommand(cmd.name) { ok ->
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (ok) context.getString(R.string.chat_command_executed, cmd.name) else context.getString(R.string.chat_command_failed, cmd.name)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        contextWindow = uiState.contextWindow,
+                        lastContextTokens = uiState.lastContextTokens
+                    )
+                    }
                     }
                 }
             }
@@ -6418,8 +6434,6 @@ private fun ChatInputBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .imePadding()
     ) {
         // Thin divider
         HorizontalDivider(
