@@ -1380,10 +1380,13 @@ fun ChatScreen(
     var isRestoringPosition by remember { mutableStateOf(false) }
 
     // "Jump to bottom" indicator: shown when user has scrolled away from the bottom.
-    // In reverseLayout=true, index 0 = bottom. Threshold accounts for small scroll jitter.
+    // In reverseLayout=true, canScrollForward=true means there is content above the
+    // viewport (i.e. user is NOT at the very bottom). This is more accurate than
+    // checking firstVisibleItemIndex, because a long assistant message can span
+    // multiple screens while still having index 0.
     val showJumpToBottom by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex > 1
+            listState.canScrollForward
         }
     }
 
@@ -1398,6 +1401,25 @@ fun ChatScreen(
     // Keys for chatItems remember — used to avoid recomputation on every text delta
     val messageCount = uiState.messages.size
     val lastPartCount = uiState.messages.firstOrNull()?.parts?.size ?: 0
+
+    // Anti-drift: Use requestScrollToItem to pin scroll position during composition.
+    //
+    // Problem: In reverseLayout=true, when the bottom item (index 0) grows during streaming,
+    // all items above shift upward, causing the viewport to drift downward token-by-token.
+    //
+    // Solution: requestScrollToItem() is a synchronous, non-suspend function that sets the
+    // anchor position for the NEXT remeasure. Unlike scrollToItem() (which runs after layout),
+    // requestScrollToItem() runs during composition BEFORE the layout phase, ensuring the
+    // LazyColumn uses our pinned position during the upcoming measure pass.
+    //
+    // It's a one-shot override: it only affects the immediately following remeasure, then
+    // normal key-based position preservation resumes.
+    if (!autoScrollEnabled && savedMessageCount <= 0 && !isRestoringPosition) {
+        listState.requestScrollToItem(
+            listState.firstVisibleItemIndex,
+            listState.firstVisibleItemScrollOffset
+        )
+    }
 
     // Auto-scroll: ONLY triggered on messageCount change (new messages arrive).
     // Removing lastPartCount/pendingCount/isBusy as triggers dramatically reduces
@@ -2310,10 +2332,12 @@ fun ChatScreen(
                 }
                 else -> {
                      val messageSpacing = if (LocalCompactMessages.current) 4.dp else 12.dp
-                     // Use messageCount + lastPartCount as keys instead of uiState.messages reference.
-                     // This avoids recomputation on every text delta during streaming — only
-                     // structural changes (new message / new Part) trigger regrouping.
-                     val chatItems = remember(messageCount, lastPartCount) { groupMessages(uiState.messages) }
+                     // Use uiState.messages as key so text deltas during streaming update the UI.
+                      // Note: this means chatItems recomputes on every delta, but auto-scroll
+                      // only triggers on messageCount change (not on every delta), so flickering
+                      // is avoided. Minor viewport drift in reverseLayout is accepted as a
+                      // tradeoff for correct streaming updates.
+                      val chatItems = remember(uiState.messages) { groupMessages(uiState.messages) }
 
                      if (uiState.sessionParentId == null) {
                           // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB
