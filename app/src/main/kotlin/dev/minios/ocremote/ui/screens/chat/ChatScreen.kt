@@ -1420,7 +1420,7 @@ fun ChatScreen(
         if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         // Don't auto-scroll when a scroll position restoration is pending (loading older messages)
         if (savedMessageCount > 0 || isRestoringPosition) return@LaunchedEffect
-        if (messageCount > 0 && (autoScrollEnabled || pendingCount > 0)) {
+        if (messageCount > 0 && autoScrollEnabled) {
             // With reverseLayout=true + reversed data, index 0 = newest at the bottom
             listState.scrollToItem(0)
         }
