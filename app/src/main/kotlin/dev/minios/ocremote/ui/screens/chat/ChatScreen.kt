@@ -1380,7 +1380,7 @@ fun ChatScreen(
     var isRestoringPosition by remember { mutableStateOf(false) }
 
     // "Jump to bottom" indicator: shown when user has scrolled away from the bottom.
-    // In reverseLayout=true, canScrollForward=true means there is content above the
+    // With reverseLayout=false, canScrollForward=true means there is content below the
     // viewport (i.e. user is NOT at the very bottom). This is more accurate than
     // checking firstVisibleItemIndex, because a long assistant message can span
     // multiple screens while still having index 0.
@@ -1402,25 +1402,6 @@ fun ChatScreen(
     val messageCount = uiState.messages.size
     val lastPartCount = uiState.messages.firstOrNull()?.parts?.size ?: 0
 
-    // Anti-drift: Use requestScrollToItem to pin scroll position during composition.
-    //
-    // Problem: In reverseLayout=true, when the bottom item (index 0) grows during streaming,
-    // all items above shift upward, causing the viewport to drift downward token-by-token.
-    //
-    // Solution: requestScrollToItem() is a synchronous, non-suspend function that sets the
-    // anchor position for the NEXT remeasure. Unlike scrollToItem() (which runs after layout),
-    // requestScrollToItem() runs during composition BEFORE the layout phase, ensuring the
-    // LazyColumn uses our pinned position during the upcoming measure pass.
-    //
-    // It's a one-shot override: it only affects the immediately following remeasure, then
-    // normal key-based position preservation resumes.
-    if (!autoScrollEnabled && savedMessageCount <= 0 && !isRestoringPosition) {
-        listState.requestScrollToItem(
-            listState.firstVisibleItemIndex,
-            listState.firstVisibleItemScrollOffset
-        )
-    }
-
     // Auto-scroll: ONLY triggered on messageCount change (new messages arrive).
     // Removing lastPartCount/pendingCount/isBusy as triggers dramatically reduces
     // scrollToItem frequency during streaming, eliminating click-race on tool cards.
@@ -1429,16 +1410,20 @@ fun ChatScreen(
         // Don't auto-scroll when a scroll position restoration is pending (loading older messages)
         if (savedMessageCount > 0 || isRestoringPosition) return@LaunchedEffect
         if (messageCount > 0 && autoScrollEnabled) {
-            // With reverseLayout=true + reversed data, index 0 = newest at the bottom
-            listState.scrollToItem(0)
+            // With reverseLayout=false, the newest message is at the END of the list,
+            // so scroll to the last index to bring it into view.
+            listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
         }
     }
 
     // Restore scroll position after loading older messages
     LaunchedEffect(uiState.isLoadingOlder) {
         if (!uiState.isLoadingOlder && savedMessageCount > 0) {
+            // With normal layout, chatItems are reversed (oldest-first) in the LazyColumn.
+            // Find the saved key in the reversed list, then add offset for load_older item.
+            val loadOlderOffset = if (uiState.hasOlderMessages) 1 else 0
             val targetIndex = savedFirstVisibleMessageId?.let { id ->
-                groupMessages(uiState.messages).indexOfFirst { it.key == id }.coerceAtLeast(0)
+                groupMessages(uiState.messages).reversed().indexOfFirst { it.key == id }.coerceAtLeast(0) + loadOlderOffset
             } ?: 0
             listState.scrollToItem(targetIndex, savedScrollOffset)
             savedMessageCount = 0
@@ -2335,7 +2320,7 @@ fun ChatScreen(
                      // Use uiState.messages as key so text deltas during streaming update the UI.
                       // Note: this means chatItems recomputes on every delta, but auto-scroll
                       // only triggers on messageCount change (not on every delta), so flickering
-                      // is avoided. Minor viewport drift in reverseLayout is accepted as a
+                      // is avoided. Minor viewport drift is accepted as a
                       // tradeoff for correct streaming updates.
                       val chatItems = remember(uiState.messages) { groupMessages(uiState.messages) }
 
@@ -2347,65 +2332,67 @@ fun ChatScreen(
                                 LazyColumn(
                                       state = listState,
                                       modifier = Modifier.fillMaxSize(),
-                                      reverseLayout = true,
                                       contentPadding = PaddingValues(
                                           start = 12.dp,
                                           top = 8.dp,
                                           end = 12.dp,
                                           bottom = 8.dp
                                       ),
-                                      verticalArrangement = Arrangement.spacedBy(messageSpacing)
+                                      verticalArrangement = Arrangement.spacedBy(
+                                          space = messageSpacing,
+                                          alignment = Alignment.Bottom
+                                      )
                      ) {
-                         // reverseLayout=true: items declared first render at the BOTTOM
+                         // Normal layout: items declared first render at the TOP
                          // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
 
-                         // Pending questions (bottom-most in visual order, so declared first)
-                         items(
-                             uiState.pendingQuestions,
-                             key = { "question_${it.id}" }
-                         ) { question ->
-                             QuestionCard(
-                                 question = question,
-                                 onSubmit = { answers ->
-                                     viewModel.replyToQuestion(question.id, answers)
-                                 },
-                                 onReject = {
-                                     viewModel.rejectQuestion(question.id)
-                                 }
-                             )
-                         }
-
-                         // Pending permissions
-                         items(
-                             uiState.pendingPermissions,
-                             key = { "perm_${it.id}" }
-                         ) { permission ->
-                             PermissionCard(
-                                 permission = permission,
-                                 onOnce = { viewModel.replyToPermission(permission.id, "once") },
-                                 onAlways = { viewModel.replyToPermission(permission.id, "always") },
-                                 onReject = { viewModel.replyToPermission(permission.id, "reject") }
-                             )
-                         }
-
-                         // Revert banner
-                         if (uiState.revert != null) {
-                             item(key = "revert_banner") {
-                                 RevertBanner(onRedo = {
-                                     viewModel.redoMessage { ok ->
-                                         coroutineScope.launch {
-                                             snackbarHostState.showSnackbar(
-                                                 if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                         // "Load earlier messages" at the TOP (first in DSL = topmost)
+                         if (uiState.hasOlderMessages) {
+                             item(key = "load_older") {
+                                 Box(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .padding(vertical = 4.dp),
+                                     contentAlignment = Alignment.Center
+                                 ) {
+                                     if (uiState.isLoadingOlder) {
+                                         Row(
+                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                             verticalAlignment = Alignment.CenterVertically
+                                         ) {
+                                             PulsingDotsIndicator(
+                                                 dotSize = 6.dp,
+                                                 dotSpacing = 4.dp,
+                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                                             )
+                                             Text(
+                                                 text = stringResource(R.string.chat_loading_earlier),
+                                                 style = MaterialTheme.typography.bodySmall,
+                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                              )
                                          }
+                                     } else {
+                                          TextButton(onClick = {
+                                              // Save scroll position before loading older messages
+                                              val loadOlderOffset = if (uiState.hasOlderMessages) 1 else 0
+                                              val chatItemIndex = listState.firstVisibleItemIndex - loadOlderOffset
+                                              savedFirstVisibleMessageId = chatItems.reversed().getOrNull(chatItemIndex)?.key
+                                              savedScrollOffset = listState.firstVisibleItemScrollOffset
+                                              savedMessageCount = uiState.messages.size
+                                              isRestoringPosition = true
+                                              viewModel.loadOlderMessages()
+                                          }) {
+                                             Text(stringResource(R.string.chat_load_earlier))
+                                         }
                                      }
-                                 })
+                                 }
                              }
                          }
 
-                          // Chat messages (index 0 = newest = at the bottom with reverseLayout)
+                          // Chat messages: oldest first (reversed from newest-first groupMessages output)
+                          // Normal layout renders items top→bottom, so oldest renders at top, newest at bottom
                           items(
-                              chatItems,
+                              chatItems.reversed(),
                             key = { it.key },
                             contentType = { chatItem ->
                                 when (chatItem) {
@@ -2539,60 +2526,63 @@ fun ChatScreen(
                             }
                          }
 
-                         // "Load earlier messages" button at the top (last in DSL = topmost visually)
-                         if (uiState.hasOlderMessages) {
-                             item(key = "load_older") {
-                                 Box(
-                                     modifier = Modifier
-                                         .fillMaxWidth()
-                                         .padding(vertical = 4.dp),
-                                     contentAlignment = Alignment.Center
-                                 ) {
-                                     if (uiState.isLoadingOlder) {
-                                         Row(
-                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                             verticalAlignment = Alignment.CenterVertically
-                                         ) {
-                                             PulsingDotsIndicator(
-                                                 dotSize = 6.dp,
-                                                 dotSpacing = 4.dp,
-                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                         // Revert banner
+                         if (uiState.revert != null) {
+                             item(key = "revert_banner") {
+                                 RevertBanner(onRedo = {
+                                     viewModel.redoMessage { ok ->
+                                         coroutineScope.launch {
+                                             snackbarHostState.showSnackbar(
+                                                 if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
                                              )
-                                             Text(
-                                                 text = stringResource(R.string.chat_loading_earlier),
-                                                 style = MaterialTheme.typography.bodySmall,
-                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-                                             )
-                                         }
-                                     } else {
-                                          TextButton(onClick = {
-                                              // Save scroll position before loading older messages
-                                              savedFirstVisibleMessageId = chatItems.getOrNull(listState.firstVisibleItemIndex)?.key
-                                              savedScrollOffset = listState.firstVisibleItemScrollOffset
-                                              savedMessageCount = uiState.messages.size
-                                              isRestoringPosition = true
-                                              viewModel.loadOlderMessages()
-                                          }) {
-                                             Text(stringResource(R.string.chat_load_earlier))
                                          }
                                      }
-                                 }
+                                 })
                              }
+                         }
+
+                         // Pending permissions (near bottom, after messages)
+                         items(
+                             uiState.pendingPermissions,
+                             key = { "perm_${it.id}" }
+                         ) { permission ->
+                             PermissionCard(
+                                 permission = permission,
+                                 onOnce = { viewModel.replyToPermission(permission.id, "once") },
+                                 onAlways = { viewModel.replyToPermission(permission.id, "always") },
+                                 onReject = { viewModel.replyToPermission(permission.id, "reject") }
+                             )
+                         }
+
+                         // Pending questions (bottom-most, declared last)
+                         items(
+                             uiState.pendingQuestions,
+                             key = { "question_${it.id}" }
+                         ) { question ->
+                             QuestionCard(
+                                 question = question,
+                                 onSubmit = { answers ->
+                                     viewModel.replyToQuestion(question.id, answers)
+                                 },
+                                 onReject = {
+                                     viewModel.rejectQuestion(question.id)
+                                 }
+                             )
                          }
                      }
  
-                    // Scroll-to-bottom FAB
-                      if (!autoScrollEnabled) {
-                          SmallFloatingActionButton(
-                              onClick = {
-                                  coroutineScope.launch {
-                                      listState.scrollToItem(0)
-                                      autoScrollEnabled = true
-                                  }
-                              },
-                              modifier = Modifier
-                                  .align(Alignment.BottomEnd)
-                                  .padding(bottom = 8.dp),
+                     // Scroll-to-bottom FAB
+                       if (!autoScrollEnabled) {
+                           SmallFloatingActionButton(
+                               onClick = {
+                                   coroutineScope.launch {
+                                       listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                                       autoScrollEnabled = true
+                                   }
+                               },
+                               modifier = Modifier
+                                   .align(Alignment.BottomEnd)
+                                   .padding(bottom = 8.dp),
                              containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                              contentColor = MaterialTheme.colorScheme.onSurface
                          ) {
@@ -2608,65 +2598,66 @@ fun ChatScreen(
                      } else {
                          // Sub-session (no input bar): just LazyColumn + FAB
                          Box(modifier = Modifier.fillMaxSize()) {
-                             LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                reverseLayout = true,
-                                contentPadding = PaddingValues(
-                                    horizontal = 12.dp,
-                                    vertical = 8.dp
-                                ),
-                                verticalArrangement = Arrangement.spacedBy(messageSpacing)
-                            ) {
-                                // reverseLayout=true: items declared first render at the BOTTOM
+                              LazyColumn(
+                                 state = listState,
+                                 modifier = Modifier.fillMaxSize(),
+                                 contentPadding = PaddingValues(
+                                     horizontal = 12.dp,
+                                     vertical = 8.dp
+                                 ),
+                                 verticalArrangement = Arrangement.spacedBy(
+                                     space = messageSpacing,
+                                     alignment = Alignment.Bottom
+                                 )
+                             ) {
+                                 // Normal layout: items declared first render at the TOP
+                                 // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
 
-                                // Pending questions (bottom-most visually, declared first)
-                                items(
-                                    uiState.pendingQuestions,
-                                    key = { "question_${it.id}" }
-                                ) { question ->
-                                    QuestionCard(
-                                        question = question,
-                                        onSubmit = { answers ->
-                                            viewModel.replyToQuestion(question.id, answers)
-                                        },
-                                        onReject = {
-                                            viewModel.rejectQuestion(question.id)
-                                        }
-                                    )
-                                }
+                                 // "Load earlier messages" at the TOP (first in DSL = topmost)
+                                 if (uiState.hasOlderMessages) {
+                                     item(key = "load_older") {
+                                         Box(
+                                             modifier = Modifier
+                                                 .fillMaxWidth()
+                                                 .padding(vertical = 4.dp),
+                                             contentAlignment = Alignment.Center
+                                         ) {
+                                             if (uiState.isLoadingOlder) {
+                                                 Row(
+                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                     verticalAlignment = Alignment.CenterVertically
+                                                 ) {
+                                                     PulsingDotsIndicator(
+                                                         dotSize = 6.dp,
+                                                         dotSpacing = 4.dp,
+                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                     )
+                                                     Text(
+                                                         text = stringResource(R.string.chat_loading_earlier),
+                                                         style = MaterialTheme.typography.bodySmall,
+                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                     )
+                                                 }
+                                             } else {
+                                                  TextButton(onClick = {
+                                                      val loadOlderOffset = if (uiState.hasOlderMessages) 1 else 0
+                                                      val chatItemIndex = listState.firstVisibleItemIndex - loadOlderOffset
+                                                      savedFirstVisibleMessageId = chatItems.reversed().getOrNull(chatItemIndex)?.key
+                                                      savedScrollOffset = listState.firstVisibleItemScrollOffset
+                                                      savedMessageCount = uiState.messages.size
+                                                      isRestoringPosition = true
+                                                      viewModel.loadOlderMessages()
+                                                  }) {
+                                                     Text(stringResource(R.string.chat_load_earlier))
+                                                 }
+                                             }
+                                         }
+                                     }
+                                  }
 
-                                // Pending permissions
-                                items(
-                                    uiState.pendingPermissions,
-                                    key = { "perm_${it.id}" }
-                                ) { permission ->
-                                    PermissionCard(
-                                        permission = permission,
-                                        onOnce = { viewModel.replyToPermission(permission.id, "once") },
-                                        onAlways = { viewModel.replyToPermission(permission.id, "always") },
-                                        onReject = { viewModel.replyToPermission(permission.id, "reject") }
-                                    )
-                                }
-
-                                // Revert banner
-                                if (uiState.revert != null) {
-                                    item(key = "revert_banner") {
-                                        RevertBanner(onRedo = {
-                                            viewModel.redoMessage { ok ->
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
-                                                    )
-                                                }
-                                            }
-                                        })
-                                    }
-                                }
-
-                                // Chat messages (index 0 = newest = at the bottom with reverseLayout)
-                                items(
-                                    chatItems,
+                                 // Chat messages: oldest first (reversed from newest-first groupMessages output)
+                                 items(
+                                     chatItems.reversed(),
                                     key = { it.key },
                                     contentType = { chatItem ->
                                         when (chatItem) {
@@ -2785,61 +2776,65 @@ fun ChatScreen(
                                             )
                                         }
                                     }
-                                }
+                                 }
 
-                                // "Load earlier messages" button at the top (last in DSL = topmost visually)
-                                if (uiState.hasOlderMessages) {
-                                    item(key = "load_older") {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (uiState.isLoadingOlder) {
-                                                Row(
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    PulsingDotsIndicator(
-                                                        dotSize = 6.dp,
-                                                        dotSpacing = 4.dp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    Text(
-                                                        text = stringResource(R.string.chat_loading_earlier),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            } else {
-                                                 TextButton(onClick = {
-                                                     savedFirstVisibleMessageId = chatItems.getOrNull(listState.firstVisibleItemIndex)?.key
-                                                     savedScrollOffset = listState.firstVisibleItemScrollOffset
-                                                     savedMessageCount = uiState.messages.size
-                                                     isRestoringPosition = true
-                                                     viewModel.loadOlderMessages()
-                                                 }) {
-                                                    Text(stringResource(R.string.chat_load_earlier))
-                                                }
-                                            }
-                                        }
-                                    }
+                                 // Revert banner
+                                 if (uiState.revert != null) {
+                                     item(key = "revert_banner") {
+                                         RevertBanner(onRedo = {
+                                             viewModel.redoMessage { ok ->
+                                                 coroutineScope.launch {
+                                                     snackbarHostState.showSnackbar(
+                                                         if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                                     )
+                                                 }
+                                             }
+                                         })
+                                     }
+                                 }
+
+                                 // Pending permissions (near bottom, after messages)
+                                 items(
+                                     uiState.pendingPermissions,
+                                     key = { "perm_${it.id}" }
+                                 ) { permission ->
+                                     PermissionCard(
+                                         permission = permission,
+                                         onOnce = { viewModel.replyToPermission(permission.id, "once") },
+                                         onAlways = { viewModel.replyToPermission(permission.id, "always") },
+                                         onReject = { viewModel.replyToPermission(permission.id, "reject") }
+                                     )
+                                 }
+
+                                 // Pending questions (bottom-most, declared last)
+                                 items(
+                                     uiState.pendingQuestions,
+                                     key = { "question_${it.id}" }
+                                 ) { question ->
+                                     QuestionCard(
+                                         question = question,
+                                         onSubmit = { answers ->
+                                             viewModel.replyToQuestion(question.id, answers)
+                                         },
+                                         onReject = {
+                                             viewModel.rejectQuestion(question.id)
+                                         }
+                                     )
                                  }
                              }
  
-                            // Scroll-to-bottom FAB
-                              if (!autoScrollEnabled) {
-                                  SmallFloatingActionButton(
-                                      onClick = {
-                                          coroutineScope.launch {
-                                              listState.scrollToItem(0)
-                                              autoScrollEnabled = true
-                                          }
-                                      },
-                                      modifier = Modifier
-                                          .align(Alignment.BottomCenter)
-                                         .padding(bottom = 8.dp),
+                             // Scroll-to-bottom FAB
+                               if (!autoScrollEnabled) {
+                                   SmallFloatingActionButton(
+                                       onClick = {
+                                           coroutineScope.launch {
+                                               listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                                               autoScrollEnabled = true
+                                           }
+                                       },
+                                       modifier = Modifier
+                                           .align(Alignment.BottomCenter)
+                                          .padding(bottom = 8.dp),
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     contentColor = MaterialTheme.colorScheme.onSurface
                                 ) {
