@@ -1411,22 +1411,30 @@ fun ChatScreen(
         }
     }
 
-    // Streaming follow: track item 0's SIZE (height in pixels).
-    // size increases = content grew (streaming) → compensate offset to keep bottom pinned.
-    // size unchanged = user scrolled → do nothing.
+    // Streaming follow: track item 0's SIZE to detect content growth.
+    // Only compensate when viewport was at the bottom before this growth tick.
+    // Distinguish user-scroll (size unchanged, offset != 0) from content growth.
     LaunchedEffect(autoScrollEnabled) {
         if (!autoScrollEnabled) return@LaunchedEffect
         var previousSize = 0
+        var wasAtBottom = false
         snapshotFlow {
             val item0 = listState.layoutInfo.visibleItemsInfo
                 .firstOrNull { it.index == 0 }
             if (item0 != null) item0.size to item0.offset else 0 to 0
         }.collect { (size, offset) ->
-            if (size > previousSize && previousSize > 0) {
-                // Content grew by (size - previousSize) pixels.
-                // Compensate to keep item 0's bottom at viewport bottom.
-                val growth = size - previousSize
-                listState.scroll { scrollBy(-growth.toFloat()) }
+            if (previousSize > 0) {
+                if (size > previousSize && wasAtBottom) {
+                    // Content grew while at bottom → compensate
+                    listState.scroll { scrollBy(-(size - previousSize).toFloat()) }
+                } else if (size == previousSize && offset != 0) {
+                    // Content didn't grow, but offset moved → user scrolled up
+                    wasAtBottom = false
+                }
+            }
+            // User manually scrolled back to absolute bottom
+            if (offset == 0) {
+                wasAtBottom = true
             }
             previousSize = size
         }
@@ -4674,8 +4682,7 @@ private fun MarkdownContent(
  * Table component for 0.41.0 — replaces the default MarkdownTable whose
  * MarkdownTableBasicText inline-content pipeline fails to render cells.
  *
- * Each row uses fillMaxWidth() + weight(1f) on cells, so every cell in the
- * same column automatically shares the same width across all rows.
+ * Column widths are driven by the widest cell content in each column.
  * Horizontal scroll is enabled when the table exceeds the available width.
  */
 @Composable
@@ -4689,29 +4696,20 @@ private fun SimpleMarkdownTable(
     val rowBgOdd = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
     val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     val pad = 10.dp
-    val cellMinWidth = 80.dp
-
     val shape = RoundedCornerShape(6.dp)
     val border = BorderStroke(1.dp, dividerColor)
 
-    // Collect rows
-    data class TableRow(val isHeader: Boolean, val cells: List<ASTNode>)
-
-    val rows = remember(tableNode) {
-        val result = mutableListOf<TableRow>()
-        tableNode.children.forEach { child ->
+    val columnCount = remember(tableNode) {
+        tableNode.children.maxOfOrNull { child ->
             when (child.type) {
-                GFMHeader -> result.add(TableRow(true, child.children.filter { it.type == GFMCell }))
-                GFMRow -> result.add(TableRow(false, child.children.filter { it.type == GFMCell }))
+                GFMHeader, GFMRow -> child.children.count { it.type == GFMCell }
+                else -> 0
             }
-        }
-        result
+        } ?: 0
     }
-    if (rows.isEmpty()) return
-
-    val columnCount = rows.maxOfOrNull { it.cells.size } ?: 0
     if (columnCount == 0) return
 
+    var rowIndex = 0
     val scrollState = rememberScrollState()
 
     Column(
@@ -4721,79 +4719,80 @@ private fun SimpleMarkdownTable(
             .border(border, shape)
             .clip(shape)
     ) {
-        var bodyRowIndex = 0
-        rows.forEach { row ->
-            if (row.isHeader) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(headerBg),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    row.cells.forEachIndexed { colIndex, cell ->
-                        val isLast = colIndex == columnCount - 1
-                        Box(
+            tableNode.children.forEach { child ->
+                when (child.type) {
+                    GFMHeader -> {
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .widthIn(min = cellMinWidth)
-                                .then(
-                                    if (!isLast) Modifier.drawBehind {
-                                        drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
-                                    } else Modifier
-                                )
-                                .padding(horizontal = pad, vertical = 8.dp)
+                                .background(headerBg),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            MarkdownBasicText(
-                                text = content.buildMarkdownAnnotatedString(
-                                    textNode = cell,
-                                    style = style.copy(fontWeight = FontWeight.SemiBold),
-                                    annotatorSettings = annotatorSettings(),
-                                ),
-                                style = style.copy(fontWeight = FontWeight.SemiBold),
-                            )
+                            child.children.filter { it.type == GFMCell }.forEachIndexed { colIndex, cell ->
+                                val isLast = colIndex == columnCount - 1
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(min = 80.dp)
+                                        .then(
+                                            if (!isLast) Modifier.drawBehind {
+                                                drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
+                                            } else Modifier
+                                        )
+                                        .padding(horizontal = pad, vertical = 8.dp)
+                                ) {
+                                    MarkdownBasicText(
+                                        text = content.buildMarkdownAnnotatedString(
+                                            textNode = cell,
+                                            style = style.copy(fontWeight = FontWeight.SemiBold),
+                                            annotatorSettings = annotatorSettings(),
+                                        ),
+                                        style = style.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                }
+                            }
                         }
+                        HorizontalDivider(thickness = 1.5.dp, color = dividerColor)
+                    }
+                    GFMRow -> {
+                        val rowBg = if (rowIndex % 2 == 0) rowBgEven else rowBgOdd
+                        Row(
+                            modifier = Modifier
+                                .background(rowBg),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            child.children.filter { it.type == GFMCell }.forEachIndexed { colIndex, cell ->
+                                val isLast = colIndex == columnCount - 1
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(min = 80.dp)
+                                        .then(
+                                            if (!isLast) Modifier.drawBehind {
+                                                drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
+                                            } else Modifier
+                                        )
+                                        .padding(horizontal = pad, vertical = 6.dp)
+                                ) {
+                                    MarkdownBasicText(
+                                        text = content.buildMarkdownAnnotatedString(
+                                            textNode = cell,
+                                            style = style,
+                                            annotatorSettings = annotatorSettings(),
+                                        ),
+                                        style = style,
+                                    )
+                                }
+                            }
+                        }
+                        if (rowIndex < tableNode.children.count { it.type == GFMRow } - 1) {
+                            HorizontalDivider(color = dividerColor.copy(alpha = 0.5f))
+                        }
+                        rowIndex++
+                    }
+                    GFMTableSeparator -> {
+                        HorizontalDivider(thickness = 1.5.dp, color = dividerColor)
                     }
                 }
-                HorizontalDivider(thickness = 1.5.dp, color = dividerColor)
-            } else {
-                val rowBg = if (bodyRowIndex % 2 == 0) rowBgEven else rowBgOdd
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(rowBg),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    row.cells.forEachIndexed { colIndex, cell ->
-                        val isLast = colIndex == columnCount - 1
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .widthIn(min = cellMinWidth)
-                                .then(
-                                    if (!isLast) Modifier.drawBehind {
-                                        drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
-                                    } else Modifier
-                                )
-                                .padding(horizontal = pad, vertical = 6.dp)
-                        ) {
-                            MarkdownBasicText(
-                                text = content.buildMarkdownAnnotatedString(
-                                    textNode = cell,
-                                    style = style,
-                                    annotatorSettings = annotatorSettings(),
-                                ),
-                                style = style,
-                            )
-                        }
-                    }
-                }
-                if (bodyRowIndex < rows.count { !it.isHeader } - 1) {
-                    HorizontalDivider(color = dividerColor.copy(alpha = 0.5f))
-                }
-                bodyRowIndex++
             }
         }
-    }
 }
 
 private val HtmlDocumentHintRegex = Regex("(?is)<!doctype\\s+html\\b|<\\s*html\\b")
