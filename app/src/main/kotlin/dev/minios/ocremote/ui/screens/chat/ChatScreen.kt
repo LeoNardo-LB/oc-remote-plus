@@ -1367,32 +1367,53 @@ fun ChatScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Whether auto-scroll should follow new content.
-    // Disabled when user scrolls away from bottom; re-enabled only via FAB.
+    // Disabled when user scrolls to older messages (idx > 0); re-enabled via FAB.
     var autoScrollEnabled by remember { mutableStateOf(true) }
 
-    // "Jump to bottom" indicator: show when NOT at absolute bottom.
+    // "Jump to bottom" indicator: show when user scrolled to older messages.
+    // In reverseLayout=true: idx=0 means last message is visible = near bottom.
+    // We only check idx, NOT offset — streaming text growth changes offset but
+    // that's not a user scroll action.
     val showJumpToBottom by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex > 0 ||
-            listState.firstVisibleItemScrollOffset > 10
+            listState.firstVisibleItemIndex > 0
         }
     }
 
-    // Disable auto-scroll when scrolled away from bottom.
-    // Re-enable only via FAB onClick (below).
+    // Disable auto-scroll when user scrolls to older messages.
+    // Re-enable only via FAB onClick.
     LaunchedEffect(showJumpToBottom) {
         if (showJumpToBottom) {
             autoScrollEnabled = false
         }
     }
 
+    // Streaming content keeps the last message (idx=0) growing.
+    // To stay pinned to bottom, we must actively scrollToItem(0) on every
+    // recomposition where autoScrollEnabled is true.
+    // We use a snapshotFlow on offset to detect content changes and re-pin.
     val messageCount = uiState.messages.size
 
-    // Auto-scroll to bottom when new messages arrive and user is at bottom.
-    // In reverseLayout=true, scrollToItem(0) brings newest message into view.
+    // Scroll to bottom when new messages arrive.
     LaunchedEffect(messageCount) {
         if (messageCount > 0 && autoScrollEnabled) {
             listState.scrollToItem(0)
+        }
+    }
+
+    // Keep pinned to bottom during streaming (content growth changes offset).
+    // Only active when autoScrollEnabled and idx == 0 (last message visible).
+    LaunchedEffect(autoScrollEnabled) {
+        if (!autoScrollEnabled) return@LaunchedEffect
+        snapshotFlow {
+            // Emit when offset changes (streaming growth) while idx == 0
+            if (listState.firstVisibleItemIndex == 0) {
+                listState.firstVisibleItemScrollOffset
+            } else -1
+        }.collect { offset ->
+            if (offset > 0 && autoScrollEnabled) {
+                listState.scrollToItem(0, 0)
+            }
         }
     }
 
