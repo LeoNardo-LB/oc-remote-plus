@@ -2338,13 +2338,10 @@ fun ChatScreen(
                                           end = 12.dp,
                                           bottom = 8.dp
                                       ),
-                                      verticalArrangement = Arrangement.spacedBy(
-                                          space = messageSpacing,
-                                          alignment = Alignment.Bottom
-                                      )
-                     ) {
-                         // Normal layout: items declared first render at the TOP
-                         // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
+                                      verticalArrangement = Arrangement.spacedBy(messageSpacing)
+                      ) {
+                          // Normal layout: items declared first render at the TOP
+                          // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
 
                          // "Load earlier messages" at the TOP (first in DSL = topmost)
                          if (uiState.hasOlderMessages) {
@@ -2605,13 +2602,10 @@ fun ChatScreen(
                                      horizontal = 12.dp,
                                      vertical = 8.dp
                                  ),
-                                 verticalArrangement = Arrangement.spacedBy(
-                                     space = messageSpacing,
-                                     alignment = Alignment.Bottom
-                                 )
-                             ) {
-                                 // Normal layout: items declared first render at the TOP
-                                 // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
+                                  verticalArrangement = Arrangement.spacedBy(messageSpacing)
+                              ) {
+                                  // Normal layout: items declared first render at the TOP
+                                  // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
 
                                  // "Load earlier messages" at the TOP (first in DSL = topmost)
                                  if (uiState.hasOlderMessages) {
