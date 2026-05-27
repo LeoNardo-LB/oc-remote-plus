@@ -1371,9 +1371,6 @@ fun ChatScreen(
     var autoScrollEnabled by remember { mutableStateOf(true) }
 
     // "Jump to bottom" indicator: show when user scrolled to older messages.
-    // In reverseLayout=true: idx=0 means last message is visible = near bottom.
-    // We only check idx, NOT offset — streaming text growth changes offset but
-    // that's not a user scroll action.
     val showJumpToBottom by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0
@@ -1388,10 +1385,6 @@ fun ChatScreen(
         }
     }
 
-    // Streaming content keeps the last message (idx=0) growing.
-    // To stay pinned to bottom, we must actively scrollToItem(0) on every
-    // recomposition where autoScrollEnabled is true.
-    // We use a snapshotFlow on offset to detect content changes and re-pin.
     val messageCount = uiState.messages.size
 
     // Scroll to bottom when new messages arrive.
@@ -1401,18 +1394,27 @@ fun ChatScreen(
         }
     }
 
-    // Keep pinned to bottom during streaming (content growth changes offset).
-    // Only active when autoScrollEnabled and idx == 0 (last message visible).
+    // Keep pinned to bottom during streaming (content growth).
+    //
+    // Key insight: scrollToItem(0) in reverseLayout puts item 0's TOP at the viewport bottom.
+    // We want item 0's BOTTOM at the viewport bottom. So we use scrollBy() to correct.
+    //
+    // In reverseLayout=true:
+    //   item.offset = distance from item's visual bottom edge to viewport bottom edge
+    //   offset == 0 → item bottom is flush with viewport bottom (perfect!)
+    //   offset != 0 → need to scrollBy(-offset) to correct
+    //   scrollBy(positive) scrolls toward list start (older items)
+    //   scrollBy(negative) scrolls toward list end (newer items)
     LaunchedEffect(autoScrollEnabled) {
         if (!autoScrollEnabled) return@LaunchedEffect
         snapshotFlow {
-            // Emit when offset changes (streaming growth) while idx == 0
-            if (listState.firstVisibleItemIndex == 0) {
-                listState.firstVisibleItemScrollOffset
-            } else -1
+            listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == 0 }
+                ?.offset
+                ?: Int.MAX_VALUE
         }.collect { offset ->
-            if (offset > 0 && autoScrollEnabled) {
-                listState.scrollToItem(0, 0)
+            if (offset != Int.MAX_VALUE && offset != 0 && autoScrollEnabled) {
+                listState.scroll { scrollBy(-offset.toFloat()) }
             }
         }
     }
