@@ -516,7 +516,7 @@ class ChatViewModel @Inject constructor(
             currentMessageLimit *= 2
             try {
                 val messages = api.listMessages(conn, sessionId, limit = currentMessageLimit)
-                eventReducer.setMessages(sessionId, messages)
+                eventReducer.mergeMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded older: ${messages.size} messages (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
             } catch (e: Exception) {
