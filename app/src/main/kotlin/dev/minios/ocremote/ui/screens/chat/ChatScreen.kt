@@ -64,7 +64,13 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.focus.FocusRequester
@@ -106,6 +112,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -4679,11 +4686,11 @@ private fun MarkdownContent(
 }
 
 /**
- * Table component for 0.41.0 — replaces the default MarkdownTable whose
- * MarkdownTableBasicText inline-content pipeline fails to render cells.
+ * Table component — uniform column widths driven by the widest cell content.
  *
- * Column widths are driven by the widest cell content in each column.
- * Horizontal scroll is enabled when the table exceeds the available width.
+ * Uses a custom [Layout] with [MeasurePolicy] to measure all cells in a
+ * single pass, compute per-column max widths, and place them on a uniform
+ * grid.  Horizontal scroll is enabled when the table exceeds the parent width.
  */
 @Composable
 private fun SimpleMarkdownTable(
@@ -4692,12 +4699,12 @@ private fun SimpleMarkdownTable(
     style: TextStyle,
 ) {
     val headerBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-    val rowBgEven = Color.Transparent
     val rowBgOdd = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
     val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     val pad = 10.dp
     val shape = RoundedCornerShape(6.dp)
     val border = BorderStroke(1.dp, dividerColor)
+    val annotator = annotatorSettings()
 
     val columnCount = remember(tableNode) {
         tableNode.children.maxOfOrNull { child ->
@@ -4709,90 +4716,192 @@ private fun SimpleMarkdownTable(
     }
     if (columnCount == 0) return
 
-    var rowIndex = 0
+    // Collect structured row data from AST
+    val rows = remember(tableNode, content) {
+        val list = mutableListOf<TableRow>()
+        var rowIdx = 0
+        tableNode.children.forEach { child ->
+            when (child.type) {
+                GFMHeader -> {
+                    val cells = child.children.filter { it.type == GFMCell }
+                    list.add(TableRow(isHeader = true, rowIndex = -1, cells = cells))
+                }
+                GFMRow -> {
+                    val cells = child.children.filter { it.type == GFMCell }
+                    list.add(TableRow(isHeader = false, rowIndex = rowIdx, cells = cells))
+                    rowIdx++
+                }
+            }
+        }
+        list
+    }
+
+    val rowCount = rows.size
     val scrollState = rememberScrollState()
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
             .border(border, shape)
             .clip(shape)
     ) {
-            tableNode.children.forEach { child ->
-                when (child.type) {
-                    GFMHeader -> {
-                        Row(
+        Layout(
+            content = {
+                rows.forEachIndexed { rowIdx, row ->
+                    val cellCount = minOf(row.cells.size, columnCount)
+                    repeat(cellCount) { colIdx ->
+                        val cell = row.cells[colIdx]
+                        val isLastCol = colIdx == cellCount - 1
+                        val cellStyle = if (row.isHeader) {
+                            style.copy(fontWeight = FontWeight.SemiBold)
+                        } else {
+                            style
+                        }
+                        Box(
                             modifier = Modifier
-                                .background(headerBg),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            child.children.filter { it.type == GFMCell }.forEachIndexed { colIndex, cell ->
-                                val isLast = colIndex == columnCount - 1
-                                Box(
-                                    modifier = Modifier
-                                        .widthIn(min = 80.dp)
-                                        .then(
-                                            if (!isLast) Modifier.drawBehind {
-                                                drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
-                                            } else Modifier
+                                .background(
+                                    when {
+                                        row.isHeader -> headerBg
+                                        row.rowIndex % 2 == 1 -> rowBgOdd
+                                        else -> Color.Transparent
+                                    }
+                                )
+                                .then(
+                                    if (!isLastCol) Modifier.drawBehind {
+                                        drawLine(
+                                            dividerColor,
+                                            Offset(size.width, 0f),
+                                            Offset(size.width, size.height),
+                                            strokeWidth = 1f
                                         )
-                                        .padding(horizontal = pad, vertical = 8.dp)
-                                ) {
-                                    MarkdownBasicText(
-                                        text = content.buildMarkdownAnnotatedString(
-                                            textNode = cell,
-                                            style = style.copy(fontWeight = FontWeight.SemiBold),
-                                            annotatorSettings = annotatorSettings(),
-                                        ),
-                                        style = style.copy(fontWeight = FontWeight.SemiBold),
-                                    )
-                                }
-                            }
-                        }
-                        HorizontalDivider(thickness = 1.5.dp, color = dividerColor)
-                    }
-                    GFMRow -> {
-                        val rowBg = if (rowIndex % 2 == 0) rowBgEven else rowBgOdd
-                        Row(
-                            modifier = Modifier
-                                .background(rowBg),
-                            verticalAlignment = Alignment.CenterVertically
+                                    } else Modifier
+                                )
+                                .padding(horizontal = pad, vertical = if (row.isHeader) 8.dp else 6.dp)
                         ) {
-                            child.children.filter { it.type == GFMCell }.forEachIndexed { colIndex, cell ->
-                                val isLast = colIndex == columnCount - 1
-                                Box(
-                                    modifier = Modifier
-                                        .widthIn(min = 80.dp)
-                                        .then(
-                                            if (!isLast) Modifier.drawBehind {
-                                                drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
-                                            } else Modifier
-                                        )
-                                        .padding(horizontal = pad, vertical = 6.dp)
-                                ) {
-                                    MarkdownBasicText(
-                                        text = content.buildMarkdownAnnotatedString(
-                                            textNode = cell,
-                                            style = style,
-                                            annotatorSettings = annotatorSettings(),
-                                        ),
-                                        style = style,
-                                    )
-                                }
-                            }
+                            MarkdownBasicText(
+                                text = content.buildMarkdownAnnotatedString(
+                                    textNode = cell,
+                                    style = cellStyle,
+                                    annotatorSettings = annotator,
+                                ),
+                                style = cellStyle,
+                            )
                         }
-                        if (rowIndex < tableNode.children.count { it.type == GFMRow } - 1) {
-                            HorizontalDivider(color = dividerColor.copy(alpha = 0.5f))
-                        }
-                        rowIndex++
-                    }
-                    GFMTableSeparator -> {
-                        HorizontalDivider(thickness = 1.5.dp, color = dividerColor)
                     }
                 }
+            },
+            measurePolicy = remember(columnCount, rowCount) {
+                UniformColumnMeasurePolicy(columnCount, rowCount, pad)
+            }
+        )
+    }
+}
+
+/** Data class representing a parsed table row from the AST. */
+private data class TableRow(
+    val isHeader: Boolean,
+    val rowIndex: Int,
+    val cells: List<ASTNode>,
+)
+
+/**
+ * [MeasurePolicy] that lays out children in a grid with uniform column widths.
+ * Each column's width equals the widest cell in that column.
+ */
+private class UniformColumnMeasurePolicy(
+    private val columnCount: Int,
+    private val rowCount: Int,
+    private val cellPadding: Dp,
+) : MeasurePolicy {
+
+    override fun MeasureScope.measure(
+        measurables: List<Measurable>,
+        constraints: Constraints,
+    ): MeasureResult {
+        if (measurables.isEmpty()) return layout(0, 0) {}
+
+        // 1. Measure all cells with loose width (minWidth=0) to get natural sizes
+        val looseConstraints = Constraints(
+            minWidth = 0,
+            maxWidth = constraints.maxWidth,
+            minHeight = 0,
+            maxHeight = constraints.maxHeight,
+        )
+        val placeables = measurables.map { it.measure(looseConstraints) }
+
+        // 2. Compute per-column max width
+        val colWidths = IntArray(columnCount) { 0 }
+        placeables.forEachIndexed { index, placeable ->
+            val col = index % columnCount
+            colWidths[col] = maxOf(colWidths[col], placeable.width)
+        }
+
+        // 3. Compute per-row max height
+        val actualRowCount = (placeables.size + columnCount - 1) / columnCount
+        val rowHeights = IntArray(actualRowCount) { 0 }
+        placeables.forEachIndexed { index, placeable ->
+            val row = index / columnCount
+            rowHeights[row] = maxOf(rowHeights[row], placeable.height)
+        }
+
+        // 4. Total dimensions
+        val totalWidth = colWidths.sum()
+        val totalHeight = rowHeights.sum()
+
+        // 5. Place in grid, center each cell vertically within its row
+        return layout(totalWidth, totalHeight) {
+            var y = 0
+            for (row in 0 until actualRowCount) {
+                var x = 0
+                for (col in 0 until columnCount) {
+                    val idx = row * columnCount + col
+                    if (idx < placeables.size) {
+                        val p = placeables[idx]
+                        val dy = (rowHeights[row] - p.height) / 2
+                        p.placeRelative(x, y + dy)
+                    }
+                    x += colWidths[col]
+                }
+                y += rowHeights[row]
             }
         }
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(
+        measurables: List<IntrinsicMeasurable>,
+        height: Int,
+    ): Int {
+        val colMax = IntArray(columnCount) { 0 }
+        measurables.forEachIndexed { i, m ->
+            colMax[i % columnCount] = maxOf(colMax[i % columnCount], m.minIntrinsicWidth(height))
+        }
+        return colMax.sum()
+    }
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(
+        measurables: List<IntrinsicMeasurable>,
+        height: Int,
+    ): Int = minIntrinsicWidth(measurables, height)
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(
+        measurables: List<IntrinsicMeasurable>,
+        width: Int,
+    ): Int {
+        if (measurables.isEmpty()) return 0
+        val actualRowCount = (measurables.size + columnCount - 1) / columnCount
+        val rowHeights = IntArray(actualRowCount) { 0 }
+        measurables.forEachIndexed { i, m ->
+            val row = i / columnCount
+            rowHeights[row] = maxOf(rowHeights[row], m.minIntrinsicHeight(width))
+        }
+        return rowHeights.sum()
+    }
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(
+        measurables: List<IntrinsicMeasurable>,
+        width: Int,
+    ): Int = minIntrinsicHeight(measurables, width)
 }
 
 private val HtmlDocumentHintRegex = Regex("(?is)<!doctype\\s+html\\b|<\\s*html\\b")

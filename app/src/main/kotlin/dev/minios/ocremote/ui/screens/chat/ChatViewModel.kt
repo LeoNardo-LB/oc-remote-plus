@@ -326,6 +326,13 @@ class ChatViewModel @Inject constructor(
             _selectedAgent.value = effectiveAgent to false
         }
 
+        // Keep model StateFlows in sync with the effective model,
+        // mirroring the agent sync logic above.
+        if ((effectiveProviderId != selProviderId || effectiveModelId != selModelId) && !isModelExplicitlySelected) {
+            _selectedProviderId.value = effectiveProviderId
+            _selectedModelId.value = effectiveModelId
+        }
+
         // Compute cost/token totals from assistant messages
         val assistantMessages = sessionMessages.filterIsInstance<Message.Assistant>()
         val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
@@ -353,6 +360,13 @@ class ChatViewModel @Inject constructor(
             }
         }
         val availableVariants = currentModel?.variants?.keys?.toList()?.sorted() ?: emptyList()
+
+        // Persist the resolved model to the in-memory cache so it survives
+        // session switching (ViewModel recreation).  This runs on every
+        // combine emission but is cheap (Map.put).
+        if (effectiveProviderId != null && effectiveModelId != null) {
+            sessionModelCache[sessionId] = effectiveProviderId to effectiveModelId
+        }
 
         // Compute queued message IDs: messages sent while assistant is still generating
         val pendingAssistantIndex = chatMessages.indexOfFirst {
