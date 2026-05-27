@@ -1459,10 +1459,14 @@ fun ChatScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        // Subtitle: total tokens and cost for the session
+                        // Subtitle: chat items count, total tokens and cost for the session
                         val totalTokens = uiState.totalInputTokens + uiState.totalOutputTokens
-                        if (totalTokens > 0 || uiState.totalCost > 0) {
+                        val hasStats = uiState.chatItemsCount > 0 || totalTokens > 0 || uiState.totalCost > 0
+                        if (hasStats) {
                             val parts = mutableListOf<String>()
+                            if (uiState.chatItemsCount > 0) {
+                                parts.add(stringResource(R.string.chat_items_count, uiState.chatItemsCount))
+                            }
                             if (totalTokens > 0) {
                                 parts.add(stringResource(R.string.chat_tokens_summary, formatTokenCount(totalTokens)))
                             }

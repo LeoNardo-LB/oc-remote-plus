@@ -234,6 +234,7 @@
     <string name="chat_collapse">Collapse</string>
     <string name="chat_expand">Expand</string>
     <string name="chat_tokens_summary">%1$s tokens</string>
+    <string name="chat_items_count">%1$d messages</string>
     <string name="chat_default_variant">Default</string>
     <string name="chat_type_answer">Type your answer…</string>
     <string name="chat_image">Image</string>
