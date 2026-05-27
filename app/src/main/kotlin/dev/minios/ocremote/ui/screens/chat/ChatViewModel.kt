@@ -17,6 +17,7 @@ import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventReducer
 import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.ui.screens.chat.groupMessages
 import dev.minios.ocremote.domain.model.*
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,6 +41,7 @@ data class ChatUiState(
     val sessionTitle: String = "",
     val serverName: String = "",
     val messages: List<ChatMessage> = emptyList(),
+    val chatItemsCount: Int = 0,
     val revert: Session.Revert? = null,
     val sessionStatus: SessionStatus = SessionStatus.Idle,
     val pendingPermissions: List<SseEvent.PermissionAsked> = emptyList(),
@@ -365,10 +367,13 @@ class ChatViewModel @Inject constructor(
             emptySet<String>()
         }
 
+        val chatItemsCount = groupMessages(chatMessages).size
+
         ChatUiState(
             sessionTitle = session?.title ?: "",
             serverName = serverName,
             messages = chatMessages,
+            chatItemsCount = chatItemsCount,
             revert = revertState,
             sessionStatus = statuses[sessionId] ?: SessionStatus.Idle,
             pendingPermissions = permissions[sessionId] ?: emptyList(),
@@ -485,7 +490,7 @@ class ChatViewModel @Inject constructor(
                     currentMessageLimit = (currentMessageLimit / 2).coerceAtLeast(10)
                     try {
                         val messages = api.listMessages(conn, sessionId, limit = currentMessageLimit)
-                        eventReducer.setMessages(sessionId, messages)
+                eventReducer.mergeMessages(sessionId, messages)
                         _hasOlderMessages.value = messages.size >= currentMessageLimit
                         if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
                     } catch (retryEx: Exception) {

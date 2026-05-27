@@ -424,6 +424,27 @@ class EventReducer @Inject constructor() {
     }
     
     /**
+     * Refresh messages from REST load-older, replacing the full message list
+     * (to guarantee correct sort order) while preserving SSE-provided parts
+     * (which may be newer than the REST snapshot).
+     */
+    fun mergeMessages(sessionId: String, messages: List<MessageWithParts>) {
+        _messages.update { current ->
+            val incoming = messages.map { it.info }.sortedByDescending { m -> m.time.created }
+            current + (sessionId to incoming)
+        }
+
+        // Only merge parts that we don't already have from SSE (SSE is always fresher)
+        _parts.update { currentParts ->
+            val existingKeys = currentParts.keys
+            val newParts = messages
+                .filter { it.info.id !in existingKeys }
+                .associate { it.info.id to it.parts }
+            currentParts + newParts
+        }
+    }
+    
+    /**
      * Clear all state (used when ALL servers disconnect)
      */
     fun clearAll() {
