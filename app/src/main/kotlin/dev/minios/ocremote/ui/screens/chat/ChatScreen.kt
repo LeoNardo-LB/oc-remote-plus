@@ -1411,9 +1411,10 @@ fun ChatScreen(
 
     val messageCount = uiState.messages.size
 
-    // Scroll to bottom when new messages arrive.
+    // Scroll to bottom when NEW messages arrive (from SSE/streaming),
+    // but NOT when loading older messages (user is scrolled up reading history).
     LaunchedEffect(messageCount) {
-        if (messageCount > 0 && autoScrollEnabled) {
+        if (messageCount > 0 && autoScrollEnabled && !uiState.isLoadingOlder) {
             listState.scrollToItem(0)
         }
     }
