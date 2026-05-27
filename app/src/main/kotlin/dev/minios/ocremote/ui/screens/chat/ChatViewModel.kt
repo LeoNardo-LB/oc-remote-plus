@@ -426,6 +426,13 @@ class ChatViewModel @Inject constructor(
             }
         }
 
+        // Restore model selection from in-memory cache (survives session switching, cleared on app restart)
+        sessionModelCache[sessionId]?.let { (providerId, modelId) ->
+            _selectedProviderId.value = providerId
+            _selectedModelId.value = modelId
+            isModelExplicitlySelected = true
+        }
+
         viewModelScope.launch {
             settingsRepository.hiddenModels(serverId).collect { hidden ->
                 _hiddenModels.value = hidden
@@ -503,6 +510,18 @@ class ChatViewModel @Inject constructor(
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    /**
+     * Refresh session data when returning from background (lock screen / app switch).
+     * Reloads messages, pending questions, and pending permissions.
+     */
+    fun refreshSession() {
+        viewModelScope.launch {
+            loadMessages()
+            loadPendingQuestions()
+            loadPendingPermissions()
         }
     }
 
@@ -687,6 +706,8 @@ class ChatViewModel @Inject constructor(
         _selectedProviderId.value = providerId
         _selectedModelId.value = modelId
         isModelExplicitlySelected = true
+        // Remember selection for this session (in-memory, cleared on app restart)
+        sessionModelCache[sessionId] = providerId to modelId
     }
 
     // ============ @ File Mention Search ============
@@ -1322,6 +1343,14 @@ class ChatViewModel @Inject constructor(
             .filterIsInstance<Part.Text>()
             .joinToString("") { it.text }
             .ifBlank { null }
+    }
+
+    companion object {
+        /**
+         * In-memory cache mapping sessionId → (providerId, modelId).
+         * Survives session switching (ViewModel recreation) but clears on app restart (process death).
+         */
+        private val sessionModelCache = mutableMapOf<String, Pair<String, String>>()
     }
 }
 

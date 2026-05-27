@@ -117,6 +117,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.model.rememberMarkdownState
@@ -1366,6 +1367,24 @@ fun ChatScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Refresh session when returning from background (lock screen / app switch)
+    var hasResumedOnce by remember { mutableStateOf(false) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (hasResumedOnce) {
+                    viewModel.refreshSession()
+                } else {
+                    hasResumedOnce = true
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Whether the user has manually scrolled away — re-enable only via FAB.
     var autoScrollEnabled by remember { mutableStateOf(true) }
 
@@ -1464,15 +1483,6 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    if (uiState.sessionStatus is SessionStatus.Busy) {
-                        IconButton(onClick = { viewModel.abortSession() }) {
-                            Icon(
-                                Icons.Default.Stop,
-                                contentDescription = stringResource(R.string.chat_stop),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
                     if (uiState.sessionParentId == null) {
                     IconButton(onClick = { isTerminalMode = true }) {
                         Icon(
@@ -1940,7 +1950,8 @@ fun ChatScreen(
 
                         },
                         contextWindow = uiState.contextWindow,
-                        lastContextTokens = uiState.lastContextTokens
+                        lastContextTokens = uiState.lastContextTokens,
+                        onStop = { viewModel.abortSession() }
                     )
                 }
             }
@@ -6763,7 +6774,8 @@ private fun ChatInputBar(
     inputMode: ChatInputMode = ChatInputMode.NORMAL,
     onInputModeChange: (ChatInputMode) -> Unit = {},
     contextWindow: Int = 0,
-    lastContextTokens: Int = 0
+    lastContextTokens: Int = 0,
+    onStop: () -> Unit = {}
 ) {
     val isAmoled = isAmoledTheme()
     val isShellMode = inputMode == ChatInputMode.SHELL
@@ -7335,13 +7347,16 @@ private fun ChatInputBar(
                     )
                 }
 
-                // Send button — tap to send, long-press toggles shell mode
+                // Send / Stop button — tap to send or stop, long-press toggles shell mode
+                val showStop = isBusy && text.isBlank()
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(22.dp))
                         .background(
-                            if (isShellMode && !isSending) {
+                            if (showStop) {
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                            } else if (isShellMode && !isSending) {
                                 if (isAmoled) {
                                     Color.Black
                                 } else {
@@ -7352,7 +7367,13 @@ private fun ChatInputBar(
                             }
                         )
                         .then(
-                            if (isShellMode && !isSending) {
+                            if (showStop) {
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                                    shape = RoundedCornerShape(22.dp),
+                                )
+                            } else if (isShellMode && !isSending) {
                                 Modifier.border(
                                     width = if (isAmoled) 1.2.dp else 1.dp,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = if (isAmoled) 0.88f else 0.75f),
@@ -7364,19 +7385,30 @@ private fun ChatInputBar(
                         )
                         .combinedClickable(
                             onClick = {
-                                if (canSend) {
+                                if (showStop) {
+                                    onStop()
+                                } else if (canSend) {
                                     onSend()
                                 }
                             },
                             onLongClick = {
-                                onInputModeChange(
-                                    if (isShellMode) ChatInputMode.NORMAL else ChatInputMode.SHELL
-                                )
+                                if (!showStop) {
+                                    onInputModeChange(
+                                        if (isShellMode) ChatInputMode.NORMAL else ChatInputMode.SHELL
+                                    )
+                                }
                             }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isSending) {
+                    if (showStop) {
+                        Icon(
+                            Icons.Default.Stop,
+                            contentDescription = stringResource(R.string.chat_stop),
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    } else if (isSending) {
                         BreathingCircleIndicator(
                             size = 20.dp,
                             color = MaterialTheme.colorScheme.primary
