@@ -103,6 +103,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.toArgb
@@ -4648,8 +4649,8 @@ private fun MarkdownContent(
  * Table component for 0.41.0 — replaces the default MarkdownTable whose
  * MarkdownTableBasicText inline-content pipeline fails to render cells.
  *
- * Styled with header background, alternating rows, vertical dividers, and an
- * outer border for a clean but distinct table appearance.
+ * Column widths are determined by the widest cell content in each column.
+ * Horizontal scroll is enabled when the table exceeds the available width.
  */
 @Composable
 private fun SimpleMarkdownTable(
@@ -4665,14 +4666,76 @@ private fun SimpleMarkdownTable(
     val shape = RoundedCornerShape(6.dp)
     val border = BorderStroke(1.dp, dividerColor)
 
+    // Parse all cells into a grid structure: List<List<ASTNode>> (rows × cols)
+    val rows = remember(tableNode, content) {
+        val result = mutableListOf<List<ASTNode>>()
+        tableNode.children.forEach { child ->
+            when (child.type) {
+                GFMHeader -> {
+                    result.add(child.children.filter { it.type == GFMCell })
+                }
+                GFMRow -> {
+                    result.add(child.children.filter { it.type == GFMCell })
+                }
+                else -> { /* GFMTableSeparator — skip */ }
+            }
+        }
+        result
+    }
+
+    val columnCount = remember(rows) { rows.maxOfOrNull { it.size } ?: 0 }
+    if (columnCount == 0 || rows.isEmpty()) return
+
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val annotationSettings = annotatorSettings()
+
+    // Measure column widths using TextMeasurer (no composition needed)
+    val columnWidths = remember(rows, content, style, density, annotationSettings) {
+        val minColWidth = with(density) { 60.dp.roundToPx() }
+        val maxColWidth = with(density) { 320.dp.roundToPx() }
+        val padding = with(density) { (pad * 2).roundToPx() }
+        val widths = IntArray(columnCount) { minColWidth }
+
+        for (row in rows) {
+            row.forEachIndexed { colIndex, cell ->
+                val cellText = content.buildMarkdownAnnotatedString(
+                    textNode = cell,
+                    style = style,
+                    annotatorSettings = annotationSettings,
+                )
+                val measured = textMeasurer.measure(
+                    text = cellText,
+                    style = style,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                val textWidth = measured.size.width + padding
+                if (colIndex < columnCount) {
+                    widths[colIndex] = maxOf(widths[colIndex], textWidth.coerceIn(minColWidth, maxColWidth))
+                }
+            }
+        }
+        widths
+    }
+
+    val scrollState = rememberScrollState()
+    val totalTableWidth = remember(columnWidths) {
+        with(density) { columnWidths.sumOf { it }.toDp() }
+    }
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val needsScroll = totalTableWidth > screenWidth - 24.dp // 12.dp padding * 2
+
     var rowIndex = 0
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (needsScroll) Modifier.horizontalScroll(scrollState) else Modifier)
             .border(border, shape)
             .clip(shape)
     ) {
+        var headerRendered = false
         tableNode.children.forEach { child ->
             when (child.type) {
                 GFMHeader -> {
@@ -4683,10 +4746,10 @@ private fun SimpleMarkdownTable(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         child.children.filter { it.type == GFMCell }.forEachIndexed { colIndex, cell ->
-                            val isLast = colIndex == child.children.count { it.type == GFMCell } - 1
+                            val isLast = colIndex == columnCount - 1
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .width(with(density) { columnWidths[colIndex].toDp() })
                                     .then(
                                         if (!isLast) Modifier.drawBehind {
                                             drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
@@ -4706,6 +4769,7 @@ private fun SimpleMarkdownTable(
                         }
                     }
                     HorizontalDivider(thickness = 1.5.dp, color = dividerColor)
+                    headerRendered = true
                 }
                 GFMRow -> {
                     val rowBg = if (rowIndex % 2 == 0) rowBgEven else rowBgOdd
@@ -4716,10 +4780,10 @@ private fun SimpleMarkdownTable(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         child.children.filter { it.type == GFMCell }.forEachIndexed { colIndex, cell ->
-                            val isLast = colIndex == child.children.count { it.type == GFMCell } - 1
+                            val isLast = colIndex == columnCount - 1
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .width(with(density) { columnWidths.getOrNull(colIndex)?.toDp() ?: with(density) { 60.dp } })
                                     .then(
                                         if (!isLast) Modifier.drawBehind {
                                             drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
