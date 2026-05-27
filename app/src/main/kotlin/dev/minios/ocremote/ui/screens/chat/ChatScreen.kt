@@ -144,7 +144,6 @@ import dev.minios.ocremote.data.api.ProviderInfo
 import dev.minios.ocremote.data.api.ProviderModel
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.ui.theme.CodeTypography
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -1367,9 +1366,10 @@ fun ChatScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Whether auto-scroll should follow new content.
-    // Disabled when user manually scrolls up; re-enabled when user scrolls back to bottom.
+    // Disabled when user manually scrolls up; re-enabled only via FAB onClick.
     var autoScrollEnabled by remember { mutableStateOf(true) }
-    var isAutoScrolling by remember { mutableStateOf(false) }
+    // isAutoScrolling removed — previous snapshotFlow-based approach had timing race conditions
+    // causing isAutoScrolling to reset before scrollToItem actually started scrolling
 
     // Scroll anchor for restoring position after loading older messages.
     var savedFirstVisibleMessageId by remember { mutableStateOf<String?>(null) }
@@ -1386,16 +1386,13 @@ fun ChatScreen(
         }
     }
 
-    // When user manually touches the list, disable auto-scroll; re-enable when they reach bottom.
-    // Guarded by isAutoScrolling to prevent programmatic scrollToItem from re-enabling auto-scroll.
-    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
-        if (isAutoScrolling) return@LaunchedEffect
-        if (listState.isScrollInProgress) {
-            // User is actively dragging/flinging — disable auto-scroll
+    // Disable auto-scroll when user scrolls away from bottom.
+    // Do NOT re-enable here — that caused a positive feedback loop where
+    // scrollToItem(0) → isAtBottom=true → autoScrollEnabled=true → scrollToItem(0) → flash.
+    // Re-enable only via FAB onClick.
+    LaunchedEffect(isAtBottom) {
+        if (!isAtBottom) {
             autoScrollEnabled = false
-        } else if (isAtBottom) {
-            // User stopped scrolling and ended up at the bottom — re-enable
-            autoScrollEnabled = true
         }
     }
 
@@ -1413,14 +1410,8 @@ fun ChatScreen(
         // Don't auto-scroll when a scroll position restoration is pending (loading older messages)
         if (savedMessageCount > 0 || isRestoringPosition) return@LaunchedEffect
         if (messageCount > 0 && autoScrollEnabled) {
-            isAutoScrolling = true
             // With reverseLayout=true + reversed data, index 0 = newest at the bottom
             listState.scrollToItem(0)
-            // Wait for the scroll to fully complete before clearing the flag,
-            // so the guard LaunchedEffect doesn't re-enable autoScrollEnabled
-            // due to the programmatic scroll's isScrollInProgress → isAtBottom sequence.
-            snapshotFlow { listState.isScrollInProgress }.first { !it }
-            isAutoScrolling = false
         }
     }
 
@@ -2566,18 +2557,18 @@ fun ChatScreen(
                          }
                      }
  
-                     // Scroll-to-bottom FAB
-                     if (!isAtBottom && !autoScrollEnabled) {
-                         SmallFloatingActionButton(
-                             onClick = {
-                                 coroutineScope.launch {
-                                     listState.scrollToItem(0)
-                                     autoScrollEnabled = true
-                                 }
-                             },
-                             modifier = Modifier
-                                 .align(Alignment.BottomEnd)
-                                 .padding(bottom = 8.dp),
+                    // Scroll-to-bottom FAB
+                      if (!autoScrollEnabled) {
+                          SmallFloatingActionButton(
+                              onClick = {
+                                  coroutineScope.launch {
+                                      listState.scrollToItem(0)
+                                      autoScrollEnabled = true
+                                  }
+                              },
+                              modifier = Modifier
+                                  .align(Alignment.BottomEnd)
+                                  .padding(bottom = 8.dp),
                              containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                              contentColor = MaterialTheme.colorScheme.onSurface
                          ) {
@@ -2813,18 +2804,18 @@ fun ChatScreen(
                                  }
                              }
  
-                             // Scroll-to-bottom FAB
-                             if (!isAtBottom && !autoScrollEnabled) {
-                                 SmallFloatingActionButton(
-                                     onClick = {
-                                         coroutineScope.launch {
-                                             listState.scrollToItem(0)
-                                             autoScrollEnabled = true
-                                         }
-                                     },
-                                     modifier = Modifier
-                                         .align(Alignment.BottomCenter)
-                                        .padding(bottom = 8.dp),
+                            // Scroll-to-bottom FAB
+                              if (!autoScrollEnabled) {
+                                  SmallFloatingActionButton(
+                                      onClick = {
+                                          coroutineScope.launch {
+                                              listState.scrollToItem(0)
+                                              autoScrollEnabled = true
+                                          }
+                                      },
+                                      modifier = Modifier
+                                          .align(Alignment.BottomCenter)
+                                         .padding(bottom = 8.dp),
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     contentColor = MaterialTheme.colorScheme.onSurface
                                 ) {
@@ -4674,25 +4665,20 @@ private fun SimpleMarkdownTable(
     if (columnCount == 0) return
 
     var rowIndex = 0
-    val cellMinWidth = 120.dp
     val scrollState = rememberScrollState()
 
-    BoxWithConstraints {
-        val rowWidth = maxOf(maxWidth, cellMinWidth * columnCount)
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scrollState)
-                .border(border, shape)
-                .clip(shape)
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .border(border, shape)
+            .clip(shape)
+    ) {
             tableNode.children.forEach { child ->
                 when (child.type) {
                     GFMHeader -> {
                         Row(
                             modifier = Modifier
-                                .width(rowWidth)
                                 .background(headerBg),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -4700,7 +4686,7 @@ private fun SimpleMarkdownTable(
                                 val isLast = colIndex == columnCount - 1
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
+                                        .widthIn(min = 80.dp)
                                         .then(
                                             if (!isLast) Modifier.drawBehind {
                                                 drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
@@ -4725,7 +4711,6 @@ private fun SimpleMarkdownTable(
                         val rowBg = if (rowIndex % 2 == 0) rowBgEven else rowBgOdd
                         Row(
                             modifier = Modifier
-                                .width(rowWidth)
                                 .background(rowBg),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -4733,7 +4718,7 @@ private fun SimpleMarkdownTable(
                                 val isLast = colIndex == columnCount - 1
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
+                                        .widthIn(min = 80.dp)
                                         .then(
                                             if (!isLast) Modifier.drawBehind {
                                                 drawLine(dividerColor, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
@@ -4763,7 +4748,6 @@ private fun SimpleMarkdownTable(
                 }
             }
         }
-    }
 }
 
 private val HtmlDocumentHintRegex = Regex("(?is)<!doctype\\s+html\\b|<\\s*html\\b")
