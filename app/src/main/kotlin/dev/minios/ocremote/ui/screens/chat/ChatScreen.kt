@@ -5108,7 +5108,7 @@ private fun ToolCallCard(tool: Part.Tool) {
                         val inputText = input.entries
                             .filter { (_, v) -> v.toString().length <= 500 }
                             .joinToString("\n") { (k, v) ->
-                                val value = v.jsonPrimitive.contentOrNull ?: v.toString().take(200)
+                                val value = v.jsonPrimitive?.contentOrNull ?: v.toString().take(200)
                                 "$k: $value"
                             }
                         if (inputText.isNotBlank()) {
