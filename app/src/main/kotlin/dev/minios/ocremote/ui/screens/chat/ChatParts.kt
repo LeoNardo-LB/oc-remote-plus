@@ -30,8 +30,12 @@ internal fun groupMessages(messages: List<ChatMessage>): List<ChatItem> {
 
     fun flushAssistantGroup() {
         if (currentAssistantGroup.isNotEmpty()) {
+            // Use the oldest (last in newest-first order) message's ID as the turn key.
+            // This keeps the key stable when new assistant messages are appended to the
+            // same turn during streaming — new messages are newer and appear earlier in
+            // the newest-first list, so .last() always returns the original oldest ID.
             items.add(ChatItem.AssistantTurn(
-                key = "turn_${currentAssistantGroup.first().message.id}",
+                key = "turn_${currentAssistantGroup.last().message.id}",
                 messages = currentAssistantGroup.reversed()
             ))
             currentAssistantGroup = mutableListOf()

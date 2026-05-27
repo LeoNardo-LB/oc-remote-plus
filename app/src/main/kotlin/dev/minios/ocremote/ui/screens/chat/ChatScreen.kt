@@ -1380,6 +1380,7 @@ fun ChatScreen(
     // Disable auto-scroll when user scrolls away from bottom.
     // Re-enable only via FAB onClick.
     LaunchedEffect(showJumpToBottom) {
+        android.util.Log.w("SCR", "showJumpToBottom=$showJumpToBottom idx=${listState.firstVisibleItemIndex} auto=$autoScrollEnabled")
         if (showJumpToBottom) {
             autoScrollEnabled = false
         }
@@ -1390,8 +1391,11 @@ fun ChatScreen(
     // Auto-scroll to bottom when new messages arrive and user is at bottom.
     // In reverseLayout=true, scrollToItem(0) brings newest message into view.
     LaunchedEffect(messageCount) {
+        android.util.Log.w("SCR", "LaunchedEffect(mc=$messageCount) auto=$autoScrollEnabled idx=${listState.firstVisibleItemIndex} canFwd=${listState.canScrollForward}")
         if (messageCount > 0 && autoScrollEnabled) {
+            android.util.Log.w("SCR", "→ scrollToItem(0)")
             listState.scrollToItem(0)
+            android.util.Log.w("SCR", "→ after: idx=${listState.firstVisibleItemIndex} canFwd=${listState.canScrollForward}")
         }
     }
 
@@ -2283,7 +2287,36 @@ fun ChatScreen(
                 }
                 else -> {
                      val messageSpacing = if (LocalCompactMessages.current) 4.dp else 12.dp
-                      val chatItems = remember(uiState.messages) { groupMessages(uiState.messages) }
+                      // Cache group structure keyed on message IDs only (not parts content).
+                      // Parts deltas change every frame during streaming; the grouping structure
+                      // only changes when messages are added/removed, so we key on IDs to avoid
+                      // recomputing the grouping on every text delta.
+                      val messageFingerprint = uiState.messages.map { it.message.id }
+                      val cachedGroups = remember(messageFingerprint) { groupMessages(uiState.messages) }
+                      // Refresh chatItems with the latest parts data on every recomposition.
+                      // The grouping structure stays the same (same keys), but ChatMessage.parts
+                      // are updated so bubbles render the latest streaming content.
+                      val chatItems = if (cachedGroups.isEmpty()) {
+                          cachedGroups
+                      } else {
+                          val msgById = uiState.messages.associateBy { it.message.id }
+                          cachedGroups.map { item ->
+                              when (item) {
+                                  is ChatItem.UserMessage -> {
+                                      val fresh = msgById[item.chatMessage.message.id]
+                                      if (fresh != null && fresh != item.chatMessage) item.copy(chatMessage = fresh) else item
+                                  }
+                                  is ChatItem.AssistantTurn -> {
+                                      val freshMsgs = item.messages.map { msg ->
+                                          msgById[msg.message.id] ?: msg
+                                      }
+                                      // Only create a new instance if something actually changed
+                                      // to avoid unnecessary LazyColumn item recompositions.
+                                      if (freshMsgs == item.messages) item else item.copy(messages = freshMsgs)
+                                  }
+                              }
+                          }
+                      }
 
                       if (uiState.sessionParentId == null) {
                           // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB

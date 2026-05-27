@@ -63,11 +63,12 @@ class MessageGrouperTest {
 
     @Test
     fun `groupMessages merges consecutive assistant messages into single turn`() {
+        // Simulates newest-first order (production): a3 newest → a1 oldest
         val messages = listOf(
             createChatMessage("u1", isUser = true),
-            createChatMessage("a1", isUser = false),
+            createChatMessage("a3", isUser = false), // newest
             createChatMessage("a2", isUser = false),
-            createChatMessage("a3", isUser = false),
+            createChatMessage("a1", isUser = false), // oldest
         )
 
         val result = groupMessages(messages)
@@ -76,8 +77,10 @@ class MessageGrouperTest {
         assertTrue(result[0] is ChatItem.UserMessage)
 
         val turn = result[1] as ChatItem.AssistantTurn
+        // Key uses last() in traversal = a1 (oldest), stable when new messages are prepended
         assertEquals("turn_a1", turn.key)
         assertEquals(3, turn.messages.size)
+        // reversed() restores oldest-first reading order: a1, a2, a3
         assertEquals(listOf("a1", "a2", "a3"), turn.messages.map { it.message.id })
     }
 
@@ -101,68 +104,74 @@ class MessageGrouperTest {
 
     @Test
     fun `groupMessages handles complex interleaved pattern`() {
-        // u1 → a1, a2 → u2 → a3 → u3, u4 → a4, a5, a6
+        // Production uses newest-first order. Simulate that here:
+        // Visual (top→bottom): a6 → a5 → a4 → u4 → u3 → a3 → u2 → a2 → a1 → u1
         val messages = listOf(
-            createChatMessage("u1", isUser = true),
-            createChatMessage("a1", isUser = false),
-            createChatMessage("a2", isUser = false),
-            createChatMessage("u2", isUser = true),
-            createChatMessage("a3", isUser = false),
-            createChatMessage("u3", isUser = true),
-            createChatMessage("u4", isUser = true),
-            createChatMessage("a4", isUser = false),
-            createChatMessage("a5", isUser = false),
             createChatMessage("a6", isUser = false),
+            createChatMessage("a5", isUser = false),
+            createChatMessage("a4", isUser = false),
+            createChatMessage("u4", isUser = true),
+            createChatMessage("u3", isUser = true),
+            createChatMessage("a3", isUser = false),
+            createChatMessage("u2", isUser = true),
+            createChatMessage("a2", isUser = false),
+            createChatMessage("a1", isUser = false),
+            createChatMessage("u1", isUser = true),
         )
 
         val result = groupMessages(messages)
 
         assertEquals(7, result.size)
 
-        // u1
-        assertTrue(result[0] is ChatItem.UserMessage)
-        assertEquals("u1", result[0].key)
+        // a6, a5, a4 merged (newest group, encountered first in newest-first)
+        val turn1 = result[0] as ChatItem.AssistantTurn
+        assertEquals("turn_a4", turn1.key) // last() in traversal = oldest of this group
+        assertEquals(listOf("a4", "a5", "a6"), turn1.messages.map { it.message.id })
 
-        // a1, a2 merged
-        val turn1 = result[1] as ChatItem.AssistantTurn
-        assertEquals("turn_a1", turn1.key)
-        assertEquals(listOf("a1", "a2"), turn1.messages.map { it.message.id })
+        // u4
+        assertTrue(result[1] is ChatItem.UserMessage)
+        assertEquals("u4", result[1].key)
 
-        // u2
+        // u3
         assertTrue(result[2] is ChatItem.UserMessage)
-        assertEquals("u2", result[2].key)
+        assertEquals("u3", result[2].key)
 
         // a3
         val turn2 = result[3] as ChatItem.AssistantTurn
         assertEquals("turn_a3", turn2.key)
         assertEquals(1, turn2.messages.size)
 
-        // u3
+        // u2
         assertTrue(result[4] is ChatItem.UserMessage)
-        assertEquals("u3", result[4].key)
+        assertEquals("u2", result[4].key)
 
-        // u4
-        assertTrue(result[5] is ChatItem.UserMessage)
-        assertEquals("u4", result[5].key)
+        // a2, a1 merged
+        val turn3 = result[5] as ChatItem.AssistantTurn
+        assertEquals("turn_a1", turn3.key) // last() in traversal = oldest of this group
+        assertEquals(listOf("a1", "a2"), turn3.messages.map { it.message.id })
 
-        // a4, a5, a6 merged
-        val turn3 = result[6] as ChatItem.AssistantTurn
-        assertEquals("turn_a4", turn3.key)
-        assertEquals(listOf("a4", "a5", "a6"), turn3.messages.map { it.message.id })
+        // u1 (oldest user message, last in newest-first list)
+        assertTrue(result[6] is ChatItem.UserMessage)
+        assertEquals("u1", result[6].key)
     }
 
     @Test
-    fun `groupMessages uses first assistant message id as turn key`() {
+    fun `groupMessages uses last assistant message id as turn key`() {
+        // Newest-first order (production): a3 newest → a1 oldest
         val messages = listOf(
-            createChatMessage("a1", isUser = false),
+            createChatMessage("a3", isUser = false), // newest
             createChatMessage("a2", isUser = false),
-            createChatMessage("a3", isUser = false),
+            createChatMessage("a1", isUser = false), // oldest
         )
 
         val result = groupMessages(messages)
 
         val turn = result[0] as ChatItem.AssistantTurn
+        // Key uses last() in traversal order — the oldest message ID.
+        // Stable when new (newer) messages are prepended to the newest-first list.
         assertEquals("turn_a1", turn.key)
+        // reversed() restores oldest-first reading order
+        assertEquals(listOf("a1", "a2", "a3"), turn.messages.map { it.message.id })
     }
 
     @Test
