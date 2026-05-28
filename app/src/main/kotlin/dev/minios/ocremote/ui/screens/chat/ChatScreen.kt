@@ -15,6 +15,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 
@@ -26,6 +27,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -52,6 +55,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -152,6 +156,7 @@ import dev.minios.ocremote.data.api.ProviderInfo
 import dev.minios.ocremote.data.api.ProviderModel
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.ui.theme.CodeTypography
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -210,6 +215,13 @@ val LocalHapticFeedbackEnabled = compositionLocalOf { true }
 
 /** Image save request callback available to image preview composables. */
 val LocalImageSaveRequest = compositionLocalOf<(ByteArray, String, String?) -> Unit> { { _, _, _ -> } }
+
+/** Persisted expand/collapse state for tool cards, keyed by Part.Tool.id or Part.Patch.id. */
+val LocalToolExpandedStates = compositionLocalOf<Map<String, Boolean>> { emptyMap() }
+
+/** Callback to toggle a tool card's expanded state by its part id. */
+val LocalOnToggleToolExpanded = compositionLocalOf<(String) -> Unit> { { } }
+
 
 @Composable
 private fun isAmoledTheme(): Boolean {
@@ -872,7 +884,7 @@ private suspend fun buildAttachmentFromUri(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
     onNavigateBack: () -> Unit,
@@ -903,6 +915,28 @@ fun ChatScreen(
         }
     }
     val listState = rememberLazyListState()
+
+    // Restore scroll position when returning from sub-session navigation.
+    // Using LaunchedEffect(scrollRestoreVersion) instead of rememberLazyListState(initial...)
+    // because `remember` caches the initial state and ignores new values on recomposition,
+    // causing unreliable restoration when the composable is recomposed (not recreated).
+    LaunchedEffect(viewModel.scrollRestoreVersion) {
+        if (viewModel.scrollRestoreVersion > 0) {
+            listState.scrollToItem(
+                viewModel.savedFirstVisibleItemIndex,
+                viewModel.savedFirstVisibleItemScrollOffset
+            )
+        }
+    }
+
+    // Wrapper that saves scroll position before navigating to a sub-session
+    val navigateToChildSessionWithSave: (String) -> Unit = { childSessionId ->
+        viewModel.saveScrollPosition(
+            listState.firstVisibleItemIndex,
+            listState.firstVisibleItemScrollOffset
+        )
+        onNavigateToChildSession(childSessionId)
+    }
 
     var showModelPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -1408,13 +1442,15 @@ fun ChatScreen(
         }
     }
 
-    // Detect user scrolling up → disable auto-scroll
+    // Detect user scrolling → toggle auto-scroll
     LaunchedEffect(Unit) {
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (index, offset) ->
             if (index > 0 || offset > 50) {
                 autoScrollEnabled = false
+            } else {
+                autoScrollEnabled = true
             }
         }
     }
@@ -1427,6 +1463,8 @@ fun ChatScreen(
         LocalExpandReasoning provides expandReasoning,
         LocalHapticFeedbackEnabled provides hapticEnabled,
         LocalImageSaveRequest provides requestSaveImage,
+        LocalToolExpandedStates provides uiState.toolExpandedStates,
+        LocalOnToggleToolExpanded provides { viewModel.toggleToolExpanded(it) },
     ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -2330,9 +2368,11 @@ fun ChatScreen(
                           Box(
                               modifier = Modifier.fillMaxSize()
                           ) {
-                                LazyColumn(
+                                 LazyColumn(
                                       state = listState,
-                                      modifier = Modifier.fillMaxSize(),
+                                      modifier = Modifier.fillMaxSize()
+                                          .imeNestedScroll()
+                                          .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
                                       contentPadding = PaddingValues(
                                           start = 12.dp,
                                           top = 8.dp,
@@ -2402,7 +2442,7 @@ fun ChatScreen(
                                         AssistantMessageCard(
                                             chatMessage = msg,
                                             isContinuation = isContinuation,
-                                            onViewSubSession = onNavigateToChildSession,
+                                            onViewSubSession = navigateToChildSessionWithSave,
                                             onCopyText = {
                                                 val text = msg.parts.filterIsInstance<Part.Text>()
                                                     .joinToString("\n") { it.text }
@@ -2487,7 +2527,7 @@ fun ChatScreen(
                                         ChatMessageBubble(
                                             chatMessage = chatMessage,
                                             isQueued = chatMessage.message.id in uiState.queuedMessageIds,
-                                            onViewSubSession = onNavigateToChildSession,
+                                            onViewSubSession = navigateToChildSessionWithSave,
                                             onRevert = if (uiState.sessionParentId == null) {{
                                                 val revertText = chatMessage.parts
                                                     .filterIsInstance<Part.Text>()
@@ -2553,10 +2593,10 @@ fun ChatScreen(
                                   }
                               }
                           }
-                      }
- 
-                      // Scroll-to-bottom FAB
-                        if (!autoScrollEnabled) {
+                          }
+   
+                        // Scroll-to-bottom FAB
+                         if (!autoScrollEnabled) {
                             SmallFloatingActionButton(
                                 onClick = {
                                     coroutineScope.launch {
@@ -2573,18 +2613,20 @@ fun ChatScreen(
                               Icon(
                                   Icons.Default.KeyboardArrowDown,
                                   contentDescription = stringResource(R.string.chat_scroll_bottom),
-                                  modifier = Modifier.size(20.dp)
-                              )
-                          }
-                      }
+                                           modifier = Modifier.size(20.dp)
+                                      )
+                                  }
+                              }
 
-                          }
-                      } else {
-                          // Sub-session (no input bar): just LazyColumn + FAB
-                          Box(modifier = Modifier.fillMaxSize()) {
-                               LazyColumn(
+                           }
+                       } else {
+                            // Sub-session (no input bar): just LazyColumn + FAB
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                LazyColumn(
                                   state = listState,
-                                  modifier = Modifier.fillMaxSize(),
+                                  modifier = Modifier.fillMaxSize()
+                                      .imeNestedScroll()
+                                      .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
                                   contentPadding = PaddingValues(
                                       horizontal = 12.dp,
                                       vertical = 8.dp
@@ -2652,7 +2694,7 @@ fun ChatScreen(
                                               AssistantMessageCard(
                                                   chatMessage = msg,
                                                   isContinuation = isContinuation,
-                                                  onViewSubSession = onNavigateToChildSession,
+                                                  onViewSubSession = navigateToChildSessionWithSave,
                                                   onCopyText = {
                                                       val text = msg.parts.filterIsInstance<Part.Text>()
                                                           .joinToString("\n") { it.text }
@@ -2739,7 +2781,7 @@ fun ChatScreen(
                                               ChatMessageBubble(
                                                   chatMessage = chatMessage,
                                                   isQueued = chatMessage.message.id in uiState.queuedMessageIds,
-                                                  onViewSubSession = onNavigateToChildSession,
+                                                  onViewSubSession = navigateToChildSessionWithSave,
                                                   onRevert = null,
                                                   onCopyText = {
                                                       val text = chatMessage.parts
@@ -2818,12 +2860,14 @@ fun ChatScreen(
                                      )
                                  }
                              }
+
                          }
                      }
                  }
-            }
-        }
-    }
+             }
+         }
+      }
+
 
     // Model picker dialog
     if (showModelPicker) {
@@ -4464,20 +4508,57 @@ private fun PartContent(
         }
         is Part.Tool -> {
             // todoread parts are filtered out entirely (WebUI convention)
+            val toolExpandedStates = LocalToolExpandedStates.current
+            val onToggleToolExpanded = LocalOnToggleToolExpanded.current
             if (part.tool == "todoread") {
                 // skip
             } else if (part.tool == "todowrite") {
-                TodoListCard(tool = part)
+                TodoListCard(
+                    tool = part,
+                    isExpanded = toolExpandedStates[part.id] ?: true,
+                    onToggleExpand = { onToggleToolExpanded(part.id) }
+                )
             } else {
                 // Dispatch to tool-specific renderers (like WebUI)
+                val autoExpand = LocalCollapseTools.current
                 when (part.tool) {
-                    "edit", "multiedit" -> EditToolCard(tool = part)
-                    "write" -> WriteToolCard(tool = part)
-                    "bash" -> BashToolCard(tool = part)
-                    "read" -> ReadToolCard(tool = part)
-                    "glob", "grep" -> SearchToolCard(tool = part)
-                    "task" -> TaskToolCard(tool = part, onViewSubSession = onViewSubSession, turnAgentName = turnAgentName)
-                    else -> ToolCallCard(tool = part)
+                    "edit", "multiedit" -> EditToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "write" -> WriteToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "bash" -> BashToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "read" -> ReadToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "glob", "grep" -> SearchToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "task" -> TaskToolCard(
+                        tool = part,
+                        onViewSubSession = onViewSubSession,
+                        turnAgentName = turnAgentName,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    else -> ToolCallCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
                 }
             }
         }
@@ -4488,7 +4569,14 @@ private fun PartContent(
             // Token/cost info hidden from message bubbles (WebUI convention)
         }
         is Part.Patch -> {
-            PatchCard(patch = part)
+            val autoExpand = LocalCollapseTools.current
+            val toolExpandedStates = LocalToolExpandedStates.current
+            val onToggleToolExpanded = LocalOnToggleToolExpanded.current
+            PatchCard(
+                patch = part,
+                isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                onToggleExpand = { onToggleToolExpanded(part.id) }
+            )
         }
         is Part.File -> {
             FileCard(file = part)
@@ -5036,19 +5124,25 @@ private fun ReasoningBlock(text: String, defaultExpanded: Boolean = false) {
                 )
             }
 
-            // Expandable content
-            AnimatedVisibility(visible = expanded) {
-                Column {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontStyle = FontStyle.Italic,
-                            lineHeight = 18.sp,
-                            letterSpacing = 0.15.sp
-                        ),
-                        color = textColor.copy(alpha = 0.55f)
-                    )
+            // Expandable content — half-screen height, scrollable, Markdown rendered
+            AnimatedVisibility(
+                visible = expanded,
+            ) {
+                val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = halfScreenHeight)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        MarkdownContent(
+                            markdown = text,
+                            textColor = textColor.copy(alpha = 0.55f),
+                            isUser = false
+                        )
+                    }
                 }
             }
         }
@@ -5056,7 +5150,11 @@ private fun ReasoningBlock(text: String, defaultExpanded: Boolean = false) {
 }
 
 @Composable
-private fun ToolCallCard(tool: Part.Tool) {
+private fun ToolCallCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     val stateColor = when (tool.state) {
         is ToolState.Pending -> MaterialTheme.colorScheme.outline
@@ -5076,24 +5174,15 @@ private fun ToolCallCard(tool: Part.Tool) {
     // Resolve display info based on tool type
     val toolDisplay = resolveToolDisplay(tool.tool, tool.state, input)
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
 
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
-        tonalElevation = if (isAmoled) 0.dp else 1.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
             // Header row — always clickable to allow expand/collapse in any state
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -5167,7 +5256,7 @@ private fun ToolCallCard(tool: Part.Tool) {
 
             // Expandable details
             AnimatedVisibility(
-                visible = expanded
+                visible = expanded,
             ) {
                 Column(
                     modifier = Modifier.padding(top = 4.dp),
@@ -5227,8 +5316,6 @@ private fun ToolCallCard(tool: Part.Tool) {
                     }
                 }
             }
-        }
-    }
 }
 
 /**
@@ -5389,7 +5476,11 @@ private fun extractToolOutput(tool: Part.Tool): String {
  * Like WebUI: trigger = "Edit" + filename + DiffChanges, content = diff view.
  */
 @Composable
-private fun EditToolCard(tool: Part.Tool) {
+private fun EditToolCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -5415,10 +5506,9 @@ private fun EditToolCard(tool: Part.Tool) {
     val additions = if (addCount > 0) addCount else 0
     val deletions = if (addCount < 0) -addCount else 0
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
     val hasContent = oldString.isNotBlank() || newString.isNotBlank()
@@ -5435,7 +5525,7 @@ private fun EditToolCard(tool: Part.Tool) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -5450,22 +5540,13 @@ private fun EditToolCard(tool: Part.Tool) {
                         modifier = Modifier.size(16.dp),
                         tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.chat_edit_label),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1
-                        )
-                        if (shortPath.isNotBlank()) {
-                            Text(
-                                text = shortPath,
-                                style = CodeTypography.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    Text(
+                        text = stringResource(R.string.chat_edit_label),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 // Diff stats + expand indicator
                 Row(
@@ -5494,7 +5575,7 @@ private fun EditToolCard(tool: Part.Tool) {
 
             // Expanded diff view
             AnimatedVisibility(
-                visible = expanded && hasContent
+                visible = expanded && hasContent,
             ) {
                 Column(modifier = Modifier.padding(top = 6.dp)) {
                     if (isError) {
@@ -5578,7 +5659,6 @@ private fun DiffView(before: String, after: String) {
         Column(
             modifier = Modifier
                 .codeHorizontalScroll()
-                .verticalScroll(rememberScrollState())
                 .padding(4.dp)
         ) {
             for (line in diffLines) {
@@ -5669,7 +5749,11 @@ private fun computeSimpleDiff(before: List<String>, after: List<String>): List<D
  * Like WebUI: trigger = "Write" + filename, content = code view.
  */
 @Composable
-private fun WriteToolCard(tool: Part.Tool) {
+private fun WriteToolCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
@@ -5677,10 +5761,9 @@ private fun WriteToolCard(tool: Part.Tool) {
     val shortPath = filePath.substringAfterLast('/')
     val content = input["content"]?.jsonPrimitive?.contentOrNull ?: ""
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
     val hasContent = content.isNotBlank()
@@ -5696,7 +5779,7 @@ private fun WriteToolCard(tool: Part.Tool) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -5711,21 +5794,13 @@ private fun WriteToolCard(tool: Part.Tool) {
                         modifier = Modifier.size(16.dp),
                         tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.chat_write_label),
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                        if (shortPath.isNotBlank()) {
-                            Text(
-                                text = shortPath,
-                                style = CodeTypography.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    Text(
+                        text = stringResource(R.string.chat_write_label),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 if (isRunning) {
                     PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
@@ -5740,7 +5815,7 @@ private fun WriteToolCard(tool: Part.Tool) {
             }
 
             AnimatedVisibility(
-                visible = expanded && hasContent
+                visible = expanded && hasContent,
             ) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
@@ -5757,7 +5832,6 @@ private fun WriteToolCard(tool: Part.Tool) {
                         modifier = Modifier
                             .padding(8.dp)
                             .codeHorizontalScroll()
-                            .verticalScroll(rememberScrollState())
                     )
                 }
             }
@@ -5770,7 +5844,11 @@ private fun WriteToolCard(tool: Part.Tool) {
  * Like WebUI: trigger = "Shell" + description, content = code block with command+output.
  */
 @Composable
-private fun BashToolCard(tool: Part.Tool) {
+private fun BashToolCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     val input = extractToolInput(tool)
@@ -5795,10 +5873,9 @@ private fun BashToolCard(tool: Part.Tool) {
         else -> null
     }
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
     val hasContent = command.isNotBlank() || output.isNotBlank()
@@ -5814,7 +5891,7 @@ private fun BashToolCard(tool: Part.Tool) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -5829,23 +5906,13 @@ private fun BashToolCard(tool: Part.Tool) {
                         modifier = Modifier.size(16.dp),
                         tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = serverTitle ?: stringResource(R.string.tool_shell),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (description != null) {
-                            Text(
-                                text = description,
-                                style = CodeTypography.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    Text(
+                        text = serverTitle ?: stringResource(R.string.tool_shell),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 if (isRunning) {
                     PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
@@ -5880,7 +5947,7 @@ private fun BashToolCard(tool: Part.Tool) {
             }
 
             AnimatedVisibility(
-                visible = expanded && hasContent
+                visible = expanded && hasContent,
             ) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
@@ -5898,7 +5965,6 @@ private fun BashToolCard(tool: Part.Tool) {
                             modifier = Modifier
                                 .padding(8.dp)
                                 .codeHorizontalScroll()
-                                .verticalScroll(rememberScrollState())
                         )
                     }
                 }
@@ -5911,7 +5977,11 @@ private fun BashToolCard(tool: Part.Tool) {
  * Read tool card — shows "读取" title, file name subtitle, expandable for details.
  */
 @Composable
-private fun ReadToolCard(tool: Part.Tool) {
+private fun ReadToolCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
@@ -5929,10 +5999,9 @@ private fun ReadToolCard(tool: Part.Tool) {
         limit?.let { add("limit=$it") }
     }.takeIf { it.isNotEmpty() }?.joinToString(", ", "[", "]")
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
     val isCompleted = tool.state is ToolState.Completed
 
     Surface(
@@ -5946,7 +6015,7 @@ private fun ReadToolCard(tool: Part.Tool) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -5961,35 +6030,13 @@ private fun ReadToolCard(tool: Part.Tool) {
                         modifier = Modifier.size(16.dp),
                         tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.tool_read),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (shortPath.isNotBlank()) {
-                                Text(
-                                    text = shortPath,
-                                    style = CodeTypography.copy(fontSize = 11.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (args != null) {
-                                Text(
-                                    text = args,
-                                    style = CodeTypography.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = stringResource(R.string.tool_read),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 if (isRunning) {
                     PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
@@ -6004,7 +6051,7 @@ private fun ReadToolCard(tool: Part.Tool) {
             }
 
             AnimatedVisibility(
-                visible = expanded
+                visible = expanded,
             ) {
                 Column(
                     modifier = Modifier.padding(top = 4.dp),
@@ -6057,7 +6104,11 @@ private fun ReadToolCard(tool: Part.Tool) {
  * Like WebUI: trigger = "Glob"/"Grep" + directory + [pattern=...], content = markdown output.
  */
 @Composable
-private fun SearchToolCard(tool: Part.Tool) {
+private fun SearchToolCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull
@@ -6083,10 +6134,9 @@ private fun SearchToolCard(tool: Part.Tool) {
         include?.let { add("include=$it") }
     }.takeIf { it.isNotEmpty() }?.joinToString(", ", "[", "]")
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
     val isRunning = tool.state is ToolState.Running
     val hasOutput = output.isNotBlank()
 
@@ -6101,7 +6151,7 @@ private fun SearchToolCard(tool: Part.Tool) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -6116,36 +6166,13 @@ private fun SearchToolCard(tool: Part.Tool) {
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (dirPath != null) {
-                                Text(
-                                    text = dirPath.substringAfterLast('/').ifEmpty { dirPath },
-                                    style = CodeTypography.copy(fontSize = 11.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (argsText != null) {
-                                Text(
-                                    text = argsText,
-                                    style = CodeTypography.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 if (isRunning) {
                     PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
@@ -6160,7 +6187,7 @@ private fun SearchToolCard(tool: Part.Tool) {
             }
 
             AnimatedVisibility(
-                visible = expanded && hasOutput
+                visible = expanded && hasOutput,
             ) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
@@ -6172,7 +6199,7 @@ private fun SearchToolCard(tool: Part.Tool) {
                         .heightIn(max = 600.dp)
                 ) {
                     Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState())
+                        modifier = Modifier
                     ) {
                         MarkdownContent(
                             markdown = output,
@@ -6194,7 +6221,9 @@ private fun SearchToolCard(tool: Part.Tool) {
 private fun TaskToolCard(
     tool: Part.Tool,
     onViewSubSession: ((String) -> Unit)? = null,
-    turnAgentName: String? = null
+    turnAgentName: String? = null,
+    isExpanded: Boolean = false,
+    onToggleExpand: () -> Unit = {}
 ) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
@@ -6216,10 +6245,9 @@ private fun TaskToolCard(
         else -> null
     }
 
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
     val isRunning = tool.state is ToolState.Running
     val hasOutput = output.isNotBlank()
     val subSessionId = when (val state = tool.state) {
@@ -6245,7 +6273,7 @@ private fun TaskToolCard(
                             subSessionId != null && onViewSubSession != null ->
                                 mod.clickable { performHaptic(hapticView, hapticOn); onViewSubSession(subSessionId) }
                             else ->
-                                mod.clickable { performHaptic(hapticView, hapticOn); expanded = !expanded }
+                                mod.clickable { performHaptic(hapticView, hapticOn); onToggleExpand() }
                         }
                     },
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -6301,7 +6329,7 @@ private fun TaskToolCard(
             }
 
             AnimatedVisibility(
-                visible = expanded && hasOutput
+                visible = expanded && hasOutput,
             ) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
@@ -6313,7 +6341,7 @@ private fun TaskToolCard(
                         .heightIn(max = 600.dp)
                 ) {
                     Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState())
+                        modifier = Modifier
                     ) {
                         MarkdownContent(
                             markdown = output,
@@ -6327,7 +6355,11 @@ private fun TaskToolCard(
     }
 }
 @Composable
-private fun TodoListCard(tool: Part.Tool) {
+private fun TodoListCard(
+    tool: Part.Tool,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
     // Extract todos from metadata first, then fall back to input
     val todos = remember(tool) {
@@ -6356,29 +6388,21 @@ private fun TodoListCard(tool: Part.Tool) {
 
     if (todos.isEmpty()) {
         // Fallback to generic tool card if we can't parse todos
-        ToolCallCard(tool = tool)
+        ToolCallCard(tool = tool, isExpanded = isExpanded, onToggleExpand = onToggleExpand)
         return
     }
 
     val completedCount = todos.count { it.status == "completed" }
     val totalCount = todos.size
-    var expanded by remember { mutableStateOf(true) }
+    val expanded = isExpanded
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
 
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
-        tonalElevation = if (isAmoled) 0.dp else 1.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
             // Header row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -6421,7 +6445,7 @@ private fun TodoListCard(tool: Part.Tool) {
 
             // Todo items
             AnimatedVisibility(
-                visible = expanded
+                visible = expanded,
             ) {
                 Column(
                     modifier = Modifier.padding(top = 4.dp),
@@ -6432,8 +6456,6 @@ private fun TodoListCard(tool: Part.Tool) {
                     }
                 }
             }
-        }
-    }
 }
 
 private data class TodoItem(
@@ -6507,26 +6529,21 @@ private fun StepFinishInfo(step: Part.StepFinish) {
 }
 
 @Composable
-private fun PatchCard(patch: Part.Patch) {
+private fun PatchCard(
+    patch: Part.Patch,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
     val isAmoled = isAmoledTheme()
-    val autoExpand = LocalCollapseTools.current
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    var expanded by remember(autoExpand) { mutableStateOf(autoExpand) }
+    val expanded = isExpanded
 
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
-        tonalElevation = if (isAmoled) 0.dp else 1.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
             // Header row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded },
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -6559,7 +6576,7 @@ private fun PatchCard(patch: Part.Patch) {
 
             // Expanded file list
             AnimatedVisibility(
-                visible = expanded
+                visible = expanded,
             ) {
                 Column(
                     modifier = Modifier.padding(top = 6.dp),
@@ -6579,8 +6596,6 @@ private fun PatchCard(patch: Part.Patch) {
                     }
                 }
             }
-        }
-    }
 }
 
 /**

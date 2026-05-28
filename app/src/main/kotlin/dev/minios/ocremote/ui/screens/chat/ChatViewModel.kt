@@ -1,6 +1,9 @@
 package dev.minios.ocremote.ui.screens.chat
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.R
 import androidx.lifecycle.SavedStateHandle
@@ -26,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -76,7 +80,9 @@ data class ChatUiState(
     /** Parent session ID — non-null when this session is a child/sub-agent session. */
     val sessionParentId: String? = null,
     /** Agent name for this session (e.g. "explore", "general"). Populated for sub-agent sessions. */
-    val sessionAgent: String? = null
+    val sessionAgent: String? = null,
+    /** Persisted expand/collapse state for tool cards, keyed by Part.Tool.id or Part.Patch.id. */
+    val toolExpandedStates: Map<String, Boolean> = emptyMap()
 )
 
 data class RevertedDraftPayload(
@@ -193,6 +199,41 @@ class ChatViewModel @Inject constructor(
     val collapseTools = settingsRepository.collapseTools.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
+
+    // ============ Tool Expand State ============
+    private val _toolExpandedStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val toolExpandedStates: StateFlow<Map<String, Boolean>> = _toolExpandedStates
+
+    fun toggleToolExpanded(toolId: String) {
+        _toolExpandedStates.update { it + (toolId to !(it[toolId] ?: false)) }
+    }
+
+    fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean {
+        return _toolExpandedStates.value[toolId] ?: autoExpand
+    }
+
+    // ============ Scroll Position Save/Restore ============
+    /** Saved scroll position for restoring after sub-session navigation. */
+    var savedFirstVisibleItemIndex by mutableStateOf(0)
+        private set
+    var savedFirstVisibleItemScrollOffset by mutableStateOf(0)
+        private set
+
+    /**
+     * Incremented each time [saveScrollPosition] is called.
+     * ChatScreen observes this via LaunchedEffect to reliably restore scroll position
+     * after sub-session navigation. Using rememberLazyListState(initial...) is unreliable
+     * because `remember` caches the initial state on first composition and ignores
+     * new values on recomposition, causing scroll to sometimes restore and sometimes not.
+     */
+    var scrollRestoreVersion by mutableStateOf(0)
+        private set
+
+    fun saveScrollPosition(index: Int, offset: Int) {
+        savedFirstVisibleItemIndex = index
+        savedFirstVisibleItemScrollOffset = offset
+        scrollRestoreVersion++
+    }
     val expandReasoning = settingsRepository.expandReasoning.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
@@ -239,7 +280,8 @@ class ChatViewModel @Inject constructor(
         _selectedVariant,
         _commands,
         _hasOlderMessages,
-        _isLoadingOlder
+        _isLoadingOlder,
+        _toolExpandedStates
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val allSessions = args[0] as List<Session>
@@ -265,6 +307,8 @@ class ChatViewModel @Inject constructor(
         val commands = args[17] as List<CommandInfo>
         val hasOlderMessages = args[18] as Boolean
         val isLoadingOlder = args[19] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val toolExpandedStates = args[20] as Map<String, Boolean>
 
         val session = allSessions.find { it.id == sessionId }
         val sessionMessages = allMessages[sessionId] ?: emptyList()
@@ -417,7 +461,8 @@ class ChatViewModel @Inject constructor(
             lastContextTokens = lastContextTokens,
             queuedMessageIds = queuedMessageIds,
             sessionParentId = session?.parentId,
-            sessionAgent = session?.agent
+            sessionAgent = session?.agent,
+            toolExpandedStates = toolExpandedStates
         )
     }.stateIn(
         viewModelScope,
@@ -1227,12 +1272,18 @@ class ChatViewModel @Inject constructor(
                     arguments
                 }
 
+                val currentAgent = uiState.value.selectedAgent
+                val currentModel = uiState.value.selectedModelId
+                val currentVariant = uiState.value.selectedVariant
                 val ok = api.executeCommand(
                     conn = conn,
                     sessionId = sessionId,
                     command = normalizedCommand,
                     arguments = effectiveArguments,
-                    directory = effectiveDirectory
+                    directory = effectiveDirectory,
+                    agent = currentAgent,
+                    model = currentModel,
+                    variant = currentVariant
                 )
                 if (BuildConfig.DEBUG) {
                     Log.d(

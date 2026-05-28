@@ -112,7 +112,13 @@ class EventReducer @Inject constructor() {
             is SseEvent.WorkspaceFailed -> Log.w(TAG, "Workspace failed: ${event.workspaceId} error=${event.error}")
             is SseEvent.FileEdited -> { if (BuildConfig.DEBUG) Log.d(TAG, "File edited: ${event.path}") }
             is SseEvent.McpToolsChanged -> { if (BuildConfig.DEBUG) Log.d(TAG, "MCP tools changed: ${event.server}") }
-            is SseEvent.CommandExecuted -> { if (BuildConfig.DEBUG) Log.d(TAG, "Command executed: ${event.name}") }
+            is SseEvent.CommandExecuted -> {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Command executed: ${event.name}")
+                // Command execution completed — reset session status to Idle
+                event.sessionId.let { sid ->
+                    _sessionStatuses.update { it + (sid to SessionStatus.Idle) }
+                }
+            }
             is SseEvent.FileWatcherUpdated -> { if (BuildConfig.DEBUG) Log.d(TAG, "File watcher updated: ${event.path}") }
             is SseEvent.InstallationUpdated -> { if (BuildConfig.DEBUG) Log.d(TAG, "Installation updated: ${event.version}") }
             is SseEvent.InstallationUpdateAvailable -> Log.i(TAG, "Update available: ${event.version}")

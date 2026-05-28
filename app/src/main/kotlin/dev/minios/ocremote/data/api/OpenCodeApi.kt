@@ -254,20 +254,29 @@ class OpenCodeApi @Inject constructor(
     /**
      * Execute a server-side command in a session.
      * POST /session/{sessionId}/command
-     * Body: { command: String, arguments: String }
+     * Body: { command: String, arguments: String, agent?, model?, variant?, parts? }
      */
     suspend fun executeCommand(
         conn: ServerConnection,
         sessionId: String,
         command: String,
         arguments: String = "",
-        directory: String? = null
+        directory: String? = null,
+        agent: String? = null,
+        model: String? = null,
+        variant: String? = null,
+        parts: List<Map<String, String>>? = null
     ): Boolean {
+        val body = mutableMapOf<String, Any>("command" to command, "arguments" to arguments)
+        agent?.let { body["agent"] = it }
+        model?.let { body["model"] = it }
+        variant?.let { body["variant"] = it }
+        parts?.let { body["parts"] = it }
         val response = httpClient.post("${conn.baseUrl}/session/$sessionId/command") {
             conn.authHeader?.let { header("Authorization", it) }
             directory?.let { header("x-opencode-directory", it) }
             contentType(ContentType.Application.Json)
-            setBody(mapOf("command" to command, "arguments" to arguments))
+            setBody(body)
         }
         return response.status.isSuccess()
     }
