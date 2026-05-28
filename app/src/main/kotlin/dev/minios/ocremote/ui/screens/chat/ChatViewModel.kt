@@ -464,7 +464,7 @@ class ChatViewModel @Inject constructor(
 
         // Load initial message count from settings, then load data
         viewModelScope.launch {
-            currentMessageLimit = settingsRepository.initialChatItemCount.first()
+            currentMessageLimit = settingsRepository.initialMessageCount.first()
             loadSession()
             loadMessages()
             loadPendingQuestions()
