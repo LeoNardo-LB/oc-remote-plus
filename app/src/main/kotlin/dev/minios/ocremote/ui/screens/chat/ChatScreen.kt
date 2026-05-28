@@ -59,7 +59,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
@@ -1782,6 +1781,11 @@ fun ChatScreen(
                                 viewModel.sendMessage(allParts, attachmentParts)
                                 inputText = TextFieldValue("")
                                 attachments.clear()
+                                // Scroll to bottom after sending
+                                coroutineScope.launch {
+                                    autoScrollEnabled = true
+                                    listState.scrollToItem(0)
+                                }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
                                 viewModel.clearDraft()
@@ -4166,29 +4170,7 @@ private fun AssistantMessageCard(
                         )
                     }
                 }
-
-                // Token/cost footer
-                val footerAlpha = if (isContinuation) 0.2f else 0.4f
-                if (chatMessage.isAssistant) {
-                    val cost = assistantMsg?.cost
-                    val tokens = assistantMsg?.tokens
-                    if (cost != null || tokens != null) {
-                        val parts = mutableListOf<String>()
-                        if (tokens != null) parts.add("↑${tokens.input} ↓${tokens.output}")
-                        if (cost != null) parts.add("$${"%.4f".format(cost)}")
-                        val footer = parts.joinToString(" · ")
-                        if (footer.isNotBlank()) {
-                            Text(
-                                text = footer,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = textColor.copy(alpha = footerAlpha),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                }
             }
-        }
     }
 }
 
@@ -5000,118 +4982,73 @@ private fun preserveRawHtmlPayload(markdown: String): String {
 
 @Composable
 private fun ReasoningBlock(text: String, defaultExpanded: Boolean = false) {
-    val isAmoled = isAmoledTheme()
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     var expanded by remember { mutableStateOf(defaultExpanded) }
 
-    val accentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-    val containerColor = when {
-        isAmoled -> Color.Black
-        else -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.7f)
-    }
-    val onSurfaceMuted = MaterialTheme.colorScheme.onSurface
+    val accentColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    val textColor = MaterialTheme.colorScheme.onSurface
 
-    // Pulse animation for the thinking dot
-    val infiniteTransition = rememberInfiniteTransition(label = "thinkingPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes { durationMillis = 1200; 0.7f at 400; 0.4f at 800 },
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = containerColor,
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded }
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            // Gradient left accent bar — matchParentSize fills the Box height
+        // Left accent line — matchParentSize follows content height
+        Box(
+            modifier = Modifier.matchParentSize()
+        ) {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
-                    .padding(end = 0.dp)
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(accentColor)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 0.dp, top = 8.dp, bottom = 8.dp)
+        ) {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(2.5.dp)
-                        .fillMaxHeight()
-                        .drawBehind {
-                            drawRect(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        accentColor,
-                                        accentColor.copy(alpha = 0.15f)
-                                    )
-                                )
-                            )
-                        }
+                Text(
+                    text = stringResource(R.string.chat_status_thinking),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = textColor.copy(alpha = 0.45f)
+                )
+
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded)
+                        stringResource(R.string.chat_collapse)
+                    else
+                        stringResource(R.string.chat_expand),
+                    modifier = Modifier.size(16.dp),
+                    tint = textColor.copy(alpha = 0.35f)
                 )
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); expanded = !expanded }
-                    .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
-            ) {
-                // Header row: dot + label + arrow
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Animated pulse dot
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .drawBehind {
-                                    drawCircle(color = accentColor.copy(alpha = pulseAlpha))
-                                }
-                        )
-                        Spacer(modifier = Modifier.width(7.dp))
-                        Text(
-                            text = stringResource(R.string.chat_status_thinking),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 0.8.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 10.5.sp
-                            ),
-                            color = onSurfaceMuted.copy(alpha = 0.45f)
-                        )
-                    }
-
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (expanded)
-                            stringResource(R.string.chat_collapse)
-                        else
-                            stringResource(R.string.chat_expand),
-                        modifier = Modifier.size(18.dp),
-                        tint = onSurfaceMuted.copy(alpha = 0.3f)
+            // Expandable content
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontStyle = FontStyle.Italic,
+                            lineHeight = 18.sp,
+                            letterSpacing = 0.15.sp
+                        ),
+                        color = textColor.copy(alpha = 0.55f)
                     )
-                }
-
-                // Expandable content
-                AnimatedVisibility(visible = expanded) {
-                    Column {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = text,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                                lineHeight = 19.sp,
-                                fontWeight = FontWeight.Normal,
-                                letterSpacing = 0.15.sp
-                            ),
-                            color = onSurfaceMuted.copy(alpha = 0.55f)
-                        )
-                    }
                 }
             }
         }
@@ -5176,22 +5113,39 @@ private fun ToolCallCard(tool: Part.Tool) {
                         modifier = Modifier.size(16.dp),
                         tint = if (tool.state is ToolState.Error) stateColor else toolDisplay.iconTint ?: stateColor
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = toolDisplay.title,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (toolDisplay.subtitle != null) {
+                    if (tool.tool == "task") {
+                        // Task tool: keep 2-line layout
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = toolDisplay.subtitle,
-                                style = CodeTypography.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                text = toolDisplay.title,
+                                style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            if (toolDisplay.subtitle != null) {
+                                Text(
+                                    text = toolDisplay.subtitle,
+                                    style = CodeTypography.copy(fontSize = 11.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
+                    } else {
+                        // Other tools: single line
+                        val displayText = if (toolDisplay.subtitle != null && toolDisplay.subtitle != toolDisplay.title) {
+                            "${toolDisplay.title} ${toolDisplay.subtitle}"
+                        } else {
+                            toolDisplay.title
+                        }
+                        Text(
+                            text = displayText,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
                 // Expand indicator
