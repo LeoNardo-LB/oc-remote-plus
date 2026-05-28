@@ -3,60 +3,8 @@ package dev.minios.ocremote.ui.screens.chat
 import dev.minios.ocremote.domain.model.Part
 
 /**
- * Represents a renderable item in the chat list.
- * Consecutive assistant messages are grouped into a single AssistantTurn.
+ * Utility functions for filtering and categorizing chat parts.
  */
-internal sealed class ChatItem {
-    abstract val key: String
-
-    data class UserMessage(
-        override val key: String,
-        val chatMessage: ChatMessage
-    ) : ChatItem()
-
-    data class AssistantTurn(
-        override val key: String,
-        val messages: List<ChatMessage>
-    ) : ChatItem()
-}
-
-/**
- * Groups a flat list of ChatMessages into ChatItems.
- * Consecutive assistant messages are merged into a single AssistantTurn.
- */
-internal fun groupMessages(messages: List<ChatMessage>): List<ChatItem> {
-    val items = mutableListOf<ChatItem>()
-    var currentAssistantGroup = mutableListOf<ChatMessage>()
-
-    fun flushAssistantGroup() {
-        if (currentAssistantGroup.isNotEmpty()) {
-            // Use the oldest (last in newest-first order) message's ID as the turn key.
-            // This keeps the key stable when new assistant messages are appended to the
-            // same turn during streaming — new messages are newer and appear earlier in
-            // the newest-first list, so .last() always returns the original oldest ID.
-            items.add(ChatItem.AssistantTurn(
-                key = "turn_${currentAssistantGroup.last().message.id}",
-                messages = currentAssistantGroup.reversed()
-            ))
-            currentAssistantGroup = mutableListOf()
-        }
-    }
-
-    for (msg in messages) {
-        if (msg.isUser) {
-            flushAssistantGroup()
-            items.add(ChatItem.UserMessage(
-                key = msg.message.id,
-                chatMessage = msg
-            ))
-        } else {
-            currentAssistantGroup.add(msg)
-        }
-    }
-    flushAssistantGroup()
-
-    return items
-}
 
 /**
  * Determines whether a Part should be rendered inside a chat bubble.

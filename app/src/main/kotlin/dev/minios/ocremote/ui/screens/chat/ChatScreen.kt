@@ -3820,8 +3820,7 @@ private fun resolveStepsStatus(stepParts: List<Part>): String {
     }
 }
 
-// ChatItem, groupMessages, isBubbleRenderablePart, and filterRenderableParts
-// are now defined in ChatParts.kt for testability.
+// isBubbleRenderablePart and filterRenderableParts are defined in ChatParts.kt.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
