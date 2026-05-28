@@ -17,7 +17,6 @@ import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventReducer
 import dev.minios.ocremote.data.repository.SettingsRepository
-import dev.minios.ocremote.ui.screens.chat.groupMessages
 import dev.minios.ocremote.domain.model.*
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -41,7 +40,7 @@ data class ChatUiState(
     val sessionTitle: String = "",
     val serverName: String = "",
     val messages: List<ChatMessage> = emptyList(),
-    val chatItemsCount: Int = 0,
+    val messageCount: Int = 0,
     val revert: Session.Revert? = null,
     val sessionStatus: SessionStatus = SessionStatus.Idle,
     val pendingPermissions: List<SseEvent.PermissionAsked> = emptyList(),
@@ -210,14 +209,8 @@ class ChatViewModel @Inject constructor(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 60
     )
     // ============ Pagination ============
-    /** Target number of chat items (bubbles) per page. */
-    private var chatItemTargetCount = 10
-
-    /**
-     * Current message limit passed to the API.
-     * Starts conservative and grows based on messages-per-item ratio.
-     */
-    private var currentMessageLimit = 10
+    /** Number of messages to load per page. Doubles each "load older" click. */
+    private var currentMessageLimit = 20
     /** Whether there are more messages on the server beyond the current limit. */
     private val _hasOlderMessages = MutableStateFlow(false)
     /** Whether a "load older" request is in flight. */
@@ -387,13 +380,13 @@ class ChatViewModel @Inject constructor(
             emptySet<String>()
         }
 
-        val chatItemsCount = groupMessages(chatMessages).size
+        val messageCount = chatMessages.size
 
         ChatUiState(
             sessionTitle = session?.title ?: "",
             serverName = serverName,
             messages = chatMessages,
-            chatItemsCount = chatItemsCount,
+            messageCount = messageCount,
             revert = revertState,
             sessionStatus = statuses[sessionId] ?: SessionStatus.Idle,
             pendingPermissions = permissions[sessionId] ?: emptyList(),
@@ -468,8 +461,7 @@ class ChatViewModel @Inject constructor(
 
         // Load initial message count from settings, then load data
         viewModelScope.launch {
-            chatItemTargetCount = settingsRepository.initialChatItemCount.first()
-            currentMessageLimit = chatItemTargetCount.coerceAtLeast(10)
+            currentMessageLimit = settingsRepository.initialChatItemCount.first()
             loadSession()
             loadMessages()
             loadPendingQuestions()
@@ -505,37 +497,13 @@ class ChatViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                // Adaptive initial load: start with a small limit, then grow if needed
-                // to reach the target chat item count.
-                var messages = api.listMessages(conn, sessionId, limit = currentMessageLimit)
+                // Load messages with current limit
+                val messages = api.listMessages(conn, sessionId, limit = currentMessageLimit)
                 eventReducer.setMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
-                // Grow limit until we have enough chat items or exhaust the server
-                var retries = 0
-                while (_hasOlderMessages.value && retries < 3) {
-                    val allMsgs = eventReducer.messages.value[sessionId] ?: emptyList()
-                    val currentItems = groupMessages(allMsgs.map { msg ->
-                        ChatMessage(
-                            message = msg,
-                            parts = eventReducer.parts.value[msg.id] ?: emptyList()
-                        )
-                    }).size
-                    if (currentItems >= chatItemTargetCount) break
-
-                    currentMessageLimit = estimateLimitForItems(chatItemTargetCount)
-                    messages = api.listMessages(conn, sessionId, limit = currentMessageLimit)
-                    eventReducer.mergeMessages(sessionId, messages)
-                    _hasOlderMessages.value = messages.size >= currentMessageLimit
-                    retries++
-                }
-
                 if (BuildConfig.DEBUG) {
-                    val allMsgs = eventReducer.messages.value[sessionId] ?: emptyList()
-                    val chatItems = groupMessages(allMsgs.map { msg ->
-                        ChatMessage(message = msg, parts = eventReducer.parts.value[msg.id] ?: emptyList())
-                    })
-                    Log.d(TAG, "Loaded ${allMsgs.size} messages → ${chatItems.size} items for session $sessionId (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
+                    Log.d(TAG, "Loaded ${messages.size} messages for session $sessionId (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load messages", e)
@@ -573,63 +541,27 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Load older messages to show more chat items (bubbles).
-     * Estimates how many raw messages are needed for [chatItemTargetCount]
-     * more bubbles, then requests from the API.
+     * Load older messages by doubling the current limit.
      */
     fun loadOlderMessages() {
         viewModelScope.launch {
             _isLoadingOlder.value = true
-            val newLimit = estimateLimitForItems(chatItemTargetCount)
-            currentMessageLimit = newLimit
+            currentMessageLimit = currentMessageLimit * 2
             try {
                 val messages = api.listMessages(conn, sessionId, limit = currentMessageLimit)
                 eventReducer.mergeMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
                 if (BuildConfig.DEBUG) {
-                    val allMsgs = eventReducer.messages.value[sessionId] ?: emptyList()
-                    val chatItems = groupMessages(allMsgs.map { msg ->
-                        ChatMessage(message = msg, parts = eventReducer.parts.value[msg.id] ?: emptyList())
-                    })
-                    Log.d(TAG, "Loaded older: ${messages.size} messages → ${chatItems.size} items (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
+                    Log.d(TAG, "Loaded older: ${messages.size} messages (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load older messages", e)
-                currentMessageLimit = newLimit / 2
+                currentMessageLimit = currentMessageLimit / 2
             } finally {
                 _isLoadingOlder.value = false
             }
         }
-    }
-
-    /**
-     * Calculates a new API message limit that should yield approximately
-     * [additionalItems] more chat items than we currently have.
-     *
-     * Uses the current messages-per-item ratio as an estimator.
-     * Falls back to doubling if the ratio is unknown (first load).
-     */
-    private fun estimateLimitForItems(additionalItems: Int): Int {
-        val currentMessages = eventReducer.messages.value[sessionId] ?: emptyList()
-        val currentItems = groupMessages(currentMessages.map { msg ->
-            ChatMessage(
-                message = msg,
-                parts = eventReducer.parts.value[msg.id] ?: emptyList()
-            )
-        }).size
-
-        if (currentItems == 0 || currentMessages.isEmpty()) {
-            // No baseline — use a simple multiplier
-            return currentMessageLimit + additionalItems * 5
-        }
-
-        val messagesPerItem = currentMessages.size.toFloat() / currentItems
-        val targetItems = currentItems + additionalItems
-        val estimatedLimit = (targetItems * messagesPerItem).toInt()
-            .coerceAtLeast(currentMessages.size + 1)
-
-        return estimatedLimit
     }
 
     /**
