@@ -160,6 +160,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 import android.net.Uri
@@ -2080,9 +2081,9 @@ fun ChatScreen(
                                                                                 style = MaterialTheme.typography.labelSmall,
                                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                             )
-                                                                        }
-                                                                    }
-                                                                }
+    }
+}
+                                                                 }
                                                             }
                                                             if (!tab.connected) {
                                                                 IconButton(
@@ -2335,36 +2336,18 @@ fun ChatScreen(
                 }
                 else -> {
                      val messageSpacing = if (LocalCompactMessages.current) 4.dp else 12.dp
-                      // Cache group structure keyed on message IDs only (not parts content).
-                      // Parts deltas change every frame during streaming; the grouping structure
-                      // only changes when messages are added/removed, so we key on IDs to avoid
-                      // recomputing the grouping on every text delta.
-                      val messageFingerprint = uiState.messages.map { it.message.id }
-                      val cachedGroups = remember(messageFingerprint) { groupMessages(uiState.messages) }
-                      // Refresh chatItems with the latest parts data on every recomposition.
-                      // The grouping structure stays the same (same keys), but ChatMessage.parts
-                      // are updated so bubbles render the latest streaming content.
-                      val chatItems = if (cachedGroups.isEmpty()) {
-                          cachedGroups
-                      } else {
-                          val msgById = uiState.messages.associateBy { it.message.id }
-                          cachedGroups.map { item ->
-                              when (item) {
-                                  is ChatItem.UserMessage -> {
-                                      val fresh = msgById[item.chatMessage.message.id]
-                                      if (fresh != null && fresh != item.chatMessage) item.copy(chatMessage = fresh) else item
-                                  }
-                                  is ChatItem.AssistantTurn -> {
-                                      val freshMsgs = item.messages.map { msg ->
-                                          msgById[msg.message.id] ?: msg
-                                      }
-                                      // Only create a new instance if something actually changed
-                                      // to avoid unnecessary LazyColumn item recompositions.
-                                      if (freshMsgs == item.messages) item else item.copy(messages = freshMsgs)
-                                  }
-                              }
+
+                      // Tag each assistant message with whether it follows another assistant
+                      // in reverseLayout chronological order. Used for visual continuity:
+                      // consecutive assistants share reduced spacing, no card separation.
+                      val isAssistantContinuation = remember(uiState.messages.size) {
+                          uiState.messages.mapIndexed { index, msg ->
+                              val prevMsg = uiState.messages.getOrNull(index + 1)
+                              msg.isAssistant && prevMsg?.isAssistant == true
                           }
                       }
+                      // Use raw messages directly — each Message is one LazyColumn item.
+                      val rawMessages = uiState.messages
 
                       if (uiState.sessionParentId == null) {
                           // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB
@@ -2430,142 +2413,134 @@ fun ChatScreen(
                               }
                           }
 
-                          // Chat messages: newest-first (groupMessages returns newest-first).
-                          // In reverseLayout=true, newest at index 0 = bottom. Correct.
-                          items(
-                              chatItems,
-                            key = { it.key },
-                            contentType = { chatItem ->
-                                when (chatItem) {
-                                    is ChatItem.UserMessage -> "user"
-                                    is ChatItem.AssistantTurn -> "assistant"
-                                }
-                            }
-                        ) { chatItem ->
-                            when (chatItem) {
-                                is ChatItem.UserMessage -> {
-                                    val chatMessage = chatItem.chatMessage
+                            // Chat messages: newest-first (rawMessages is sorted newest-first).
+                            // In reverseLayout=true, newest at index 0 = bottom. Correct.
+                            itemsIndexed(
+                                rawMessages,
+                                key = { _, msg -> msg.message.id },
+                                contentType = { _, msg -> if (msg.isUser) "user" else "assistant" }
+                            ) { index, msg ->
+                                when {
+                                    msg.isAssistant -> {
+                                        val isContinuation = isAssistantContinuation.getOrElse(index) { false }
+                                        AssistantMessageCard(
+                                            chatMessage = msg,
+                                            isContinuation = isContinuation,
+                                            onViewSubSession = onNavigateToChildSession,
+                                            onCopyText = {
+                                                val text = msg.parts.filterIsInstance<Part.Text>()
+                                                    .joinToString("\n") { it.text }
+                                                if (text.isNotBlank()) {
+                                                    clipboardManager.setText(
+                                                        androidx.compose.ui.text.AnnotatedString(text)
+                                                    )
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                    msg.isUser -> {
+                                        val chatMessage = msg
 
-                                    // Detect compaction trigger messages (user messages with Part.Compaction)
-                                    val isCompactionTrigger = chatMessage.parts.any { it is Part.Compaction }
+                                        val isCompactionTrigger = chatMessage.parts.any { it is Part.Compaction }
 
-                                    // Show compact system-style divider for compaction triggers
-                                    // Long-press to revert (undo compaction and subsequent messages)
-                                    if (isCompactionTrigger) {
-                                        var showRevertDialog by remember { mutableStateOf(false) }
+                                        if (isCompactionTrigger) {
+                                            var showRevertDialog by remember { mutableStateOf(false) }
 
-                                        if (showRevertDialog) {
-                                            AlertDialog(
-                                                onDismissRequest = { showRevertDialog = false },
-                                                title = { Text(stringResource(R.string.chat_revert_title)) },
-                                                text = { Text(stringResource(R.string.chat_revert_message)) },
-                                                confirmButton = {
-                                                    TextButton(
-                                                        onClick = {
-                                                            showRevertDialog = false
-                                                            viewModel.revertMessage(chatMessage.message.id) { ok ->
-                                                                coroutineScope.launch {
-                                                                    snackbarHostState.showSnackbar(
-                                                                        if (ok) context.getString(R.string.chat_message_reverted) else context.getString(R.string.chat_message_revert_failed)
-                                                                    )
+                                            if (showRevertDialog) {
+                                                AlertDialog(
+                                                    onDismissRequest = { showRevertDialog = false },
+                                                    title = { Text(stringResource(R.string.chat_revert_title)) },
+                                                    text = { Text(stringResource(R.string.chat_revert_message)) },
+                                                    confirmButton = {
+                                                        TextButton(
+                                                            onClick = {
+                                                                showRevertDialog = false
+                                                                viewModel.revertMessage(chatMessage.message.id) { ok ->
+                                                                    coroutineScope.launch {
+                                                                        snackbarHostState.showSnackbar(
+                                                                            if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                                                        )
+                                                                    }
                                                                 }
                                                             }
+                                                        ) {
+                                                            Text(stringResource(R.string.chat_revert), color = MaterialTheme.colorScheme.error)
                                                         }
-                                                    ) {
-                                                        Text(stringResource(R.string.chat_revert), color = MaterialTheme.colorScheme.error)
+                                                    },
+                                                    dismissButton = {
+                                                        TextButton(onClick = { showRevertDialog = false }) {
+                                                            Text(stringResource(R.string.cancel))
+                                                        }
                                                     }
-                                                },
-                                                dismissButton = {
-                                                    TextButton(onClick = { showRevertDialog = false }) {
-                                                        Text(stringResource(R.string.cancel))
-                                                    }
-                                                }
-                                            )
-                                        }
-
-                                        @OptIn(ExperimentalFoundationApi::class)
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .combinedClickable(
-                                                    onClick = { },
-                                                    onLongClick = { showRevertDialog = true }
                                                 )
-                                                .padding(vertical = 4.dp, horizontal = 32.dp),
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            HorizontalDivider(
-                                                modifier = Modifier.weight(1f),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.chat_summarized),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.padding(horizontal = 12.dp)
-                                            )
-                                            HorizontalDivider(
-                                                modifier = Modifier.weight(1f),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                            )
-                                        }
-                                        return@items
-                                    }
+                                            }
 
-                                    ChatMessageBubble(
-                                        chatMessage = chatMessage,
-                                        isQueued = chatMessage.message.id in uiState.queuedMessageIds,
-                                        onViewSubSession = onNavigateToChildSession,
-                                        // Disable swipe-to-revert in sub-sessions (read-only)
-                                        onRevert = if (uiState.sessionParentId == null) {{
-                                            val revertText = chatMessage.parts
-                                                .filterIsInstance<Part.Text>()
-                                                .joinToString("\n") { it.text }
-                                            viewModel.revertMessage(chatMessage.message.id, revertText) { ok ->
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        if (ok) context.getString(R.string.chat_message_reverted) else context.getString(R.string.chat_message_revert_failed)
+                                            @OptIn(ExperimentalFoundationApi::class)
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .combinedClickable(
+                                                        onClick = { },
+                                                        onLongClick = { showRevertDialog = true }
                                                     )
-                                                }
-                                            }
-                                        }} else null,
-                                        onCopyText = {
-                                            val text = chatMessage.parts
-                                                .filterIsInstance<Part.Text>()
-                                                .joinToString("\n") { it.text }
-                                            if (text.isNotBlank()) {
-                                                clipboardManager.setText(
-                                                    androidx.compose.ui.text.AnnotatedString(text)
+                                                    .padding(vertical = 4.dp, horizontal = 32.dp),
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                HorizontalDivider(
+                                                    modifier = Modifier.weight(1f),
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                                                 )
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                                is ChatItem.AssistantTurn -> {
-                                    AssistantTurnBubble(
-                                        messages = chatItem.messages,
-                                        onViewSubSession = onNavigateToChildSession,
-                                        onCopyText = {
-                                            val text = chatItem.messages.flatMap { msg ->
-                                                msg.parts.filterIsInstance<Part.Text>()
-                                            }.joinToString("\n") { it.text }
-                                            if (text.isNotBlank()) {
-                                                clipboardManager.setText(
-                                                    androidx.compose.ui.text.AnnotatedString(text)
+                                                Text(
+                                                    text = stringResource(R.string.chat_summarized),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.padding(horizontal = 12.dp)
                                                 )
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
+                                                HorizontalDivider(
+                                                    modifier = Modifier.weight(1f),
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                                )
+                                            }
+                                            return@itemsIndexed
+                                        }
+
+                                        ChatMessageBubble(
+                                            chatMessage = chatMessage,
+                                            isQueued = chatMessage.message.id in uiState.queuedMessageIds,
+                                            onViewSubSession = onNavigateToChildSession,
+                                            onRevert = if (uiState.sessionParentId == null) {{
+                                                val revertText = chatMessage.parts
+                                                    .filterIsInstance<Part.Text>()
+                                                    .joinToString("\n") { it.text }
+                                                viewModel.revertMessage(chatMessage.message.id, revertText) { ok ->
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            if (ok) context.getString(R.string.chat_message_reverted) else context.getString(R.string.chat_message_revert_failed)
+                                                        )
+                                                    }
+                                                }
+                                            }} else null,
+                                            onCopyText = {
+                                                val text = chatMessage.parts
+                                                    .filterIsInstance<Part.Text>()
+                                                    .joinToString("\n") { it.text }
+                                                if (text.isNotBlank()) {
+                                                    clipboardManager.setText(
+                                                        androidx.compose.ui.text.AnnotatedString(text)
+                                                    )
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
+                                                    }
                                                 }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
-                          }
 
                           // "Load earlier messages" at the TOP (declared last in reverseLayout = topmost)
                           if (uiState.hasOlderMessages) {
@@ -2688,128 +2663,124 @@ fun ChatScreen(
                                       }
                                   }
 
-                                  // Chat messages: newest-first (groupMessages returns newest-first).
+                                  // Chat messages: newest-first (rawMessages is sorted newest-first).
                                   // In reverseLayout=true, newest at index 0 = bottom. Correct.
-                                  items(
-                                      chatItems,
-                                     key = { it.key },
-                                     contentType = { chatItem ->
-                                         when (chatItem) {
-                                             is ChatItem.UserMessage -> "user"
-                                             is ChatItem.AssistantTurn -> "assistant"
-                                         }
-                                     }
-                                 ) { chatItem ->
-                                     when (chatItem) {
-                                         is ChatItem.UserMessage -> {
-                                             val chatMessage = chatItem.chatMessage
+                                  itemsIndexed(
+                                      rawMessages,
+                                      key = { _, msg -> msg.message.id },
+                                      contentType = { _, msg -> if (msg.isUser) "user" else "assistant" }
+                                  ) { index, msg ->
+                                      when {
+                                          msg.isAssistant -> {
+                                              val isContinuation = isAssistantContinuation.getOrElse(index) { false }
+                                              AssistantMessageCard(
+                                                  chatMessage = msg,
+                                                  isContinuation = isContinuation,
+                                                  onViewSubSession = onNavigateToChildSession,
+                                                  onCopyText = {
+                                                      val text = msg.parts.filterIsInstance<Part.Text>()
+                                                          .joinToString("\n") { it.text }
+                                                      if (text.isNotBlank()) {
+                                                          clipboardManager.setText(
+                                                              androidx.compose.ui.text.AnnotatedString(text)
+                                                          )
+                                                          coroutineScope.launch {
+                                                              snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
+                                                          }
+                                                      }
+                                                  }
+                                              )
+                                          }
+                                          msg.isUser -> {
+                                              val chatMessage = msg
 
-                                             // Detect compaction trigger messages (user messages with Part.Compaction)
-                                             val isCompactionTrigger = chatMessage.parts.any { it is Part.Compaction }
+                                              // Detect compaction trigger messages (user messages with Part.Compaction)
+                                              val isCompactionTrigger = chatMessage.parts.any { it is Part.Compaction }
 
-                                             // Show compact system-style divider for compaction triggers
-                                             if (isCompactionTrigger) {
-                                                 var showRevertDialog by remember { mutableStateOf(false) }
+                                              // Show compact system-style divider for compaction triggers
+                                              if (isCompactionTrigger) {
+                                                  var showRevertDialog by remember { mutableStateOf(false) }
 
-                                                 if (showRevertDialog) {
-                                                     AlertDialog(
-                                                         onDismissRequest = { showRevertDialog = false },
-                                                         title = { Text(stringResource(R.string.chat_revert_title)) },
-                                                         text = { Text(stringResource(R.string.chat_revert_message)) },
-                                                         confirmButton = {
-                                                             TextButton(
-                                                                 onClick = {
-                                                                     showRevertDialog = false
-                                                                     viewModel.revertMessage(chatMessage.message.id) { ok ->
-                                                                         coroutineScope.launch {
-                                                                             snackbarHostState.showSnackbar(
-                                                                                 if (ok) context.getString(R.string.chat_message_reverted) else context.getString(R.string.chat_message_revert_failed)
-                                                                             )
-                                                                         }
-                                                                     }
-                                                                 }
-                                                             ) {
-                                                                 Text(stringResource(R.string.chat_revert), color = MaterialTheme.colorScheme.error)
-                                                             }
-                                                         },
-                                                         dismissButton = {
-                                                             TextButton(onClick = { showRevertDialog = false }) {
-                                                                 Text(stringResource(R.string.cancel))
-                                                             }
-                                                         }
-                                                     )
-                                                 }
+                                                  if (showRevertDialog) {
+                                                      AlertDialog(
+                                                          onDismissRequest = { showRevertDialog = false },
+                                                          title = { Text(stringResource(R.string.chat_revert_title)) },
+                                                          text = { Text(stringResource(R.string.chat_revert_message)) },
+                                                          confirmButton = {
+                                                              TextButton(
+                                                                  onClick = {
+                                                                      showRevertDialog = false
+                                                                      viewModel.revertMessage(chatMessage.message.id) { ok ->
+                                                                          coroutineScope.launch {
+                                                                              snackbarHostState.showSnackbar(
+                                                                                  if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                                                              )
+                                                                          }
+                                                                      }
+                                                                  }
+                                                              ) {
+                                                                  Text(stringResource(R.string.chat_revert), color = MaterialTheme.colorScheme.error)
+                                                              }
+                                                          },
+                                                          dismissButton = {
+                                                              TextButton(onClick = { showRevertDialog = false }) {
+                                                                  Text(stringResource(R.string.cancel))
+                                                              }
+                                                          }
+                                                      )
+                                                  }
 
-                                                 @OptIn(ExperimentalFoundationApi::class)
-                                                 Row(
-                                                     modifier = Modifier
-                                                         .fillMaxWidth()
-                                                         .combinedClickable(
-                                                             onClick = { },
-                                                             onLongClick = { showRevertDialog = true }
-                                                         )
-                                                         .padding(vertical = 4.dp, horizontal = 32.dp),
-                                                     horizontalArrangement = Arrangement.Center,
-                                                     verticalAlignment = Alignment.CenterVertically
-                                                 ) {
-                                                     HorizontalDivider(
-                                                         modifier = Modifier.weight(1f),
-                                                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                                     )
-                                                     Text(
-                                                         text = stringResource(R.string.chat_summarized),
-                                                         style = MaterialTheme.typography.labelSmall,
-                                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                         modifier = Modifier.padding(horizontal = 12.dp)
-                                                     )
-                                                     HorizontalDivider(
-                                                         modifier = Modifier.weight(1f),
-                                                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                                     )
-                                                 }
-                                                 return@items
-                                             }
+                                                  @OptIn(ExperimentalFoundationApi::class)
+                                                  Row(
+                                                      modifier = Modifier
+                                                          .fillMaxWidth()
+                                                          .combinedClickable(
+                                                              onClick = { },
+                                                              onLongClick = { showRevertDialog = true }
+                                                          )
+                                                          .padding(vertical = 4.dp, horizontal = 32.dp),
+                                                      horizontalArrangement = Arrangement.Center,
+                                                      verticalAlignment = Alignment.CenterVertically
+                                                  ) {
+                                                      HorizontalDivider(
+                                                          modifier = Modifier.weight(1f),
+                                                          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                                      )
+                                                      Text(
+                                                          text = stringResource(R.string.chat_summarized),
+                                                          style = MaterialTheme.typography.labelSmall,
+                                                          color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                          modifier = Modifier.padding(horizontal = 12.dp)
+                                                      )
+                                                      HorizontalDivider(
+                                                          modifier = Modifier.weight(1f),
+                                                          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                                      )
+                                                  }
+                                                  return@itemsIndexed
+                                              }
 
-                                             ChatMessageBubble(
-                                                 chatMessage = chatMessage,
-                                                 isQueued = chatMessage.message.id in uiState.queuedMessageIds,
-                                                 onViewSubSession = onNavigateToChildSession,
-                                                 onRevert = null,
-                                                 onCopyText = {
-                                                     val text = chatMessage.parts
-                                                         .filterIsInstance<Part.Text>()
-                                                         .joinToString("\n") { it.text }
-                                                     if (text.isNotBlank()) {
-                                                         clipboardManager.setText(
-                                                             androidx.compose.ui.text.AnnotatedString(text)
-                                                         )
-                                                         coroutineScope.launch {
-                                                             snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
-                                                         }
-                                                     }
-                                                 }
-                                             )
-                                         }
-                                         is ChatItem.AssistantTurn -> {
-                                             AssistantTurnBubble(
-                                                 messages = chatItem.messages,
-                                                 onViewSubSession = onNavigateToChildSession,
-                                                 onCopyText = {
-                                                     val text = chatItem.messages.flatMap { msg ->
-                                                         msg.parts.filterIsInstance<Part.Text>()
-                                                     }.joinToString("\n") { it.text }
-                                                     if (text.isNotBlank()) {
-                                                         clipboardManager.setText(
-                                                             androidx.compose.ui.text.AnnotatedString(text)
-                                                         )
-                                                         coroutineScope.launch {
-                                                             snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
-                                                         }
-                                                     }
-                                                 }
-                                             )
-                                         }
-                                     }
+                                              ChatMessageBubble(
+                                                  chatMessage = chatMessage,
+                                                  isQueued = chatMessage.message.id in uiState.queuedMessageIds,
+                                                  onViewSubSession = onNavigateToChildSession,
+                                                  onRevert = null,
+                                                  onCopyText = {
+                                                      val text = chatMessage.parts
+                                                          .filterIsInstance<Part.Text>()
+                                                          .joinToString("\n") { it.text }
+                                                      if (text.isNotBlank()) {
+                                                          clipboardManager.setText(
+                                                              androidx.compose.ui.text.AnnotatedString(text)
+                                                          )
+                                                          coroutineScope.launch {
+                                                              snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
+                                                          }
+                                                      }
+                                                  }
+                                              )
+                                          }
+                                      }
                                   }
 
                                   // "Load earlier messages" at the TOP (declared last in reverseLayout = topmost)
@@ -4116,6 +4087,159 @@ private fun ChatMessageBubble(
     }
 }
 
+/**
+ * Renders a SINGLE assistant message with its parts interleaved.
+ * Unlike the old AssistantTurnBubble, this handles exactly one ChatMessage,
+ * so streaming text updates only recompose THIS card, not all sibling messages.
+ */
+@Composable
+private fun AssistantMessageCard(
+    chatMessage: ChatMessage,
+    isContinuation: Boolean,
+    onViewSubSession: ((String) -> Unit)? = null,
+    onCopyText: (() -> Unit)? = null,
+) {
+    val isAmoled = isAmoledTheme()
+    val backgroundColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh
+    val textColor = if (isAmoled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface
+    val bubbleBorder = if (isAmoled) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+    } else null
+
+    val assistantMsg = chatMessage.message as? Message.Assistant
+    val errorText = formatAssistantErrorMessage(assistantMsg?.error)
+    val renderableParts = filterRenderableParts(chatMessage.parts)
+
+    if (renderableParts.isEmpty() && errorText == null) return
+
+    val compact = LocalCompactMessages.current
+    val hapticView = LocalView.current
+    val hapticOn = LocalHapticFeedbackEnabled.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = if (isContinuation) 2.dp else 0.dp),
+        horizontalAlignment = Alignment.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = 4.dp,
+                topEnd = 18.dp,
+                bottomStart = 18.dp,
+                bottomEnd = 18.dp
+            ),
+            color = backgroundColor,
+            border = bubbleBorder,
+            tonalElevation = if (isAmoled) 0.dp else 1.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    horizontal = if (compact) 10.dp else 16.dp,
+                    vertical = if (compact) 8.dp else 14.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp)
+            ) {
+                // "Response" header — only on the first of a consecutive sequence
+                if (!isContinuation) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            if (assistantMsg?.providerId != null) {
+                                ProviderIcon(
+                                    providerId = assistantMsg.providerId,
+                                    size = 12.dp,
+                                    tint = textColor.copy(alpha = 0.4f)
+                                )
+                            }
+                            Text(
+                                text = stringResource(R.string.chat_response),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    letterSpacing = 0.8.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = textColor.copy(alpha = 0.4f)
+                            )
+                        }
+                        if (onCopyText != null) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = stringResource(R.string.chat_copy),
+                                modifier = Modifier
+                                    .size(15.dp)
+                                    .clickable { performHaptic(hapticView, hapticOn); onCopyText() },
+                                tint = textColor.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                }
+
+                // Render parts in original order
+                for (part in renderableParts) {
+                    key(part.id) {
+                        PartContent(
+                            part = part,
+                            textColor = textColor,
+                            isUser = false,
+                            onViewSubSession = onViewSubSession,
+                            turnAgentName = if (part is Part.Tool && part.tool == "task") {
+                                val agentParts = chatMessage.parts.filterIsInstance<Part.Agent>()
+                                agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
+                            } else null
+                        )
+                    }
+                }
+
+                // Error display
+                if (errorText != null) {
+                    Surface(
+                        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = if (isAmoled) 0.75f else 0.35f)),
+                        tonalElevation = 0.dp,
+                    ) {
+                        ErrorPayloadContent(
+                            text = errorText,
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            textColor = textColor,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                        )
+                    }
+                }
+
+                // Token/cost footer
+                val footerAlpha = if (isContinuation) 0.2f else 0.4f
+                if (chatMessage.isAssistant) {
+                    val cost = assistantMsg?.cost
+                    val tokens = assistantMsg?.tokens
+                    if (cost != null || tokens != null) {
+                        val parts = mutableListOf<String>()
+                        if (tokens != null) parts.add("↑${tokens.input} ↓${tokens.output}")
+                        if (cost != null) parts.add("$${"%.4f".format(cost)}")
+                        val footer = parts.joinToString(" · ")
+                        if (footer.isNotBlank()) {
+                            Text(
+                                text = footer,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = textColor.copy(alpha = footerAlpha),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AssistantTurnBubble(
     messages: List<ChatMessage>,
@@ -5109,7 +5233,7 @@ private fun ToolCallCard(tool: Part.Tool) {
                         val inputText = input.entries
                             .filter { (_, v) -> v.toString().length <= 500 }
                             .joinToString("\n") { (k, v) ->
-                                val value = v.jsonPrimitive?.contentOrNull ?: v.toString().take(200)
+                                val value = (v as? JsonPrimitive)?.contentOrNull ?: v.toString().take(200)
                                 "$k: $value"
                             }
                         if (inputText.isNotBlank()) {
