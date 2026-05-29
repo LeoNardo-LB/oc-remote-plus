@@ -90,7 +90,7 @@ import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.components.BreathingCircleIndicator
-import dev.minios.ocremote.ui.screens.chat.components.PulsingDotsIndicator
+import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.dialog.ImagePreviewDialog
 import dev.minios.ocremote.ui.screens.chat.util.ImageAttachment
 import dev.minios.ocremote.ui.screens.chat.util.agentColor

@@ -34,7 +34,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.screens.chat.components.ErrorPayloadContent
-import dev.minios.ocremote.ui.screens.chat.components.PulsingDotsIndicator
+import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.tools.DiffChangesInline
 import dev.minios.ocremote.ui.screens.chat.tools.DiffView
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput

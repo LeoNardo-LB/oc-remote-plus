@@ -240,7 +240,7 @@ import dev.minios.ocremote.ui.screens.chat.components.ChatMessageBubble
 import dev.minios.ocremote.ui.screens.chat.components.AssistantMessageCard
 import dev.minios.ocremote.ui.screens.chat.components.AssistantTurnBubble
 import dev.minios.ocremote.ui.screens.chat.components.ErrorPayloadContent
-import dev.minios.ocremote.ui.screens.chat.components.PulsingDotsIndicator
+import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
 
 
@@ -248,37 +248,6 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  * Chat Screen - conversation view with native markdown rendering.
  * Shows messages with streaming text rendered via mikepenz markdown renderer.
  */
-
-// CompositionLocals moved to util/ChatCompositionLocals.kt
-
-
-// isAmoledTheme & toolOutputContainerColor moved to util/ChatColors.kt
-
-// performHaptic moved to util/ChatModifiers.kt
-
-// agentColorCycle, QueuedBadgeColor, QueuedBadgeTextColor, agentColor moved to util/ChatColors.kt
-
-// codeHorizontalScroll moved to util/ChatModifiers.kt
-
-// consumeBoundaryFling moved to util/ChatModifiers.kt
-
-// SlashCommand, ChatInputMode, clientCommands moved to input/ChatInputBar.kt
-
-// PulsingDotsIndicator moved to components/PulsingDotsIndicator.kt
-
-// BreathingCircleIndicator moved to components/BreathingCircleIndicator.kt (was in input/ChatInputBar.kt)
-
-// ErrorPayloadContent (and HtmlErrorViewMode) moved to components/ErrorPayloadContent.kt
-
-/** Format a token count to a human-readable string (e.g., 1.2k, 45.3k, 1.2M). */
-// FileMentionVisualTransformation moved to input/ChatInputBar.kt
-
-// buildPromptParts moved to input/ChatInputBar.kt
-
-// ImageAttachment, ImageSaveRequest, PreparedAttachment, AttachmentComparison,
-// decodeDataUrlBytes, decodePartFileBytes, extensionForMime, imageThumbnailModel,
-// estimateVisionTokens, formatFileSize, buildAttachmentFromUri
-// moved to util/MediaUtils.kt and util/ChatFormatters.kt
 
 private data class ImageSaveRequest(
     val bytes: ByteArray,
@@ -934,8 +903,7 @@ fun ChatScreen(
                 },
                 actions = {
                     if (uiState.sessionParentId == null) {
-                    // Terminal moved into the overflow (three-dot) menu below
-                    Box {
+Box {
                         val isAmoled = isAmoledTheme()
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
@@ -2375,39 +2343,3 @@ fun ChatScreen(
     }
     } // CompositionLocalProvider
 }
-
-// ModelPickerDialog moved to dialog/ModelPickerDialog.kt
-
-
-// resolveStepsStatus moved to util/ChatFormatters.kt
-
-// isBubbleRenderablePart and filterRenderableParts are defined in ChatParts.kt.
-
-// ChatMessageBubble moved to components/ChatMessageBubble.kt
-
-/** Format millisecond duration to human-readable string (e.g., "12.3s", "1.5m"). */
-// formatDuration moved to util/ChatFormatters.kt
-
-// AssistantMessageCard moved to components/AssistantMessageCard.kt
-
-// AssistantTurnBubble moved to components/AssistantTurnBubble.kt
-
-// isBubbleRenderablePart moved to ChatParts.kt for testability
-
-// resolveUserCommandLabel moved to util/ChatFormatters.kt
-
-// RevertBanner moved to components/RevertBanner.kt
-
-// PartContent moved to components/PartContent.kt
-
-// ReasoningBlock moved to components/ReasoningBlock.kt
-
-// ImageThumbnailRow & ImagePreviewDialog moved to dialog/ImagePreviewDialog.kt
-
-// FileCard, FileCardFallback moved to components/FileCard.kt
-
-// PermissionCard moved to dialog/PermissionRequestCard.kt
-
-// placeholderHintResIds + ChatInputBar moved to input/ChatInputBar.kt
-
-// QuestionCard moved to dialog/QuestionCard.kt
