@@ -4807,7 +4807,8 @@ private fun PartContent(
 private fun MarkdownContent(
     markdown: String,
     textColor: Color,
-    isUser: Boolean
+    isUser: Boolean,
+    customFontSize: String? = null  // null = use global setting; "small"/"medium"/"large" = override
 ) {
     val normalizedMarkdown = remember(markdown, isUser) {
         val base = preserveRawHtmlPayload(markdown)
@@ -4841,7 +4842,7 @@ private fun MarkdownContent(
     }
 
     // Font size from settings: small=13sp, medium=14sp (default), large=16sp
-    val fontSizeSetting = LocalChatFontSize.current
+    val fontSizeSetting = customFontSize ?: LocalChatFontSize.current
     val (bodyFontSize, bodyLineHeight) = when (fontSizeSetting) {
         "small" -> 13.sp to 18.sp
         "large" -> 16.sp to 26.sp
@@ -5281,7 +5282,7 @@ private fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleEx
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(0.dp),
         color = containerColor,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -5336,11 +5337,7 @@ private fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleEx
                         Spacer(modifier = Modifier.width(7.dp))
                         Text(
                             text = headerText,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 0.8.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 10.5.sp
-                            ),
+                            style = MaterialTheme.typography.labelMedium,
                             color = textColor.copy(alpha = 0.45f)
                         )
                     }
@@ -5369,11 +5366,12 @@ private fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleEx
                                 .consumeBoundaryFling(reasoningScrollState)
                                 .verticalScroll(reasoningScrollState)
                         ) {
-                            MarkdownContent(
-                                markdown = text,
-                                textColor = textColor.copy(alpha = 0.55f),
-                                isUser = false
-                            )
+                        MarkdownContent(
+                            markdown = text,
+                            textColor = textColor.copy(alpha = 0.55f),
+                            isUser = false,
+                            customFontSize = "small"
+                        )
                         }
                     }
                 }
