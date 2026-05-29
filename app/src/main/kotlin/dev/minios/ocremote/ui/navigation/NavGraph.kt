@@ -39,9 +39,9 @@ import dev.minios.ocremote.ui.screens.home.HomeRoute
 import dev.minios.ocremote.ui.screens.about.AboutScreen
 import dev.minios.ocremote.ui.screens.sessions.SessionListRoute
 import dev.minios.ocremote.ui.screens.settings.SettingsRoute
-import dev.minios.ocremote.ui.screens.server.ServerModelFilterScreen
-import dev.minios.ocremote.ui.screens.server.ServerProvidersScreen
-import dev.minios.ocremote.ui.screens.server.ServerSettingsScreen
+import dev.minios.ocremote.ui.screens.server.ServerModelFilterRoute
+import dev.minios.ocremote.ui.screens.server.ServerProvidersRoute
+import dev.minios.ocremote.ui.screens.server.ServerSettingsRoute
 import dev.minios.ocremote.ui.screens.webview.WebViewScreen
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -281,9 +281,9 @@ fun NavGraph(
             val password = URLDecoder.decode(it.arguments?.getString("password") ?: "", "UTF-8")
             val serverName = URLDecoder.decode(it.arguments?.getString("serverName") ?: "", "UTF-8")
             val serverId = URLDecoder.decode(it.arguments?.getString("serverId") ?: "", "UTF-8")
-            ServerSettingsScreen(
+            ServerSettingsRoute(
                 onNavigateBack = { navController.popBackStack() },
-                onOpenProviders = {
+                onNavigateToProviders = {
                     navController.navigate(
                         Screen.ServerProviders.createRoute(
                             serverUrl = serverUrl,
@@ -294,7 +294,7 @@ fun NavGraph(
                         )
                     )
                 },
-                onOpenModels = {
+                onNavigateToModelFilter = {
                     navController.navigate(
                         Screen.ServerModelFilter.createRoute(
                             serverUrl = serverUrl,
@@ -318,7 +318,7 @@ fun NavGraph(
                 navArgument("serverId") { type = NavType.StringType },
             )
         ) {
-            ServerProvidersScreen(
+            ServerProvidersRoute(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -333,7 +333,7 @@ fun NavGraph(
                 navArgument("serverId") { type = NavType.StringType },
             )
         ) {
-            ServerModelFilterScreen(
+            ServerModelFilterRoute(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
