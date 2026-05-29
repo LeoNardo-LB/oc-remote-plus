@@ -1,0 +1,217 @@
+package dev.minios.ocremote.ui.screens.chat.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import dev.minios.ocremote.R
+import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
+import dev.minios.ocremote.ui.screens.chat.tools.ToolCallCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.BashToolCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.EditToolCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.PatchCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.ReadToolCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.SearchToolCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.TaskToolCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.TodoListCard
+import dev.minios.ocremote.ui.screens.chat.tools.cards.WriteToolCard
+import dev.minios.ocremote.ui.screens.chat.util.LocalCollapseTools
+import dev.minios.ocremote.ui.screens.chat.util.LocalExpandReasoning
+import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
+import dev.minios.ocremote.ui.screens.chat.util.LocalOnToggleToolExpanded
+import dev.minios.ocremote.ui.screens.chat.util.LocalToolExpandedStates
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+@Composable
+internal fun PartContent(
+    part: Part,
+    textColor: Color,
+    isUser: Boolean = false,
+    onViewSubSession: ((String) -> Unit)? = null,
+    turnAgentName: String? = null
+) {
+    when (part) {
+        is Part.Text -> {
+            // Hide synthetic/ignored text parts (internal system content)
+            if (part.text.isNotBlank() && part.synthetic != true && part.ignored != true) {
+                MarkdownContent(
+                    markdown = part.text,
+                    textColor = textColor,
+                    isUser = isUser
+                )
+            }
+        }
+        is Part.Reasoning -> {
+            if (part.text.isNotBlank()) {
+                val reasoningDuration = part.time?.let { t ->
+                    t.end?.let { end -> end - t.start }
+                }
+                val toolExpandedStates = LocalToolExpandedStates.current
+                val onToggleToolExpanded = LocalOnToggleToolExpanded.current
+                ReasoningBlock(
+                    text = part.text,
+                    isExpanded = toolExpandedStates[part.id] ?: LocalExpandReasoning.current,
+                    onToggleExpand = { onToggleToolExpanded(part.id) },
+                    durationMs = reasoningDuration
+                )
+            }
+        }
+        is Part.Tool -> {
+            // todoread parts are filtered out entirely (WebUI convention)
+            val toolExpandedStates = LocalToolExpandedStates.current
+            val onToggleToolExpanded = LocalOnToggleToolExpanded.current
+            if (part.tool == "todoread") {
+                // skip
+            } else if (part.tool == "todowrite") {
+                TodoListCard(
+                    tool = part,
+                    isExpanded = toolExpandedStates[part.id] ?: true,
+                    onToggleExpand = { onToggleToolExpanded(part.id) }
+                )
+            } else {
+                // Dispatch to tool-specific renderers (like WebUI)
+                val autoExpand = LocalCollapseTools.current
+                when (part.tool) {
+                    "edit", "multiedit" -> EditToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "write" -> WriteToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "bash" -> BashToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "read" -> ReadToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "glob", "grep" -> SearchToolCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    "task" -> TaskToolCard(
+                        tool = part,
+                        onViewSubSession = onViewSubSession,
+                        turnAgentName = turnAgentName,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                    else -> ToolCallCard(
+                        tool = part,
+                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                    )
+                }
+            }
+        }
+        is Part.StepStart -> {
+            // Visual separator between steps (hidden - WebUI doesn't show these)
+        }
+        is Part.StepFinish -> {
+            // Token/cost info is aggregated at the bottom of AssistantMessageCard
+        }
+        is Part.Patch -> {
+            val autoExpand = LocalCollapseTools.current
+            val toolExpandedStates = LocalToolExpandedStates.current
+            val onToggleToolExpanded = LocalOnToggleToolExpanded.current
+            PatchCard(
+                patch = part,
+                isExpanded = toolExpandedStates[part.id] ?: autoExpand,
+                onToggleExpand = { onToggleToolExpanded(part.id) }
+            )
+        }
+        is Part.File -> {
+            FileCard(file = part)
+        }
+        is Part.Permission -> {
+            Text(
+                text = stringResource(R.string.chat_permission_label, part.message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+        is Part.Question -> {
+            Text(
+                text = stringResource(R.string.chat_question_inline, part.question),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+        is Part.Abort -> {
+            Text(
+                text = stringResource(R.string.chat_aborted, part.reason),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        is Part.Retry -> {
+            Text(
+                text = stringResource(R.string.chat_retry, part.attempt, part.errorMessage),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        // Ignore less relevant parts
+        is Part.Snapshot, is Part.Subtask, is Part.Compaction,
+        is Part.SessionTurn, is Part.Unknown -> { /* skip */ }
+        is Part.Agent -> {
+            val displayName = part.name.ifBlank { "Agent" }
+            val displaySource = part.source?.jsonPrimitive?.contentOrNull ?: ""
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Android,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (displaySource.isNotBlank()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = displaySource,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        }
+    }
+}

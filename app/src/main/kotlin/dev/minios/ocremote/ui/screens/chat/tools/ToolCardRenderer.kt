@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.tools
+﻿package dev.minios.ocremote.ui.screens.chat.tools
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
-import dev.minios.ocremote.ui.screens.chat.PulsingDotsIndicator
+import dev.minios.ocremote.ui.screens.chat.components.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryFling
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme

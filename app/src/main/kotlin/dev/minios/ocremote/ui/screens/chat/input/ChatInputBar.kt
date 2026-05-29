@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.input
+﻿package dev.minios.ocremote.ui.screens.chat.input
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -89,7 +89,8 @@ import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
-import dev.minios.ocremote.ui.screens.chat.PulsingDotsIndicator
+import dev.minios.ocremote.ui.screens.chat.components.BreathingCircleIndicator
+import dev.minios.ocremote.ui.screens.chat.components.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.dialog.ImagePreviewDialog
 import dev.minios.ocremote.ui.screens.chat.util.ImageAttachment
 import dev.minios.ocremote.ui.screens.chat.util.agentColor
@@ -132,49 +133,7 @@ internal fun clientCommands(): List<SlashCommand> {
     )
 }
 
-/** Breathing circle loading indicator — single circle that pulses smoothly. */
-@Composable
-private fun BreathingCircleIndicator(
-    modifier: Modifier = Modifier,
-    size: Dp = 20.dp,
-    color: Color = MaterialTheme.colorScheme.primary
-) {
-    val transition = rememberInfiniteTransition(label = "breathing_circle")
-    val scale by transition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "circle_scale"
-    )
-    val alpha by transition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "circle_alpha"
-    )
-
-    Box(
-        modifier = modifier.size(size),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(size)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    this.alpha = alpha
-                }
-                .background(color, CircleShape)
-        )
-    }
-}
+// BreathingCircleIndicator moved to components/BreathingCircleIndicator.kt
 
 /**
  * Visual transformation that highlights confirmed @file mentions in the input field.
