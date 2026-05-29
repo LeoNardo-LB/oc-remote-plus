@@ -22,7 +22,10 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
@@ -120,6 +123,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
@@ -294,6 +298,33 @@ private fun Modifier.codeHorizontalScroll(): Modifier {
     } else {
         this
     }
+}
+
+/**
+ * Prevents nested-scroll inertia from propagating to the parent when the child
+ * scrollable reaches its boundary.  Uses conditional consume (方案B): only
+ * absorbs remaining fling velocity when [ScrollState.canScrollForward] or
+ * [ScrollState.canScrollBackward] is false.
+ */
+@Composable
+private fun Modifier.consumeBoundaryFling(scrollState: ScrollState): Modifier {
+    val connection = remember(scrollState) {
+        object : NestedScrollConnection {
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                val atBottom = !scrollState.canScrollForward
+                val atTop = !scrollState.canScrollBackward
+                return if ((atBottom && available.y < 0f) || (atTop && available.y > 0f)) {
+                    available
+                } else {
+                    Velocity.Zero
+                }
+            }
+        }
+    }
+    return this.nestedScroll(connection)
 }
 
 /**
@@ -4126,6 +4157,15 @@ private fun ChatMessageBubble(
     }
 }
 
+/** Format millisecond duration to human-readable string (e.g., "12.3s", "1.5m"). */
+private fun formatDuration(ms: Long): String {
+    return when {
+        ms < 1000 -> "${ms}ms"
+        ms < 60000 -> "%.1fs".format(ms / 1000.0)
+        else -> "%.1fm".format(ms / 60000.0)
+    }
+}
+
 /**
  * Renders a SINGLE assistant message with its parts interleaved.
  * Unlike the old AssistantTurnBubble, this handles exactly one ChatMessage,
@@ -4188,6 +4228,20 @@ private fun AssistantMessageCard(
                                 ),
                                 color = textColor.copy(alpha = 0.4f)
                             )
+                            // Local timestamp from message creation time
+                            assistantMsg?.time?.created?.let { createdMs ->
+                                val timeText = remember(createdMs) {
+                                    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                                        .format(java.util.Date(createdMs))
+                                }
+                                Text(
+                                    text = timeText,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp
+                                    ),
+                                    color = textColor.copy(alpha = 0.3f)
+                                )
+                            }
                         }
                         if (onCopyText != null) {
                             Icon(
@@ -4218,32 +4272,68 @@ private fun AssistantMessageCard(
                     }
                 }
 
-                // Token/cost footer from all StepFinish parts in this message
+                // Token/cost/duration footer from all StepFinish parts in this message
                 val stepFinishes = chatMessage.parts.filterIsInstance<Part.StepFinish>()
                 if (stepFinishes.isNotEmpty()) {
                     val totalInput = stepFinishes.sumOf { it.tokens?.input ?: 0 }
                     val totalOutput = stepFinishes.sumOf { it.tokens?.output ?: 0 }
                     val totalCost = stepFinishes.sumOf { it.cost ?: 0.0 }
-                    val hasStats = totalInput > 0 || totalOutput > 0 || totalCost > 0.0
+                    val hasTokenStats = totalInput > 0 || totalOutput > 0 || totalCost > 0.0
 
-                    if (hasStats) {
+                    // Duration from message time
+                    val durationMs = assistantMsg?.time?.let { t ->
+                        t.completed?.let { end -> end - t.created }
+                    }
+                    val hasFooter = hasTokenStats || durationMs != null || !assistantMsg?.modelId.isNullOrBlank()
+
+                    if (hasFooter) {
                         Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Provider icon (small, in footer)
+                            if (assistantMsg?.providerId != null) {
+                                ProviderIcon(
+                                    providerId = assistantMsg.providerId,
+                                    size = 10.dp,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
+                            // Model name
+                            if (!assistantMsg?.modelId.isNullOrBlank()) {
+                                Text(
+                                    text = assistantMsg.modelId,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                            }
+                            // Duration
+                            if (durationMs != null && durationMs > 0) {
+                                Text(
+                                    text = formatDuration(durationMs),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
+                            // Tokens
                             if (totalInput > 0 || totalOutput > 0) {
                                 Text(
                                     text = stringResource(R.string.chat_tokens_format, totalInput, totalOutput),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                 )
                             }
+                            // Cost
                             if (totalCost > 0.0 && totalCost.isFinite()) {
                                 Text(
                                     text = stringResource(R.string.chat_cost_format, String.format("%.4f", totalCost)),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                 )
                             }
                         }
@@ -4867,108 +4957,51 @@ private fun MarkdownContent(
         tableMaxWidth = screenWidthDp * 1.5f
     )
 
-    // NOTE: SelectionContainer intentionally removed for ALL messages.
-    // The selectableGroup() pointer-input handler inside SelectionContainer
-    // interferes with click handling on subsequent sibling composables (tool
-    // cards, expand/collapse rows) inside the same Column when the Markdown
-    // content undergoes async Loading→Success transitions.
-    //
-    // This was originally only removed for assistant messages, but the same
-    // interference occurs for user messages in sub-sessions where the
-    // SwipeToDismissBox wrapper is absent (onRevert == null). Without that
-    // isolation layer, the SelectionContainer's pointer-input handler leaks
-    // into the LazyColumn's pointer scope and blocks clicks on tool cards in
-    // adjacent AssistantTurnBubble items.
-    //
-    // Text can still be copied via the "Copy" button in the bubble header.
+    // Text selection: transparent SelectionContainer overlay (方案D).
+    // Direct SelectionContainer wrapping breaks click handling on sibling
+    // composables (tool cards, expand/collapse) due to selectableGroup()
+    // pointer-input leaking into LazyColumn's scope. Instead, we overlay a
+    // transparent text layer on top of the rendered Markdown — same pattern
+    // used by the terminal component.
     //
     // retainState = true keeps the previous rendered content visible while
     // new markdown is being parsed, preventing the Loading→Success flicker
     // that causes screen flashing during streaming output.
-    // Long-press to select/copy text (Dialog-based to avoid SelectionContainer
-    // pointer-input interference with LazyColumn's tool card clicks)
-    var showTextDialog by remember { mutableStateOf(false) }
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-    val view = LocalView.current
-
     val markdownState = rememberMarkdownState(
         content = normalizedMarkdown,
         retainState = true
     )
-    Markdown(
-        markdownState = markdownState,
-        colors = colors,
-        typography = typography,
-        components = components,
-        dimens = dimens,
-        imageTransformer = Coil3ImageTransformerImpl,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (!isUser) {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onLongPress = {
-                                performHaptic(view, true)
-                                showTextDialog = true
-                            }
-                        )
-                    }
-                } else {
-                    Modifier
-                }
-            )
-    )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // Layer 1: Visible Markdown rendering
+        Markdown(
+            markdownState = markdownState,
+            colors = colors,
+            typography = typography,
+            components = components,
+            dimens = dimens,
+            imageTransformer = Coil3ImageTransformerImpl,
+            modifier = Modifier.fillMaxWidth()
+        )
 
-    // Selectable text dialog — SelectionContainer is safe here because
-    // Dialog operates in a separate window, isolated from LazyColumn
-    if (showTextDialog) {
-        AlertDialog(
-            onDismissRequest = { showTextDialog = false },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+        // Layer 2: Transparent text selection overlay — only for assistant messages
+        if (!isUser) {
+            val selectionColors = TextSelectionColors(
+                handleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+            CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                SelectionContainer(
+                    modifier = Modifier.matchParentSize()
                 ) {
                     Text(
-                        text = stringResource(R.string.chat_select_text_title),
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    IconButton(onClick = {
-                        clipboardManager.setText(AnnotatedString(markdown))
-                        showTextDialog = false
-                    }) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = stringResource(R.string.chat_copy),
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            },
-            text = {
-                val dialogScrollState = rememberScrollState()
-                SelectionContainer {
-                    Text(
-                        text = markdown,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            lineHeight = 20.sp
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(dialogScrollState)
+                        text = normalizedMarkdown,
+                        color = Color.Transparent,
+                        style = bodyStyle,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showTextDialog = false }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 }
 
@@ -5325,11 +5358,13 @@ private fun ReasoningBlock(text: String, defaultExpanded: Boolean = false, durat
                     Column {
                         Spacer(modifier = Modifier.height(10.dp))
                         val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                        val reasoningScrollState = rememberScrollState()
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = halfScreenHeight)
-                                .verticalScroll(rememberScrollState())
+                                .consumeBoundaryFling(reasoningScrollState)
+                                .verticalScroll(reasoningScrollState)
                         ) {
                             MarkdownContent(
                                 markdown = text,
@@ -5451,48 +5486,58 @@ private fun ToolCallCard(
             }
 
             AnimatedVisibility(visible = expanded) {
-                Column(
-                    modifier = Modifier.padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                val toolCardScrollState = rememberScrollState()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = halfScreenHeight)
+                        .consumeBoundaryFling(toolCardScrollState)
+                        .verticalScroll(toolCardScrollState)
                 ) {
-                    if (input.isNotEmpty()) {
-                        val inputText = input.entries
-                            .filter { (_, v) -> v.toString().length <= 500 }
-                            .joinToString("\n") { (k, v) ->
-                                val value = (v as? JsonPrimitive)?.contentOrNull ?: v.toString().take(200)
-                                "$k: $value"
+                    Column(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (input.isNotEmpty()) {
+                            val inputText = input.entries
+                                .filter { (_, v) -> v.toString().length <= 500 }
+                                .joinToString("\n") { (k, v) ->
+                                    val value = (v as? JsonPrimitive)?.contentOrNull ?: v.toString().take(200)
+                                    "$k: $value"
+                                }
+                            if (inputText.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = toolOutputContainerColor(isAmoled),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = inputText.take(2000),
+                                        style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)),
+                                        modifier = Modifier.padding(8.dp).codeHorizontalScroll()
+                                    )
+                                }
                             }
-                        if (inputText.isNotBlank()) {
+                        }
+                        val output = when (val s = tool.state) {
+                            is ToolState.Completed -> s.output
+                            is ToolState.Error -> s.error
+                            else -> ""
+                        }
+                        if (output.isNotBlank()) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
                                 color = toolOutputContainerColor(isAmoled),
+                                border = if (isAmoled) BorderStroke(1.dp, stateColor.copy(alpha = 0.6f)) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = inputText.take(2000),
-                                    style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)),
+                                    text = output.take(3000),
+                                    style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
                                     modifier = Modifier.padding(8.dp).codeHorizontalScroll()
                                 )
                             }
-                        }
-                    }
-                    val output = when (val s = tool.state) {
-                        is ToolState.Completed -> s.output
-                        is ToolState.Error -> s.error
-                        else -> ""
-                    }
-                    if (output.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = toolOutputContainerColor(isAmoled),
-                            border = if (isAmoled) BorderStroke(1.dp, stateColor.copy(alpha = 0.6f)) else null,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = output.take(3000),
-                                style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
-                                modifier = Modifier.padding(8.dp).codeHorizontalScroll()
-                            )
                         }
                     }
                 }
@@ -6380,6 +6425,8 @@ private fun SearchToolCard(
             AnimatedVisibility(
                 visible = expanded && hasOutput,
             ) {
+                val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                val scrollState = rememberScrollState()
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = toolOutputContainerColor(isAmoled),
@@ -6387,17 +6434,15 @@ private fun SearchToolCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 6.dp)
-                        .heightIn(max = 600.dp)
+                        .heightIn(max = halfScreenHeight)
+                        .consumeBoundaryFling(scrollState)
+                        .verticalScroll(scrollState)
                 ) {
-                    Column(
-                        modifier = Modifier
-                    ) {
-                        MarkdownContent(
-                            markdown = output,
-                            textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
-                            isUser = false
-                        )
-                    }
+                    MarkdownContent(
+                        markdown = output,
+                        textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
+                        isUser = false
+                    )
                 }
             }
         }
@@ -6522,6 +6567,8 @@ private fun TaskToolCard(
             AnimatedVisibility(
                 visible = expanded && hasOutput,
             ) {
+                val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                val scrollState = rememberScrollState()
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = toolOutputContainerColor(isAmoled),
@@ -6529,17 +6576,15 @@ private fun TaskToolCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 6.dp)
-                        .heightIn(max = 600.dp)
+                        .heightIn(max = halfScreenHeight)
+                        .consumeBoundaryFling(scrollState)
+                        .verticalScroll(scrollState)
                 ) {
-                    Column(
-                        modifier = Modifier
-                    ) {
-                        MarkdownContent(
-                            markdown = output,
-                            textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
-                            isUser = false
-                        )
-                    }
+                    MarkdownContent(
+                        markdown = output,
+                        textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
+                        isUser = false
+                    )
                 }
             }
         }

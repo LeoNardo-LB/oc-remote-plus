@@ -379,11 +379,16 @@ class ChatViewModel @Inject constructor(
             _selectedModelId.value = effectiveModelId
         }
 
-        // Compute cost/token totals from assistant messages
+        // Compute cost/token totals — prefer session-level aggregates (covers all messages,
+        // not just loaded ones). Fall back to summing loaded assistant messages.
         val assistantMessages = sessionMessages.filterIsInstance<Message.Assistant>()
-        val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
-        val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
-        val totalOutputTokens = assistantMessages.sumOf { it.tokens?.output ?: 0 }
+        val sessionTokens = session?.tokens
+        val totalCost = session?.cost
+            ?: assistantMessages.sumOf { it.cost ?: 0.0 }
+        val totalInputTokens = sessionTokens?.input
+            ?: assistantMessages.sumOf { it.tokens?.input ?: 0 }
+        val totalOutputTokens = sessionTokens?.output
+            ?: assistantMessages.sumOf { it.tokens?.output ?: 0 }
         // Context usage: total tokens from the last assistant message with output > 0
         val lastWithOutput = assistantMessages.firstOrNull { (it.tokens?.output ?: 0) > 0 }
         val lastContextTokens = lastWithOutput?.tokens?.let { t ->
