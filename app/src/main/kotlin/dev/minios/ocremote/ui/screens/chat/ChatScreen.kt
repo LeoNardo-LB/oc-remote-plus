@@ -6605,30 +6605,6 @@ private fun TodoItemRow(todo: TodoItem) {
     }
 }
 
-@Composable
-private fun StepFinishInfo(step: Part.StepFinish) {
-    if (step.tokens != null || step.cost != null) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            step.tokens?.let { tokens ->
-                Text(
-                    text = stringResource(R.string.chat_tokens_format, tokens.input, tokens.output),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                )
-            }
-            step.cost?.let { cost ->
-                Text(
-                    text = stringResource(R.string.chat_cost_format, String.format("%.4f", cost)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun PatchCard(
