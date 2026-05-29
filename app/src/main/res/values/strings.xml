@@ -189,6 +189,7 @@
     <string name="chat_status_running_subagent">Running sub-agent</string>
     <string name="chat_status_updating_tasks">Updating tasks</string>
     <string name="chat_status_thinking">Thinking</string>
+    <string name="chat_thinking_complete">Thought for %1$s</string>
     <string name="chat_tool_reading_file">Reading file…</string>
     <string name="chat_tool_writing_file">Writing file…</string>
     <string name="chat_tool_editing_file">Editing file…</string>
