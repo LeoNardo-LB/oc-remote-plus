@@ -268,10 +268,6 @@ class OpenCodeApi @Inject constructor(
         parts: List<Map<String, String>>? = null
     ): Boolean {
         val body = mutableMapOf<String, Any>("command" to command, "arguments" to arguments)
-        agent?.let { body["agent"] = it }
-        model?.let { body["model"] = it }
-        variant?.let { body["variant"] = it }
-        parts?.let { body["parts"] = it }
         val response = httpClient.post("${conn.baseUrl}/session/$sessionId/command") {
             conn.authHeader?.let { header("Authorization", it) }
             directory?.let { header("x-opencode-directory", it) }

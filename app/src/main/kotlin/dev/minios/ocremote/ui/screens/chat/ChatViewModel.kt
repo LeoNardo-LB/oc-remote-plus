@@ -536,7 +536,9 @@ class ChatViewModel @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load session info", e)
         } finally {
-            sessionLoaded.complete(Unit)
+            if (!sessionLoaded.isCompleted) {
+                sessionLoaded.complete(Unit)
+            }
         }
     }
 
@@ -1272,18 +1274,12 @@ class ChatViewModel @Inject constructor(
                     arguments
                 }
 
-                val currentAgent = uiState.value.selectedAgent
-                val currentModel = uiState.value.selectedModelId
-                val currentVariant = uiState.value.selectedVariant
                 val ok = api.executeCommand(
                     conn = conn,
                     sessionId = sessionId,
                     command = normalizedCommand,
                     arguments = effectiveArguments,
                     directory = effectiveDirectory,
-                    agent = currentAgent,
-                    model = currentModel,
-                    variant = currentVariant
                 )
                 if (BuildConfig.DEBUG) {
                     Log.d(

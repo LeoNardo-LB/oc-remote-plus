@@ -916,16 +916,24 @@ fun ChatScreen(
     }
     val listState = rememberLazyListState()
 
+    // Auto-scroll state must be declared before scroll-restore LaunchedEffect
+    var autoScrollEnabled by remember { mutableStateOf(true) }
+
     // Restore scroll position when returning from sub-session navigation.
     // Using LaunchedEffect(scrollRestoreVersion) instead of rememberLazyListState(initial...)
     // because `remember` caches the initial state and ignores new values on recomposition,
     // causing unreliable restoration when the composable is recomposed (not recreated).
     LaunchedEffect(viewModel.scrollRestoreVersion) {
         if (viewModel.scrollRestoreVersion > 0) {
+            autoScrollEnabled = false
             listState.scrollToItem(
                 viewModel.savedFirstVisibleItemIndex,
                 viewModel.savedFirstVisibleItemScrollOffset
             )
+            // scrollToItem 是挂起函数，返回时滚动已完成、listState 已更新
+            // 根据恢复后的实际位置正确设置 autoScrollEnabled
+            autoScrollEnabled = listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset <= 50
         }
     }
 
@@ -1430,8 +1438,7 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll: always follow new messages; disable when user scrolls up.
-    var autoScrollEnabled by remember { mutableStateOf(true) }
+    // (autoScrollEnabled declared earlier, near listState)
 
     val messageCount = uiState.messages.size
 
