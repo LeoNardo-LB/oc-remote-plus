@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin, Ktor Client 3.5.0, Kotlinx Serialization, Hilt 2.59.2, JUnit 4, MockK, Turbine
 
-**Prerequisites:** Phase 0（Domain Model 定义）+ Phase 1（Domain Repository 接口）已完成。假设存在以下 domain 接口：
+**Prerequisites:** Phase 1（Domain Model 定义 + Repository 接口 + UseCase 定义）已完成。假设存在以下 domain 接口：
 - `domain.repository.ChatRepository`
 - `domain.repository.SessionRepository`
 - `domain.repository.SettingsRepository`（已存在具体实现，后续改造为 Impl）
@@ -594,6 +594,16 @@ data class ServerConnection(
 import dev.minios.ocremote.data.dto.request.*
 import dev.minios.ocremote.data.dto.response.*
 import dev.minios.ocremote.data.dto.common.*
+```
+
+**同步更新测试文件的 import（DTO 类从 `data.api.OpenCodeApi` 移到 `data.dto.*` 后，以下测试文件需要更新 import）：**
+
+- `app/src/test/.../data/api/OpenCodeApiTest.kt`
+- `app/src/test/.../domain/model/SerializationTest.kt`
+
+使用 grep 列出所有受影响文件：
+```powershell
+Get-ChildItem -Recurse -Filter "*.kt" -Path "app\src\test" | Select-String -Pattern "import dev.minios.ocremote.data.api.(PromptRequest|PromptPart|ShellRequest|PtyCreateRequest|PtyInfo|ProvidersResponse|ProviderInfo|AgentInfo|CommandInfo|SearchMatch|ServerConnection)" | Select-Object Path -Unique
 ```
 
 ### 1.17 编译验证
@@ -1304,6 +1314,14 @@ class OpenCodeApi @Inject constructor(
 
 **Goal:** 将 EventReducer.kt（540行）拆分为 EventDispatcher + 5个 Handler，使用 Hilt 多绑定。
 
+> **D5 NOTE (P3-D5-001 降级为 P2):** Handler 代码引用 `SseEvent.PermissionReplied`, `SseEvent.QuestionReplied`, `SseEvent.QuestionRejected` 等类型。经源码确认，这些类型在 `SseEvent.kt` 中**已存在**（line 97-137）。但建议在 Task 5 执行前验证：
+>
+> ```powershell
+> Select-String -Path "app/src/main/kotlin/dev/minios/ocremote/domain/model/SseEvent.kt" -Pattern "PermissionReplied|QuestionReplied|QuestionRejected"
+> ```
+>
+> 如果这些子类不存在（如因 Phase 1 未完成 SseEvent 扩展），需先在 SseEvent.kt 中添加。
+
 ### 5.1 创建 `data/repository/handler/SseEventHandler.kt`
 
 ```kotlin
@@ -1345,12 +1363,23 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     private val TAG = "SessionEventHandler"
 
-    val serverSessions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
-    val sessions = MutableStateFlow<List<Session>>(emptyList())
-    val sessionStatuses = MutableStateFlow<Map<String, SessionStatus>>(emptyMap())
-    val sessionDiffs = MutableStateFlow<Map<String, List<FileDiff>>>(emptyMap())
-    val vcsBranch = MutableStateFlow<String?>(null)
-    val projectInfo = MutableStateFlow<Project?>(null)
+    private val _serverSessions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val serverSessions: StateFlow<Map<String, Set<String>>> get() = _serverSessions.asStateFlow()
+
+    private val _sessions = MutableStateFlow<List<Session>>(emptyList())
+    val sessions: StateFlow<List<Session>> get() = _sessions.asStateFlow()
+
+    private val _sessionStatuses = MutableStateFlow<Map<String, SessionStatus>>(emptyMap())
+    val sessionStatuses: StateFlow<Map<String, SessionStatus>> get() = _sessionStatuses.asStateFlow()
+
+    private val _sessionDiffs = MutableStateFlow<Map<String, List<FileDiff>>>(emptyMap())
+    val sessionDiffs: StateFlow<Map<String, List<FileDiff>>> get() = _sessionDiffs.asStateFlow()
+
+    private val _vcsBranch = MutableStateFlow<String?>(null)
+    val vcsBranch: StateFlow<String?> get() = _vcsBranch.asStateFlow()
+
+    private val _projectInfo = MutableStateFlow<Project?>(null)
+    val projectInfo: StateFlow<Project?> get() = _projectInfo.asStateFlow()
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
@@ -1369,14 +1398,14 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
             is SseEvent.SessionCompacted -> {
                 Log.i(TAG, "Session ${event.sessionId} compacted"); true
             }
-            is SseEvent.VcsBranchUpdated -> { vcsBranch.value = event.branch; true }
-            is SseEvent.ProjectUpdated -> { projectInfo.value = event.info; true }
+            is SseEvent.VcsBranchUpdated -> { _vcsBranch.value = event.branch; true }
+            is SseEvent.ProjectUpdated -> { _projectInfo.value = event.info; true }
             else -> false
         }
     }
 
     private fun trackSession(serverId: String, sessionId: String) {
-        serverSessions.update { current ->
+        _serverSessions.update { current ->
             val existing = current[serverId] ?: emptySet()
             current + (serverId to (existing + sessionId))
         }
@@ -1384,13 +1413,13 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     private fun handleSessionCreated(event: SseEvent.SessionCreated, serverId: String) {
         trackSession(serverId, event.info.id)
-        sessions.update { (it + event.info).sortedByDescending { s -> s.time.updated } }
-        sessionStatuses.update { it + (event.info.id to SessionStatus.Idle) }
+        _sessions.update { (it + event.info).sortedByDescending { s -> s.time.updated } }
+        _sessionStatuses.update { it + (event.info.id to SessionStatus.Idle) }
     }
 
     private fun handleSessionUpdated(event: SseEvent.SessionUpdated, serverId: String) {
         trackSession(serverId, event.info.id)
-        sessions.update { current ->
+        _sessions.update { current ->
             val idx = current.indexOfFirst { it.id == event.info.id }
             if (idx >= 0) {
                 current.toMutableList().apply { set(idx, event.info) }
@@ -1403,21 +1432,21 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     private fun handleSessionDeleted(event: SseEvent.SessionDeleted) {
         val sessionId = event.info.id
-        sessions.update { it.filter { s -> s.id != sessionId } }
-        sessionStatuses.update { it - sessionId }
-        sessionDiffs.update { it - sessionId }
+        _sessions.update { it.filter { s -> s.id != sessionId } }
+        _sessionStatuses.update { it - sessionId }
+        _sessionDiffs.update { it - sessionId }
     }
 
     private fun handleSessionStatus(event: SseEvent.SessionStatus) {
-        sessionStatuses.update { it + (event.sessionId to event.status) }
+        _sessionStatuses.update { it + (event.sessionId to event.status) }
     }
 
     private fun handleSessionIdle(event: SseEvent.SessionIdle) {
-        sessionStatuses.update { it + (event.sessionId to SessionStatus.Idle) }
+        _sessionStatuses.update { it + (event.sessionId to SessionStatus.Idle) }
     }
 
     private fun handleSessionDiff(event: SseEvent.SessionDiff) {
-        sessionDiffs.update { it + (event.sessionId to event.diff) }
+        _sessionDiffs.update { it + (event.sessionId to event.diff) }
     }
 
     private fun handleSessionError(event: SseEvent.SessionError) {
@@ -1428,11 +1457,11 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     fun setSessions(serverId: String, newSessions: List<Session>) {
         val sessionIds = newSessions.map { it.id }.toSet()
-        serverSessions.update { current ->
+        _serverSessions.update { current ->
             val existing = current[serverId] ?: emptySet()
             current + (serverId to (existing + sessionIds))
         }
-        sessions.update { current ->
+        _sessions.update { current ->
             val updated = current.toMutableList()
             for (session in newSessions) {
                 val idx = updated.indexOfFirst { it.id == session.id }
@@ -1443,28 +1472,28 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     fun updateSessionStatus(sessionId: String, status: SessionStatus) {
-        sessionStatuses.update { it + (sessionId to status) }
+        _sessionStatuses.update { it + (sessionId to status) }
     }
 
     fun clearForServer(serverId: String) {
-        val sessionIds = serverSessions.value[serverId] ?: emptySet()
+        val sessionIds = _serverSessions.value[serverId] ?: emptySet()
         if (sessionIds.isEmpty()) {
-            serverSessions.update { it - serverId }
+            _serverSessions.update { it - serverId }
             return
         }
-        serverSessions.update { it - serverId }
-        sessions.update { it.filter { s -> s.id !in sessionIds } }
-        sessionStatuses.update { it - sessionIds }
-        sessionDiffs.update { it - sessionIds }
+        _serverSessions.update { it - serverId }
+        _sessions.update { it.filter { s -> s.id !in sessionIds } }
+        _sessionStatuses.update { it - sessionIds }
+        _sessionDiffs.update { it - sessionIds }
     }
 
     fun clearAll() {
-        serverSessions.value = emptyMap()
-        sessions.value = emptyList()
-        sessionStatuses.value = emptyMap()
-        sessionDiffs.value = emptyMap()
-        vcsBranch.value = null
-        projectInfo.value = null
+        _serverSessions.value = emptyMap()
+        _sessions.value = emptyList()
+        _sessionStatuses.value = emptyMap()
+        _sessionDiffs.value = emptyMap()
+        _vcsBranch.value = null
+        _projectInfo.value = null
     }
 }
 ```
@@ -1491,8 +1520,11 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
 
     private val TAG = "MessageEventHandler"
 
-    val messages = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
-    val parts = MutableStateFlow<Map<String, List<Part>>>(emptyMap())
+    private val _messages = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
+    val messages: StateFlow<Map<String, List<Message>>> get() = _messages.asStateFlow()
+
+    private val _parts = MutableStateFlow<Map<String, List<Part>>>(emptyMap())
+    val parts: StateFlow<Map<String, List<Part>>> get() = _parts.asStateFlow()
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
@@ -1507,7 +1539,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
 
     private fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
-        messages.update { current ->
+        _messages.update { current ->
             val sessionMessages = current[sessionId]?.toMutableList() ?: mutableListOf()
             val idx = sessionMessages.indexOfFirst { it.id == event.info.id }
             if (idx >= 0) {
@@ -1521,16 +1553,16 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessageRemoved(event: SseEvent.MessageRemoved) {
-        messages.update { current ->
+        _messages.update { current ->
             val sessionMessages = current[event.sessionId]?.filter { it.id != event.messageId }
             if (sessionMessages != null) current + (event.sessionId to sessionMessages) else current
         }
-        parts.update { it - event.messageId }
+        _parts.update { it - event.messageId }
     }
 
     private fun handleMessagePartUpdated(event: SseEvent.MessagePartUpdated) {
         val messageId = event.part.messageId
-        parts.update { current ->
+        _parts.update { current ->
             val messageParts = current[messageId]?.toMutableList() ?: mutableListOf()
             val idx = messageParts.indexOfFirst { it.id == event.part.id }
             if (idx >= 0) messageParts[idx] = event.part else messageParts.add(event.part)
@@ -1539,7 +1571,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
-        parts.update { current ->
+        _parts.update { current ->
             val messageParts = current[event.messageId]?.toMutableList() ?: return@update current
             val idx = messageParts.indexOfFirst { it.id == event.partId }
             if (idx < 0) return@update current
@@ -1555,7 +1587,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessagePartRemoved(event: SseEvent.MessagePartRemoved) {
-        parts.update { current ->
+        _parts.update { current ->
             val messageParts = current[event.messageId]?.filter { it.id != event.partId }
             if (messageParts != null) current + (event.messageId to messageParts) else current
         }
@@ -1564,19 +1596,19 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     // ============ Batch Operations ============
 
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        messages.update { it + (sessionId to newMessages.map { m -> m.info }.sortedByDescending { m -> m.time.created }) }
+        _messages.update { it + (sessionId to newMessages.map { m -> m.info }.sortedByDescending { m -> m.time.created }) }
         val partsMap = newMessages.associate { it.info.id to it.parts }
-        parts.update { it + partsMap }
+        _parts.update { it + partsMap }
     }
 
     fun mergeMessages(sessionId: String, newMessages: List<MessageWithParts>) {
         val incoming = newMessages.map { it.info }.sortedByDescending { m -> m.time.created }
-        messages.update { current ->
+        _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val existingById = existing.associateBy { it.id }
             current + (sessionId to incoming.map { newMsg -> existingById[newMsg.id] ?: newMsg })
         }
-        parts.update { currentParts ->
+        _parts.update { currentParts ->
             val existingKeys = currentParts.keys
             val newParts = newMessages
                 .filter { it.info.id !in existingKeys }
@@ -1586,16 +1618,16 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     fun clearForServer(sessionIds: Set<String>) {
-        val messageIds = messages.value
+        val messageIds = _messages.value
             .filterKeys { it in sessionIds }.values.flatten()
             .map { it.id }.toSet()
-        messages.update { it - sessionIds }
-        parts.update { it - messageIds }
+        _messages.update { it - sessionIds }
+        _parts.update { it - messageIds }
     }
 
     fun clearAll() {
-        messages.value = emptyMap()
-        parts.value = emptyMap()
+        _messages.value = emptyMap()
+        _parts.value = emptyMap()
     }
 }
 ```
@@ -1618,7 +1650,8 @@ import javax.inject.Singleton
 @Singleton
 class PermissionEventHandler @Inject constructor() : SseEventHandler {
 
-    val permissions = MutableStateFlow<Map<String, List<SseEvent.PermissionAsked>>>(emptyMap())
+    private val _permissions = MutableStateFlow<Map<String, List<SseEvent.PermissionAsked>>>(emptyMap())
+    val permissions: StateFlow<Map<String, List<SseEvent.PermissionAsked>>> get() = _permissions.asStateFlow()
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
@@ -1629,7 +1662,7 @@ class PermissionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handlePermissionAsked(event: SseEvent.PermissionAsked) {
-        permissions.update { current ->
+        _permissions.update { current ->
             val sessionPerms = current[event.sessionId]?.toMutableList() ?: mutableListOf()
             sessionPerms.add(event)
             current + (event.sessionId to sessionPerms)
@@ -1637,30 +1670,30 @@ class PermissionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handlePermissionReplied(event: SseEvent.PermissionReplied) {
-        permissions.update { current ->
+        _permissions.update { current ->
             val sessionPerms = current[event.sessionId]?.filter { it.id != event.requestId }
             if (sessionPerms != null) current + (event.sessionId to sessionPerms) else current
         }
     }
 
     fun removePermission(permissionId: String) {
-        permissions.update { current ->
+        _permissions.update { current ->
             current.mapValues { (_, perms) -> perms.filter { it.id != permissionId } }
         }
     }
 
     fun setPermissions(sessionId: String, perms: List<SseEvent.PermissionAsked>) {
-        permissions.update { current ->
+        _permissions.update { current ->
             if (perms.isEmpty()) current - sessionId else current + (sessionId to perms)
         }
     }
 
     fun clearForServer(sessionIds: Set<String>) {
-        permissions.update { it - sessionIds }
+        _permissions.update { it - sessionIds }
     }
 
     fun clearAll() {
-        permissions.value = emptyMap()
+        _permissions.value = emptyMap()
     }
 }
 ```
@@ -1683,7 +1716,8 @@ import javax.inject.Singleton
 @Singleton
 class QuestionEventHandler @Inject constructor() : SseEventHandler {
 
-    val questions = MutableStateFlow<Map<String, List<SseEvent.QuestionAsked>>>(emptyMap())
+    private val _questions = MutableStateFlow<Map<String, List<SseEvent.QuestionAsked>>>(emptyMap())
+    val questions: StateFlow<Map<String, List<SseEvent.QuestionAsked>>> get() = _questions.asStateFlow()
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
@@ -1695,7 +1729,7 @@ class QuestionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleQuestionAsked(event: SseEvent.QuestionAsked) {
-        questions.update { current ->
+        _questions.update { current ->
             val sessionQs = current[event.sessionId]?.toMutableList() ?: mutableListOf()
             sessionQs.add(event)
             current + (event.sessionId to sessionQs)
@@ -1703,37 +1737,37 @@ class QuestionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleQuestionReplied(event: SseEvent.QuestionReplied) {
-        questions.update { current ->
+        _questions.update { current ->
             val sessionQs = current[event.sessionId]?.filter { it.id != event.requestId }
             if (sessionQs != null) current + (event.sessionId to sessionQs) else current
         }
     }
 
     private fun handleQuestionRejected(event: SseEvent.QuestionRejected) {
-        questions.update { current ->
+        _questions.update { current ->
             val sessionQs = current[event.sessionId]?.filter { it.id != event.requestId }
             if (sessionQs != null) current + (event.sessionId to sessionQs) else current
         }
     }
 
     fun removeQuestion(questionId: String) {
-        questions.update { current ->
+        _questions.update { current ->
             current.mapValues { (_, qs) -> qs.filter { it.id != questionId } }
         }
     }
 
     fun setQuestions(sessionId: String, qs: List<SseEvent.QuestionAsked>) {
-        questions.update { current ->
+        _questions.update { current ->
             if (qs.isEmpty()) current - sessionId else current + (sessionId to qs)
         }
     }
 
     fun clearForServer(sessionIds: Set<String>) {
-        questions.update { it - sessionIds }
+        _questions.update { it - sessionIds }
     }
 
     fun clearAll() {
-        questions.value = emptyMap()
+        _questions.value = emptyMap()
     }
 }
 ```
@@ -1761,11 +1795,12 @@ class MiscEventHandler @Inject constructor() : SseEventHandler {
 
     private val TAG = "MiscEventHandler"
 
-    val todos = MutableStateFlow<Map<String, List<SseEvent.TodoUpdated.Todo>>>(emptyMap())
+    private val _todos = MutableStateFlow<Map<String, List<SseEvent.TodoUpdated.Todo>>>(emptyMap())
+    val todos: StateFlow<Map<String, List<SseEvent.TodoUpdated.Todo>>> get() = _todos.asStateFlow()
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
-            is SseEvent.TodoUpdated -> { todos.update { it + (event.sessionId to event.todos) }; true }
+            is SseEvent.TodoUpdated -> { _todos.update { it + (event.sessionId to event.todos) }; true }
             is SseEvent.PtyCreated -> { if (BuildConfig.DEBUG) Log.d(TAG, "PTY created: ${event.id}"); true }
             is SseEvent.PtyUpdated -> { if (BuildConfig.DEBUG) Log.d(TAG, "PTY updated: ${event.id}"); true }
             is SseEvent.PtyDeleted -> { if (BuildConfig.DEBUG) Log.d(TAG, "PTY deleted: ${event.id}"); true }
@@ -1787,11 +1822,11 @@ class MiscEventHandler @Inject constructor() : SseEventHandler {
     }
 
     fun clearForServer(sessionIds: Set<String>) {
-        todos.update { it - sessionIds }
+        _todos.update { it - sessionIds }
     }
 
     fun clearAll() {
-        todos.value = emptyMap()
+        _todos.value = emptyMap()
     }
 }
 ```
@@ -1816,7 +1851,6 @@ import javax.inject.Singleton
  */
 @Singleton
 class EventDispatcher @Inject constructor(
-    private val handlers: Set<@JvmSuppressWildcards SseEventHandler>,
     private val sessionHandler: SessionEventHandler,
     private val messageHandler: MessageEventHandler,
     private val permissionHandler: PermissionEventHandler,
@@ -1844,9 +1878,11 @@ class EventDispatcher @Inject constructor(
      * Each handler returns true if it handled the event.
      */
     fun processEvent(event: SseEvent, serverId: String) {
-        for (handler in handlers) {
-            handler.handle(event, serverId)
-        }
+        sessionHandler.handle(event, serverId)
+        messageHandler.handle(event, serverId)
+        permissionHandler.handle(event, serverId)
+        questionHandler.handle(event, serverId)
+        miscHandler.handle(event, serverId)
     }
 
     // ============ Delegated Operations ============
@@ -1896,33 +1932,23 @@ class EventDispatcher @Inject constructor(
 
 ### 5.8 创建 `data/di/HandlerModule.kt`
 
+> **注意：** EventDispatcher 使用具名参数直接注入，不需要 `@IntoSet` 多绑定。此 Module 仅确保 Handler 类在 Hilt 图中可用（如果 Handler 已有 `@Inject constructor` + `@Singleton`，此 Module 可省略）。
+
 ```kotlin
 package dev.minios.ocremote.data.di
 
-import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import dev.minios.ocremote.data.repository.handler.*
 
+/**
+ * Handler classes use @Inject constructor + @Singleton, so Hilt knows how to provide them.
+ * This module exists as a placeholder for future explicit bindings if needed.
+ * EventDispatcher directly injects concrete handler types — no @Binds or @IntoSet required.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class HandlerModule {
-    @Binds @IntoSet
-    abstract fun bindSessionHandler(impl: SessionEventHandler): SseEventHandler
-
-    @Binds @IntoSet
-    abstract fun bindMessageHandler(impl: MessageEventHandler): SseEventHandler
-
-    @Binds @IntoSet
-    abstract fun bindPermissionHandler(impl: PermissionEventHandler): SseEventHandler
-
-    @Binds @IntoSet
-    abstract fun bindQuestionHandler(impl: QuestionEventHandler): SseEventHandler
-
-    @Binds @IntoSet
-    abstract fun bindMiscHandler(impl: MiscEventHandler): SseEventHandler
-}
+abstract class HandlerModule
 ```
 
 ### 5.9 更新所有 EventReducer 引用为 EventDispatcher
@@ -2493,12 +2519,7 @@ class EventDispatcherTest {
         questionHandler = QuestionEventHandler()
         miscHandler = MiscEventHandler()
 
-        val allHandlers: Set<SseEventHandler> = setOf(
-            sessionHandler, messageHandler, permissionHandler, questionHandler, miscHandler
-        )
-
         dispatcher = EventDispatcher(
-            handlers = allHandlers,
             sessionHandler = sessionHandler,
             messageHandler = messageHandler,
             permissionHandler = permissionHandler,
@@ -2601,9 +2622,9 @@ import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.model.SseEvent
+import dev.minios.ocremote.domain.repository.SettingsRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -2782,7 +2803,7 @@ class SseConnectionManager @Inject constructor(
     }
 
     private suspend fun calculateBackoff(attempt: Int): Long {
-        val maxDelay = when (settingsRepository.reconnectMode.first()) {
+        val maxDelay = when (settingsRepository.getSettingsFlow().first().reconnectMode) {
             "aggressive" -> 5_000L
             "conservative" -> 60_000L
             else -> RECONNECT_MAX_DELAY_MS
@@ -2812,10 +2833,11 @@ import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ServerConfig
+import dev.minios.ocremote.domain.repository.SettingsRepository
+import kotlinx.coroutines.flow.first
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -2968,7 +2990,7 @@ class AppNotificationManager @Inject constructor(
         val body = session?.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.notification_new_session)
 
         val pendingIntent = createSessionPendingIntent(context, server, sessionId, sessionId.hashCode())
-        val silent = settingsRepository.silentNotifications.value
+        val silent = settingsRepository.getSettingsFlow().first().silentNotifications
         val channelId = if (silent) NOTIFICATION_CHANNEL_TASKS_SILENT_ID else NOTIFICATION_CHANNEL_TASKS_ID
 
         val notifId = eventNotificationId(server.id, sessionId, 0)
@@ -3500,6 +3522,31 @@ abstract class RepositoryModule {
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): domain.repository.SettingsRepository
 }
 ```
+
+### 7.5.1 创建 DataModule（Repository @Binds）
+
+> **注意：** Phase 3 创建的 ChatRepositoryImpl 和 SessionRepositoryImpl 也需要 `@Binds` 绑定到 domain 接口。与 RepositoryModule 合并或单独创建：
+
+```kotlin
+// data/di/DataModule.kt
+package dev.minios.ocremote.data.di
+
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class DataModule {
+    @Binds abstract fun bindChatRepository(impl: ChatRepositoryImpl): dev.minios.ocremote.domain.repository.ChatRepository
+    @Binds abstract fun bindSessionRepository(impl: SessionRepositoryImpl): dev.minios.ocremote.domain.repository.SessionRepository
+    @Binds abstract fun bindServerRepository(impl: ServerRepositoryImpl): dev.minios.ocremote.domain.repository.ServerRepository
+    @Binds abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): dev.minios.ocremote.domain.repository.SettingsRepository
+}
+```
+
+> **注意：** 如果 RepositoryModule 已存在于其他位置，请将这 4 个 `@Binds` 合并到一个 Module 中，避免 Hilt 报重复绑定错误。
 
 ### 7.6 创建 Repository 测试
 

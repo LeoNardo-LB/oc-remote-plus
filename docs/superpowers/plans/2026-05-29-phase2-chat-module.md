@@ -85,6 +85,13 @@
 | 7177–7880 | `ChatInputBar(...)` | @Composable input | `input/ChatInputBar.kt` |
 | 7889–8236 | `QuestionCard(...)` | @Composable dialog | `dialog/QuestionCard.kt` |
 
+> **行号回退策略**：本表格中的行号基于原始 ChatScreen.kt。如果在 Phase 0/1 执行期间文件有变动导致行号偏移，请使用函数名搜索定位：
+> ```powershell
+> # PowerShell
+> Select-String -Path "app\src\main\kotlin\dev\minios\ocremote\ui\screens\chat\ChatScreen.kt" -Pattern "fun SessionTerminalInline" | Select-Object LineNumber
+> ```
+> 每个 Task 的 Step 1 应先确认函数位置再执行提取。
+
 ---
 
 ## File Structure
@@ -106,6 +113,7 @@ ui/screens/chat/
 ├── markdown/          # Task 3
 │   ├── MarkdownContent.kt          (含 looksLikeHtmlPayload, normalizeHtmlForEmbeddedPreview, preserveRawHtmlPayload)
 │   └── MarkdownTable.kt            (SimpleMarkdownTable)
+│   # 注：MarkdownContent 在 Phase 2 仅在 chat/markdown/ 内部使用，Phase 5 决定是否提升到 ui/components/
 ├── tools/             # Task 4
 │   ├── ToolCardRegistry.kt         (object ToolCardRegistry + ToolDisplay data class)
 │   ├── ToolCardRenderer.kt         (ToolCallCard + extractToolInput/extractToolOutput)
@@ -127,6 +135,7 @@ ui/screens/chat/
 │   ├── ChatInputBar.kt             (含 clientCommands, buildPromptParts, placeholderHintResIds)
 │   ├── SlashCommandMenu.kt         (从 ChatInputBar 中提取斜杠命令菜单)
 │   └── AttachmentPreview.kt        (从 ChatInputBar 中提取附件预览)
+│   # 注：ChatInputBar 在 Phase 2 仅在 chat/input/ 内部使用，Phase 5 决定是否提升到 ui/components/
 ├── components/        # Task 7
 │   ├── ChatMessageBubble.kt
 │   ├── AssistantMessageCard.kt
@@ -136,8 +145,6 @@ ui/screens/chat/
 │   ├── PartContent.kt
 │   ├── DiffChangesInline.kt        (含 DiffView, computeSimpleDiff)
 │   ├── RevertBanner.kt
-│   ├── BreathingCircleIndicator.kt
-│   ├── PulsingDotsIndicator.kt
 │   ├── ErrorPayloadContent.kt
 │   ├── FileCard.kt                 (含 FileCardFallback)
 │   └── ImageThumbnailRow.kt
@@ -974,8 +981,8 @@ Phase 2 Task 6/9 — no behavior changes."
 
 | 行号 | 函数 | 提取目标 |
 |------|------|----------|
-| 364–428 | `PulsingDotsIndicator()` | `components/PulsingDotsIndicator.kt` |
-| 430–472 | `BreathingCircleIndicator()` | `components/BreathingCircleIndicator.kt` |
+| 364–428 | `PulsingDotsIndicator()` | **不提取** — 保留在 ChatScreen.kt，由 Phase 5 统一提取到 `ui/components/` |
+| 430–472 | `BreathingCircleIndicator()` | **不提取** — 保留在 ChatScreen.kt，由 Phase 5 统一提取到 `ui/components/` |
 | 493–644 | `ErrorPayloadContent(...)` | `components/ErrorPayloadContent.kt` |
 | 3897–4159 | `ChatMessageBubble(...)` | `components/ChatMessageBubble.kt` |
 | 4174–4361 | `AssistantMessageCard(...)` | `components/AssistantMessageCard.kt` |
@@ -997,8 +1004,8 @@ Phase 2 Task 6/9 — no behavior changes."
 
 | 文件 | 函数 | 依赖 |
 |------|------|------|
-| `components/PulsingDotsIndicator.kt` | `PulsingDotsIndicator()` | 仅 Compose 基础 |
-| `components/BreathingCircleIndicator.kt` | `BreathingCircleIndicator()` | 仅 Compose 基础 |
+| ~~`components/PulsingDotsIndicator.kt`~~ | ~~`PulsingDotsIndicator()`~~ | ~~仅 Compose 基础~~ — **由 Phase 5 统一提取** |
+| ~~`components/BreathingCircleIndicator.kt`~~ | ~~`BreathingCircleIndicator()`~~ | ~~仅 Compose 基础~~ — **由 Phase 5 统一提取** |
 | `components/RevertBanner.kt` | `RevertBanner(onRedo)` | Compose UI + Material Icons |
 | `components/DiffChangesInline.kt` | `DiffChangesInline(...)` + `DiffView(...)` + `computeSimpleDiff(...)` | Compose UI |
 | `components/ReasoningBlock.kt` | `ReasoningBlock(...)` | Compose UI + Markdown 渲染 |
@@ -1096,9 +1103,250 @@ Phase 2 Task 7/9 — no behavior changes."
 **预计修改行数:** ~200 行改动
 **ChatViewModel.kt:** 从 1435 行逐步瘦身
 
-### Step 8.1: 前提 — Phase 1 已创建的 UseCase 接口
+> **⚠️ D5 FIX — 前置条件变更：** Phase 1 只创建了 5 个 UseCase（SendMessage, CreateSession, DeleteSession, GetServerList, UpdateSettings），但 Task 8 需要 9 个 UseCase。以下 8 个 UseCase 需在执行 Task 8 前创建：
+>
+> | 缺失 UseCase | 对应 Phase | 创建位置 |
+> |---|---|---|
+> | ManageSessionUseCase | Phase 2 | **Step 8.0-A (本 Task)** |
+> | ManagePermissionUseCase | Phase 2 | **Step 8.0-B (本 Task)** |
+> | SelectModelUseCase | Phase 2 | **Step 8.0-C (本 Task)** |
+> | ManageAgentUseCase | Phase 2 | **Step 8.0-D (本 Task)** |
+> | ManageTerminalUseCase | Phase 2 | **Step 8.0-E (本 Task)** |
+> | DraftUseCase | Phase 2 | **Step 8.0-F (本 Task)** |
+> | ShareExportUseCase | Phase 2 | **Step 8.0-G (本 Task)** |
+> | UndoRedoUseCase | Phase 2 | **Step 8.0-H (本 Task)** |
+>
+> 这些 UseCase 在创建时只有**空壳实现**（委托给现有 data 层），不改变行为。完整实现和测试在 Phase 4 中补充。
 
-Phase 1 应已创建以下 domain 层接口（确认实际文件）：
+### Step 8.0: 创建缺失的 UseCase 桩文件
+
+> **D5 FIX:** 每个 UseCase 先创建空壳实现，委托给 ChatViewModel 当前使用的 data 层 API。签名基于 ChatViewModel 中对应方法分析得出。每个文件创建后运行 `.\gradlew compileDebugKotlin` 验证。
+
+- [ ] **Step 8.0-A: ManageSessionUseCase**
+
+```kotlin
+// domain/usecase/ManageSessionUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.Session
+import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+
+/**
+ * Use case: manage session lifecycle (load, refresh, create, fork, rename).
+ * Temporary shell — delegates to OpenCodeApi. Full impl with tests in Phase 4.
+ */
+class ManageSessionUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    // TODO: Phase 4 — replace api calls with ChatRepository/SessionRepository methods
+    suspend fun loadMessages(conn: ServerConnection, sessionId: String, limit: Int): Result<List<Message>> =
+        runCatching { api.getMessages(conn, sessionId, limit) }
+
+    suspend fun refreshSession(conn: ServerConnection, sessionId: String): Result<Unit> =
+        runCatching { api.refreshSession(conn, sessionId) }
+
+    suspend fun loadOlderMessages(conn: ServerConnection, sessionId: String, before: String, limit: Int): Result<List<Message>> =
+        runCatching { api.getMessagesBefore(conn, sessionId, before, limit) }
+
+    suspend fun createNewSession(conn: ServerConnection, directory: String?): Result<Session> =
+        runCatching { api.createSession(conn, directory) }
+
+    suspend fun forkSession(conn: ServerConnection, sessionId: String): Result<Session> =
+        runCatching { api.forkSession(conn, sessionId) }
+
+    suspend fun renameSession(conn: ServerConnection, sessionId: String, title: String): Result<Unit> =
+        runCatching { api.renameSession(conn, sessionId, title) }
+}
+```
+
+- [ ] **Step 8.0-B: ManagePermissionUseCase**
+
+```kotlin
+// domain/usecase/ManagePermissionUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import javax.inject.Inject
+
+class ManagePermissionUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    suspend fun replyToPermission(conn: ServerConnection, sessionId: String, requestId: String, allowed: Boolean): Result<Unit> =
+        runCatching { api.replyPermission(conn, sessionId, requestId, allowed) }
+
+    suspend fun replyToQuestion(conn: ServerConnection, sessionId: String, requestId: String, answers: List<String>): Result<Unit> =
+        runCatching { api.replyQuestion(conn, sessionId, requestId, answers) }
+
+    suspend fun rejectQuestion(conn: ServerConnection, sessionId: String, requestId: String): Result<Unit> =
+        runCatching { api.rejectQuestion(conn, sessionId, requestId) }
+}
+```
+
+- [ ] **Step 8.0-C: SelectModelUseCase**
+
+```kotlin
+// domain/usecase/SelectModelUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import javax.inject.Inject
+
+class SelectModelUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    suspend fun selectModel(conn: ServerConnection, sessionId: String, modelId: String): Result<Unit> =
+        runCatching { api.selectModel(conn, sessionId, modelId) }
+
+    suspend fun loadProviders(conn: ServerConnection): Result<List<dev.minios.ocremote.domain.model.ProviderInfo>> =
+        runCatching { api.getProviders(conn).map { dev.minios.ocremote.domain.model.ProviderInfo(id = it.id, name = it.name) } }
+}
+```
+
+- [ ] **Step 8.0-D: ManageAgentUseCase**
+
+```kotlin
+// domain/usecase/ManageAgentUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import javax.inject.Inject
+
+class ManageAgentUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    suspend fun selectAgent(conn: ServerConnection, sessionId: String, agent: String): Result<Unit> =
+        runCatching { api.selectAgent(conn, sessionId, agent) }
+
+    suspend fun loadAgents(conn: ServerConnection): Result<List<String>> =
+        runCatching { api.getAgents(conn) }
+
+    suspend fun cycleVariant(conn: ServerConnection, sessionId: String): Result<Unit> =
+        runCatching { api.cycleVariant(conn, sessionId) }
+
+    suspend fun loadCommands(conn: ServerConnection): Result<List<String>> =
+        runCatching { api.getCommands(conn) }
+
+    suspend fun searchFilesForMention(conn: ServerConnection, query: String): Result<List<String>> =
+        runCatching { api.searchFiles(conn, query) }
+}
+```
+
+- [ ] **Step 8.0-E: ManageTerminalUseCase**
+
+```kotlin
+// domain/usecase/ManageTerminalUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import javax.inject.Inject
+
+class ManageTerminalUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    suspend fun createTerminal(conn: ServerConnection, title: String, command: String, cwd: String): Result<String> =
+        runCatching { api.createPty(conn, title, command, cwd) }
+
+    suspend fun sendTerminalInput(conn: ServerConnection, ptyId: String, input: String): Result<Unit> =
+        runCatching { api.sendPtyInput(conn, ptyId, input) }
+
+    suspend fun resizeTerminal(conn: ServerConnection, ptyId: String, cols: Int, rows: Int): Result<Unit> =
+        runCatching { api.resizePty(conn, ptyId, cols, rows) }
+
+    suspend fun closeTerminal(conn: ServerConnection, ptyId: String): Result<Unit> =
+        runCatching { api.closePty(conn, ptyId) }
+
+    suspend fun executeCommand(conn: ServerConnection, sessionId: String, command: String): Result<Unit> =
+        runCatching { api.executeCommand(conn, sessionId, command) }
+}
+```
+
+- [ ] **Step 8.0-F: DraftUseCase**
+
+```kotlin
+// domain/usecase/DraftUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.repository.DraftRepository
+import javax.inject.Inject
+
+class DraftUseCase @Inject constructor(
+    private val draftRepository: DraftRepository
+) {
+    fun getDraft(sessionId: String): String = draftRepository.getDraft(sessionId)
+    suspend fun updateDraftText(sessionId: String, text: String) = draftRepository.saveDraft(sessionId, text)
+    suspend fun clearDraft(sessionId: String) = draftRepository.clearDraft(sessionId)
+}
+```
+
+- [ ] **Step 8.0-G: ShareExportUseCase**
+
+```kotlin
+// domain/usecase/ShareExportUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import javax.inject.Inject
+
+class ShareExportUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    suspend fun shareSession(conn: ServerConnection, sessionId: String): Result<String> =
+        runCatching { api.shareSession(conn, sessionId) }
+
+    suspend fun unshareSession(conn: ServerConnection, sessionId: String): Result<Unit> =
+        runCatching { api.unshareSession(conn, sessionId) }
+
+    suspend fun exportSession(conn: ServerConnection, sessionId: String, format: String): Result<String> =
+        runCatching { api.exportSession(conn, sessionId, format) }
+
+    suspend fun compactSession(conn: ServerConnection, sessionId: String): Result<Unit> =
+        runCatching { api.compactSession(conn, sessionId) }
+}
+```
+
+- [ ] **Step 8.0-H: UndoRedoUseCase**
+
+```kotlin
+// domain/usecase/UndoRedoUseCase.kt
+package dev.minios.ocremote.domain.usecase
+
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import javax.inject.Inject
+
+class UndoRedoUseCase @Inject constructor(
+    private val api: OpenCodeApi
+) {
+    suspend fun undoMessage(conn: ServerConnection, sessionId: String): Result<Unit> =
+        runCatching { api.undoMessage(conn, sessionId) }
+
+    suspend fun revertMessage(conn: ServerConnection, sessionId: String, messageId: String): Result<Unit> =
+        runCatching { api.revertMessage(conn, sessionId, messageId) }
+
+    suspend fun redoMessage(conn: ServerConnection, sessionId: String): Result<Unit> =
+        runCatching { api.redoMessage(conn, sessionId) }
+}
+```
+
+- [ ] **Step 8.0 验证: 编译确认所有桩文件**
+
+Run: `.\gradlew compileDebugKotlin`
+Expected: BUILD SUCCESSFUL
+
+---
+
+以下 9 个 UseCase 应已就绪（Phase 1 创建 `SendMessageUseCase` + Step 8.0 创建其余 8 个桩文件）。确认实际文件存在：
+
+> **注意：** `SendMessageUseCase` 已在 Phase 1 中定义。Step 8.0 中创建的 8 个 UseCase 桩文件（ManageSessionUseCase、ManagePermissionUseCase、SelectModelUseCase、ManageAgentUseCase、ManageTerminalUseCase、DraftUseCase、ShareExportUseCase、UndoRedoUseCase）也委托给现有 data 层，完整实现和测试在 Phase 4 中补充。引用名称必须与 Phase 1 定义的 `SendMessageUseCase` 一致。
 
 | UseCase | 职责 | 替换的 ViewModel 方法 |
 |---------|------|---------------------|

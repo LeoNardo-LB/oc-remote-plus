@@ -75,6 +75,8 @@
 
 消除 HomeScreen 和 SessionListScreen 中的重复 `PulsingDotsIndicator` 实现。
 
+> **⚠️ 与 Phase 5 的关系：** Phase 5 Task 1 也规划了提取 PulsingDotsIndicator。由于 Phase 4 先执行，本 Task 为实际提取点。最终路径为 `ui/components/indicators/PulsingDotsIndicator.kt`。Phase 5 中将验证此路径正确，不会重新提取。如果 Phase 5 执行时发现本 Task 未执行（文件不存在），Phase 5 会降级为自行提取。
+
 **Files:**
 - Create: `ui/components/indicators/PulsingDotsIndicator.kt`
 - Modify: `ui/screens/home/HomeScreen.kt` (删除本地 PulsingDotsIndicator，改 import)
@@ -248,7 +250,7 @@ data class LocalServerState(
 )
 ```
 
-**注意：** `ServerRepository` 接口需要在 Phase 3 中已添加 `getLocalSetupCommand()`, `setupLocalServer()`, `startLocalServer()`, `stopLocalServer()`, `getLocalServerState()` 方法。如果 Phase 3 尚未添加这些方法，在 Task 2 执行时先在 `domain/repository/ServerRepository.kt` 接口中追加这些方法签名，然后在 `data/repository/impl/ServerRepositoryImpl.kt` 中委托给 `LocalServerManager`。
+**注意：** Phase 1 Task 7 已扩展 `ServerRepository` 接口包含所有所需方法签名（`connect()`, `disconnect()`, `checkHealth()`, `getLocalSetupCommand()`, `setupLocalServer()`, `startLocalServer()`, `stopLocalServer()`, `getLocalServerState()`, `loadProviders()`, `setProviderEnabled()`, `connectProviderApi()`, `disconnectProvider()`, `setModelVisible()`, `saveServerConfig()`），此处直接引用即可。Phase 3 的 `ServerRepositoryImpl` 负责实现这些方法，委托给 `OpenCodeConnectionService` / `LocalServerManager` / `OpenCodeApi`。如果 Phase 3 尚未完成，本 Task 的 UseCase 将因接口方法未实现而运行时失败。
 
 - [ ] **Step 4: 创建 GetSessionListUseCase**
 
@@ -482,6 +484,8 @@ git commit -m "refactor(home): extract HomeScreen components — LocalRuntimeCar
 ## Task 4: Home 模块 — 创建 HomeRoute
 
 创建 Route 包装层，解耦导航参数提取和 ViewModel 绑定。
+
+> **⚠️ 与 Phase 5 Route 的命名区分：** 本 Task 创建的 `ui/screens/home/HomeRoute.kt` 是 **Screen 级别的 Composable 包装**（负责 ViewModel 参数绑定，是 `@Composable` 函数）。Phase 5 会创建 `ui/navigation/routes/HomeRoute.kt`，是 **Navigation Route object**（定义路由模式字符串、参数解析，是 Kotlin `object`）。两者职责不同、文件路径不同，不冲突，但命名相似需注意区分。
 
 **Files:**
 - Create: `ui/screens/home/HomeRoute.kt`
@@ -854,6 +858,8 @@ git commit -m "refactor(sessions): extract SessionListScreen components — Proj
 
 ## Task 7: SessionList 模块 — 创建 Route + ViewModel 委托
 
+> **⚠️ Route 命名区分：** 本 Task 创建的 `ui/screens/sessions/SessionListRoute.kt` 是 Screen 级别的 Composable 包装（ViewModel 绑定）。Phase 5 创建的 `ui/navigation/routes/SessionListRoute.kt` 是 Navigation Route object（路由模式定义）。两者不冲突。
+
 **Files:**
 - Create: `ui/screens/sessions/SessionListRoute.kt`
 - Modify: `ui/screens/sessions/SessionListScreen.kt`
@@ -1096,6 +1102,8 @@ git commit -m "refactor(settings): extract SettingsScreen components — dialogs
 
 ## Task 9: Settings 模块 — 创建 Route + ViewModel 委托
 
+> **⚠️ Route 命名区分：** 本 Task 创建的 `ui/screens/settings/SettingsRoute.kt` 是 Screen 级别的 Composable 包装。Phase 5 创建的 `ui/navigation/routes/SettingsRoute.kt` 是 Navigation Route object。两者不冲突。
+
 **Files:**
 - Create: `ui/screens/settings/SettingsRoute.kt`
 - Modify: `ui/screens/settings/SettingsScreen.kt`
@@ -1208,6 +1216,8 @@ git commit -m "refactor(settings): add SettingsRoute, ViewModel delegates to Use
 ## Task 10: Server 模块 — 整合与组件提取
 
 Server 模块有 4 个文件（共约 1281 行），复杂度相对可控。主要工作是提取 ProviderRow 组件和 ViewModel 委托 UseCase。
+
+> **⚠️ Route 命名区分：** 本 Task 创建的 `ui/screens/server/ServerRoute.kt` 是 Screen 级别的 Composable 包装（含 `ServerSettingsRoute`, `ServerProvidersRoute`, `ServerModelFilterRoute` 三个 Composable 函数）。Phase 5 创建的 `ui/navigation/routes/` 下对应的是 Navigation Route object。两者不冲突。
 
 **Files:**
 - Create: `ui/screens/server/components/ProviderRow.kt`

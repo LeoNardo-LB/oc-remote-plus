@@ -10,6 +10,23 @@
 
 **前置依赖:** Phase 4 必须已完成
 
+> **⚠️ 行号回退策略：** 本文档中的行号参考基于初始代码分析。如果 Phase 1-4 的执行修改了目标文件，行号可能不再准确。执行者应以 **函数签名/组件名称** 为主要定位依据，行号仅作为辅助参考。当行号与实际代码不匹配时，使用 `grep`/IDE 搜索函数名定位。
+
+> **⚠️ D5 FIX — 与 Phase 2/4 的功能重叠：**
+> 以下 Task 在 Phase 2 或 Phase 4 中也有定义。执行本计划时按以下规则处理：
+>
+> | Phase 5 Task | 重叠的 Phase | 执行规则 |
+> |---|---|---|
+> | Task 1 (PulsingDotsIndicator) | Phase 4 Task 1 | **验证 + 补充** — 先检查 Phase 4 已提取的文件是否存在，存在则仅处理 ChatScreen 中残留的本地版本 |
+> | Task 2 (BreathingCircleIndicator) | Phase 2 | **验证 + 提升** — 先检查是否已存在于 chat/components/，如存在则提升到 ui/components/ |
+> | Task 3 (MarkdownContent) | Phase 2 Task 3 | **提升评估** — 评估是否多 Screen 使用。Chat 专用则保留在 chat/markdown/ 不移动 |
+> | Task 4 (ChatInputBar) | Phase 2 Task 6 | **提升评估** — 同 Task 3 逻辑 |
+> | Task 7 (Navigation Routes) | Phase 2 Task 9, Phase 4 各 Route | **合并** — 只创建 Phase 2/4 中未创建的 Route 对象，已有的直接复用 |
+> | Task 5 (LoadingIndicator) | 无 | 照常执行（可选） |
+> | Task 6 (ErrorView) | 无 | 照常执行（可选） |
+>
+> Phase 5 中不重叠的 Task（Task 8, 9, 10, 11）照常执行。
+
 ---
 
 ## 目标文件结构
@@ -22,8 +39,8 @@ ui/
 │   ├── BreathingCircleIndicator.kt      # 新增 — 从 ChatScreen 提取
 │   ├── MarkdownContent.kt               # 新增 — 从 ChatScreen 提取
 │   ├── ChatInputBar.kt                  # 新增 — 从 ChatScreen 提取（轻量化接口）
-│   ├── LoadingIndicator.kt              # 新增 — 统一加载指示器
-│   └── ErrorView.kt                     # 新增 — 统一错误视图
+│   ├── LoadingIndicator.kt              # 新增 — 统一加载指示器（可选 Task，spec 未硬性要求）
+│   └── ErrorView.kt                     # 新增 — 统一错误视图（可选 Task，spec 未硬性要求）
 ├── navigation/
 │   ├── NavGraph.kt                      # 修改 — 瘦身，路由注册委托给 Route.kt
 │   ├── Screen.kt                        # 修改 — 保留路由常量，移除 createRoute()
@@ -53,25 +70,38 @@ ui/
 │   └── ...其他 Screen 保留不动
 ```
 
+> **注意**: Spec §3.1 中 `ui/components/` 下还规划了 `cards/`（ToolCallCard, ReasoningBlock 等）和 `diff/`（DiffView, DiffChangesInline）子目录。这些组件在 Phase 2 中已提取到 `chat/` 模块下作为 Chat 专用组件。如果后续需要跨 Screen 共享，可在后续迭代中从 chat/ 提升到 ui/components/。当前 Phase 5 不处理这些组件的提升。
+
 ---
 
-## Task 1: 提取 PulsingDotsIndicator 到 ui/components/
+## Task 1: 验证/提取 PulsingDotsIndicator 到 ui/components/
 
-**消除重复:** 3 处（ChatScreen:365, SessionListScreen, HomeScreen）
+> **⚠️ D5 修复说明：** Phase 4 Task 1 已将 PulsingDotsIndicator 提取到 `ui/components/indicators/PulsingDotsIndicator.kt`。本 Task 改为"验证 + 补充"模式：先验证 Phase 4 的提取结果，仅在文件不存在时降级为自行提取。
+
+**消除重复:** ChatScreen 中可能仍有本地 PulsingDotsIndicator 需要替换为共享版本。
 
 **Files:**
-- Create: `app/src/main/kotlin/dev/minios/ocremote/ui/components/PulsingDotsIndicator.kt`
-- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt` — 删除 line 363-427 的 `PulsingDotsIndicator` 函数
-- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListScreen.kt` — 删除 `PulsingDotsIndicator` 函数
-- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/home/HomeScreen.kt` — 删除 `PulsingDotsIndicator` 函数
+- Create（仅当 Phase 4 未执行时）: `app/src/main/kotlin/dev/minios/ocremote/ui/components/indicators/PulsingDotsIndicator.kt`
+- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt` — 删除本地 `PulsingDotsIndicator` 函数（如有），改为 import 共享版本
+- Verify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/home/HomeScreen.kt` — 确认已引用共享版本
+- Verify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListScreen.kt` — 确认已引用共享版本
 
-- [ ] **Step 1: 创建共享 PulsingDotsIndicator.kt**
+- [ ] **Step 1: 验证 Phase 4 已提取的 PulsingDotsIndicator**
+
+检查文件是否存在：
+```bash
+Test-Path "app/src/main/kotlin/dev/minios/ocremote/ui/components/indicators/PulsingDotsIndicator.kt"
+```
+
+如果文件存在，跳到 Step 3。如果文件不存在（Phase 4 未执行此提取），继续 Step 2。
+
+- [ ] **Step 2: 降级提取 — 从 ChatScreen.kt 创建共享版本（仅当 Step 1 文件不存在时执行）**
 
 ChatScreen.kt 中的版本是最完整的（使用 scales2 做交错动画）。以它为基础创建公共组件：
 
 ```kotlin
-// app/src/main/kotlin/dev/minios/ocremote/ui/components/PulsingDotsIndicator.kt
-package dev.minios.ocremote.ui.components
+// app/src/main/kotlin/dev/minios/ocremote/ui/components/indicators/PulsingDotsIndicator.kt
+package dev.minios.ocremote.ui.components.indicators
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -96,65 +126,26 @@ fun PulsingDotsIndicator(
     dotSpacing: Dp = 8.dp,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    val transition = rememberInfiniteTransition(label = "pulsing_dots")
-    val phaseShift = 150 // ms between dots
-    val scales = (0..2).map { index ->
-        transition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 0.4f,
-            animationSpec = infiniteRepeatable(
-                animation = keyframes {
-                    durationMillis = 1200
-                    val offset = index * phaseShift
-                    0.4f at 0 + offset
-                    1.0f at 300 + offset
-                    0.4f at 600 + offset
-                    0.4f at 1200
-                },
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "dot_scale_$index"
-        )
-    }
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(dotSpacing),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        scales.forEach { scale ->
-            Box(
-                modifier = Modifier
-                    .size(dotSize)
-                    .graphicsLayer {
-                        scaleX = scale.value
-                        scaleY = scale.value
-                        alpha = 0.3f + 0.7f * ((scale.value - 0.4f) / 0.6f)
-                    }
-                    .background(color, CircleShape)
-            )
-        }
-    }
+    // 从 ChatScreen.kt 中 PulsingDotsIndicator 的完整实现原样复制
+    // 仅修改 package 声明和 import 语句
+    // 保持所有动画参数和布局逻辑不变
 }
 ```
 
-- [ ] **Step 2: 从 ChatScreen.kt 删除 private PulsingDotsIndicator**
+- [ ] **Step 3: 从 ChatScreen.kt 删除/替换本地 PulsingDotsIndicator**
 
 在 `ChatScreen.kt` 中：
-1. 删除 `private fun PulsingDotsIndicator(...)` 整个函数（约 line 363-427）
-2. 删除 `scales` 的声明（未被使用的第一个 scales 变量），只保留 `scales2`（已重命名为 `scales`）
-3. 添加 import: `import dev.minios.ocremote.ui.components.PulsingDotsIndicator`
+1. 搜索 `private fun PulsingDotsIndicator(` 或 `fun PulsingDotsIndicator(`
+2. 如果存在本地定义，删除整个函数体
+3. 添加 import: `import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator`
 
-- [ ] **Step 3: 从 SessionListScreen.kt 删除 private PulsingDotsIndicator**
+- [ ] **Step 4: 验证 HomeScreen.kt 和 SessionListScreen.kt 已引用共享版本**
 
-在 `SessionListScreen.kt` 中：
-1. 删除 `private fun PulsingDotsIndicator(...)` 整个函数
-2. 添加 import: `import dev.minios.ocremote.ui.components.PulsingDotsIndicator`
+在 `HomeScreen.kt` 中搜索 `PulsingDotsIndicator` 的 import，确认已指向 `ui.components.indicators.PulsingDotsIndicator`（Phase 4 Task 1 已完成此替换）。
 
-- [ ] **Step 4: 从 HomeScreen.kt 删除 private PulsingDotsIndicator**
+在 `SessionListScreen.kt` 中做同样验证。
 
-在 `HomeScreen.kt` 中：
-1. 删除 `private fun PulsingDotsIndicator(...)` 整个函数
-2. 添加 import: `import dev.minios.ocremote.ui.components.PulsingDotsIndicator`
+如果发现仍有本地定义，删除并添加正确的 import。
 
 - [ ] **Step 5: 构建验证**
 
@@ -164,22 +155,46 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/src/main/kotlin/dev/minios/ocremote/ui/components/PulsingDotsIndicator.kt
+git add app/src/main/kotlin/dev/minios/ocremote/ui/components/indicators/PulsingDotsIndicator.kt
 git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt
-git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListScreen.kt
 git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/home/HomeScreen.kt
-git commit -m "refactor: extract PulsingDotsIndicator to shared components (eliminate 3 duplicates)"
+git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListScreen.kt
+git commit -m "refactor: verify/extract PulsingDotsIndicator to shared components (eliminate duplicates)"
 ```
 
 ---
 
-## Task 2: 提取 BreathingCircleIndicator 到 ui/components/
+## Task 2: 验证/提取 BreathingCircleIndicator 到 ui/components/
+
+> **⚠️ D5 修复说明：** Phase 2 可能已将 BreathingCircleIndicator 提取到 `ui/screens/chat/components/` 目录下。本 Task 改为"验证 + 提升"模式：先检查是否已有提取版本，如有则从 chat/components/ 提升到 ui/components/；如无则从 ChatScreen.kt 提取。
 
 **Files:**
-- Create: `app/src/main/kotlin/dev/minios/ocremote/ui/components/BreathingCircleIndicator.kt`
-- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt` — 删除 line 429-471 的 `BreathingCircleIndicator` 函数
+- Create（或移动）: `app/src/main/kotlin/dev/minios/ocremote/ui/components/BreathingCircleIndicator.kt`
+- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt` — 删除本地 `BreathingCircleIndicator` 函数（如有），改为 import 共享版本
 
-- [ ] **Step 1: 创建共享 BreathingCircleIndicator.kt**
+- [ ] **Step 1: 检查 Phase 2 是否已提取 BreathingCircleIndicator**
+
+```bash
+# 检查是否已存在于 chat/components/
+Test-Path "app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/components/BreathingCircleIndicator.kt"
+# 同时检查目标位置是否已存在
+Test-Path "app/src/main/kotlin/dev/minios/ocremote/ui/components/BreathingCircleIndicator.kt"
+```
+
+- 如果已存在于 `ui/components/` → 跳到 Step 3
+- 如果存在于 `ui/screens/chat/components/` → 执行 Step 2a（移动提升）
+- 如果均不存在 → 执行 Step 2b（从 ChatScreen.kt 提取）
+
+- [ ] **Step 2a: 从 chat/components/ 提升到 ui/components/（当 Step 1 发现 chat/components/ 下有文件时）**
+
+将 `ui/screens/chat/components/BreathingCircleIndicator.kt` 移动到 `ui/components/BreathingCircleIndicator.kt`：
+1. 修改 package 声明为 `dev.minios.ocremote.ui.components`
+2. 更新可见性为 `public`（如果原来是 `internal`）
+3. 更新 ChatScreen.kt 中的 import 指向新路径
+
+- [ ] **Step 2b: 从 ChatScreen.kt 提取（当 Step 1 发现文件不存在时）**
+
+从 ChatScreen.kt 中搜索 `BreathingCircleIndicator` 函数定义，创建：
 
 ```kotlin
 // app/src/main/kotlin/dev/minios/ocremote/ui/components/BreathingCircleIndicator.kt
@@ -208,111 +223,16 @@ fun BreathingCircleIndicator(
     size: Dp = 20.dp,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    val transition = rememberInfiniteTransition(label = "breathing_circle")
-    val scale by transition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "circle_scale"
-    )
-    val alpha by transition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "circle_alpha"
-    )
-
-    Box(
-        modifier = modifier.size(size),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(size)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    this.alpha = alpha
-                }
-                .background(color, CircleShape)
-        )
-    }
+    // 从 ChatScreen.kt 中 BreathingCircleIndicator 的完整实现原样复制
+    // 仅修改 package 声明和 import 语句
 }
 ```
 
-- [ ] **Step 2: 从 ChatScreen.kt 删除 private BreathingCircleIndicator**
+- [ ] **Step 3: 从 ChatScreen.kt 删除/替换本地 BreathingCircleIndicator**
 
-1. 删除 `private fun BreathingCircleIndicator(...)` 函数（约 line 429-471）
-2. 添加 import: `import dev.minios.ocremote.ui.components.BreathingCircleIndicator`
-
-- [ ] **Step 3: 构建验证**
-
-Run: `cd D:\Develop\code\app\oc-remote && ./gradlew assembleDebug 2>&1 | tail -5`
-Expected: `BUILD SUCCESSFUL`
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add app/src/main/kotlin/dev/minios/ocremote/ui/components/BreathingCircleIndicator.kt
-git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt
-git commit -m "refactor: extract BreathingCircleIndicator to shared components"
-```
-
----
-
-## Task 3: 提取 MarkdownContent 到 ui/components/
-
-**注意:** MarkdownContent 使用了 `LocalChatFontSize` 和 `preserveRawHtmlPayload` 等 ChatScreen 内部工具函数。提取时需要：
-1. 将 `LocalChatFontSize` 移到 components 包或独立的 theme provider
-2. 将 `preserveRawHtmlPayload` 移到 MarkdownContent 伴生对象或独立 util
-
-**Files:**
-- Create: `app/src/main/kotlin/dev/minios/ocremote/ui/components/MarkdownContent.kt`
-- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt` — 删除 `MarkdownContent` 函数，删除 `preserveRawHtmlPayload`（如有其他调用则保留为 internal）
-
-- [ ] **Step 1: 确认 MarkdownContent 的依赖关系**
-
-在 ChatScreen.kt 中搜索 `MarkdownContent` 的所有调用点：
-- line 4639: 主消息气泡中的 Markdown 渲染
-- line 5369: 子消息中的 Markdown 渲染
-- line 6442: 另一个消息展示
-- line 6584: 另一个消息展示
-
-搜索 `preserveRawHtmlPayload` 的调用点 — 确认只在 MarkdownContent 内部使用。
-
-搜索 `LocalChatFontSize` 的声明位置和使用范围 — 确认是否可移到 components 包。
-
-- [ ] **Step 2: 创建共享 MarkdownContent.kt**
-
-将 ChatScreen.kt 中的 `MarkdownContent` 完整实现移到新文件。如果 `LocalChatFontSize` 声明在 ChatScreen.kt 中，则：
-- 将 `LocalChatFontSize` 的 `compositionLocalOf` 声明移到 `ui/components/ChatFontProviders.kt`（新文件）
-- 或移到 `ui/theme/` 包中
-
-如果 `preserveRawHtmlPayload` 是独立工具函数，将其作为 MarkdownContent 的 private 函数一并移走。
-
-```kotlin
-// app/src/main/kotlin/dev/minios/ocremote/ui/components/MarkdownContent.kt
-package dev.minios.ocremote.ui.components
-
-// 完整复制 ChatScreen.kt 中 MarkdownContent 的实现
-// 包括：
-// - preserveRawHtmlPayload()（作为 private 函数）
-// - MarkdownContent composable
-// - 所有相关的颜色/样式计算逻辑
-```
-
-- [ ] **Step 3: 从 ChatScreen.kt 删除 MarkdownContent 及相关代码**
-
-1. 删除 `private fun MarkdownContent(...)` 函数
-2. 删除 `private fun preserveRawHtmlPayload(...)` 函数（如已移走）
-3. 如 `LocalChatFontSize` 原声明在 ChatScreen.kt 中，删除声明并改为从 components/theme import
-4. 添加 import: `import dev.minios.ocremote.ui.components.MarkdownContent`
+1. 搜索 `private fun BreathingCircleIndicator(` 或 `fun BreathingCircleIndicator(`
+2. 如果存在本地定义，删除整个函数体
+3. 添加 import: `import dev.minios.ocremote.ui.components.BreathingCircleIndicator`
 
 - [ ] **Step 4: 构建验证**
 
@@ -322,38 +242,107 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/main/kotlin/dev/minios/ocremote/ui/components/MarkdownContent.kt
+git add app/src/main/kotlin/dev/minios/ocremote/ui/components/BreathingCircleIndicator.kt
 git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt
-git commit -m "refactor: extract MarkdownContent to shared components"
+git commit -m "refactor: verify/promote BreathingCircleIndicator to shared components"
 ```
 
 ---
 
-## Task 4: 提取 ChatInputBar 到 ui/components/
+## Task 3: 评估/提升 MarkdownContent 到 ui/components/
 
-**注意:** ChatInputBar 有 25+ 参数，深度依赖 ChatScreen 的数据类型（`ChatMessage`, `ImageAttachment`, `AgentInfo`, `SlashCommand`, `ChatInputMode`, `CommandInfo` 等）。提取策略：
-- 将与 Chat 相关的数据类型（`ChatInputMode`, `SlashCommand` 等）保留在 `ui/screens/chat/` 作为 domain 类型
-- ChatInputBar 的 composable 实现移到 components 包，但参数类型通过 import 引用
-- 这使得 ChatInputBar 可以在未来的其他聊天界面复用
+> **⚠️ D5 修复说明：** Phase 2 已将 MarkdownContent 提取到 `ui/screens/chat/markdown/MarkdownContent.kt`。本 Task 改为"提升评估"模式：评估是否需要将此组件从 chat/ 模块提升到 ui/components/（跨 Screen 共享）。如果 MarkdownContent 是 Chat 专用组件，保留在 chat/ 下不移动。
 
-**Files:**
-- Create: `app/src/main/kotlin/dev/minios/ocremote/ui/components/ChatInputBar.kt`
-- Modify: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt` — 删除 `ChatInputBar` 函数
+**决策逻辑：**
+- 如果 MarkdownContent 仅被 ChatScreen 使用 → **保留在 `ui/screens/chat/markdown/`，跳过本 Task**
+- 如果 MarkdownContent 被 2+ 个 Screen 使用 → **提升到 `ui/components/MarkdownContent.kt`**
 
-- [ ] **Step 1: 确认 ChatInputBar 的所有依赖类型**
+- [ ] **Step 1: 评估 MarkdownContent 的使用范围**
 
-检查 ChatInputBar 函数体中引用的 ChatScreen 内部类型：
-- `ChatMessage` — 位置和定义
-- `ImageAttachment` — 位置和定义
-- `AgentInfo` — 位置和定义
-- `SlashCommand` — 位置和定义
-- `ChatInputMode` — 位置和定义
-- `CommandInfo` — 位置和定义
-- `placeholderHintResIds` — 常量列表位置
-- `isAmoledTheme()` — private 函数位置
-- `LocalChatFontSize` / `LocalSoftwareKeyboardController` 等
+搜索项目中所有引用 `MarkdownContent` 的文件：
 
-- [ ] **Step 2: 创建共享 ChatInputBar.kt**
+```bash
+cd D:\Develop\code\app\oc-remote
+grep -rn "MarkdownContent" app/src/main/kotlin/dev/minios/ocremote/ui/screens/ --include="*.kt"
+```
+
+统计引用该组件的 Screen 模块数量（排除 chat/ 目录内的引用）：
+- 如果仅 chat/ 内使用 → 记录结论为"Chat 专用，保留在 chat/markdown/"，跳到 Step 4
+- 如果有其他 Screen 使用 → 继续执行 Step 2-3
+
+- [ ] **Step 2: 提升到 ui/components/（仅当 Step 1 确认多 Screen 使用时执行）**
+
+将 `ui/screens/chat/markdown/MarkdownContent.kt`（或 Phase 2 提取到的路径）移动到 `ui/components/MarkdownContent.kt`：
+
+```kotlin
+// app/src/main/kotlin/dev/minios/ocremote/ui/components/MarkdownContent.kt
+package dev.minios.ocremote.ui.components
+
+// 从原文件完整搬运 MarkdownContent composable
+// 包括：
+// - preserveRawHtmlPayload()（作为 private 函数）
+// - MarkdownContent composable
+// - 所有相关的颜色/样式计算逻辑
+```
+
+注意事项：
+- `LocalChatFontSize` 如果声明在 ChatScreen.kt 中，需要移到 `ui/components/ChatFontProviders.kt` 或 `ui/theme/` 包中
+- `preserveRawHtmlPayload` 如果是独立工具函数，一并移走
+- 更新 chat/ 下的其他组件的 import 指向新路径
+
+- [ ] **Step 3: 从 ChatScreen.kt 删除 MarkdownContent 及相关代码（仅当 Step 2 执行时）**
+
+1. 如果 ChatScreen.kt 中仍有本地 `MarkdownContent` 定义，删除
+2. 如 `LocalChatFontSize` 原声明在 ChatScreen.kt 中，删除声明并改为从 components/theme import
+3. 添加 import: `import dev.minios.ocremote.ui.components.MarkdownContent`
+
+- [ ] **Step 4: 构建验证**
+
+Run: `cd D:\Develop\code\app\oc-remote && ./gradlew assembleDebug 2>&1 | tail -5`
+Expected: `BUILD SUCCESSFUL`
+
+- [ ] **Step 5: Commit（如有变更）**
+
+```bash
+# 仅当执行了 Step 2-3 提升操作时提交
+git add app/src/main/kotlin/dev/minios/ocremote/ui/components/MarkdownContent.kt
+git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt
+git commit -m "refactor: promote MarkdownContent to shared components (multi-screen usage)"
+```
+
+---
+
+## Task 4: 评估/提升 ChatInputBar 到 ui/components/
+
+> **⚠️ D5 修复说明：** Phase 2 可能已将 ChatInputBar 提取到 `ui/screens/chat/components/` 目录下。本 Task 改为"提升评估"模式：评估是否需要将此组件从 chat/ 模块提升到 ui/components/。
+
+**决策逻辑：**
+- 如果 ChatInputBar 仅被 ChatScreen 使用 → **保留在 chat/ 模块内，跳过本 Task**
+- 如果 ChatInputBar 被 2+ 个 Screen 使用 → **提升到 `ui/components/ChatInputBar.kt`**
+
+> **注意：** ChatInputBar 有 25+ 参数，深度依赖 ChatScreen 的数据类型（`ChatMessage`, `ImageAttachment`, `AgentInfo`, `SlashCommand`, `ChatInputMode`, `CommandInfo` 等）。即使提升到 ui/components/，参数类型仍通过 import 引用 chat/ 包中的类型。
+
+- [ ] **Step 1: 评估 ChatInputBar 的使用范围**
+
+搜索项目中所有引用 `ChatInputBar` 的文件：
+
+```bash
+cd D:\Develop\code\app\oc-remote
+grep -rn "ChatInputBar" app/src/main/kotlin/dev/minios/ocremote/ui/screens/ --include="*.kt"
+```
+
+同时检查 Phase 2 是否已提取：
+```bash
+Test-Path "app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/components/ChatInputBar.kt"
+```
+
+统计引用该组件的 Screen 模块数量：
+- 如果仅 chat/ 内使用 → 记录结论为"Chat 专用，保留在 chat/"，跳到 Step 4
+- 如果有其他 Screen 使用 → 继续执行 Step 2-3
+
+- [ ] **Step 2: 提升到 ui/components/（仅当 Step 1 确认多 Screen 使用时执行）**
+
+将 ChatInputBar 移动/创建到 `ui/components/ChatInputBar.kt`：
 
 ```kotlin
 // app/src/main/kotlin/dev/minios/ocremote/ui/components/ChatInputBar.kt
@@ -362,15 +351,15 @@ package dev.minios.ocremote.ui.components
 // import ChatScreen 包中的数据类型
 import dev.minios.ocremote.ui.screens.chat.*
 
-// 完整复制 ChatScreen.kt 中 ChatInputBar 的实现
+// 完整搬运 ChatInputBar 的实现及其内部依赖的辅助 composable
 ```
 
 将 ChatInputBar 及其内部依赖的辅助 composable 一并移走。
 
-- [ ] **Step 3: 从 ChatScreen.kt 删除 ChatInputBar**
+- [ ] **Step 3: 从 ChatScreen.kt 删除 ChatInputBar（仅当 Step 2 执行时）**
 
-1. 删除 `private fun ChatInputBar(...)` 函数（约 line 7178 至约 7600+）
-2. 删除 ChatInputBar 内部定义的辅助 Composable
+1. 如果 ChatScreen.kt 中仍有本地 `ChatInputBar` 定义，删除
+2. 删除 ChatInputBar 内部定义的辅助 Composable（如已移走）
 3. 添加 import: `import dev.minios.ocremote.ui.components.ChatInputBar`
 
 - [ ] **Step 4: 构建验证**
@@ -378,17 +367,20 @@ import dev.minios.ocremote.ui.screens.chat.*
 Run: `cd D:\Develop\code\app\oc-remote && ./gradlew assembleDebug 2>&1 | tail -5`
 Expected: `BUILD SUCCESSFUL`
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit（如有变更）**
 
 ```bash
+# 仅当执行了 Step 2-3 提升操作时提交
 git add app/src/main/kotlin/dev/minios/ocremote/ui/components/ChatInputBar.kt
 git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/ChatScreen.kt
-git commit -m "refactor: extract ChatInputBar to shared components"
+git commit -m "refactor: promote ChatInputBar to shared components (multi-screen usage)"
 ```
 
 ---
 
-## Task 5: 创建 LoadingIndicator 统一组件
+## Task 5: 创建 LoadingIndicator 统一组件（可选）
+
+> **说明：** LoadingIndicator 和 ErrorView（Task 6）是合理补充（统一加载/错误状态展示），非 spec 硬性要求。如果时间紧张，可推迟到后续迭代。这两个组件不会影响其他 Task 的执行。
 
 **Files:**
 - Create: `app/src/main/kotlin/dev/minios/ocremote/ui/components/LoadingIndicator.kt`
@@ -457,7 +449,9 @@ git commit -m "feat: add unified LoadingIndicator component"
 
 ---
 
-## Task 6: 创建 ErrorView 统一组件
+## Task 6: 创建 ErrorView 统一组件（可选）
+
+> **说明：** 同 Task 5，本组件为合理补充，非 spec 硬性要求。
 
 **Files:**
 - Create: `app/src/main/kotlin/dev/minios/ocremote/ui/components/ErrorView.kt`
