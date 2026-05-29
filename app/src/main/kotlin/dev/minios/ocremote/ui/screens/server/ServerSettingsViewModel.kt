@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.server
+﻿package dev.minios.ocremote.ui.screens.server
 
 import android.util.Log
 import dev.minios.ocremote.BuildConfig
@@ -6,14 +6,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.data.api.AgentInfo
+import dev.minios.ocremote.data.dto.response.AgentInfo
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ProviderAuthMethod
-import dev.minios.ocremote.data.api.ProviderInfo
-import dev.minios.ocremote.data.api.ProviderModel
-import dev.minios.ocremote.data.api.ProviderOauthAuthorization
-import dev.minios.ocremote.data.api.ServerConfigPatch
-import dev.minios.ocremote.data.api.ServerConfigResponse
+import dev.minios.ocremote.data.dto.response.ProviderAuthMethod
+import dev.minios.ocremote.data.dto.response.ProviderInfo
+import dev.minios.ocremote.data.dto.response.ProviderModel
+import dev.minios.ocremote.data.dto.response.ProviderOauthAuthorization
+import dev.minios.ocremote.data.dto.request.ServerConfigPatch
+import dev.minios.ocremote.data.dto.response.ServerConfigResponse
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -27,7 +27,7 @@ class ManageTerminalUseCase @Inject constructor(
         sessionId: String,
         command: String,
         agent: String,
-        model: dev.minios.ocremote.data.api.ModelSelection?,
+        model: dev.minios.ocremote.data.dto.common.ModelSelection?,
         directory: String?
     ): Boolean =
         api.runShellCommand(conn, sessionId, command, agent, model, directory)

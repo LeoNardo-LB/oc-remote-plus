@@ -1,8 +1,8 @@
-package dev.minios.ocremote.domain.usecase
+﻿package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.api.ModelSelection
+import dev.minios.ocremote.data.dto.common.ModelSelection
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.PromptPart
+import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.data.api.ServerConnection
 import io.mockk.coEvery
 import io.mockk.coVerify

@@ -1,7 +1,7 @@
-package dev.minios.ocremote.domain.usecase
+﻿package dev.minios.ocremote.domain.usecase
 
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ProvidersResponse
+import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.data.api.ServerConnection
 import javax.inject.Inject
 

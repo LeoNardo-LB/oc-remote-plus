@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat
+﻿package dev.minios.ocremote.ui.screens.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -135,11 +135,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
 import dev.minios.ocremote.domain.model.*
-import dev.minios.ocremote.data.api.AgentInfo
-import dev.minios.ocremote.data.api.CommandInfo
-import dev.minios.ocremote.data.api.PromptPart
-import dev.minios.ocremote.data.api.ProviderInfo
-import dev.minios.ocremote.data.api.ProviderModel
+import dev.minios.ocremote.data.dto.response.AgentInfo
+import dev.minios.ocremote.data.dto.response.CommandInfo
+import dev.minios.ocremote.data.dto.request.PromptPart
+import dev.minios.ocremote.data.dto.response.ProviderInfo
+import dev.minios.ocremote.data.dto.response.ProviderModel
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.coroutines.channels.Channel

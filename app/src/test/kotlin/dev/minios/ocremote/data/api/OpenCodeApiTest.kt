@@ -1,5 +1,8 @@
 package dev.minios.ocremote.data.api
 
+import dev.minios.ocremote.data.dto.common.*
+import dev.minios.ocremote.data.dto.request.*
+import dev.minios.ocremote.data.dto.response.*
 import dev.minios.ocremote.domain.model.ToolRef
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive

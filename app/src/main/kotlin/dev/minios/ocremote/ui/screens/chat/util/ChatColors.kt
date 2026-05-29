@@ -1,10 +1,10 @@
-package dev.minios.ocremote.ui.screens.chat.util
+﻿package dev.minios.ocremote.ui.screens.chat.util
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import dev.minios.ocremote.data.api.AgentInfo
+import dev.minios.ocremote.data.dto.response.AgentInfo
 
 @Composable
 internal fun isAmoledTheme(): Boolean {

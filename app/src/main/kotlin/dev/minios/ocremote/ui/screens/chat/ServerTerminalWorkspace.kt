@@ -1,8 +1,8 @@
-package dev.minios.ocremote.ui.screens.chat
+﻿package dev.minios.ocremote.ui.screens.chat
 
 import android.util.Log
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.PtySocket
+import dev.minios.ocremote.data.dto.common.PtySocket
 import dev.minios.ocremote.data.api.ServerConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

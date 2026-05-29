@@ -1,8 +1,8 @@
-package dev.minios.ocremote.ui.screens.chat
+﻿package dev.minios.ocremote.ui.screens.chat
 
 import android.util.Log
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ProvidersResponse
+import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.data.repository.EventReducer
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.*

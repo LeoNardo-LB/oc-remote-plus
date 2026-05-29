@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.sessions
+﻿package dev.minios.ocremote.ui.screens.sessions
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -45,7 +45,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.BackHandler
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.minios.ocremote.R
-import dev.minios.ocremote.data.api.FileNode
+import dev.minios.ocremote.data.dto.response.FileNode
 import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.SessionStatus
 import kotlinx.coroutines.flow.launchIn

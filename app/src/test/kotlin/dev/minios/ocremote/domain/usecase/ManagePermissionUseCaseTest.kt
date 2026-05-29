@@ -1,7 +1,7 @@
-package dev.minios.ocremote.domain.usecase
+﻿package dev.minios.ocremote.domain.usecase
 
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.PermissionRequest
+import dev.minios.ocremote.data.dto.response.PermissionRequest
 import dev.minios.ocremote.data.api.ServerConnection
 import io.mockk.coEvery
 import io.mockk.mockk

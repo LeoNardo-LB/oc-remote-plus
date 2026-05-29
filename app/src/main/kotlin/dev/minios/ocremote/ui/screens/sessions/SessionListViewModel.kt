@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.sessions
+﻿package dev.minios.ocremote.ui.screens.sessions
 
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
@@ -6,7 +6,7 @@ import dev.minios.ocremote.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.data.api.FileNode
+import dev.minios.ocremote.data.dto.response.FileNode
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.EventReducer

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.dialog
+﻿package dev.minios.ocremote.ui.screens.chat.dialog
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -32,8 +32,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
-import dev.minios.ocremote.data.api.ProviderInfo
-import dev.minios.ocremote.data.api.ProviderModel
+import dev.minios.ocremote.data.dto.response.ProviderInfo
+import dev.minios.ocremote.data.dto.response.ProviderModel
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 

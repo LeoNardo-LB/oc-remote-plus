@@ -141,7 +141,7 @@ fun ServerProvidersScreen(
 
     connectProvider?.let { provider ->
         val methods = uiState.authMethods[provider.providerId].orEmpty().ifEmpty {
-            listOf(dev.minios.ocremote.data.api.ProviderAuthMethod(type = "api", label = stringResource(R.string.server_settings_auth_method_api)))
+            listOf(dev.minios.ocremote.data.dto.response.ProviderAuthMethod(type = "api", label = stringResource(R.string.server_settings_auth_method_api)))
         }
         BasicAlertDialog(onDismissRequest = { connectProvider = null }) {
             Surface(

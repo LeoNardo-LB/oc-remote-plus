@@ -82,9 +82,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.minios.ocremote.R
-import dev.minios.ocremote.data.api.AgentInfo
-import dev.minios.ocremote.data.api.CommandInfo
-import dev.minios.ocremote.data.api.PromptPart
+import dev.minios.ocremote.data.dto.response.AgentInfo
+import dev.minios.ocremote.data.dto.response.CommandInfo
+import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.ProviderIcon

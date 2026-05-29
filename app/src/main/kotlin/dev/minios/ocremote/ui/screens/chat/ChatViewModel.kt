@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat
+﻿package dev.minios.ocremote.ui.screens.chat
 
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -10,12 +10,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.data.api.AgentInfo
-import dev.minios.ocremote.data.api.CommandInfo
-import dev.minios.ocremote.data.api.ModelSelection
+import dev.minios.ocremote.data.dto.response.AgentInfo
+import dev.minios.ocremote.data.dto.response.CommandInfo
+import dev.minios.ocremote.data.dto.common.ModelSelection
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.PromptPart
-import dev.minios.ocremote.data.api.ProviderInfo
+import dev.minios.ocremote.data.dto.request.PromptPart
+import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.Draft
 import dev.minios.ocremote.data.repository.DraftRepository
