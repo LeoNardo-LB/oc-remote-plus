@@ -4206,6 +4206,38 @@ private fun AssistantMessageCard(
                     }
                 }
 
+                // Token/cost footer from all StepFinish parts in this message
+                val stepFinishes = chatMessage.parts.filterIsInstance<Part.StepFinish>()
+                if (stepFinishes.isNotEmpty()) {
+                    val totalInput = stepFinishes.sumOf { it.tokens?.input ?: 0 }
+                    val totalOutput = stepFinishes.sumOf { it.tokens?.output ?: 0 }
+                    val totalCost = stepFinishes.sumOf { it.cost ?: 0.0 }
+                    val hasStats = totalInput > 0 || totalOutput > 0 || totalCost > 0.0
+
+                    if (hasStats) {
+                        Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (totalInput > 0 || totalOutput > 0) {
+                                Text(
+                                    text = stringResource(R.string.chat_tokens_format, totalInput, totalOutput),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                )
+                            }
+                            if (totalCost > 0.0 && totalCost.isFinite()) {
+                                Text(
+                                    text = stringResource(R.string.chat_cost_format, String.format("%.4f", totalCost)),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Error display
                 if (errorText != null) {
                     Surface(
@@ -4581,7 +4613,7 @@ private fun PartContent(
             // Visual separator between steps (hidden - WebUI doesn't show these)
         }
         is Part.StepFinish -> {
-            // Token/cost info hidden from message bubbles (WebUI convention)
+            // Token/cost info is aggregated at the bottom of AssistantMessageCard
         }
         is Part.Patch -> {
             val autoExpand = LocalCollapseTools.current
