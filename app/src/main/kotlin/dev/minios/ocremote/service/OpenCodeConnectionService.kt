@@ -15,7 +15,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.api.SseClient
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.data.repository.ServerRepository
 import dev.minios.ocremote.data.repository.SettingsRepository
@@ -63,7 +63,7 @@ private data class ServerConnectionState(
  *
  * This service:
  * - Maintains persistent SSE connections to one or more servers simultaneously
- * - Processes events via EventReducer (with serverId tracking)
+ * - Processes events via EventDispatcher (with serverId tracking)
  * - Shows notifications for task completion and permission requests
  * - Auto-reconnects with exponential backoff on disconnection/error
  * - Holds a single partial WakeLock while any server is connected
@@ -96,7 +96,7 @@ class OpenCodeConnectionService : Service() {
     lateinit var sseClient: SseClient
 
     @Inject
-    lateinit var eventReducer: EventReducer
+    lateinit var eventDispatcher: EventDispatcher
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
@@ -250,7 +250,7 @@ class OpenCodeConnectionService : Service() {
         _connectedServerIds.update { it - serverId }
         _connectingServerIds.update { it - serverId }
 
-        eventReducer.clearForServer(serverId)
+        eventDispatcher.clearForServer(serverId)
 
         if (connections.isEmpty()) {
             // Last server disconnected — clean up and stop service
@@ -300,7 +300,7 @@ class OpenCodeConnectionService : Service() {
         _connectingServerIds.value = emptySet()
 
         for (serverId in serverIds) {
-            eventReducer.clearForServer(serverId)
+            eventDispatcher.clearForServer(serverId)
         }
 
         releaseWakeLock()
@@ -394,14 +394,14 @@ class OpenCodeConnectionService : Service() {
                     if (projects.isEmpty()) {
                         // Fallback: load sessions without directory header (server CWD only)
                         val sessions = api.listSessions(conn)
-                        eventReducer.setSessions(server.id, sessions)
+                        eventDispatcher.setSessions(server.id, sessions)
                         Log.i(TAG, "[${server.displayName}] Pre-loaded ${sessions.size} sessions (no projects)")
                     } else {
                         var totalSessions = 0
                         for (project in projects) {
                             try {
                                 val sessions = api.listSessions(conn, directory = project.worktree)
-                                eventReducer.setSessions(server.id, sessions)
+                                eventDispatcher.setSessions(server.id, sessions)
                                 totalSessions += sessions.size
                             } catch (e: Exception) {
                                 Log.w(TAG, "[${server.displayName}] Failed to pre-load sessions for project ${project.displayName}: ${e.message}")
@@ -481,14 +481,14 @@ class OpenCodeConnectionService : Service() {
      * matching the behavior of the official opencode WebUI and TUI.
      */
     private fun isChildSession(sessionId: String): Boolean {
-        val session = eventReducer.sessions.value.find { it.id == sessionId }
+        val session = eventDispatcher.sessions.value.find { it.id == sessionId }
         return session?.parentId != null
     }
 
     private fun processEvent(server: ServerConfig, event: SseEvent) {
         if (BuildConfig.DEBUG) Log.d(TAG, "[${server.displayName}] SSE event: ${event.javaClass.simpleName}")
 
-        eventReducer.processEvent(event, server.id)
+        eventDispatcher.processEvent(event, server.id)
 
         when (event) {
             is SseEvent.SessionIdle -> {
@@ -547,19 +547,19 @@ class OpenCodeConnectionService : Service() {
     }
 
     private fun getSessionInfo(sessionId: String): Pair<String?, String?> {
-        val session = eventReducer.sessions.value.find { it.id == sessionId }
+        val session = eventDispatcher.sessions.value.find { it.id == sessionId }
         return Pair(session?.title, session?.directory)
     }
 
     private fun latestNotifiableAssistantMessageId(sessionId: String): String? {
-        val sessionMessages = eventReducer.messages.value[sessionId] ?: return null
+        val sessionMessages = eventDispatcher.messages.value[sessionId] ?: return null
         val latestAssistant = sessionMessages
             .asReversed()
             .firstOrNull { it is Message.Assistant } as? Message.Assistant ?: return null
 
         if (!latestAssistant.error?.message.isNullOrBlank()) return latestAssistant.id
 
-        val parts = eventReducer.parts.value[latestAssistant.id] ?: return null
+        val parts = eventDispatcher.parts.value[latestAssistant.id] ?: return null
         val hasTextOutput = parts.any { part ->
             when (part) {
                 is Part.Text -> part.text.isNotBlank()
@@ -587,7 +587,7 @@ class OpenCodeConnectionService : Service() {
     }
 
     private fun buildSessionPath(sessionId: String): String? {
-        val session = eventReducer.sessions.value.find { it.id == sessionId }
+        val session = eventDispatcher.sessions.value.find { it.id == sessionId }
         if (session == null) {
             Log.w(TAG, "buildSessionPath: session $sessionId not found")
             return null

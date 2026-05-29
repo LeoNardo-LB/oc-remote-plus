@@ -3,7 +3,8 @@
 import android.util.Log
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.dto.response.ProvidersResponse
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.usecase.*
@@ -44,7 +45,7 @@ class ChatViewModelQueuedTest {
 
     // === Mock and infrastructure ===
 
-    private lateinit var eventReducer: EventReducer
+    private lateinit var eventDispatcher: EventDispatcher
     private val api: OpenCodeApi = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk()
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -67,7 +68,13 @@ class ChatViewModelQueuedTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        eventReducer = EventReducer()
+        eventDispatcher = EventDispatcher(
+            sessionHandler = SessionEventHandler(),
+            messageHandler = MessageEventHandler(),
+            permissionHandler = PermissionEventHandler(),
+            questionHandler = QuestionEventHandler(),
+            miscHandler = MiscEventHandler()
+        )
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
@@ -175,7 +182,7 @@ class ChatViewModelQueuedTest {
         ))
         return ChatViewModel(
             savedStateHandle = savedState,
-            eventReducer = eventReducer,
+            eventDispatcher = eventDispatcher,
             sendMessageUseCase = sendMessageUseCase,
             manageSessionUseCase = manageSessionUseCase,
             managePermissionUseCase = managePermissionUseCase,
@@ -191,24 +198,24 @@ class ChatViewModelQueuedTest {
     }
 
     /**
-     * Push messages into EventReducer after VM is created.
+     * Push messages into EventDispatcher after VM is created.
      * This simulates SSE updates arriving after initial load.
      */
     private fun pushMessages(messages: List<Pair<Message, List<Part>>>) {
         val messageWithParts = messages.map { (msg, parts) ->
             MessageWithParts(info = msg, parts = parts)
         }
-        eventReducer.setMessages(testSessionId, messageWithParts)
+        eventDispatcher.setMessages(testSessionId, messageWithParts)
     }
 
-    /** Set session into EventReducer. */
+    /** Set session into EventDispatcher. */
     private fun setSession(session: Session) {
-        eventReducer.setSessions(testServerId, listOf(session))
+        eventDispatcher.setSessions(testServerId, listOf(session))
     }
 
     /**
      * Configure manageSessionUseCase.listMessages to return the given messages as MessageWithParts,
-     * so that the VM's init loadMessages() will populate them into EventReducer.
+     * so that the VM's init loadMessages() will populate them into EventDispatcher.
      */
     private fun stubMessages(vararg messages: Pair<Message, List<Part>>) {
         val messageWithParts = messages.map { (msg, parts) ->

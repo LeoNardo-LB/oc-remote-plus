@@ -6,7 +6,8 @@ import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.dto.response.PermissionRequest
 import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.data.repository.DraftRepository
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
@@ -45,7 +46,7 @@ class ChatViewModelPermissionTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
 
-    private lateinit var eventReducer: EventReducer
+    private lateinit var eventDispatcher: EventDispatcher
     private lateinit var api: OpenCodeApi
     private lateinit var settingsRepository: SettingsRepository
     // UseCase mocks
@@ -66,7 +67,13 @@ class ChatViewModelPermissionTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        eventReducer = EventReducer()
+        eventDispatcher = EventDispatcher(
+            sessionHandler = SessionEventHandler(),
+            messageHandler = MessageEventHandler(),
+            permissionHandler = PermissionEventHandler(),
+            questionHandler = QuestionEventHandler(),
+            miscHandler = MiscEventHandler()
+        )
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
@@ -138,7 +145,7 @@ class ChatViewModelPermissionTest {
         ))
         return ChatViewModel(
             savedStateHandle = savedState,
-            eventReducer = eventReducer,
+            eventDispatcher = eventDispatcher,
             sendMessageUseCase = sendMessageUseCase,
             manageSessionUseCase = manageSessionUseCase,
             managePermissionUseCase = managePermissionUseCase,
@@ -200,11 +207,11 @@ class ChatViewModelPermissionTest {
     }
 
     @Test
-    fun `EventReducer setPermissions works directly`() = runTest {
+    fun `EventDispatcher setPermissions works directly`() = runTest {
         val perm = SseEvent.PermissionAsked(id = "p1", sessionId = testSessionId, permission = "bash")
-        eventReducer.setPermissions(testSessionId, listOf(perm))
-        assertEquals(1, eventReducer.permissions.value[testSessionId]?.size)
-        assertEquals("p1", eventReducer.permissions.value[testSessionId]?.firstOrNull()?.id)
+        eventDispatcher.setPermissions(testSessionId, listOf(perm))
+        assertEquals(1, eventDispatcher.permissions.value[testSessionId]?.size)
+        assertEquals("p1", eventDispatcher.permissions.value[testSessionId]?.firstOrNull()?.id)
     }
 
     // ============================================================
@@ -225,9 +232,9 @@ class ChatViewModelPermissionTest {
 
         val vm = createViewModel()
 
-        // Check EventReducer directly (source of truth)
-        val reducerPerms = eventReducer.permissions.value
-        assertEquals("EventReducer should have 1 permission for session, got: ${reducerPerms}",
+        // Check EventDispatcher directly (source of truth)
+        val reducerPerms = eventDispatcher.permissions.value
+        assertEquals("EventDispatcher should have 1 permission for session, got: ${reducerPerms}",
             1, reducerPerms[testSessionId]?.size)
         assertEquals("perm-1", reducerPerms[testSessionId]?.firstOrNull()?.id)
         assertEquals("bash", reducerPerms[testSessionId]?.firstOrNull()?.permission)
@@ -243,7 +250,7 @@ class ChatViewModelPermissionTest {
 
         val vm = createViewModel()
 
-        val reducerPerms = eventReducer.permissions.value
+        val reducerPerms = eventDispatcher.permissions.value
         assertEquals(1, reducerPerms[testSessionId]?.size)
         assertEquals("p1", reducerPerms[testSessionId]?.firstOrNull()?.id)
         assertTrue(reducerPerms["other-session"].isNullOrEmpty())
@@ -255,7 +262,7 @@ class ChatViewModelPermissionTest {
 
         val vm = createViewModel()
 
-        assertTrue(eventReducer.permissions.value.isEmpty())
+        assertTrue(eventDispatcher.permissions.value.isEmpty())
     }
 
     @Test
@@ -273,7 +280,7 @@ class ChatViewModelPermissionTest {
 
         createViewModel()
 
-        val perm = eventReducer.permissions.value[testSessionId]?.firstOrNull()
+        val perm = eventDispatcher.permissions.value[testSessionId]?.firstOrNull()
         assertNotNull(perm)
         assertEquals("hello", perm?.metadata?.get("str"))
         assertEquals("42", perm?.metadata?.get("num"))
@@ -289,7 +296,7 @@ class ChatViewModelPermissionTest {
 
         createViewModel()
 
-        val perms = eventReducer.permissions.value[testSessionId]
+        val perms = eventDispatcher.permissions.value[testSessionId]
         assertEquals(2, perms?.size)
         assertFalse(perms?.first { it.id == "p-no" }?.always ?: true)
         assertTrue(perms?.first { it.id == "p-yes" }?.always ?: false)
@@ -301,7 +308,7 @@ class ChatViewModelPermissionTest {
 
         createViewModel() // Should not throw
 
-        assertTrue(eventReducer.permissions.value.isEmpty())
+        assertTrue(eventDispatcher.permissions.value.isEmpty())
     }
 
     @Test
@@ -312,7 +319,7 @@ class ChatViewModelPermissionTest {
 
         createViewModel()
 
-        val perm = eventReducer.permissions.value[testSessionId]?.firstOrNull()
+        val perm = eventDispatcher.permissions.value[testSessionId]?.firstOrNull()
         assertNotNull(perm)
         assertEquals("m1", perm?.tool?.messageId)
         assertEquals("c1", perm?.tool?.callId)
@@ -331,12 +338,12 @@ class ChatViewModelPermissionTest {
 
         val vm = createViewModel()
         assertEquals("Precondition: 1 permission loaded",
-            1, eventReducer.permissions.value[testSessionId]?.size)
+            1, eventDispatcher.permissions.value[testSessionId]?.size)
 
         vm.replyToPermission("perm-reply", "once")
 
         coVerify { managePermissionUseCase.replyToPermission(any(), "perm-reply", "once", any()) }
-        assertTrue(eventReducer.permissions.value[testSessionId].isNullOrEmpty())
+        assertTrue(eventDispatcher.permissions.value[testSessionId].isNullOrEmpty())
     }
 
     @Test
@@ -351,7 +358,7 @@ class ChatViewModelPermissionTest {
         vm.replyToPermission("pa", "always")
 
         coVerify { managePermissionUseCase.replyToPermission(any(), "pa", "always", any()) }
-        assertTrue(eventReducer.permissions.value[testSessionId].isNullOrEmpty())
+        assertTrue(eventDispatcher.permissions.value[testSessionId].isNullOrEmpty())
     }
 
     @Test
@@ -366,7 +373,7 @@ class ChatViewModelPermissionTest {
         vm.replyToPermission("pr", "reject")
 
         coVerify { managePermissionUseCase.replyToPermission(any(), "pr", "reject", any()) }
-        assertTrue(eventReducer.permissions.value[testSessionId].isNullOrEmpty())
+        assertTrue(eventDispatcher.permissions.value[testSessionId].isNullOrEmpty())
     }
 
     @Test
@@ -380,7 +387,7 @@ class ChatViewModelPermissionTest {
 
         vm.replyToPermission("pf", "once")
 
-        assertEquals(1, eventReducer.permissions.value[testSessionId]?.size)
+        assertEquals(1, eventDispatcher.permissions.value[testSessionId]?.size)
     }
 
     @Test
@@ -395,7 +402,7 @@ class ChatViewModelPermissionTest {
 
         vm.replyToPermission("p1", "once")
 
-        val perms = eventReducer.permissions.value[testSessionId]
+        val perms = eventDispatcher.permissions.value[testSessionId]
         assertEquals(1, perms?.size)
         assertEquals("p2", perms?.firstOrNull()?.id)
         assertEquals("write", perms?.firstOrNull()?.permission)
@@ -412,7 +419,7 @@ class ChatViewModelPermissionTest {
 
         vm.replyToPermission("pe", "once")
 
-        assertEquals(1, eventReducer.permissions.value[testSessionId]?.size)
+        assertEquals(1, eventDispatcher.permissions.value[testSessionId]?.size)
     }
 
     // ============================================================
@@ -420,7 +427,7 @@ class ChatViewModelPermissionTest {
     // ============================================================
 
     @Test
-    fun `multi-session — only current session permissions loaded into EventReducer`() = runTest {
+    fun `multi-session — only current session permissions loaded into EventDispatcher`() = runTest {
         coEvery { managePermissionUseCase.listPendingPermissions(any(), any()) } returns listOf(
             createTestPermissionRequest(id = "p1", sessionId = testSessionId),
             createTestPermissionRequest(id = "p2", sessionId = "session-456")
@@ -429,10 +436,10 @@ class ChatViewModelPermissionTest {
         createViewModel()
 
         // Only current session's permissions are stored (filter is by sessionId)
-        assertEquals(1, eventReducer.permissions.value[testSessionId]?.size)
-        assertEquals("p1", eventReducer.permissions.value[testSessionId]?.firstOrNull()?.id)
+        assertEquals(1, eventDispatcher.permissions.value[testSessionId]?.size)
+        assertEquals("p1", eventDispatcher.permissions.value[testSessionId]?.firstOrNull()?.id)
         // session-456 is NOT loaded because loadPendingPermissions only stores
         // permissions matching the ViewModel's own sessionId
-        assertTrue(eventReducer.permissions.value["session-456"].isNullOrEmpty())
+        assertTrue(eventDispatcher.permissions.value["session-456"].isNullOrEmpty())
     }
 }

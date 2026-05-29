@@ -1,0 +1,117 @@
+package dev.minios.ocremote.data.repository
+
+import android.util.Log
+import dev.minios.ocremote.BuildConfig
+import dev.minios.ocremote.data.repository.handler.*
+import dev.minios.ocremote.domain.model.*
+import kotlinx.coroutines.flow.StateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private const val TAG = "EventDispatcher"
+
+/**
+ * Event Dispatcher - replaces the monolithic EventReducer.
+ *
+ * Delegates SSE events to registered [SseEventHandler] instances.
+ * Exposes read-only StateFlows aggregated from handlers.
+ * Handles cross-cutting concerns (e.g. SessionDeleted cascading cleanup,
+ * CommandExecuted session status reset).
+ */
+@Singleton
+class EventDispatcher @Inject constructor(
+    private val sessionHandler: SessionEventHandler,
+    private val messageHandler: MessageEventHandler,
+    private val permissionHandler: PermissionEventHandler,
+    private val questionHandler: QuestionEventHandler,
+    private val miscHandler: MiscEventHandler
+) {
+    // ============ Public State (read-only) ============
+
+    val serverSessions: StateFlow<Map<String, Set<String>>> get() = sessionHandler.serverSessions
+    val sessions: StateFlow<List<Session>> get() = sessionHandler.sessions
+    val sessionStatuses: StateFlow<Map<String, SessionStatus>> get() = sessionHandler.sessionStatuses
+    val messages: StateFlow<Map<String, List<Message>>> get() = messageHandler.messages
+    val parts: StateFlow<Map<String, List<Part>>> get() = messageHandler.parts
+    val sessionDiffs: StateFlow<Map<String, List<FileDiff>>> get() = sessionHandler.sessionDiffs
+    val permissions: StateFlow<Map<String, List<SseEvent.PermissionAsked>>> get() = permissionHandler.permissions
+    val questions: StateFlow<Map<String, List<SseEvent.QuestionAsked>>> get() = questionHandler.questions
+    val todos: StateFlow<Map<String, List<SseEvent.TodoUpdated.Todo>>> get() = miscHandler.todos
+    val vcsBranch: StateFlow<String?> get() = sessionHandler.vcsBranch
+    val projectInfo: StateFlow<Project?> get() = sessionHandler.projectInfo
+
+    // ============ Event Processing ============
+
+    /**
+     * Process an SSE event by dispatching to all handlers.
+     * Handles cross-cutting concerns after dispatch:
+     * - SessionDeleted: cascades cleanup to all handlers for the deleted session
+     * - CommandExecuted: resets session status to Idle
+     */
+    fun processEvent(event: SseEvent, serverId: String) {
+        sessionHandler.handle(event, serverId)
+        messageHandler.handle(event, serverId)
+        permissionHandler.handle(event, serverId)
+        questionHandler.handle(event, serverId)
+        miscHandler.handle(event, serverId)
+
+        // Cross-handler: SessionDeleted cascades cleanup to other handlers
+        if (event is SseEvent.SessionDeleted) {
+            val sessionId = event.info.id
+            messageHandler.clearForSession(sessionId)
+            permissionHandler.clearForSession(sessionId)
+            questionHandler.clearForSession(sessionId)
+            miscHandler.clearForSession(sessionId)
+        }
+
+        // Cross-handler: CommandExecuted resets session status to Idle
+        if (event is SseEvent.CommandExecuted) {
+            event.sessionId.let { sid ->
+                sessionHandler.updateSessionStatus(sid, SessionStatus.Idle)
+            }
+        }
+    }
+
+    // ============ Delegated Operations ============
+
+    fun setSessions(serverId: String, sessions: List<Session>) =
+        sessionHandler.setSessions(serverId, sessions)
+
+    fun updateSessionStatus(sessionId: String, status: SessionStatus) =
+        sessionHandler.updateSessionStatus(sessionId, status)
+
+    fun setMessages(sessionId: String, messages: List<MessageWithParts>) =
+        messageHandler.setMessages(sessionId, messages)
+
+    fun mergeMessages(sessionId: String, messages: List<MessageWithParts>) =
+        messageHandler.mergeMessages(sessionId, messages)
+
+    fun removePermission(permissionId: String) =
+        permissionHandler.removePermission(permissionId)
+
+    fun setPermissions(sessionId: String, permissions: List<SseEvent.PermissionAsked>) =
+        permissionHandler.setPermissions(sessionId, permissions)
+
+    fun removeQuestion(questionId: String) =
+        questionHandler.removeQuestion(questionId)
+
+    fun setQuestions(sessionId: String, questions: List<SseEvent.QuestionAsked>) =
+        questionHandler.setQuestions(sessionId, questions)
+
+    fun clearAll() {
+        sessionHandler.clearAll()
+        messageHandler.clearAll()
+        permissionHandler.clearAll()
+        questionHandler.clearAll()
+        miscHandler.clearAll()
+    }
+
+    fun clearForServer(serverId: String) {
+        val sessionIds = sessionHandler.serverSessions.value[serverId] ?: emptySet()
+        sessionHandler.clearForServer(serverId)
+        messageHandler.clearForServer(sessionIds)
+        permissionHandler.clearForServer(sessionIds)
+        questionHandler.clearForServer(sessionIds)
+        miscHandler.clearForServer(sessionIds)
+    }
+}

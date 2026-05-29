@@ -29,7 +29,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.minios.ocremote.SessionDeepLink
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.ServerRepository
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.ServerConfig
@@ -62,7 +62,7 @@ fun NavGraph(
     sharedImagesFlow: SharedFlow<List<Uri>>,
     settingsRepository: SettingsRepository,
     serverRepository: ServerRepository,
-    eventReducer: EventReducer
+    eventDispatcher: EventDispatcher
 ) {
     val navController = rememberNavController()
     
@@ -108,8 +108,8 @@ fun NavGraph(
 
             // Otherwise, show the session picker
             sharePickerServers = serverRepository.servers.firstOrNull() ?: emptyList()
-            sharePickerSessions = eventReducer.sessions.value
-            sharePickerServerSessions = eventReducer.serverSessions.value
+            sharePickerSessions = eventDispatcher.sessions.value
+            sharePickerServerSessions = eventDispatcher.serverSessions.value
             showSharePicker = true
         }
     }
@@ -520,7 +520,7 @@ fun NavGraph(
                 },
                 onOpenInWebView = {
                     // Build the session path: /<base64url(directory)>/session/<sessionId>
-                    val session = eventReducer.sessions.value.find { it.id == sessionId }
+                    val session = eventDispatcher.sessions.value.find { it.id == sessionId }
                     val dir = session?.directory ?: ""
                     val encodedDir = android.util.Base64.encodeToString(
                         dir.toByteArray(Charsets.UTF_8),

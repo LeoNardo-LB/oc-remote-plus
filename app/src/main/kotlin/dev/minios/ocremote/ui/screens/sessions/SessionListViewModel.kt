@@ -9,7 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.minios.ocremote.data.dto.response.FileNode
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
@@ -64,7 +64,7 @@ data class SessionItem(
 @HiltViewModel
 class SessionListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val eventReducer: EventReducer,
+    private val eventDispatcher: EventDispatcher,
     private val api: OpenCodeApi
 ) : ViewModel() {
 
@@ -97,9 +97,9 @@ class SessionListViewModel @Inject constructor(
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
         listOf(
-            eventReducer.sessions,
-            eventReducer.sessionStatuses,
-            eventReducer.serverSessions,
+            eventDispatcher.sessions,
+            eventDispatcher.sessionStatuses,
+            eventDispatcher.serverSessions,
             _isLoading,
             _error,
             _projects,
@@ -191,7 +191,7 @@ class SessionListViewModel @Inject constructor(
                 if (projects.isEmpty()) {
                     // Fallback: load sessions without directory header (server CWD only)
                     val sessions = api.listSessions(conn)
-                    eventReducer.setSessions(serverId, sessions)
+                    eventDispatcher.setSessions(serverId, sessions)
                     if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions (no projects)")
                 } else {
                     // Load sessions for each project using its worktree as directory
@@ -199,7 +199,7 @@ class SessionListViewModel @Inject constructor(
                     for (project in projects) {
                         try {
                             val sessions = api.listSessions(conn, directory = project.worktree)
-                            eventReducer.setSessions(serverId, sessions)
+                            eventDispatcher.setSessions(serverId, sessions)
                             totalSessions += sessions.size
                             if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions for project ${project.displayName}")
                         } catch (e: Exception) {
@@ -240,7 +240,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 val session = api.createSession(conn, directory = directory)
                 // The SSE stream should pick up the new session, but also add directly
-                eventReducer.setSessions(serverId, listOf(session))
+                eventDispatcher.setSessions(serverId, listOf(session))
                 if (BuildConfig.DEBUG) Log.d(TAG, "Created new session: ${session.id}")
                 _navigateToSession.tryEmit(session.id)
             } catch (e: Exception) {

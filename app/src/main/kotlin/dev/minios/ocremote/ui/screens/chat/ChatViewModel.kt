@@ -19,7 +19,7 @@ import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.Draft
 import dev.minios.ocremote.data.repository.DraftRepository
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.usecase.*
@@ -107,7 +107,7 @@ data class ChatMessage(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val eventReducer: EventReducer,
+    private val eventDispatcher: EventDispatcher,
     private val sendMessageUseCase: SendMessageUseCase,
     private val manageSessionUseCase: ManageSessionUseCase,
     private val managePermissionUseCase: ManagePermissionUseCase,
@@ -272,12 +272,12 @@ class ChatViewModel @Inject constructor(
     private val _isLoadingOlder = MutableStateFlow(false)
 
     val uiState: StateFlow<ChatUiState> = combine(
-        eventReducer.sessions,
-        eventReducer.messages,
-        eventReducer.parts,
-        eventReducer.sessionStatuses,
-        eventReducer.permissions,
-        eventReducer.questions,
+        eventDispatcher.sessions,
+        eventDispatcher.messages,
+        eventDispatcher.parts,
+        eventDispatcher.sessionStatuses,
+        eventDispatcher.permissions,
+        eventDispatcher.questions,
         _isLoading,
         _error,
         _isSending,
@@ -548,7 +548,7 @@ class ChatViewModel @Inject constructor(
             // Inject the REST-loaded session into the reducer so that title, parentId,
             // cost, tokens etc. are immediately available even before SSE delivers them.
             // This is critical for sub-sessions which may not be in the SSE session list.
-            eventReducer.setSessions(serverId, listOf(session))
+            eventDispatcher.setSessions(serverId, listOf(session))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load session info", e)
         } finally {
@@ -565,7 +565,7 @@ class ChatViewModel @Inject constructor(
             try {
                 // Load messages with current limit
                 val messages = manageSessionUseCase.listMessages(conn, sessionId, limit = currentMessageLimit)
-                eventReducer.setMessages(sessionId, messages)
+                eventDispatcher.setMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
                 if (BuildConfig.DEBUG) {
@@ -578,7 +578,7 @@ class ChatViewModel @Inject constructor(
                     currentMessageLimit = (currentMessageLimit / 2).coerceAtLeast(10)
                     try {
                         val messages = manageSessionUseCase.listMessages(conn, sessionId, limit = currentMessageLimit)
-                        eventReducer.mergeMessages(sessionId, messages)
+                        eventDispatcher.mergeMessages(sessionId, messages)
                         _hasOlderMessages.value = messages.size >= currentMessageLimit
                         if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
                     } catch (retryEx: Exception) {
@@ -615,7 +615,7 @@ class ChatViewModel @Inject constructor(
             currentMessageLimit = currentMessageLimit * 2
             try {
                 val messages = manageSessionUseCase.listMessages(conn, sessionId, limit = currentMessageLimit)
-                eventReducer.mergeMessages(sessionId, messages)
+                eventDispatcher.mergeMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
                 if (BuildConfig.DEBUG) {
@@ -663,7 +663,7 @@ class ChatViewModel @Inject constructor(
                     )
                 }
             if (sessionQuestions.isNotEmpty()) {
-                eventReducer.setQuestions(sessionId, sessionQuestions)
+                eventDispatcher.setQuestions(sessionId, sessionQuestions)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessionQuestions.size} pending questions for session $sessionId")
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "No pending questions for session $sessionId")
@@ -698,7 +698,7 @@ class ChatViewModel @Inject constructor(
                     )
                 }
             if (sessionPermissions.isNotEmpty()) {
-                eventReducer.setPermissions(sessionId, sessionPermissions)
+                eventDispatcher.setPermissions(sessionId, sessionPermissions)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessionPermissions.size} pending permissions for session $sessionId")
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "No pending permissions for session $sessionId")
@@ -975,7 +975,7 @@ class ChatViewModel @Inject constructor(
                 )
                 if (success) {
                     // Optimistically remove the permission card — SSE event may arrive late or not at all
-                    eventReducer.removePermission(requestId)
+                    eventDispatcher.removePermission(requestId)
                 }
                 if (BuildConfig.DEBUG) Log.d(TAG, "Replied to permission $requestId with $reply (success=$success)")
             } catch (e: Exception) {
@@ -990,7 +990,7 @@ class ChatViewModel @Inject constructor(
                 manageSessionUseCase.abortSession(conn, sessionId, directory = sessionDirectory)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
                 // Optimistically update session status to Idle so UI reflects change immediately
-                eventReducer.updateSessionStatus(sessionId, SessionStatus.Idle)
+                eventDispatcher.updateSessionStatus(sessionId, SessionStatus.Idle)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
@@ -1013,7 +1013,7 @@ class ChatViewModel @Inject constructor(
                 )
                 if (success) {
                     // Optimistically remove the question card — SSE event may arrive late or not at all
-                    eventReducer.removeQuestion(requestId)
+                    eventDispatcher.removeQuestion(requestId)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to reply to question $requestId: ${e.javaClass.simpleName}: ${e.message}", e)
@@ -1030,7 +1030,7 @@ class ChatViewModel @Inject constructor(
                 val success = managePermissionUseCase.rejectQuestion(conn = conn, requestId = requestId, directory = sessionDirectory)
                 if (success) {
                     // Optimistically remove the question card
-                    eventReducer.removeQuestion(requestId)
+                    eventDispatcher.removeQuestion(requestId)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to reject question $requestId: ${e.javaClass.simpleName}: ${e.message}", e)
@@ -1275,7 +1275,7 @@ class ChatViewModel @Inject constructor(
 
                 val normalizedCommand = command.removePrefix("/").trim()
                 val effectiveDirectory = sessionDirectory
-                    ?: eventReducer.sessions.value
+                    ?: eventDispatcher.sessions.value
                         .firstOrNull { it.id == sessionId }
                         ?.directory
                         ?.takeIf { it.isNotBlank() }
@@ -1398,7 +1398,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val session = manageSessionUseCase.createSession(conn, directory = sessionDirectory)
-                eventReducer.setSessions(serverId, listOf(session))
+                eventDispatcher.setSessions(serverId, listOf(session))
                 if (BuildConfig.DEBUG) Log.d(TAG, "Created new session: ${session.id}")
                 onResult(session)
             } catch (e: Exception) {

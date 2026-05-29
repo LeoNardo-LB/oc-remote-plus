@@ -13,7 +13,7 @@ interface SessionRepository {
 
     /**
      * Observe sessions for a specific server connection.
-     * Phase 3 impl: delegates to EventReducer.sessionsFlow filtered by serverId.
+     * Phase 3 impl: delegates to EventDispatcher.sessions filtered by serverId.
      */
     fun getSessionsFlow(serverId: String): Flow<List<Session>>
 

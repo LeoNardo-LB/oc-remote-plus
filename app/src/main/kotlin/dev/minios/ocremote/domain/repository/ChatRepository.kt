@@ -15,7 +15,7 @@ interface ChatRepository {
 
     /**
      * Observe the list of messages (with parts) for a session.
-     * Phase 3 impl: delegates to EventReducer.messagesFlow, maps to domain Message.
+     * Phase 3 impl: delegates to EventDispatcher.messages, maps to domain Message.
      */
     fun getMessagesFlow(sessionId: String): Flow<List<Message>>
 

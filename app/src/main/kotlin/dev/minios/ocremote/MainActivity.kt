@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.data.repository.ServerRepository
-import dev.minios.ocremote.data.repository.EventReducer
+import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.service.OpenCodeConnectionService
 import dev.minios.ocremote.ui.navigation.NavGraph
 import dev.minios.ocremote.ui.theme.OpenCodeTheme
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
     lateinit var serverRepository: ServerRepository
 
     @Inject
-    lateinit var eventReducer: EventReducer
+    lateinit var eventDispatcher: EventDispatcher
     
     /**
      * Shared flow for deep-link events from notification taps.
@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
                         sharedImagesFlow = sharedImagesFlow,
                         settingsRepository = settingsRepository,
                         serverRepository = serverRepository,
-                        eventReducer = eventReducer
+                        eventDispatcher = eventDispatcher
                     )
                 }
             }
