@@ -1,0 +1,442 @@
+package dev.minios.ocremote.service
+
+import android.app.*
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import dev.minios.ocremote.BuildConfig
+import dev.minios.ocremote.MainActivity
+import dev.minios.ocremote.R
+import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.domain.model.ServerConfig
+import dev.minios.ocremote.data.repository.SettingsRepository
+import kotlinx.coroutines.flow.first
+import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private const val NOTIFICATION_CHANNEL_ID = "opencode_connection"
+private const val NOTIFICATION_CHANNEL_TASKS_ID = "opencode_tasks"
+private const val NOTIFICATION_CHANNEL_TASKS_SILENT_ID = "opencode_tasks_silent"
+private const val NOTIFICATION_CHANNEL_PERMISSIONS_ID = "opencode_permissions"
+
+/**
+ * Manages all notification logic for the connection service.
+ * Extracted from [OpenCodeConnectionService] for separation of concerns.
+ */
+@Singleton
+class AppNotificationManager @Inject constructor(
+    private val eventDispatcher: EventDispatcher,
+    private val settingsRepository: SettingsRepository
+) {
+    private val TAG = "AppNotificationMgr"
+
+    /** Dedup response-ready notifications per session by last assistant message ID. */
+    private val lastNotifiedAssistantMessageBySession = ConcurrentHashMap<String, String>()
+
+    // ============ Notification Channels ============
+
+    fun createNotificationChannels(notificationManager: NotificationManager, context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val connectionChannel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                context.getString(R.string.notification_channel_connection),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = context.getString(R.string.notification_channel_connection_desc)
+                setShowBadge(false)
+            }
+
+            val tasksChannel = NotificationChannel(
+                NOTIFICATION_CHANNEL_TASKS_ID,
+                context.getString(R.string.notification_channel_tasks),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = context.getString(R.string.notification_channel_tasks_desc)
+                setShowBadge(true)
+                enableVibration(true)
+                enableLights(true)
+            }
+
+            val tasksSilentChannel = NotificationChannel(
+                NOTIFICATION_CHANNEL_TASKS_SILENT_ID,
+                context.getString(R.string.notification_channel_tasks_silent),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = context.getString(R.string.notification_channel_tasks_silent_desc)
+                setShowBadge(true)
+                enableVibration(false)
+                enableLights(false)
+                setSound(null, null)
+            }
+
+            val permissionsChannel = NotificationChannel(
+                NOTIFICATION_CHANNEL_PERMISSIONS_ID,
+                context.getString(R.string.notification_channel_permissions),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = context.getString(R.string.notification_channel_permissions_desc)
+                setShowBadge(true)
+                enableVibration(true)
+                enableLights(true)
+            }
+
+            notificationManager.createNotificationChannel(connectionChannel)
+            notificationManager.createNotificationChannel(tasksChannel)
+            notificationManager.createNotificationChannel(tasksSilentChannel)
+            notificationManager.createNotificationChannel(permissionsChannel)
+        }
+    }
+
+    // ============ Persistent Notification (InboxStyle, multi-server) ============
+
+    fun createPersistentNotification(
+        context: Context,
+        connections: Map<String, ServerConnectionState>,
+        isLocalServer: (ServerConfig) -> Boolean
+    ): Notification {
+        val tapIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val tapPendingIntent = PendingIntent.getActivity(
+            context, 0, tapIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        // Disconnect All action
+        val disconnectAllIntent = Intent(context, OpenCodeConnectionService::class.java).apply {
+            action = OpenCodeConnectionService.ACTION_DISCONNECT_ALL
+        }
+        val disconnectAllPendingIntent = PendingIntent.getService(
+            context, 1, disconnectAllIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val visibleConnections = connections.values.filterNot { isLocalServer(it.config) }
+        val serverCount = visibleConnections.size
+        val connectedCount = visibleConnections.count { it.isConnected }
+
+        val title = if (serverCount == 0) {
+            context.getString(R.string.app_name)
+        } else if (serverCount == 1) {
+            val server = visibleConnections.first()
+            if (server.isConnected) context.getString(R.string.notification_connected, server.config.displayName)
+            else context.getString(R.string.notification_connecting, server.config.displayName)
+        } else {
+            context.getString(R.string.notification_connected_count, connectedCount, serverCount)
+        }
+
+        val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(context.getString(R.string.app_name))
+            .setContentText(title)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(tapPendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+
+        if (serverCount > 0) {
+            builder.addAction(
+                R.mipmap.ic_launcher,
+                context.getString(R.string.notification_disconnect_all),
+                disconnectAllPendingIntent
+            )
+        }
+
+        // InboxStyle when multiple servers
+        if (serverCount > 1) {
+            val inboxStyle = NotificationCompat.InboxStyle()
+                .setBigContentTitle(context.getString(R.string.notification_inbox_title, connectedCount, serverCount))
+            for (state in visibleConnections) {
+                val status = if (state.isConnected) context.getString(R.string.notification_status_connected)
+                else context.getString(R.string.notification_status_connecting)
+                inboxStyle.addLine("${state.config.displayName}: $status")
+            }
+            builder.setStyle(inboxStyle)
+        }
+
+        return builder.build()
+    }
+
+    fun updatePersistentNotification(
+        context: Context,
+        notificationManager: NotificationManager,
+        connections: Map<String, ServerConnectionState>,
+        isLocalServer: (ServerConfig) -> Boolean
+    ) {
+        val notification = createPersistentNotification(context, connections, isLocalServer)
+        notificationManager.notify(PERSISTENT_NOTIFICATION_ID, notification)
+    }
+
+    // ============ Event Notifications (grouped by server) ============
+
+    suspend fun showTaskCompleteNotification(
+        context: Context,
+        notificationManager: NotificationManager,
+        server: ServerConfig,
+        sessionId: String
+    ) {
+        val (sessionTitle, _) = getSessionInfo(sessionId)
+        val body = sessionTitle?.takeIf { it.isNotBlank() } ?: context.getString(R.string.notification_new_session)
+
+        val pendingIntent = createSessionPendingIntent(context, server, sessionId, sessionId.hashCode())
+
+        val silent = settingsRepository.silentNotifications.first()
+        val channelId = if (silent) NOTIFICATION_CHANNEL_TASKS_SILENT_ID else NOTIFICATION_CHANNEL_TASKS_ID
+
+        val notifId = eventNotificationId(server.id, sessionId, 0)
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setContentTitle(context.getString(R.string.notification_response_ready))
+            .setContentText(body)
+            .setSubText(server.displayName)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(if (silent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
+            .setGroup("server_${server.id}")
+
+        if (!silent) {
+            builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setVibrate(longArrayOf(0, 500, 200, 500))
+        }
+
+        notificationManager.notify(notifId, builder.build())
+        showServerGroupSummary(context, notificationManager, server)
+    }
+
+    fun showPermissionNotification(
+        context: Context,
+        notificationManager: NotificationManager,
+        server: ServerConfig,
+        sessionId: String,
+        permission: String
+    ) {
+        val (sessionTitle, directory) = getSessionInfo(sessionId)
+        val displayTitle = sessionTitle ?: context.getString(R.string.notification_new_session)
+        val projectName = getProjectName(directory)
+        val body = if (projectName != null) {
+            context.getString(R.string.notification_needs_permission_project, displayTitle, projectName)
+        } else {
+            context.getString(R.string.notification_needs_permission, displayTitle)
+        }
+
+        val notifId = eventNotificationId(server.id, sessionId, 1000)
+        val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)
+
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_PERMISSIONS_ID)
+            .setContentTitle(context.getString(R.string.notification_permission_required))
+            .setContentText(body)
+            .setSubText(server.displayName)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVibrate(longArrayOf(0, 300, 100, 300))
+            .setGroup("server_${server.id}")
+            .build()
+
+        notificationManager.notify(notifId, notification)
+        showServerGroupSummary(context, notificationManager, server)
+    }
+
+    fun showQuestionNotification(
+        context: Context,
+        notificationManager: NotificationManager,
+        server: ServerConfig,
+        sessionId: String,
+        questionText: String
+    ) {
+        val (sessionTitle, directory) = getSessionInfo(sessionId)
+        val displayTitle = sessionTitle ?: context.getString(R.string.notification_new_session)
+        val projectName = getProjectName(directory)
+        val body = if (projectName != null) {
+            context.getString(R.string.notification_has_question_project, displayTitle, projectName)
+        } else {
+            context.getString(R.string.notification_has_question, displayTitle)
+        }
+
+        val notifId = eventNotificationId(server.id, sessionId, 2000)
+        val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)
+
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_PERMISSIONS_ID)
+            .setContentTitle(context.getString(R.string.notification_question))
+            .setContentText(body)
+            .setSubText(server.displayName)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVibrate(longArrayOf(0, 300, 100, 300))
+            .setGroup("server_${server.id}")
+            .build()
+
+        notificationManager.notify(notifId, notification)
+        showServerGroupSummary(context, notificationManager, server)
+    }
+
+    fun showErrorNotification(
+        context: Context,
+        notificationManager: NotificationManager,
+        server: ServerConfig,
+        sessionId: String?,
+        error: String
+    ) {
+        val body = if (sessionId != null) {
+            val (sessionTitle, _) = getSessionInfo(sessionId)
+            sessionTitle ?: error.ifBlank { context.getString(R.string.error_unknown) }
+        } else {
+            error.ifBlank { context.getString(R.string.error_unknown) }
+        }
+
+        val notifId = eventNotificationId(server.id, sessionId ?: "error", 3000)
+        val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)
+
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_TASKS_ID)
+            .setContentTitle(context.getString(R.string.notification_session_error))
+            .setContentText(body)
+            .setSubText(server.displayName)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setGroup("server_${server.id}")
+            .build()
+
+        notificationManager.notify(notifId, notification)
+        showServerGroupSummary(context, notificationManager, server)
+    }
+
+    // ============ Notification Dedup / Session Helpers ============
+
+    /**
+     * Check if a session is a child/sub-agent session (has parentID set).
+     * Child sessions should not trigger user-facing notifications.
+     */
+    fun isChildSession(sessionId: String): Boolean {
+        val session = eventDispatcher.sessions.value.find { it.id == sessionId }
+        return session?.parentId != null
+    }
+
+    /**
+     * Check if there's a new notifiable assistant message for the session.
+     * Returns the message ID if it should trigger a notification, null otherwise.
+     * Handles dedup internally via [lastNotifiedAssistantMessageBySession].
+     */
+    fun checkNewAssistantMessage(sessionId: String): String? {
+        val sessionMessages = eventDispatcher.messages.value[sessionId] ?: return null
+        val latestAssistant = sessionMessages
+            .asReversed()
+            .firstOrNull { it is Message.Assistant } as? Message.Assistant ?: return null
+
+        // Always notify on error messages
+        if (!latestAssistant.error?.message.isNullOrBlank()) return latestAssistant.id
+
+        // Check for text output
+        val parts = eventDispatcher.parts.value[latestAssistant.id] ?: return null
+        val hasTextOutput = parts.any { part ->
+            when (part) {
+                is Part.Text -> part.text.isNotBlank()
+                is Part.Reasoning -> part.text.isNotBlank()
+                else -> false
+            }
+        }
+        if (!hasTextOutput) return null
+
+        // Dedup
+        val previousNotified = lastNotifiedAssistantMessageBySession[sessionId]
+        if (previousNotified == latestAssistant.id) return null
+
+        lastNotifiedAssistantMessageBySession[sessionId] = latestAssistant.id
+        return latestAssistant.id
+    }
+
+    // ============ Private Helpers ============
+
+    private fun showServerGroupSummary(
+        context: Context,
+        notificationManager: NotificationManager,
+        server: ServerConfig
+    ) {
+        val summaryId = "server_summary_${server.id}".hashCode()
+        val summary = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_TASKS_SILENT_ID)
+            .setContentTitle(server.displayName)
+            .setContentText(context.getString(R.string.notification_group_summary))
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setGroup("server_${server.id}")
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(summaryId, summary)
+    }
+
+    private fun createSessionPendingIntent(
+        context: Context,
+        server: ServerConfig,
+        sessionId: String?,
+        requestCode: Int
+    ): PendingIntent {
+        val sessionPath = sessionId?.let { buildSessionPath(it) }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = OpenCodeConnectionService.ACTION_OPEN_SESSION
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(OpenCodeConnectionService.EXTRA_SERVER_URL, server.url)
+            putExtra(OpenCodeConnectionService.EXTRA_SERVER_USERNAME, server.username)
+            putExtra(OpenCodeConnectionService.EXTRA_SERVER_PASSWORD, server.password ?: "")
+            putExtra(OpenCodeConnectionService.EXTRA_SERVER_NAME, server.displayName)
+            sessionPath?.let { putExtra(OpenCodeConnectionService.EXTRA_SESSION_PATH, it) }
+            sessionId?.let { putExtra(OpenCodeConnectionService.EXTRA_SESSION_ID, it) }
+        }
+
+        return PendingIntent.getActivity(
+            context, requestCode, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+    }
+
+    private fun buildSessionPath(sessionId: String): String? {
+        val session = eventDispatcher.sessions.value.find { it.id == sessionId }
+        if (session == null) {
+            Log.w(TAG, "buildSessionPath: session $sessionId not found")
+            return null
+        }
+        val encodedDir = base64UrlEncode(session.directory)
+        return "/$encodedDir/session/$sessionId"
+    }
+
+    private fun base64UrlEncode(value: String): String {
+        val encoded = android.util.Base64.encodeToString(
+            value.toByteArray(Charsets.UTF_8),
+            android.util.Base64.NO_WRAP
+        )
+        return encoded
+            .replace('+', '-')
+            .replace('/', '_')
+            .replace("=", "")
+    }
+
+    private fun getSessionInfo(sessionId: String): Pair<String?, String?> {
+        val session = eventDispatcher.sessions.value.find { it.id == sessionId }
+        return Pair(session?.title, session?.directory)
+    }
+
+    private fun getProjectName(directory: String?): String? {
+        if (directory.isNullOrBlank()) return null
+        return directory.trimEnd('/').substringAfterLast('/')
+    }
+
+    private fun eventNotificationId(serverId: String, sessionId: String, typeOffset: Int): Int {
+        return (serverId + sessionId).hashCode() + typeOffset
+    }
+
+    companion object {
+        const val PERSISTENT_NOTIFICATION_ID = 1001
+    }
+}
