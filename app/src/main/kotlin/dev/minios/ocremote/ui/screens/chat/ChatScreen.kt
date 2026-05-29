@@ -5896,8 +5896,13 @@ private fun WriteToolCard(
                         modifier = Modifier.size(16.dp),
                         tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
+                    val displayText = if (shortPath.isNotBlank()) {
+                        "${stringResource(R.string.chat_write_label)} · $shortPath"
+                    } else {
+                        stringResource(R.string.chat_write_label)
+                    }
                     Text(
-                        text = stringResource(R.string.chat_write_label),
+                        text = displayText,
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
