@@ -7569,8 +7569,10 @@ private fun ChatInputBar(
                                 } else {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                                 }
+                            } else if (isAmoled) {
+                                Color.Black
                             } else {
-                                Color.Transparent
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                             }
                         )
                         .then(
@@ -7586,8 +7588,18 @@ private fun ChatInputBar(
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = if (isAmoled) 0.88f else 0.75f),
                                     shape = RoundedCornerShape(22.dp),
                                 )
+                            } else if (isAmoled) {
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(22.dp),
+                                )
                             } else {
-                                Modifier
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                    shape = RoundedCornerShape(22.dp),
+                                )
                             }
                         )
                         .combinedClickable(
