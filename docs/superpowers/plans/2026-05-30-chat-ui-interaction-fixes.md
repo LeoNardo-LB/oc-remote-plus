@@ -2144,6 +2144,7 @@ private suspend fun ByteReadChannel.readRawLineBytes(): List<Byte>? {
         while (true) {
             val b = readByte()
             if (b == '\n'.code.toByte()) break
+            if (b == '\r'.code.toByte()) continue  // 兼容 CRLF
             result.add(b)
         }
     } catch (e: ClosedReceiveChannelException) {
@@ -2226,9 +2227,7 @@ val buffer = mutableListOf<List<Byte>>()
 
 - [ ] **Step 3: 验证编译通过**
 
-```bash
-cd D:\Develop\code\app\oc-remote; .\gradlew :app:compileDevDebugKotlin
-```
+Run: `.\gradlew :app:compileDevDebugKotlin`
 Expected: BUILD SUCCESSFUL
 
 - [ ] **Step 4: Commit**
@@ -2317,6 +2316,7 @@ git commit -m "fix(chat): address regression test failures"
 | F4b syncSessionStatus | Task 18 | ✅ |
 | F4c ChatScreen 触发 | Task 19 | ✅ |
 | F4d markSessionIdle | Task 18 | ✅ |
+| G SseClient 字节解析 | Task 21 | ✅ |
 
 ### 占位符扫描
 

@@ -1169,7 +1169,7 @@ while (!channel.isClosedForRead) {
 // 注意：需 import io.ktor.utils.io.core.*
 while (!channel.isClosedForRead) {
     // 读取原始字节直到 \n（不做 UTF-8 解码）
-    val lineBytes = readRawLineBytes(channel) ?: break
+    val lineBytes = channel.readRawLineBytes() ?: break
 
     if (lineBytes.isEmpty()) {
         // 空白行 = SSE 事件结束 → 解码整个 buffer
@@ -1188,14 +1188,19 @@ while (!channel.isClosedForRead) {
 }
 
 // 辅助函数
-private fun readRawLineBytes(channel: ByteReadChannel): List<Byte>? {
+private suspend fun ByteReadChannel.readRawLineBytes(): List<Byte>? {
     val result = mutableListOf<Byte>()
-    while (!channel.isClosedForRead) {
-        val byte = channel.readByte()
-        if (byte == '\n'.code.toByte()) break  // 到达行尾
-        result.add(byte)
+    try {
+        while (true) {
+            val byte = readByte()
+            if (byte == '\n'.code.toByte()) break  // 到达行尾 (LF)
+            if (byte == '\r'.code.toByte()) continue  // 跳过回车符 (CR)，兼容 CRLF
+            result.add(byte)
+        }
+    } catch (e: ClosedReceiveChannelException) {
+        // Channel 关闭且无更多数据 → 返回 null
+        if (result.isEmpty()) return null
     }
-    if (channel.isClosedForRead && result.isEmpty()) return null
     return result
 }
 
