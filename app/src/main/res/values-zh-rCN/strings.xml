@@ -78,6 +78,7 @@
     <string name="session_delete_confirm">确定要删除“%1$s”？此操作无法撤销。</string>
     <string name="chat_stop">停止</string>
     <string name="chat_copy">复制</string>
+    <string name="chat_select_text_title">选择文本</string>
     <string name="chat_revert">还原</string>
     <string name="chat_revert_title">还原消息？</string>
     <string name="chat_revert_message">此操作将撤销该消息及之后所有消息，文件更改也将被回退。</string>

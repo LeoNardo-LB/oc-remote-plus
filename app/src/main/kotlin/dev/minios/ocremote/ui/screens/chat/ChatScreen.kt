@@ -4885,6 +4885,12 @@ private fun MarkdownContent(
     // retainState = true keeps the previous rendered content visible while
     // new markdown is being parsed, preventing the Loading→Success flicker
     // that causes screen flashing during streaming output.
+    // Long-press to select/copy text (Dialog-based to avoid SelectionContainer
+    // pointer-input interference with LazyColumn's tool card clicks)
+    var showTextDialog by remember { mutableStateOf(false) }
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val view = LocalView.current
+
     val markdownState = rememberMarkdownState(
         content = normalizedMarkdown,
         retainState = true
@@ -4896,8 +4902,74 @@ private fun MarkdownContent(
         components = components,
         dimens = dimens,
         imageTransformer = Coil3ImageTransformerImpl,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (!isUser) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = {
+                                performHaptic(view, true)
+                                showTextDialog = true
+                            }
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+            )
     )
+
+    // Selectable text dialog — SelectionContainer is safe here because
+    // Dialog operates in a separate window, isolated from LazyColumn
+    if (showTextDialog) {
+        AlertDialog(
+            onDismissRequest = { showTextDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(R.string.chat_select_text_title),
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    IconButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(markdown))
+                        showTextDialog = false
+                    }) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = stringResource(R.string.chat_copy),
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            },
+            text = {
+                val dialogScrollState = rememberScrollState()
+                SelectionContainer {
+                    Text(
+                        text = markdown,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            lineHeight = 20.sp
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(dialogScrollState)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTextDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
 
 /**

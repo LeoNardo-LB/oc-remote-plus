@@ -140,6 +140,7 @@
     <string name="chat_abort">Abort</string>
     <string name="chat_empty">Start a conversation with OpenCode</string>
     <string name="chat_copy">Copy</string>
+    <string name="chat_select_text_title">Select Text</string>
     <string name="chat_revert">Revert</string>
     <string name="chat_revert_title">Revert message?</string>
     <string name="chat_revert_message">This will undo this message and all subsequent messages. File changes will be reversed.</string>
