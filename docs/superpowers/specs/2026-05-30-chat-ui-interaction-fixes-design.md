@@ -1,8 +1,8 @@
 # Chat UI 交互修复设计文档
 
 > 日期: 2026-05-30
-> 范围: 对话界面滚动竞态、复制偏差、卡片间距、统计时机、事件生命周期文档
-> 影响文件: 14 Kotlin 源文件（12 修改 + 2 新建）
+> 范围: 对话界面滚动竞态、复制偏差、卡片间距、统计时机、会话状态修正、事件生命周期文档
+> 影响文件: 15 Kotlin 源文件（13 修改 + 2 新建）
 > 环境要求: Kotlin 1.9.x / Compose UI 1.7.x / AGP 8.7.x / minSdk 26 / compileSdk 35
 
 ---
@@ -20,6 +20,7 @@
 - [设计 C：工具卡片间距紧凑化](#设计-c工具卡片间距紧凑化)
 - [设计 D：统计信息时机修正](#设计-d统计信息时机修正)
 - [设计 E：事件生命周期文档](#设计-e事件生命周期文档)
+- [设计 F：会话状态修正 — 进入会话时修正离线偏差](#设计-f会话状态修正--进入会话时修正离线偏差)
 - [改动文件汇总](#改动文件汇总)
 - [测试要点](#测试要点)
 
@@ -33,6 +34,7 @@
 | 2 | 复制时框选高亮位置与实际文字有偏差 | 透明 SelectionContainer 使用单一字体的 Text，与 mikepenz Markdown 渲染层的多字体/多行高/多 padding 布局不对齐 | 中 |
 | 3 | 工具卡片上下左右边距过大 | 各卡片 padding 值统一偏大 | 低 |
 | 4 | 统计信息逐条显示，应在 agent 整次回答结束后只在最后一条汇总 | AssistantMessageCard 对每条 Assistant 消息独立聚合 stepFinishes 显示 Footer | 中 |
+| 5 | 进入会话时显示"思考中"但实际已停止输出 | SSE 断连/APP 被后台杀死后重连时，UI 状态未同步 OpenCode Server 的实际会话状态 | 中 |
 
 ---
 
@@ -887,7 +889,182 @@ Queued (用户消息等待发送)
 
 ---
 
-## 改动文件汇总
+## 设计 F：会话状态修正 — 进入会话时修正离线偏差
+
+### F1. 问题描述
+
+```
+场景：
+1. 用户在 OC Remote 中进入某会话，agent 正在输出（SSE 事件正常）
+2. 用户切到后台 → APP 被系统杀死或 SSE 连接断开
+3. 用户重新打开 APP → SSE 重连 → 进入同一个会话
+4. UI 仍显示"思考中"（从上次缓存的 Message 状态推断）
+5. 但实际上 OpenCode Server 中该会话已经 idle（输出完成）
+
+根因：UI 的状态判断依赖 SSE 事件的连续序列。
+     断连后错过了 session.idle 事件，UI 无法自行修正。
+```
+
+### F2. 解决方案：REST 查询兜底 SSE
+
+**官方 API**：`GET /session/status`
+
+```
+请求：GET {baseUrl}/session/status
+响应：{
+  "session-id-1": { "type": "idle" },
+  "session-id-2": { "type": "busy" },
+  "session-id-3": { "type": "retry", "attempt": 2, "message": "...", "next": 5000 }
+}
+```
+
+**SessionStatus 类型**（来自 OpenCode 官方文档）：
+```
+type: "idle"   — 空闲，输出已完成
+type: "busy"   — 运行中，正在思考或输出
+type: "retry"  — 重试中，失败后等待重试
+```
+
+### F3. 触发时机
+
+两处触发 `GET /session/status` 查询：
+
+| 时机 | 触发条件 | 目的 |
+|------|----------|------|
+| **进入会话时** | ChatScreen 首次组合 + sessionId 非空 | 修正 SSE 断连导致的 UI 状态偏差 |
+| **从后台恢复时** | `DisposableEffect(lifecycleOwner)` 中 `ON_RESUME` 事件 | 确保 APP 被后台杀死后重连时修正状态 |
+
+### F4. 实现
+
+#### F4a. 新增 API 方法
+
+**文件**: `chat/network/OpenCodeApi.kt`
+
+```kotlin
+/**
+ * 查询所有会话的当前状态。
+ * GET /session/status
+ * @return Map<sessionId, SessionStatus> 其中 SessionStatus.type ∈ {"idle", "busy", "retry"}
+ */
+suspend fun fetchSessionStatus(): Result<Map<String, SessionStatus>>
+
+data class SessionStatus(
+    val type: String,       // "idle" | "busy" | "retry"
+    val attempt: Int? = null,  // 仅 retry 时有值
+    val message: String? = null,
+    val next: Long? = null
+)
+```
+
+#### F4b. ChatViewModel 中新增状态修正逻辑
+
+**文件**: `chat/ChatViewModel.kt`
+
+```kotlin
+/** 修正 UI 状态：查询 OpenCode Server 的实际会话状态，修正"思考中"的假象 */
+fun syncSessionStatus() {
+    viewModelScope.launch {
+        val result = openCodeApi.fetchSessionStatus()
+        result.onSuccess { statuses ->
+            val status = statuses[sessionId]
+            if (status != null && status.type == "idle") {
+                // 服务端报告空闲，但 UI 可能因 SSE 断连而显示"思考中"
+                // → 清除 loading 状态，强制将任何 streaming 消息标记为 completed
+                _isLoading.value = false
+                eventDispatcher.markSessionIdle(sessionId)
+            }
+        }
+        // 失败时静默处理：保留当前 UI 状态，依靠后续 SSE 事件修正
+    }
+}
+```
+
+#### F4c. ChatScreen 中触发
+
+**文件**: `ChatScreen.kt`
+
+```kotlin
+// 进入会话时修正状态
+LaunchedEffect(sessionId) {
+    if (sessionId.isNotBlank()) {
+        viewModel.syncSessionStatus()
+    }
+}
+
+// 从后台恢复时修正状态
+DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+        if (event == Lifecycle.Event.ON_RESUME) {
+            viewModel.syncSessionStatus()
+        }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+}
+```
+
+#### F4d. EventDispatcher 中新增 markSessionIdle
+
+**文件**: `chat/network/EventDispatcher.kt`
+
+```kotlin
+/** 强制将指定会话的所有 streaming 消息标记为已完成 */
+fun markSessionIdle(sessionId: String) {
+    // 更新该会话下所有未完成的 Message 的 completed timestamp
+    val updatedMessages = _messages.value.map { (id, msg) ->
+        if (id.startsWith(sessionId) && msg is Message.Assistant && msg.completed == null) {
+            id to msg.copy(completed = System.currentTimeMillis())
+        } else {
+            id to msg
+        }
+    }.toMap()
+    _messages.value = updatedMessages
+
+    // 更新会话状态为 idle
+    _sessionStatuses.value = _sessionStatuses.value + (sessionId to SessionStatus.Idle)
+}
+```
+
+### F5. 与现有 SSE 系统的关系
+
+```
+正常路径（SSE 在线）：
+  SSE session.status 事件 → EventDispatcher → ChatViewModel → UI 实时更新
+  无需额外的 /session/status 查询
+
+异常路径（SSE 断连后）：
+  APP 恢复/进入会话 → syncSessionStatus()
+    → GET /session/status → 查到 idle → markSessionIdle() → UI 修正
+    → GET /session/status → 查到 busy → 继续等待 SSE 事件
+    → GET /session/status → 失败 → 静默处理，不恶化 UI
+
+设计原则：REST 查询是 SSE 的兜底，不是替代。
+          仅在“可能错过事件”的时机（进入会话、从后台恢复）触发。
+          不引入轮询（不做定时查询）。
+```
+
+### F6. 竞态条件分析
+
+```
+竞态场景：syncSessionStatus 和 SSE session.status 事件同时到达
+
+时序 A（安全）：
+  syncSessionStatus 先返回 → markSessionIdle → 清除了 streaming 标记
+  → SSE 事件后到达 → status=idle → 无变化（幂等）
+
+时序 B（安全）：
+  SSE 事件先到达 → status=idle → UI 更新为完成
+  → syncSessionStatus 后返回 → status=idle → markSessionIdle → 无变化（幂等）
+
+时序 C（安全）：
+  SSE 事件到达 → status=busy → UI 显示思考中
+  → syncSessionStatus 返回 → status=busy → 不操作
+  → SSE 后续 session.idle 事件 → UI 更新为完成
+
+结论：所有时序都是安全的。syncSessionStatus 和 SSE 事件互不干扰。
+```
+
+
 
 | 文件 | 改动类型 | 涉及设计 |
 |------|----------|----------|
@@ -903,7 +1080,10 @@ Queued (用户消息等待发送)
 | `chat/tools/cards/TaskToolCard.kt` | 更新调用名 + padding 调整 | B2, C7 |
 | `chat/components/AssistantMessageCard.kt` | 新增参数 + Footer 逻辑变更 | D2, D3 |
 | `chat/components/ReasoningBlock.kt` | 更新调用名 + padding 调整 | B2, C8 |
-| `chat/ChatScreen.kt` | Dialog 状态 + turn 分组 + 调用变更 | A3, D4, D5, C9 |
+| `chat/ChatScreen.kt` | Dialog 状态 + turn 分组 + 调用变更 + 会话状态修正 | A3, D4, D5, C9, F |
+| `chat/ChatViewModel.kt` | 进入会话时 + onResume 时查询 session/status | F |
+| `chat/network/OpenCodeApi.kt` | 新增 fetchSessionStatus API 方法 | F |
+| `chat/network/SseConnectionManager.kt` | 确保 session.status/session.idle 事件处理 | F |
 | `docs/chat-ui-event-lifecycle.md` | **新建** | E |
 
 ---
@@ -934,6 +1114,12 @@ Queued (用户消息等待发送)
 
 5. **间距**: 视觉检查工具卡片展开/折叠态的间距
    - 验证：各卡片的 padding/spacing 值与设计 C1-C8 中的精确数值表一致（如 ToolCallCard 外层 Column padding 应为 4.dp）
+
+6. **会话状态修正**: 模拟会话在"busy"状态下进入
+   - 验证：进入会话后自动查询 session/status
+   - 验证：若 status.type = "idle"，清除"思考中"状态
+   - 验证：若 status.type = "busy"，保持"思考中"并继续监听 SSE
+   - 验证：若 SSE 断连后恢复，状态通过 SSE 事件自动更新
 
 ### 单元测试补充
 
