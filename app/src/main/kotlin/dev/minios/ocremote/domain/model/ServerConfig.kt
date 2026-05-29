@@ -45,6 +45,7 @@ data class ServerConfig(
  */
 @Serializable
 data class ServerHealth(
-    val healthy: Boolean,
-    val version: String? = null
+    val healthy: Boolean = false,
+    val version: String? = null,
+    val uptime: Long? = null
 )
