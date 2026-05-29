@@ -1,8 +1,8 @@
 # Chat UI 交互修复设计文档
 
 > 日期: 2026-05-30
-> 范围: 对话界面滚动竞态、复制偏差、卡片间距、统计时机、会话状态修正、事件生命周期文档
-> 影响文件: 15 Kotlin 源文件（13 修改 + 2 新建）
+> 范围: 对话界面滚动竞态、复制偏差、卡片间距、统计时机、会话状态修正、SSE 中文乱码、事件生命周期文档
+> 影响文件: 16 Kotlin 源文件（14 修改 + 2 新建）
 > 环境要求: Kotlin 1.9.x / Compose UI 1.7.x / AGP 8.7.x / minSdk 26 / compileSdk 35
 
 ---
@@ -21,6 +21,7 @@
 - [设计 D：统计信息时机修正](#设计-d统计信息时机修正)
 - [设计 E：事件生命周期文档](#设计-e事件生命周期文档)
 - [设计 F：会话状态修正 — 进入会话时修正离线偏差](#设计-f会话状态修正--进入会话时修正离线偏差)
+- [设计 G：SSE 流式中文乱码修复 — UTF-8 多字节边界解码](#设计-gsse-流式中文乱码修复--utf-8-多字节边界解码)
 - [改动文件汇总](#改动文件汇总)
 - [测试要点](#测试要点)
 
@@ -35,6 +36,7 @@
 | 3 | 工具卡片上下左右边距过大 | 各卡片 padding 值统一偏大 | 低 |
 | 4 | 统计信息逐条显示，应在 agent 整次回答结束后只在最后一条汇总 | AssistantMessageCard 对每条 Assistant 消息独立聚合 stepFinishes 显示 Footer | 中 |
 | 5 | 进入会话时显示"思考中"但实际已停止输出 | SSE 断连/APP 被后台杀死后重连时，UI 状态未同步 OpenCode Server 的实际会话状态 | 中 |
+| 6 | 流式输出中文偶尔出现乱码（�） | SseClient.kt 逐行 UTF-8 解码：当 TCP chunk 边界切开多字节中文字符时，不完整字节被替换为 U+FFFD | 中 |
 
 ---
 
@@ -1085,10 +1087,178 @@ fun markSessionIdle(sessionId: String) {
 | `chat/network/OpenCodeApi.kt` | 新增 fetchSessionStatus API 方法 | F |
 | `chat/network/SseConnectionManager.kt` | 确保 session.status/session.idle 事件处理 | F |
 | `docs/chat-ui-event-lifecycle.md` | **新建** | E |
+| `data/api/SseClient.kt` | 基于字节的 SSE 解析（方案 A） | G |
 
 ---
 
-## 测试要点
+## 设计 G：SSE 流式中文乱码修复 — UTF-8 多字节边界解码
+
+### G1. 问题描述
+
+```
+场景：
+1. agent 正在流式输出中文文本（如"怎么样了"）
+2. SSE server 通过 TCP/HTTP 发送 data: 行
+3. 中文"了"的 UTF-8 编码为 3 字节: E4 BA 86
+4. TCP 分块边界恰好切在 E4 BA 和 86 之间
+5. SseClient 逐行解码 UTF-8 → E4 BA 是不完整序列 → 被替换为 U+FFFD (�)
+
+现象：对话中偶尔出现 �，单独打字则不会（因为完整字符不会被切分）
+```
+
+### G2. 根因分析
+
+**文件**: `data/api/SseClient.kt` L75-107
+
+```kotlin
+// 当前代码 — 逐行 UTF-8 解码（问题所在）
+while (!channel.isClosedForRead) {
+    val line = channel.readUTF8Line() ?: break           // ← L81: 逐行解码
+    // ... data 行拼接 ...
+    buffer += line.substring(6)                           // ← L103: 字符串拼接
+}
+```
+
+**故障链路**:
+
+```
+服务器发送: data: {"delta":"怎么样E4 BA 86"}\n\n  (了 = E4 BA 86)
+
+TCP 分块:
+  ┌─ Chunk 1 ─────────────────────┐
+  │ data: {"delta":"怎么样\xe4\xba\n │  ← readUTF8Line() 在此行遇到 \n
+  └────────────────────────────────┘
+        │
+        ▼ 逐行UTF-8解码: \xe4\xba 是不完整3字节序列
+        │                 → 替换为 U+FFFD (�)
+        │
+  ┌─ Chunk 2 ─────────────────────┐
+  │ \x86"}\n\n                      │  ← \x86 是孤立字节，也被替换为 �
+  └────────────────────────────────┘
+
+结果: delta = "怎么样��"  → 两个乱码字符
+```
+
+**为什么间歇性发生**:
+- 依赖 TCP/HTTP 分块边界的时机（不可控）
+- 只有多字节字符（中文∈3字节，emoji∈4字节）受影响
+- 单字节 ASCII 字符不受影响
+- 网络延迟、缓冲大小等微小因素决定是否触发
+
+### G3. 解决方案：基于字节的 SSE 解析（方案 A）
+
+**核心思想**: 不逐行解码 UTF-8，而是先将原始字节累积到完整 SSE 事件边界（空白行），再一次性解码整个 event buffer。
+
+**文件**: `data/api/SseClient.kt`
+
+**改动**:
+
+```kotlin
+// 改前（逐行UTF-8解码）
+while (!channel.isClosedForRead) {
+    val line = channel.readUTF8Line() ?: break  // 逐行解码
+    if (line.isEmpty() && buffer.isNotEmpty()) {
+        val event = parseEvent(buffer)
+        // ...
+    } else if (line.startsWith("data:")) {
+        buffer += line.removePrefix("data:").removePrefix(" ")
+    }
+}
+
+// 改后（基于字节累积，在完整事件边界解码）
+// 注意：需 import io.ktor.utils.io.core.*
+while (!channel.isClosedForRead) {
+    // 读取原始字节直到 \n（不做 UTF-8 解码）
+    val lineBytes = readRawLineBytes(channel) ?: break
+
+    if (lineBytes.isEmpty()) {
+        // 空白行 = SSE 事件结束 → 解码整个 buffer
+        if (buffer.isNotEmpty()) {
+            val data = buildStringFromBytes(buffer)
+            try {
+                val event = parseEvent(data)
+                // ... emit(event)
+            } catch (e: Exception) { Log.e(TAG, "Parse error", e) }
+            buffer.clear()
+        }
+    } else if (startsWithDataPrefix(lineBytes)) {
+        // 提取 "data: " 或 "data:" 之后的内容（原始字节）
+        buffer.add(lineBytes, offset = dataOffset(lineBytes))
+    }
+}
+
+// 辅助函数
+private fun readRawLineBytes(channel: ByteReadChannel): List<Byte>? {
+    val result = mutableListOf<Byte>()
+    while (!channel.isClosedForRead) {
+        val byte = channel.readByte()
+        if (byte == '\n'.code.toByte()) break  // 到达行尾
+        result.add(byte)
+    }
+    if (channel.isClosedForRead && result.isEmpty()) return null
+    return result
+}
+
+private fun buildStringFromBytes(buffer: List<List<Byte>>): String {
+    val totalSize = buffer.sumOf { it.size }
+    val array = ByteArray(totalSize)
+    var offset = 0
+    for (chunk in buffer) {
+        System.arraycopy(chunk.toByteArray(), 0, array, offset, chunk.size)
+        offset += chunk.size
+    }
+    return array.toString(Charsets.UTF_8)  // 在完整字节序列上解码
+}
+```
+
+**工作原理**:
+
+```
+服务器发送: data: {"delta":"怎么样E4 BA 86"}\n\n
+
+TCP 分块:
+  ┌─ Chunk 1 ─────────────────────────────────────┐
+  │ data: {"delta":"怎么样\xe4\xba\n                 │
+  └────────────────────────────────────────────────┘
+        │ readRawLineBytes() → [d,a,t,a,:, ,{,",d,e,l,t,a,",:,",怎,么,样,0xE4,0xBA]
+        │ （不进行UTF-8解码！直接存储原始字节）
+        │ buffer.add([0xE4, 0xBA])
+        
+  ┌─ Chunk 2 ─────────────────────────────────────┐
+  │ \x86"}\n                                        │
+  │ \n                                              │  ← 空白行：event 结束！
+  └────────────────────────────────────────────────┘
+        │ readRawLineBytes() → [0x86,",}]
+        │ buffer.add([0x86,",}])
+        │
+        │ 下一行是空白行 → event结束
+        │
+        ▼ buildStringFromBytes(buffer)
+          → 完整字节: [0xE4, 0xBA, 0x86, ",}]
+          → UTF-8解码: "了"}  ← 正确！
+          
+结果: delta = "怎么样了"  ← 无乱码
+```
+
+**优势**:
+- 根治问题：只在完整的 UTF-8 字节序列上解码
+- 向后兼容：`parseEvent()` 的输入不变（始终是完整字符串）
+- 无性能损失：仅在 SSE event 边界做一次 UTF-8 解码（原来也是逐行解码，总解码次数不变）
+- 仅改动一个文件（`SseClient.kt`）
+
+### G4. 竞态条件分析
+
+修复后的 SSE 解析不存在新的竞态条件：
+
+```
+SSE 事件累积过程:
+  1. readRawLineBytes → 原始字节列表
+  2. buffer += 原始字节（线程1: SSE 读取协程）
+  3. 遇到空白行 → buildStringFromBytes + parseEvent + emit(event)
+  4. 事件通过 Channel 发送 → EventDispatcher 在视图协程中消费
+
+由于 SseClient 内部是单协程顺序处理（while 循环），不会出现多线程写入 buffer 的竞态。
+```
 
 ### 手动测试场景
 
@@ -1120,6 +1290,11 @@ fun markSessionIdle(sessionId: String) {
    - 验证：若 status.type = "idle"，清除"思考中"状态
    - 验证：若 status.type = "busy"，保持"思考中"并继续监听 SSE
    - 验证：若 SSE 断连后恢复，状态通过 SSE 事件自动更新
+
+7. **中文乱码修复**: 触发多次包含中文的 agent 回答
+   - 验证：流式输出过程中无 � 问号出现
+   - 验证：任意位置的中文字符完整显示
+   - 验证：emoji（4字节 UTF-8）也正常显示
 
 ### 单元测试补充
 
