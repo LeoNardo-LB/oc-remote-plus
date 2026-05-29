@@ -1,0 +1,97 @@
+package dev.minios.ocremote.ui.screens.settings.components
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import dev.minios.ocremote.R
+import java.util.Locale
+
+@Composable
+internal fun getThemeDisplayName(theme: String): String {
+    return when (theme) {
+        "system" -> stringResource(R.string.settings_theme_system)
+        "light" -> stringResource(R.string.settings_theme_light)
+        "dark" -> stringResource(R.string.settings_theme_dark)
+        else -> theme
+    }
+}
+
+@Composable
+internal fun getFontSizeDisplayName(size: String): String {
+    return when (size) {
+        "small" -> stringResource(R.string.settings_font_size_small)
+        "medium" -> stringResource(R.string.settings_font_size_medium)
+        "large" -> stringResource(R.string.settings_font_size_large)
+        else -> size
+    }
+}
+
+@Composable
+internal fun getLanguageDisplayName(code: String): String {
+    val systemDefault = stringResource(R.string.settings_language_system)
+
+    if (code.isEmpty()) return systemDefault
+
+    // Parse the language tag and get native display name
+    val locale = if (code.contains("-")) {
+        val parts = code.split("-")
+        if (parts.size >= 2) {
+            Locale(parts[0], parts[1].uppercase())
+        } else {
+            Locale(parts[0])
+        }
+    } else {
+        Locale(code)
+    }
+
+    return locale.getDisplayName(locale).replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(locale) else it.toString()
+    }
+}
+
+@Composable
+internal fun getReconnectModeDisplayName(mode: String): String {
+    return when (mode) {
+        "aggressive" -> stringResource(R.string.settings_reconnect_aggressive)
+        "normal" -> stringResource(R.string.settings_reconnect_normal)
+        "conservative" -> stringResource(R.string.settings_reconnect_conservative)
+        else -> mode
+    }
+}
+
+@Composable
+internal fun getImageMaxSideDisplayName(px: Int): String {
+    if (px <= 0) {
+        return stringResource(R.string.settings_compress_images_max_side_keep_original)
+    }
+    return stringResource(R.string.settings_compress_images_max_side_value, px)
+}
+
+@Composable
+internal fun amoledDialogModifier(): Modifier {
+    val isAmoledTheme = MaterialTheme.colorScheme.background == Color.Black &&
+        MaterialTheme.colorScheme.surface == Color.Black
+    return if (isAmoledTheme) {
+        Modifier.border(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f),
+            shape = RoundedCornerShape(28.dp),
+        )
+    } else {
+        Modifier
+    }
+}
+
+@Composable
+internal fun amoledDialogContainerColor(): Color {
+    val isAmoledTheme = MaterialTheme.colorScheme.background == Color.Black &&
+        MaterialTheme.colorScheme.surface == Color.Black
+    return if (isAmoledTheme) Color.Black else AlertDialogDefaults.containerColor
+}

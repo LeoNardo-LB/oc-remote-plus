@@ -38,7 +38,7 @@ import dev.minios.ocremote.ui.screens.chat.ChatScreen
 import dev.minios.ocremote.ui.screens.home.HomeRoute
 import dev.minios.ocremote.ui.screens.about.AboutScreen
 import dev.minios.ocremote.ui.screens.sessions.SessionListRoute
-import dev.minios.ocremote.ui.screens.settings.SettingsScreen
+import dev.minios.ocremote.ui.screens.settings.SettingsRoute
 import dev.minios.ocremote.ui.screens.server.ServerModelFilterScreen
 import dev.minios.ocremote.ui.screens.server.ServerProvidersScreen
 import dev.minios.ocremote.ui.screens.server.ServerSettingsScreen
@@ -259,7 +259,7 @@ fun NavGraph(
         
         // ============ Settings Screen ============
         composable(Screen.Settings.route) {
-            SettingsScreen(
+            SettingsRoute(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

@@ -3,378 +3,192 @@ package dev.minios.ocremote.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.data.repository.LocalServerManager
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.domain.model.AppSettings
+import dev.minios.ocremote.domain.usecase.GetSettingsFlowUseCase
+import dev.minios.ocremote.domain.usecase.UpdateSettingsUseCase
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val getSettingsFlowUseCase: GetSettingsFlowUseCase,
+    private val updateSettingsUseCase: UpdateSettingsUseCase
 ) : ViewModel() {
-    
-    val appLanguage = settingsRepository.appLanguage.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = ""
-    )
 
-    val appTheme = settingsRepository.appTheme.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "system"
-    )
+    val settings: StateFlow<AppSettings> = getSettingsFlowUseCase()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppSettings())
 
-    val dynamicColor = settingsRepository.dynamicColor.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
+    // --- Convenience properties (mapped from aggregated settings flow) ---
 
-    val chatFontSize = settingsRepository.chatFontSize.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "medium"
-    )
+    val appLanguage = settings.map { it.appLanguage }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val appTheme = settings.map { it.appTheme }.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
+    val dynamicColor = settings.map { it.dynamicColor }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val chatFontSize = settings.map { it.chatFontSize }.stateIn(viewModelScope, SharingStarted.Eagerly, "medium")
+    val notificationsEnabled = settings.map { it.notificationsEnabled }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val initialMessageCount = settings.map { it.initialMessageCount }.stateIn(viewModelScope, SharingStarted.Eagerly, 50)
+    val codeWordWrap = settings.map { it.codeWordWrap }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val confirmBeforeSend = settings.map { it.confirmBeforeSend }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val amoledDark = settings.map { it.amoledDark }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val compactMessages = settings.map { it.compactMessages }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val collapseTools = settings.map { it.collapseTools }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val expandReasoning = settings.map { it.expandReasoning }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val hapticFeedback = settings.map { it.hapticFeedback }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val reconnectMode = settings.map { it.reconnectMode }.stateIn(viewModelScope, SharingStarted.Eagerly, "normal")
+    val keepScreenOn = settings.map { it.keepScreenOn }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val compressImageAttachments = settings.map { it.compressImageAttachments }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val imageAttachmentMaxLongSide = settings.map { it.imageAttachmentMaxLongSide }.stateIn(viewModelScope, SharingStarted.Eagerly, 1440)
+    val imageAttachmentWebpQuality = settings.map { it.imageAttachmentWebpQuality }.stateIn(viewModelScope, SharingStarted.Eagerly, 60)
+    val showLocalRuntime = settings.map { it.showLocalRuntime }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val silentNotifications = settings.map { it.silentNotifications }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val terminalFontSize = settings.map { it.terminalFontSize }.stateIn(viewModelScope, SharingStarted.Eagerly, 13f)
+    val localProxyEnabled = settings.map { it.localProxyEnabled }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val localProxyUrl = settings.map { it.localProxyUrl }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val localProxyNoProxy = settings.map { it.localProxyNoProxy }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val localServerAllowLan = settings.map { it.localServerAllowLan }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val localServerUsername = settings.map { it.localServerUsername }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val localServerPassword = settings.map { it.localServerPassword }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val localServerRunInBackground = settings.map { it.localServerRunInBackground }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val localServerAutoStart = settings.map { it.localServerAutoStart }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val localServerStartupTimeoutSec = settings.map { it.localServerStartupTimeoutSec }.stateIn(viewModelScope, SharingStarted.Eagerly, 30)
 
-    val notificationsEnabled = settingsRepository.notificationsEnabled.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
-
-    val initialMessageCount = settingsRepository.initialMessageCount.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 50
-    )
-
-    val codeWordWrap = settingsRepository.codeWordWrap.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val confirmBeforeSend = settingsRepository.confirmBeforeSend.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val amoledDark = settingsRepository.amoledDark.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val compactMessages = settingsRepository.compactMessages.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val collapseTools = settingsRepository.collapseTools.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val expandReasoning = settingsRepository.expandReasoning.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val hapticFeedback = settingsRepository.hapticFeedback.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
-
-    val reconnectMode = settingsRepository.reconnectMode.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "normal"
-    )
-
-    val keepScreenOn = settingsRepository.keepScreenOn.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val compressImageAttachments = settingsRepository.compressImageAttachments.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
-
-    val imageAttachmentMaxLongSide = settingsRepository.imageAttachmentMaxLongSide.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 1440
-    )
-
-    val imageAttachmentWebpQuality = settingsRepository.imageAttachmentWebpQuality.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 60
-    )
-
-    val showLocalRuntime = settingsRepository.showLocalRuntime.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
-
-    val silentNotifications = settingsRepository.silentNotifications.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val terminalFontSize = settingsRepository.terminalFontSize.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 13f
-    )
-
-    val localProxyEnabled = settingsRepository.localProxyEnabled.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false,
-    )
-
-    val localProxyUrl = settingsRepository.localProxyUrl.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "",
-    )
-
-    val localProxyNoProxy = settingsRepository.localProxyNoProxy.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = LocalServerManager.DEFAULT_NO_PROXY_LIST,
-    )
-
-    val localServerAllowLan = settingsRepository.localServerAllowLan.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false,
-    )
-
-    val localServerUsername = settingsRepository.localServerUsername.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "",
-    )
-
-    val localServerPassword = settingsRepository.localServerPassword.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "",
-    )
-
-    val localServerRunInBackground = settingsRepository.localServerRunInBackground.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true,
-    )
-
-    val localServerAutoStart = settingsRepository.localServerAutoStart.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false,
-    )
-
-    val localServerStartupTimeoutSec = settingsRepository.localServerStartupTimeoutSec.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 30,
-    )
+    // --- Setters ---
 
     fun setLanguage(languageCode: String) {
-        viewModelScope.launch {
-            settingsRepository.setAppLanguage(languageCode)
-        }
+        updateSetting { it.copy(appLanguage = languageCode) }
     }
 
     fun setTheme(theme: String) {
-        viewModelScope.launch {
-            settingsRepository.setAppTheme(theme)
-        }
+        updateSetting { it.copy(appTheme = theme) }
     }
 
     fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setDynamicColor(enabled)
-        }
+        updateSetting { it.copy(dynamicColor = enabled) }
     }
 
     fun setChatFontSize(size: String) {
-        viewModelScope.launch {
-            settingsRepository.setChatFontSize(size)
-        }
+        updateSetting { it.copy(chatFontSize = size) }
     }
 
     fun setNotificationsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setNotificationsEnabled(enabled)
-        }
+        updateSetting { it.copy(notificationsEnabled = enabled) }
     }
 
     fun setInitialMessageCount(count: Int) {
-        viewModelScope.launch {
-            settingsRepository.setInitialMessageCount(count)
-        }
+        updateSetting { it.copy(initialMessageCount = count) }
     }
 
     fun setCodeWordWrap(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setCodeWordWrap(enabled)
-        }
+        updateSetting { it.copy(codeWordWrap = enabled) }
     }
 
     fun setConfirmBeforeSend(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setConfirmBeforeSend(enabled)
-        }
+        updateSetting { it.copy(confirmBeforeSend = enabled) }
     }
 
     fun setAmoledDark(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setAmoledDark(enabled)
-        }
+        updateSetting { it.copy(amoledDark = enabled) }
     }
 
     fun setCompactMessages(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setCompactMessages(enabled)
-        }
+        updateSetting { it.copy(compactMessages = enabled) }
     }
 
     fun setCollapseTools(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setCollapseTools(enabled)
-        }
+        updateSetting { it.copy(collapseTools = enabled) }
     }
 
     fun setExpandReasoning(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setExpandReasoning(enabled)
-        }
+        updateSetting { it.copy(expandReasoning = enabled) }
     }
 
     fun setHapticFeedback(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setHapticFeedback(enabled)
-        }
+        updateSetting { it.copy(hapticFeedback = enabled) }
     }
 
     fun setReconnectMode(mode: String) {
-        viewModelScope.launch {
-            settingsRepository.setReconnectMode(mode)
-        }
+        updateSetting { it.copy(reconnectMode = mode) }
     }
 
     fun setKeepScreenOn(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setKeepScreenOn(enabled)
-        }
+        updateSetting { it.copy(keepScreenOn = enabled) }
     }
 
     fun setSilentNotifications(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setSilentNotifications(enabled)
-        }
+        updateSetting { it.copy(silentNotifications = enabled) }
     }
 
     fun setCompressImageAttachments(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setCompressImageAttachments(enabled)
-        }
+        updateSetting { it.copy(compressImageAttachments = enabled) }
     }
 
     fun setImageAttachmentMaxLongSide(px: Int) {
-        viewModelScope.launch {
-            settingsRepository.setImageAttachmentMaxLongSide(px)
-        }
+        updateSetting { it.copy(imageAttachmentMaxLongSide = px) }
     }
 
     fun setImageAttachmentWebpQuality(quality: Int) {
-        viewModelScope.launch {
-            settingsRepository.setImageAttachmentWebpQuality(quality)
-        }
+        updateSetting { it.copy(imageAttachmentWebpQuality = quality) }
     }
 
     fun setShowLocalRuntime(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setShowLocalRuntime(enabled)
-        }
+        updateSetting { it.copy(showLocalRuntime = enabled) }
     }
 
     fun setTerminalFontSize(size: Float) {
-        viewModelScope.launch {
-            settingsRepository.setTerminalFontSize(size)
-        }
+        updateSetting { it.copy(terminalFontSize = size) }
     }
 
     fun setLocalProxyEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setLocalProxyEnabled(enabled)
-        }
+        updateSetting { it.copy(localProxyEnabled = enabled) }
     }
 
     fun setLocalProxyUrl(url: String) {
-        viewModelScope.launch {
-            settingsRepository.setLocalProxyUrl(url)
-        }
+        updateSetting { it.copy(localProxyUrl = url) }
     }
 
     fun setLocalProxyNoProxy(value: String) {
-        viewModelScope.launch {
-            settingsRepository.setLocalProxyNoProxy(value)
-        }
+        updateSetting { it.copy(localProxyNoProxy = value) }
     }
 
     fun setLocalServerAllowLan(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setLocalServerAllowLan(enabled)
-        }
+        updateSetting { it.copy(localServerAllowLan = enabled) }
     }
 
     fun setLocalServerUsername(value: String) {
-        viewModelScope.launch {
-            settingsRepository.setLocalServerUsername(value)
-        }
+        updateSetting { it.copy(localServerUsername = value) }
     }
 
     fun setLocalServerPassword(value: String) {
-        viewModelScope.launch {
-            settingsRepository.setLocalServerPassword(value)
-        }
+        updateSetting { it.copy(localServerPassword = value) }
     }
 
     fun setLocalServerRunInBackground(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setLocalServerRunInBackground(enabled)
+            val current = settings.value
+            val updated = current.copy(localServerRunInBackground = enabled)
             if (!enabled) {
-                settingsRepository.setLocalServerAutoStart(false)
+                updateSettingsUseCase(updated.copy(localServerAutoStart = false))
+            } else {
+                updateSettingsUseCase(updated)
             }
         }
     }
 
     fun setLocalServerAutoStart(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setLocalServerAutoStart(enabled)
-        }
+        updateSetting { it.copy(localServerAutoStart = enabled) }
     }
 
     fun setLocalServerStartupTimeoutSec(value: Int) {
+        updateSetting { it.copy(localServerStartupTimeoutSec = value) }
+    }
+
+    private fun updateSetting(transform: (AppSettings) -> AppSettings) {
         viewModelScope.launch {
-            settingsRepository.setLocalServerStartupTimeoutSec(value)
+            val current = settings.value
+            updateSettingsUseCase(transform(current))
         }
     }
 }
