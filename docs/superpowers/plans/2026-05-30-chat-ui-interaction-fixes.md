@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin, Jetpack Compose, mikepenz/multiplatform-markdown-renderer v0.30.0, OpenCode Serve API, Hilt, JUnit 4
 
-**执行顺序:** B+C（滚动+间距，同文件一起做）→ A（SelectionContainer+弹窗）→ D（统计时机）→ F（会话状态）→ E（文档，最后）
+**执行顺序:** B+C（滚动+间距，同文件一起做）→ A（SelectionContainer+弹窗）→ D（统计时机）→ F（会话状态）→ G（SSE中文乱码）→ E（文档，最后）
 
 ---
 
@@ -36,6 +36,7 @@
 | Create | `docs/chat-ui-event-lifecycle.md` | E |
 | Create | `test/.../chat/util/ChatModifiersTest.kt` | B1 |
 | Create | `test/.../chat/util/TurnGroupCalculatorTest.kt` | D4 |
+| Modify | `data/api/SseClient.kt` | G |
 
 所有源文件路径相对于 `app/src/main/kotlin/dev/minios/ocremote/`。
 所有测试文件路径相对于 `app/src/test/kotlin/dev/minios/ocremote/`。
@@ -2119,9 +2120,140 @@ Design E. Refs: #2026-05-30-chat-ui-interaction-fixes"
 
 ---
 
+## Phase 5.5: SSE 中文乱码修复 (G)
+
+### Task 21: SseClient 基于字节的 SSE 解析
+
+**Files:**
+- Modify: `data/api/SseClient.kt`: L75-L107
+
+**Goal**: 将逐行 UTF-8 解码改为基于字节累积 → 完整 event 边界解码。
+
+- [ ] **Step 1: 新增辅助方法 readRawLineBytes 和 buildStringFromBytes**
+
+在 `SseClient.kt` 中新增两个私有辅助函数：
+
+```kotlin
+/**
+ * 读取原始字节直到遇到 \n，不做 UTF-8 解码。
+ * 返回 null 表示 channel 已关闭且无更多数据。
+ */
+private suspend fun ByteReadChannel.readRawLineBytes(): List<Byte>? {
+    val result = mutableListOf<Byte>()
+    try {
+        while (true) {
+            val b = readByte()
+            if (b == '\n'.code.toByte()) break
+            result.add(b)
+        }
+    } catch (e: ClosedReceiveChannelException) {
+        if (result.isEmpty()) return null
+    }
+    return result
+}
+
+/**
+ * 将 byte 块列表拼接为完整字节数组，然后一次性 UTF-8 解码。
+ */
+private fun buildStringFromBytes(chunks: List<List<Byte>>): String {
+    val totalSize = chunks.sumOf { it.size }
+    if (totalSize == 0) return ""
+    val array = ByteArray(totalSize)
+    var pos = 0
+    for (chunk in chunks) {
+        for (b in chunk) {
+            array[pos++] = b
+        }
+    }
+    return array.toString(Charsets.UTF_8)
+}
+```
+
+- [ ] **Step 2: 重写 SSE 解析主循环**
+
+将 `readUTF8Line()` 替换为 `readRawLineBytes()`，并在空白行处解码整个 buffer：
+
+```kotlin
+// 改前 (L75-L107):
+val line = channel.readUTF8Line() ?: break
+// ... line.isEmpty(), line.startsWith("data:") ...
+
+// 改后:
+val lineBytes = channel.readRawLineBytes() ?: break
+
+if (lineBytes.isEmpty()) {
+    // 空白行 = SSE event 边界 → 解码整个 buffer
+    val data = buildStringFromBytes(buffer)
+    if (data.isNotEmpty()) {
+        try {
+            val event = parseEvent(data)
+            if (event != null) {
+                emit(event)
+                eventCount++
+                lastHeartbeat = System.currentTimeMillis()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse SSE event", e)
+        }
+        buffer.clear()
+    }
+} else {
+    // data: 行 → 提取 payload 的原始字节
+    val prefix = "data:".encodeToByteArray()
+    var start = 0
+    // 跳过 "data:" 前缀
+    if (lineBytes.size >= prefix.size && 
+        lineBytes.subList(0, prefix.size) == prefix.toList()) {
+        start = prefix.size
+        if (start < lineBytes.size && lineBytes[start] == ' '.code.toByte()) {
+            start++  // 跳过 "data: " 中的空格
+        }
+    }
+    if (start < lineBytes.size) {
+        buffer.add(lineBytes.subList(start, lineBytes.size))
+    }
+}
+```
+
+**注意**: 需要将 `buffer` 的类型从 `String` 改为 `MutableList<List<Byte>>`：
+```kotlin
+// 改前
+var buffer = ""
+
+// 改后
+val buffer = mutableListOf<List<Byte>>()
+```
+
+- [ ] **Step 3: 验证编译通过**
+
+```bash
+cd D:\Develop\code\app\oc-remote; .\gradlew :app:compileDevDebugKotlin
+```
+Expected: BUILD SUCCESSFUL
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add data/api/SseClient.kt
+git commit -m "fix: prevent SSE streaming Chinese character corruption
+
+Replace line-by-line readUTF8Line() decoding with raw byte buffering.
+U+FFFD (�) was caused by TCP chunk boundary splitting a multi-byte
+UTF-8 sequence across lines — the partial bytes were silently replaced
+by the UTF-8 decoder's REPLACE action.
+
+Now bytes accumulate until a blank line (SSE event boundary), then the
+entire buffer is decoded as UTF-8. Multi-byte characters are always
+reassembled correctly regardless of TCP chunk boundaries.
+
+Design G. Refs: #2026-05-30-chat-ui-interaction-fixes"
+```
+
+---
+
 ## Phase 6: 回归测试
 
-### Task 21: 运行全量单元测试回归
+### Task 22: 运行全量单元测试回归
 
 **Files:**
 - 无文件变更
