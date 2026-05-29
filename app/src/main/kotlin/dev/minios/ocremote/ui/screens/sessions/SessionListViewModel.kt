@@ -13,6 +13,7 @@ import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
+import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -65,7 +66,8 @@ data class SessionItem(
 class SessionListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val eventDispatcher: EventDispatcher,
-    private val api: OpenCodeApi
+    private val api: OpenCodeApi,
+    private val manageSessionUseCase: ManageSessionUseCase
 ) : ViewModel() {
 
     val serverUrl: String = URLDecoder.decode(
@@ -238,7 +240,7 @@ class SessionListViewModel @Inject constructor(
     fun createNewSession(directory: String? = null) {
         viewModelScope.launch {
             try {
-                val session = api.createSession(conn, directory = directory)
+                val session = manageSessionUseCase.createSession(conn, directory = directory)
                 // The SSE stream should pick up the new session, but also add directly
                 eventDispatcher.setSessions(serverId, listOf(session))
                 if (BuildConfig.DEBUG) Log.d(TAG, "Created new session: ${session.id}")
@@ -312,7 +314,7 @@ class SessionListViewModel @Inject constructor(
     fun renameSession(sessionId: String, newTitle: String) {
         viewModelScope.launch {
             try {
-                api.updateSession(conn, sessionId, newTitle)
+                manageSessionUseCase.renameSession(conn, sessionId, newTitle)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Renamed session $sessionId to '$newTitle'")
                 loadSessions()
             } catch (e: Exception) {

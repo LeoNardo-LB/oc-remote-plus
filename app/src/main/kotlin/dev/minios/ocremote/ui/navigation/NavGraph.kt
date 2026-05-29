@@ -37,7 +37,7 @@ import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.ui.screens.chat.ChatScreen
 import dev.minios.ocremote.ui.screens.home.HomeRoute
 import dev.minios.ocremote.ui.screens.about.AboutScreen
-import dev.minios.ocremote.ui.screens.sessions.SessionListScreen
+import dev.minios.ocremote.ui.screens.sessions.SessionListRoute
 import dev.minios.ocremote.ui.screens.settings.SettingsScreen
 import dev.minios.ocremote.ui.screens.server.ServerModelFilterScreen
 import dev.minios.ocremote.ui.screens.server.ServerProvidersScreen
@@ -430,7 +430,7 @@ fun NavGraph(
                 backStackEntry.arguments?.getString("serverId") ?: "", "UTF-8"
             )
 
-            SessionListScreen(
+            SessionListRoute(
                 onNavigateToChat = { sessionId, openTerminal ->
                     navController.navigate(
                         Screen.Chat.createRoute(
