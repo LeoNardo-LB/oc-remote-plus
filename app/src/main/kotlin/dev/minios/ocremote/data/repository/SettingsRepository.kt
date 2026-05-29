@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import dev.minios.ocremote.domain.model.AppSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -521,5 +522,45 @@ class SettingsRepository @Inject constructor(
                 current + key
             }
         }
+    }
+
+    /**
+     * Aggregate all settings into a single [AppSettings] flow.
+     * Reads atomically from DataStore preferences — avoids combining 30+ individual flows.
+     */
+    val appSettingsFlow: Flow<AppSettings> = dataStore.data.map { prefs ->
+        AppSettings(
+            appLanguage = prefs[LANGUAGE_KEY] ?: "",
+            appTheme = prefs[THEME_KEY] ?: "system",
+            dynamicColor = prefs[DYNAMIC_COLOR_KEY] ?: true,
+            amoledDark = prefs[AMOLED_DARK_KEY] ?: false,
+            chatFontSize = prefs[FONT_SIZE_KEY] ?: "medium",
+            initialMessageCount = prefs[INITIAL_MESSAGE_COUNT_KEY] ?: 30,
+            codeWordWrap = prefs[CODE_WORD_WRAP_KEY] ?: false,
+            confirmBeforeSend = prefs[CONFIRM_BEFORE_SEND_KEY] ?: false,
+            compactMessages = prefs[COMPACT_MESSAGES_KEY] ?: false,
+            collapseTools = prefs[COLLAPSE_TOOLS_KEY] ?: false,
+            expandReasoning = prefs[EXPAND_REASONING_KEY] ?: false,
+            notificationsEnabled = prefs[NOTIFICATIONS_KEY] ?: true,
+            silentNotifications = prefs[SILENT_NOTIFICATIONS_KEY] ?: false,
+            hapticFeedback = prefs[HAPTIC_FEEDBACK_KEY] ?: true,
+            reconnectMode = prefs[RECONNECT_MODE_KEY] ?: "normal",
+            keepScreenOn = prefs[KEEP_SCREEN_ON_KEY] ?: false,
+            compressImageAttachments = prefs[COMPRESS_IMAGE_ATTACHMENTS_KEY] ?: true,
+            imageAttachmentMaxLongSide = (prefs[IMAGE_ATTACHMENT_MAX_LONG_SIDE_KEY] ?: 1440).let { if (it <= 0) 0 else it.coerceIn(720, 4096) },
+            imageAttachmentWebpQuality = (prefs[IMAGE_ATTACHMENT_WEBP_QUALITY_KEY] ?: 60).coerceIn(1, 100),
+            terminalFontSize = (prefs[TERMINAL_FONT_SIZE_KEY] ?: 13f).coerceIn(6f, 20f),
+            showLocalRuntime = prefs[SHOW_LOCAL_RUNTIME_KEY] ?: true,
+            localSetupCompleted = prefs[LOCAL_SETUP_COMPLETED_KEY] ?: false,
+            localProxyEnabled = prefs[LOCAL_PROXY_ENABLED_KEY] ?: false,
+            localProxyUrl = prefs[LOCAL_PROXY_URL_KEY] ?: "",
+            localProxyNoProxy = prefs[LOCAL_PROXY_NO_PROXY_KEY] ?: LocalServerManager.DEFAULT_NO_PROXY_LIST,
+            localServerAllowLan = prefs[LOCAL_SERVER_ALLOW_LAN_KEY] ?: false,
+            localServerUsername = prefs[LOCAL_SERVER_USERNAME_KEY] ?: "",
+            localServerPassword = prefs[LOCAL_SERVER_PASSWORD_KEY] ?: "",
+            localServerRunInBackground = prefs[LOCAL_SERVER_RUN_IN_BACKGROUND_KEY] ?: true,
+            localServerAutoStart = prefs[LOCAL_SERVER_AUTO_START_KEY] ?: false,
+            localServerStartupTimeoutSec = (prefs[LOCAL_SERVER_STARTUP_TIMEOUT_SEC_KEY] ?: 30).coerceIn(10, 120)
+        )
     }
 }

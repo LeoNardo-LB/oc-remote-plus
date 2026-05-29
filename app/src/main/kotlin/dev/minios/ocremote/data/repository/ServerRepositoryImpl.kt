@@ -1,0 +1,179 @@
+package dev.minios.ocremote.data.repository
+
+import android.content.Context
+import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.domain.model.LocalServerState
+import dev.minios.ocremote.domain.model.ProviderInfo as DomainProviderInfo
+import dev.minios.ocremote.domain.model.ModelInfo
+import dev.minios.ocremote.domain.model.ServerConfig
+import dev.minios.ocremote.domain.repository.ServerRepository
+import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Implementation of [ServerRepository].
+ * Wraps the existing [data.repository.ServerRepository] (DataStore CRUD),
+ * [LocalServerManager] (Termux lifecycle), and [OpenCodeApi] (providers/config).
+ *
+ * Phase 3: compiled but not yet wired to UseCases. Phase 4 will migrate
+ * ViewModel direct calls to go through this repository.
+ */
+@Singleton
+class ServerRepositoryImpl @Inject constructor(
+    private val dataRepo: dev.minios.ocremote.data.repository.ServerRepository,
+    private val localServerManager: LocalServerManager,
+    private val api: OpenCodeApi
+) : ServerRepository {
+
+    // ── Server CRUD ──
+
+    override fun getServersFlow(): Flow<List<ServerConfig>> = dataRepo.getAllServers()
+
+    override suspend fun addServer(config: ServerConfig): Result<Unit> = runCatching {
+        dataRepo.addServer(
+            url = config.url,
+            username = config.username,
+            password = config.password,
+            name = config.name,
+            autoConnect = config.autoConnect
+        )
+    }
+
+    override suspend fun removeServer(id: String): Result<Unit> = runCatching {
+        dataRepo.deleteServer(id)
+    }
+
+    override suspend fun updateServer(server: ServerConfig): Result<Unit> = runCatching {
+        dataRepo.updateServer(server)
+    }
+
+    override suspend fun getServer(id: String): ServerConfig? = dataRepo.getServer(id)
+
+    // ── Connection lifecycle ──
+    // Phase 4: will delegate to OpenCodeConnectionService
+
+    override suspend fun connect(server: ServerConfig): Result<Unit> = runCatching {
+        // Phase 4: delegate to OpenCodeConnectionService.connect(server)
+        throw NotImplementedError("ServerRepository.connect — Phase 4")
+    }
+
+    override suspend fun disconnect(serverId: String): Result<Unit> = runCatching {
+        // Phase 4: delegate to OpenCodeConnectionService.disconnect(serverId)
+        throw NotImplementedError("ServerRepository.disconnect — Phase 4")
+    }
+
+    override suspend fun testConnection(server: ServerConfig): Result<Boolean> = runCatching {
+        dataRepo.checkHealth(server).isSuccess
+    }
+
+    // ── Local server management ──
+
+    override fun getLocalSetupCommand(): String = localServerManager.getSetupCommand()
+
+    override suspend fun setupLocalServer(context: Context): Result<Unit> = runCatching {
+        // Setup is a user-driven action (paste command into Termux).
+        // Mark setup as completed if Termux is installed.
+        if (localServerManager.isTermuxInstalled()) Unit
+        else throw IllegalStateException("Termux is not installed")
+    }
+
+    override suspend fun startLocalServer(context: Context): Result<Unit> = runCatching {
+        localServerManager.startServer(context)
+    }
+
+    override suspend fun stopLocalServer(context: Context): Result<Unit> = runCatching {
+        localServerManager.stopServer(context)
+    }
+
+    override suspend fun getLocalServerState(): Result<LocalServerState> = runCatching {
+        if (!localServerManager.isTermuxInstalled()) {
+            LocalServerState(status = "unavailable", message = "Termux is not installed")
+        } else {
+            val healthy = localServerManager.isServerHealthy()
+            if (healthy) {
+                LocalServerState(status = "running")
+            } else {
+                LocalServerState(status = "stopped")
+            }
+        }
+    }
+
+    // ── Provider management ──
+
+    override suspend fun loadProviders(serverId: String): Result<List<DomainProviderInfo>> = runCatching {
+        val conn = resolveConnection(serverId)
+        val catalog = api.listProviderCatalog(conn)
+        val connected = catalog.connected.toSet()
+        catalog.all.map { dto ->
+            DomainProviderInfo(
+                id = dto.id,
+                name = dto.name,
+                enabled = dto.id in connected,
+                connected = dto.id in connected,
+                models = dto.models.values.map { model ->
+                    ModelInfo(
+                        id = model.id,
+                        name = model.name,
+                        visible = true
+                    )
+                }
+            )
+        }
+    }
+
+    override suspend fun setProviderEnabled(
+        serverId: String,
+        providerId: String,
+        enabled: Boolean
+    ): Result<Unit> = runCatching {
+        val conn = resolveConnection(serverId)
+        if (enabled) {
+            // Phase 4: implement provider enable/disable via config API
+        } else {
+            api.removeProviderAuth(conn, providerId)
+        }
+    }
+
+    override suspend fun connectProviderApi(
+        serverId: String,
+        providerId: String,
+        apiKey: String
+    ): Result<Unit> = runCatching {
+        val conn = resolveConnection(serverId)
+        api.setProviderApiKey(conn, providerId, apiKey)
+    }
+
+    override suspend fun disconnectProvider(
+        serverId: String,
+        providerId: String
+    ): Result<Unit> = runCatching {
+        val conn = resolveConnection(serverId)
+        api.removeProviderAuth(conn, providerId)
+    }
+
+    override suspend fun setModelVisible(
+        serverId: String,
+        providerId: String,
+        modelId: String,
+        visible: Boolean
+    ): Result<Unit> = runCatching {
+        // Delegate to SettingsRepository's hidden models tracking
+        // This will be properly wired in Phase 4
+        Unit
+    }
+
+    override suspend fun saveServerConfig(serverId: String): Result<Unit> = runCatching {
+        // Phase 4: persist server-side config
+        Unit
+    }
+
+    // ── Private Helpers ──
+
+    private suspend fun resolveConnection(serverId: String): ServerConnection {
+        val config = dataRepo.getServer(serverId)
+            ?: throw IllegalStateException("Server config not found: $serverId")
+        return ServerConnection.from(config.url, config.username, config.password)
+    }
+}
