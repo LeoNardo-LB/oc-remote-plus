@@ -16,8 +16,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -916,5 +919,44 @@ class OpenCodeApi @Inject constructor(
             parameter("path", path)
         }.body()
     }
+
+    // ============ Session Status ============
+
+    /**
+     * Query the current status of all sessions from the OpenCode server.
+     * GET /session/status
+     *
+     * Used as a REST fallback when SSE events may have been missed
+     * (app backgrounded, connection lost, etc.).
+     *
+     * @return Map of sessionId → RestSessionStatusInfo where type ∈ {"idle", "busy", "retry"}
+     */
+    suspend fun fetchSessionStatus(conn: ServerConnection): Result<Map<String, RestSessionStatusInfo>> {
+        return runCatching {
+            val response: Map<String, kotlinx.serialization.json.JsonObject> =
+                httpClient.get("${conn.baseUrl}/session/status") {
+                    conn.authHeader?.let { header("Authorization", it) }
+                }.body()
+            response.mapValues { (_, obj) ->
+                RestSessionStatusInfo(
+                    type = obj["type"]?.jsonPrimitive?.content ?: "idle",
+                    attempt = obj["attempt"]?.jsonPrimitive?.intOrNull,
+                    message = obj["message"]?.jsonPrimitive?.contentOrNull,
+                    next = obj["next"]?.jsonPrimitive?.longOrNull
+                )
+            }
+        }
+    }
 }
+
+/**
+ * Represents the status of a session as reported by GET /session/status.
+ * Used for REST-based state correction when SSE events may have been missed.
+ */
+data class RestSessionStatusInfo(
+    val type: String,          // "idle" | "busy" | "retry"
+    val attempt: Int? = null,  // only for "retry"
+    val message: String? = null,
+    val next: Long? = null
+)
 
