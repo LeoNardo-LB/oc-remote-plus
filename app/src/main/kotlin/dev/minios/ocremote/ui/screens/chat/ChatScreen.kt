@@ -57,6 +57,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -289,8 +291,15 @@ fun ChatScreen(
     }
     val listState = rememberLazyListState()
 
-    // Auto-scroll state must be declared before scroll-restore LaunchedEffect
-    var autoScrollEnabled by remember { mutableStateOf(true) }
+    // Detect if user is at the bottom of the list (last item visible)
+    val isAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            if (layoutInfo.totalItemsCount == 0) return@derivedStateOf true
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()
+            lastVisible != null && lastVisible.index >= layoutInfo.totalItemsCount - 1
+        }
+    }
 
     // Restore scroll position when returning from sub-session navigation.
     // Using LaunchedEffect(scrollRestoreVersion) instead of rememberLazyListState(initial...)
@@ -298,24 +307,56 @@ fun ChatScreen(
     // causing unreliable restoration when the composable is recomposed (not recreated).
     LaunchedEffect(viewModel.scrollRestoreVersion) {
         if (viewModel.scrollRestoreVersion > 0) {
-            autoScrollEnabled = false
-            listState.scrollToItem(
-                viewModel.savedFirstVisibleItemIndex,
-                viewModel.savedFirstVisibleItemScrollOffset
-            )
-            // scrollToItem 是挂起函数，返回时滚动已完成、listState 已更新
-            // 根据恢复后的实际位置正确设置 autoScrollEnabled
-            autoScrollEnabled = listState.firstVisibleItemIndex == 0 &&
-                listState.firstVisibleItemScrollOffset <= 50
+            val savedId = viewModel.savedMessageId
+            if (savedId != null) {
+                // Reconstruct displayItems filtering to find the target's LazyColumn index.
+                // visibleItemsInfo only contains currently visible items — the target is
+                // almost never in range, so every restore degraded to "scroll to bottom".
+                val msgs = uiState.messages
+                var displayIndex = -1
+                var count = 0
+                for (i in msgs.indices) {
+                    val msg = msgs[i]
+                    val include = when {
+                        msg.isUser -> true
+                        msg.isAssistant -> {
+                            val next = msgs.getOrNull(i + 1)
+                            next?.isAssistant != true
+                        }
+                        else -> false
+                    }
+                    if (include) {
+                        if (msg.message.id == savedId) {
+                            displayIndex = count
+                            break
+                        }
+                        count++
+                    }
+                }
+                if (displayIndex >= 0) {
+                    // displayItems is the first item group in the LazyColumn, so offset = 0
+                    listState.scrollToItem(displayIndex, viewModel.savedScrollOffset)
+                } else {
+                    // Fallback: scroll to bottom
+                    if (listState.layoutInfo.totalItemsCount > 0) {
+                        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                    }
+                }
+            }
         }
     }
 
     // Wrapper that saves scroll position before navigating to a sub-session
     val navigateToChildSessionWithSave: (String) -> Unit = { childSessionId ->
-        viewModel.saveScrollPosition(
-            listState.firstVisibleItemIndex,
-            listState.firstVisibleItemScrollOffset
-        )
+        val firstMessageKey = listState.layoutInfo.visibleItemsInfo
+            .firstOrNull {
+                val key = (it.key as? String) ?: ""
+                !key.startsWith("question_") &&
+                !key.startsWith("perm_") &&
+                key != "revert_banner"
+            }
+            ?.key as? String
+        viewModel.saveScrollPosition(firstMessageKey, listState.firstVisibleItemScrollOffset)
         onNavigateToChildSession(childSessionId)
     }
 
@@ -833,27 +874,12 @@ fun ChatScreen(
         }
     }
 
-    // (autoScrollEnabled declared earlier, near listState)
-
     val messageCount = uiState.messages.size
 
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messageCount) {
-        if (messageCount > 0 && autoScrollEnabled) {
-            listState.scrollToItem(0)
-        }
-    }
-
-    // Detect user scrolling → toggle auto-scroll
-    LaunchedEffect(Unit) {
-        snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            if (index > 0 || offset > 50) {
-                autoScrollEnabled = false
-            } else {
-                autoScrollEnabled = true
-            }
+        if (messageCount > 0 && isAtBottom) {
+            listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
         }
     }
 
@@ -1222,8 +1248,9 @@ Box {
                                 attachments.clear()
                                 // Scroll to bottom after sending
                                 coroutineScope.launch {
-                                    autoScrollEnabled = true
-                                    listState.scrollToItem(0)
+                                    if (listState.layoutInfo.totalItemsCount > 0) {
+                                        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                                    }
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -1624,10 +1651,10 @@ Box {
                                                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
                                         )
                                     }
-                                }
-                            }
-                        }
-                    ) {
+                                 }
+                             }
+                         }
+                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             SessionTerminalInline(
                                 emulator = viewModel.terminalEmulator,
@@ -1767,7 +1794,7 @@ Box {
                            when {
                                msg.isUser -> index to msg
                                msg.isAssistant -> {
-                                   val nextMsg = rawMessages.getOrNull(index - 1)
+                                   val nextMsg = rawMessages.getOrNull(index + 1)
                                    if (nextMsg?.isAssistant != true) index to msg else null
                                }
                                else -> null
@@ -1775,73 +1802,39 @@ Box {
                        }
 
                        if (uiState.sessionParentId == null) {
-                          // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB
-                          Box(
-                              modifier = Modifier.fillMaxSize()
-                          ) {
-                                  LazyColumn(
-                                       state = listState,
-                                       modifier = Modifier.fillMaxSize()
-                                           .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
-                                      contentPadding = PaddingValues(
-                                          start = 12.dp,
-                                          top = 8.dp,
-                                          end = 12.dp,
+                           // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB
+                           Box(
+                               modifier = Modifier.fillMaxSize()
+                           ) {
+                                   @OptIn(ExperimentalMaterial3Api::class)
+                                   val pullToRefreshState = rememberPullToRefreshState()
+                                    PullToRefreshBox(
+                                        isRefreshing = uiState.isLoadingOlder,
+                                        onRefresh = {
+                                            if (uiState.hasOlderMessages) viewModel.loadOlderMessages()
+                                        },
+                                        state = pullToRefreshState,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                    LazyColumn(
+                                        state = listState,
+                                        modifier = Modifier.fillMaxSize()
+                                            .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
+                                       contentPadding = PaddingValues(
+                                           start = 12.dp,
+                                           top = 8.dp,
+                                           end = 12.dp,
                                           bottom = 8.dp
                                       ),
-                                      reverseLayout = true,
-                                      verticalArrangement = Arrangement.spacedBy(messageSpacing)
-                      ) {
-                          // reverseLayout=true: items declared first render at the BOTTOM
-                          // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
+                                       reverseLayout = false,
+                                       verticalArrangement = Arrangement.spacedBy(messageSpacing)
+                       ) {
+                           // reverseLayout=false: items declared first render at the TOP
+                           // Visual order (top→bottom): oldest msgs → newest msgs → revert → pending
 
-                          // Pending questions (bottom-most, declared first = index 0)
-                          items(
-                              uiState.pendingQuestions,
-                              key = { "question_${it.id}" }
-                          ) { question ->
-                              QuestionCard(
-                                  question = question,
-                                  onSubmit = { answers ->
-                                      viewModel.replyToQuestion(question.id, answers)
-                                  },
-                                  onReject = {
-                                      viewModel.rejectQuestion(question.id)
-                                  }
-                              )
-                          }
-
-                          // Pending permissions
-                          items(
-                              uiState.pendingPermissions,
-                              key = { "perm_${it.id}" }
-                          ) { permission ->
-                              PermissionCard(
-                                  permission = permission,
-                                  onOnce = { viewModel.replyToPermission(permission.id, "once") },
-                                  onAlways = { viewModel.replyToPermission(permission.id, "always") },
-                                  onReject = { viewModel.replyToPermission(permission.id, "reject") }
-                              )
-                          }
-
-                          // Revert banner
-                          if (uiState.revert != null) {
-                              item(key = "revert_banner") {
-                                  RevertBanner(onRedo = {
-                                      viewModel.redoMessage { ok ->
-                                          coroutineScope.launch {
-                                              snackbarHostState.showSnackbar(
-                                                  if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
-                                              )
-                                          }
-                                      }
-                                  })
-                              }
-                          }
-
-                            // Chat messages: newest-first (displayItems is sorted newest-first).
-                            // In reverseLayout=true, newest at index 0 = bottom. Correct.
-                            itemsIndexed(
+                             // Chat messages: oldest-first (displayItems is sorted oldest-first).
+                             // In reverseLayout=false, oldest at index 0 = top. Correct.
+                             itemsIndexed(
                                 displayItems,
                                 key = { _, item -> item.second.message.id },
                                 contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
@@ -1850,7 +1843,7 @@ Box {
                                     msg.isAssistant -> {
                                         val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
                                         // The first assistant in a turn IS the last (newest) message of the turn
-                                        val isTurnLast = rawIndex == 0 || rawMessages.getOrNull(rawIndex - 1)?.isAssistant != true
+                                        val isTurnLast = rawIndex == rawMessages.lastIndex || rawMessages.getOrNull(rawIndex + 1)?.isAssistant != true
 
                                         MessageCard(
                                             role = MessageCardRole.ASSISTANT,
@@ -1861,7 +1854,7 @@ Box {
                                             isTurnLast = isTurnLast,
                                             onCopyText = if (isTurnLast) {
                                                 {
-                                                    val messages = turnMessagesForMsg.reversed()
+                                                    val messages = turnMessagesForMsg
                                                     val text = messages.flatMap { m ->
                                                         m.parts.filterIsInstance<Part.Text>().map { it.text }
                                                     }.joinToString("\n\n")
@@ -1973,52 +1966,60 @@ Box {
                                 }
                             }
 
-                          // "Load earlier messages" at the TOP (declared last in reverseLayout = topmost)
-                          if (uiState.hasOlderMessages) {
-                              item(key = "load_older") {
-                                  Box(
-                                      modifier = Modifier
-                                          .fillMaxWidth()
-                                          .padding(vertical = 4.dp),
-                                      contentAlignment = Alignment.Center
-                                  ) {
-                                      if (uiState.isLoadingOlder) {
-                                          Row(
-                                              horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                              verticalAlignment = Alignment.CenterVertically
-                                          ) {
-                                              PulsingDotsIndicator(
-                                                  dotSize = 6.dp,
-                                                  dotSpacing = 4.dp,
-                                                  color = MaterialTheme.colorScheme.onSurfaceVariant
-                                              )
-                                              Text(
-                                                  text = stringResource(R.string.chat_loading_earlier),
-                                                  style = MaterialTheme.typography.bodySmall,
-                                                  color = MaterialTheme.colorScheme.onSurfaceVariant
-                                              )
-                                          }
-                                      } else {
-                                          TextButton(onClick = {
-                                              viewModel.loadOlderMessages()
-                                          }) {
-                                              Text(stringResource(R.string.chat_load_earlier))
-                                          }
-                                      }
-                                  }
-                              }
-                          }
-                          }
-   
-                        // Scroll-to-bottom FAB
-                         if (!autoScrollEnabled) {
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        listState.scrollToItem(0)
-                                        autoScrollEnabled = true
+                           // Revert banner
+                           if (uiState.revert != null) {
+                               item(key = "revert_banner") {
+                                   RevertBanner(onRedo = {
+                                       viewModel.redoMessage { ok ->
+                                           coroutineScope.launch {
+                                               snackbarHostState.showSnackbar(
+                                                   if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                               )
+                                           }
+                                       }
+                                   })
+                               }
+                           }
+
+                           // Pending permissions
+                           items(
+                               uiState.pendingPermissions,
+                               key = { "perm_${it.id}" }
+                           ) { permission ->
+                               PermissionCard(
+                                   permission = permission,
+                                   onOnce = { viewModel.replyToPermission(permission.id, "once") },
+                                   onAlways = { viewModel.replyToPermission(permission.id, "always") },
+                                   onReject = { viewModel.replyToPermission(permission.id, "reject") }
+                               )
+                           }
+
+                           // Pending questions (bottom-most)
+                           items(
+                               uiState.pendingQuestions,
+                               key = { "question_${it.id}" }
+                           ) { question ->
+                               QuestionCard(
+                                   question = question,
+                                   onSubmit = { answers ->
+                                       viewModel.replyToQuestion(question.id, answers)
+                                   },
+                                   onReject = {
+                                       viewModel.rejectQuestion(question.id)
+                                   }
+                               )
                                     }
-                                },
+                                }
+                                  } // PullToRefreshBox
+  
+                         // Scroll-to-bottom FAB
+                          if (!isAtBottom) {
+                             SmallFloatingActionButton(
+                                 onClick = {
+                                     coroutineScope.launch {
+                                         listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                                     }
+                                 },
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .padding(bottom = 8.dp),
@@ -2035,9 +2036,19 @@ Box {
 
                            }
                        } else {
-                            // Sub-session (no input bar): just LazyColumn + FAB
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                 LazyColumn(
+                             // Sub-session (no input bar): just LazyColumn + FAB
+                             Box(modifier = Modifier.fillMaxSize()) {
+                                  @OptIn(ExperimentalMaterial3Api::class)
+                                  val pullToRefreshState = rememberPullToRefreshState()
+                                   PullToRefreshBox(
+                                       isRefreshing = uiState.isLoadingOlder,
+                                       onRefresh = {
+                                           if (uiState.hasOlderMessages) viewModel.loadOlderMessages()
+                                       },
+                                      state = pullToRefreshState,
+                                      modifier = Modifier.fillMaxSize()
+                                  ) {
+                                  LazyColumn(
                                   state = listState,
                                   modifier = Modifier.fillMaxSize()
                                       .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
@@ -2045,59 +2056,15 @@ Box {
                                       horizontal = 12.dp,
                                       vertical = 8.dp
                                   ),
-                                  reverseLayout = true,
-                                  verticalArrangement = Arrangement.spacedBy(messageSpacing)
-                               ) {
-                                   // reverseLayout=true: items declared first render at the BOTTOM
-                                   // Visual order (top→bottom): load_older → old msgs → new msgs → revert → pending
+                                   reverseLayout = false,
+                                   verticalArrangement = Arrangement.spacedBy(messageSpacing)
+                                ) {
+                                    // reverseLayout=false: items declared first render at the TOP
+                                    // Visual order (top→bottom): oldest msgs → newest msgs → revert → pending
 
-                                  // Pending questions (bottom-most, declared first = index 0)
-                                  items(
-                                      uiState.pendingQuestions,
-                                      key = { "question_${it.id}" }
-                                  ) { question ->
-                                      QuestionCard(
-                                          question = question,
-                                          onSubmit = { answers ->
-                                              viewModel.replyToQuestion(question.id, answers)
-                                          },
-                                          onReject = {
-                                              viewModel.rejectQuestion(question.id)
-                                          }
-                                      )
-                                  }
-
-                                  // Pending permissions
-                                  items(
-                                      uiState.pendingPermissions,
-                                      key = { "perm_${it.id}" }
-                                  ) { permission ->
-                                      PermissionCard(
-                                          permission = permission,
-                                          onOnce = { viewModel.replyToPermission(permission.id, "once") },
-                                          onAlways = { viewModel.replyToPermission(permission.id, "always") },
-                                          onReject = { viewModel.replyToPermission(permission.id, "reject") }
-                                      )
-                                  }
-
-                                  // Revert banner
-                                  if (uiState.revert != null) {
-                                      item(key = "revert_banner") {
-                                          RevertBanner(onRedo = {
-                                              viewModel.redoMessage { ok ->
-                                                  coroutineScope.launch {
-                                                      snackbarHostState.showSnackbar(
-                                                          if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
-                                                      )
-                                                  }
-                                              }
-                                          })
-                                      }
-                                  }
-
-                                  // Chat messages: newest-first (displayItems is sorted newest-first).
-                                  // In reverseLayout=true, newest at index 0 = bottom. Correct.
-                                  itemsIndexed(
+                                    // Chat messages: oldest-first (displayItems is sorted oldest-first).
+                                    // In reverseLayout=false, oldest at index 0 = top. Correct.
+                                    itemsIndexed(
                                       displayItems,
                                       key = { _, item -> item.second.message.id },
                                       contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
@@ -2105,7 +2072,7 @@ Box {
                                       when {
                                             msg.isAssistant -> {
                                                 val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
-                                                val isTurnLast = rawIndex == 0 || rawMessages.getOrNull(rawIndex - 1)?.isAssistant != true
+                                                val isTurnLast = rawIndex == rawMessages.lastIndex || rawMessages.getOrNull(rawIndex + 1)?.isAssistant != true
 
                                                 MessageCard(
                                                     role = MessageCardRole.ASSISTANT,
@@ -2116,7 +2083,7 @@ Box {
                                                     isTurnLast = isTurnLast,
                                                     onCopyText = if (isTurnLast) {
                                                         {
-                                                            val messages = turnMessagesForMsg.reversed()
+                                                            val messages = turnMessagesForMsg
                                                             val text = messages.flatMap { m ->
                                                                 m.parts.filterIsInstance<Part.Text>().map { it.text }
                                                             }.joinToString("\n\n")
@@ -2219,52 +2186,60 @@ Box {
                                       }
                                   }
 
-                                  // "Load earlier messages" at the TOP (declared last in reverseLayout = topmost)
-                                  if (uiState.hasOlderMessages) {
-                                      item(key = "load_older") {
-                                          Box(
-                                              modifier = Modifier
-                                                  .fillMaxWidth()
-                                                  .padding(vertical = 4.dp),
-                                              contentAlignment = Alignment.Center
-                                          ) {
-                                              if (uiState.isLoadingOlder) {
-                                                  Row(
-                                                      horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                      verticalAlignment = Alignment.CenterVertically
-                                                  ) {
-                                                      PulsingDotsIndicator(
-                                                          dotSize = 6.dp,
-                                                          dotSpacing = 4.dp,
-                                                          color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                      )
-                                                      Text(
-                                                          text = stringResource(R.string.chat_loading_earlier),
-                                                          style = MaterialTheme.typography.bodySmall,
-                                                          color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                      )
-                                                  }
-                                              } else {
-                                                  TextButton(onClick = {
-                                                      viewModel.loadOlderMessages()
-                                                  }) {
-                                                      Text(stringResource(R.string.chat_load_earlier))
-                                                  }
-                                              }
-                                          }
-                                      }
-                                  }
-                              }
- 
-                              // Scroll-to-bottom FAB
-                                if (!autoScrollEnabled) {
-                                    SmallFloatingActionButton(
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                listState.scrollToItem(0)
-                                                autoScrollEnabled = true
-                                            }
-                                        },
+                                   // Revert banner
+                                   if (uiState.revert != null) {
+                                       item(key = "revert_banner") {
+                                           RevertBanner(onRedo = {
+                                               viewModel.redoMessage { ok ->
+                                                   coroutineScope.launch {
+                                                       snackbarHostState.showSnackbar(
+                                                           if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                                       )
+                                                   }
+                                               }
+                                           })
+                                       }
+                                   }
+
+                                   // Pending permissions
+                                   items(
+                                       uiState.pendingPermissions,
+                                       key = { "perm_${it.id}" }
+                                   ) { permission ->
+                                       PermissionCard(
+                                           permission = permission,
+                                           onOnce = { viewModel.replyToPermission(permission.id, "once") },
+                                           onAlways = { viewModel.replyToPermission(permission.id, "always") },
+                                           onReject = { viewModel.replyToPermission(permission.id, "reject") }
+                                       )
+                                   }
+
+                                   // Pending questions (bottom-most)
+                                   items(
+                                       uiState.pendingQuestions,
+                                       key = { "question_${it.id}" }
+                                   ) { question ->
+                                       QuestionCard(
+                                           question = question,
+                                           onSubmit = { answers ->
+                                               viewModel.replyToQuestion(question.id, answers)
+                                           },
+                                           onReject = {
+                                               viewModel.rejectQuestion(question.id)
+                                           }
+                                       )
+                                    }
+                                }
+                                  } // PullToRefreshBox
+
+                               // Scroll-to-bottom FAB
+                                 if (!isAtBottom) {
+                                     SmallFloatingActionButton(
+                                         onClick = {
+                                             coroutineScope.launch {
+                                                 listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                                             }
+                                         },
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                            .padding(bottom = 8.dp),

@@ -225,9 +225,9 @@ class ChatViewModel @Inject constructor(
 
     // ============ Scroll Position Save/Restore ============
     /** Saved scroll position for restoring after sub-session navigation. */
-    var savedFirstVisibleItemIndex by mutableStateOf(0)
+    var savedMessageId by mutableStateOf<String?>(null)
         private set
-    var savedFirstVisibleItemScrollOffset by mutableStateOf(0)
+    var savedScrollOffset by mutableStateOf(0)
         private set
 
     /**
@@ -240,9 +240,9 @@ class ChatViewModel @Inject constructor(
     var scrollRestoreVersion by mutableStateOf(0)
         private set
 
-    fun saveScrollPosition(index: Int, offset: Int) {
-        savedFirstVisibleItemIndex = index
-        savedFirstVisibleItemScrollOffset = offset
+    fun saveScrollPosition(messageId: String?, offset: Int) {
+        savedMessageId = messageId
+        savedScrollOffset = offset
         scrollRestoreVersion++
     }
     val expandReasoning = settingsRepository.expandReasoning.stateIn(
@@ -332,7 +332,7 @@ class ChatViewModel @Inject constructor(
             // Likely only SSE-provided messages; wait for REST to complete
             emptyList()
         } else {
-            val sorted = sessionMessages.sortedByDescending { it.time.created }
+            val sorted = sessionMessages.sortedBy { it.time.created }
             // Filter out reverted messages (at or after revert point)
             val visible = if (revertState != null) {
                 sorted.filter { it.id < revertState.messageId }
@@ -355,7 +355,7 @@ class ChatViewModel @Inject constructor(
         if (!isModelExplicitlySelected) {
              val lastUserWithModel = sessionMessages
                 .filterIsInstance<Message.User>()
-                .firstOrNull { it.model != null }
+                .lastOrNull { it.model != null }
              if (lastUserWithModel?.model != null) {
                  effectiveProviderId = lastUserWithModel.model.providerId
                  effectiveModelId = lastUserWithModel.model.modelId
@@ -371,7 +371,7 @@ class ChatViewModel @Inject constructor(
         val effectiveAgent = if (!isAgentExplicitlySelected) {
             val lastUserAgent = sessionMessages
                 .filterIsInstance<Message.User>()
-                .firstOrNull { it.agent != null }
+                .lastOrNull { it.agent != null }
                 ?.agent
             lastUserAgent ?: selectedAgent
         } else {
@@ -431,11 +431,13 @@ class ChatViewModel @Inject constructor(
         }
 
         // Compute queued message IDs: messages sent while assistant is still generating
-        val pendingAssistantIndex = chatMessages.indexOfFirst {
+        // Ascending order (oldest-first): indexOfLast finds the most recent pending assistant,
+        // then drop(index+1) collects user messages after it (i.e. queued for later processing).
+        val pendingAssistantIndex = chatMessages.indexOfLast {
             it.message is Message.Assistant && it.message.time.completed == null
         }
         val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-            chatMessages.take(pendingAssistantIndex)
+            chatMessages.drop(pendingAssistantIndex + 1)
                 .filter { it.isUser }
                 .map { it.message.id }
                 .toSet()

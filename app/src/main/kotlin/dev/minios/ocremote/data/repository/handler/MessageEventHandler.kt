@@ -45,7 +45,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 sessionMessages[idx] = event.info
             } else {
                 sessionMessages.add(event.info)
-                sessionMessages.sortByDescending { it.time.created }
+                sessionMessages.sortBy { it.time.created }
             }
             current + (sessionId to sessionMessages)
         }
@@ -95,13 +95,13 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     // ============ Batch Operations ============
 
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        _messages.update { it + (sessionId to newMessages.map { m -> m.info }.sortedByDescending { m -> m.time.created }) }
+        _messages.update { it + (sessionId to newMessages.map { m -> m.info }.sortedBy { m -> m.time.created }) }
         val partsMap = newMessages.associate { it.info.id to it.parts }
         _parts.update { it + partsMap }
     }
 
     fun mergeMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        val incoming = newMessages.map { it.info }.sortedByDescending { m -> m.time.created }
+        val incoming = newMessages.map { it.info }.sortedBy { m -> m.time.created }
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val existingById = existing.associateBy { it.id }

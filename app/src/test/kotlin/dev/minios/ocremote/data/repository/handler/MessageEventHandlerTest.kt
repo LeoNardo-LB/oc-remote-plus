@@ -49,7 +49,7 @@ class MessageEventHandlerTest {
     }
 
     @Test
-    fun `handles MessageUpdated - sorts by created descending`() {
+    fun `handles MessageUpdated - sorts by created ascending`() {
         val old = testUserMessage("m1", "s1").copy(time = TimeInfo(created = 1000L))
         val recent = testUserMessage("m2", "s1").copy(time = TimeInfo(created = 3000L))
         val mid = testUserMessage("m3", "s1").copy(time = TimeInfo(created = 2000L))
@@ -59,9 +59,9 @@ class MessageEventHandlerTest {
         handler.handle(SseEvent.MessageUpdated(mid), "server1")
 
         val msgs = handler.messages.value["s1"]!!
-        assertEquals("m2", msgs[0].id)
+        assertEquals("m1", msgs[0].id)
         assertEquals("m3", msgs[1].id)
-        assertEquals("m1", msgs[2].id)
+        assertEquals("m2", msgs[2].id)
     }
 
     @Test

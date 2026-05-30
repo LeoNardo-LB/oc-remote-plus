@@ -329,7 +329,7 @@ private fun MessageCardAssistant(
     val textColor = if (isAmoled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface
 
     // Reverse turnMessages to correct newest-first order
-    val orderedTurnMessages = turnMessages?.reversed()
+    val orderedTurnMessages = turnMessages
 
     // Collect parts from ALL messages in the turn, not just currentMessage
     val allTurnParts = orderedTurnMessages?.flatMap { msg -> filterRenderableParts(msg.parts) }
