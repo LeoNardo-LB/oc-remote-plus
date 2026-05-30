@@ -119,17 +119,19 @@ internal fun MarkdownPreviewDialog(
                             }
                         }
                         PreviewMode.RENDERED -> {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(scrollState)
-                                    .padding(16.dp)
-                            ) {
-                                MarkdownContent(
-                                    markdown = markdown,
-                                    textColor = MaterialTheme.colorScheme.onSurface,
-                                    isUser = false
-                                )
+                            SelectionContainer {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(scrollState)
+                                        .padding(16.dp)
+                                ) {
+                                    MarkdownContent(
+                                        markdown = markdown,
+                                        textColor = MaterialTheme.colorScheme.onSurface,
+                                        isUser = false
+                                    )
+                                }
                             }
                         }
                     }
