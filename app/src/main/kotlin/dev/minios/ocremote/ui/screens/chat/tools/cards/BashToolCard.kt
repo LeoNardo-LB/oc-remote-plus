@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -40,6 +43,7 @@ import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolOutput
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
+import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
@@ -89,13 +93,13 @@ internal fun BashToolCard(
     val hasContent = command.isNotBlank() || output.isNotBlank()
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
         tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(4.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -104,7 +108,7 @@ internal fun BashToolCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -157,21 +161,25 @@ internal fun BashToolCard(
             AnimatedVisibility(
                 visible = expanded && hasContent,
             ) {
+                val halfScreenHeight = maxOf(LocalConfiguration.current.screenHeightDp.dp / 2, 200.dp)
+                val scrollState = rememberScrollState()
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = toolOutputContainerColor(isAmoled),
                     border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp)
-                        .heightIn(max = 400.dp)
+                        .padding(top = 3.dp)
+                        .heightIn(max = halfScreenHeight)
+                        .consumeBoundaryScroll(scrollState)
+                        .verticalScroll(scrollState)
                 ) {
                     SelectionContainer {
                         Text(
                             text = displayText,
                             style = CodeTypography.copy(fontSize = 12.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
                             modifier = Modifier
-                                .padding(8.dp)
+                                .padding(4.dp)
                                 .codeHorizontalScroll()
                         )
                     }
