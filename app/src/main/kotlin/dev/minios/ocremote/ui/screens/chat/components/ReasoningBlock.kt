@@ -37,14 +37,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
+import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 
@@ -160,13 +159,12 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
                 AnimatedVisibility(visible = expanded) {
                     Column {
                         Spacer(modifier = Modifier.height(6.dp))
-                        val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                        val halfScreenHeight = halfScreenHeight()
                         val reasoningScrollState = rememberScrollState()
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = halfScreenHeight)
-                                .consumeBoundaryScroll(reasoningScrollState)
                                 .verticalScroll(reasoningScrollState)
                         ) {
                         MarkdownContent(

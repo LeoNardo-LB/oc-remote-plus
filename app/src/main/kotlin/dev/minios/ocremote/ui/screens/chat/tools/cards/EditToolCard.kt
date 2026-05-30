@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,7 +43,7 @@ import dev.minios.ocremote.ui.screens.chat.tools.DiffChangesInline
 import dev.minios.ocremote.ui.screens.chat.tools.DiffView
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
+import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.theme.CodeTypography
@@ -158,13 +157,12 @@ internal fun EditToolCard(
             AnimatedVisibility(
                 visible = expanded && hasContent,
             ) {
-                val halfScreenHeight = maxOf(LocalConfiguration.current.screenHeightDp.dp / 2, 200.dp)
+                val halfScreenHeight = halfScreenHeight()
                 val scrollState = rememberScrollState()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = halfScreenHeight)
-                        .consumeBoundaryScroll(scrollState)
                         .verticalScroll(scrollState)
                 ) {
                     Column(modifier = Modifier.padding(top = 3.dp)) {

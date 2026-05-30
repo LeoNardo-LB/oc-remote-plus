@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,7 +39,7 @@ import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
+import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
@@ -133,13 +132,12 @@ internal fun ReadToolCard(
             AnimatedVisibility(
                 visible = expanded,
             ) {
-                val halfScreenHeight = maxOf(LocalConfiguration.current.screenHeightDp.dp / 2, 200.dp)
+                val halfScreenHeight = halfScreenHeight()
                 val scrollState = rememberScrollState()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = halfScreenHeight)
-                        .consumeBoundaryScroll(scrollState)
                         .verticalScroll(scrollState)
                 ) {
                     Column(

@@ -196,7 +196,6 @@ import dev.minios.ocremote.ui.screens.chat.util.resolveStepsStatus
 import dev.minios.ocremote.ui.screens.chat.util.resolveUserCommandLabel
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
 import dev.minios.ocremote.ui.screens.chat.util.LocalChatFontSize
 import dev.minios.ocremote.ui.screens.chat.util.LocalCodeWordWrap
 import dev.minios.ocremote.ui.screens.chat.util.LocalCompactMessages

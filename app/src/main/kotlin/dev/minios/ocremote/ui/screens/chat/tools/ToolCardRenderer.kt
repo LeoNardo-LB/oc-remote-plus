@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,7 +37,7 @@ import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
+import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
@@ -154,13 +153,12 @@ internal fun ToolCallCard(
             }
 
             AnimatedVisibility(visible = expanded) {
-                val halfScreenHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+                val halfScreenHeight = halfScreenHeight()
                 val toolCardScrollState = rememberScrollState()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = halfScreenHeight)
-                        .consumeBoundaryScroll(toolCardScrollState)
                         .verticalScroll(toolCardScrollState)
                 ) {
                     Column(
