@@ -253,13 +253,26 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  * Shows messages with streaming text rendered via mikepenz markdown renderer.
  */
 
-private suspend fun LazyListState.scrollToBottom() {
+/**
+ * Scroll to the absolute pixel bottom of the LazyColumn.
+ * Uses only pixel-based scrolling — no item index estimation involved.
+ * Suitable when layout is already stable (e.g. FAB click).
+ */
+private suspend fun LazyListState.scrollToBottomPixel() {
+    scroll { scrollBy(Float.MAX_VALUE) }
+}
+
+/**
+ * Scroll to the bottom with a two-step approach for unstable-layout scenarios.
+ * Step 1: scrollToItem jumps to the last item (estimated, correct direction).
+ * Step 2: After a frame delay for layout to settle, scrollBy compensates estimation error.
+ */
+private suspend fun LazyListState.scrollToBottomWithLayout() {
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
-    // Step 1: scrollToItem jumps to the last item (estimated offset, correct direction).
     scrollToItem(lastIndex)
-    // Step 2: scrollBy(MAX) compensates for estimation error — at this point the target
-    // item is already in the measured range, so the pixel offset is precise.
+    // Wait one frame for layout to recalculate after scrollToItem
+    kotlinx.coroutines.delay(32)
     scroll { scrollBy(Float.MAX_VALUE) }
 }
 
@@ -350,7 +363,7 @@ fun ChatScreen(
                     listState.scrollToItem(displayIndex, viewModel.savedScrollOffset)
                 } else {
                     // Fallback: scroll to bottom
-                    listState.scrollToBottom()
+                    listState.scrollToBottomWithLayout()
                 }
             }
         } else {
@@ -358,7 +371,7 @@ fun ChatScreen(
             // reverseLayout=false anchors at top, so we must explicitly scroll.
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .first { it > 0 }
-            listState.scrollToBottom()
+            listState.scrollToBottomWithLayout()
         }
     }
 
@@ -424,7 +437,7 @@ fun ChatScreen(
     LaunchedEffect(imeVisible) {
         if (imeVisible && isAtBottomBeforeIme) {
             delay(80) // let layout settle after IME resize
-            listState.scrollToBottom()
+            listState.scrollToBottomWithLayout()
         }
     }
 
@@ -912,7 +925,7 @@ fun ChatScreen(
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messageCount) {
         if (messageCount > 0 && isAtBottom) {
-            listState.scrollToBottom()
+            listState.scrollToBottomWithLayout()
         }
     }
 
@@ -1186,7 +1199,7 @@ Box {
                             // so the user can see the latest messages while composing.
                             if (wasEmpty && normalizedValue.text.isNotEmpty()) {
                                 coroutineScope.launch {
-                                    listState.scrollToBottom()
+                                    listState.scrollToBottomWithLayout()
                                 }
                             }
 
@@ -1292,7 +1305,7 @@ Box {
                                 attachments.clear()
                                 // Scroll to bottom after sending
                                 coroutineScope.launch {
-                                    listState.scrollToBottom()
+                                    listState.scrollToBottomWithLayout()
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -2056,12 +2069,12 @@ Box {
   
                         // Scroll-to-bottom FAB
                          if (!isAtBottom) {
-                                       SmallFloatingActionButton(
-                                           onClick = {
-                                               coroutineScope.launch {
-                                                   listState.scrollToBottom()
-                                               }
-                                           },
+                                        SmallFloatingActionButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    listState.scrollToBottomPixel()
+                                                }
+                                            },
                                  modifier = Modifier
                                      .align(Alignment.BottomCenter)
                                      .padding(bottom = 8.dp),
@@ -2276,12 +2289,12 @@ Box {
 
                             // Scroll-to-bottom FAB
                                   if (!isAtBottom) {
-                                      SmallFloatingActionButton(
-                                          onClick = {
-                                               coroutineScope.launch {
-                                                   listState.scrollToBottom()
-                                               }
-                                           },
+                                       SmallFloatingActionButton(
+                                           onClick = {
+                                                coroutineScope.launch {
+                                                    listState.scrollToBottomPixel()
+                                                }
+                                            },
                                          modifier = Modifier
                                              .align(Alignment.BottomCenter)
                                             .padding(bottom = 8.dp),
