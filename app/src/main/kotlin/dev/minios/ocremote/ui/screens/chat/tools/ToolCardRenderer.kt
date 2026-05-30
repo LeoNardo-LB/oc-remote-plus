@@ -77,13 +77,13 @@ internal fun ToolCallCard(
     val expanded = isExpanded
 
     Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
         tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(4.dp)) {
             // Header row — always clickable to allow expand/collapse in any state
             Row(
                 modifier = Modifier
@@ -93,7 +93,7 @@ internal fun ToolCallCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -164,8 +164,8 @@ internal fun ToolCallCard(
                         .verticalScroll(toolCardScrollState)
                 ) {
                     Column(
-                        modifier = Modifier.padding(top = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.padding(top = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         if (input.isNotEmpty()) {
                             val inputText = input.entries
@@ -183,7 +183,7 @@ internal fun ToolCallCard(
                                     Text(
                                         text = inputText.take(2000),
                                         style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)),
-                                        modifier = Modifier.padding(8.dp).codeHorizontalScroll()
+                                        modifier = Modifier.padding(4.dp).codeHorizontalScroll()
                                     )
                                 }
                             }
@@ -203,7 +203,7 @@ internal fun ToolCallCard(
                                 Text(
                                     text = output.take(3000),
                                     style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
-                                    modifier = Modifier.padding(8.dp).codeHorizontalScroll()
+                                    modifier = Modifier.padding(4.dp).codeHorizontalScroll()
                                 )
                             }
                         }
