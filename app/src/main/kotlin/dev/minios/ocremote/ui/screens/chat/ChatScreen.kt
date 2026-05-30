@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -252,6 +253,10 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  * Shows messages with streaming text rendered via mikepenz markdown renderer.
  */
 
+private suspend fun LazyListState.scrollToBottom() {
+    scroll { scrollBy(Float.MAX_VALUE) }
+}
+
 private data class ImageSaveRequest(
     val bytes: ByteArray,
     val mime: String,
@@ -339,9 +344,7 @@ fun ChatScreen(
                     listState.scrollToItem(displayIndex, viewModel.savedScrollOffset)
                 } else {
                     // Fallback: scroll to bottom
-                    if (listState.layoutInfo.totalItemsCount > 0) {
-                        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                    }
+                    listState.scrollToBottom()
                 }
             }
         } else {
@@ -349,7 +352,7 @@ fun ChatScreen(
             // reverseLayout=false anchors at top, so we must explicitly scroll.
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .first { it > 0 }
-            listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+            listState.scrollToBottom()
         }
     }
 
@@ -415,9 +418,7 @@ fun ChatScreen(
     LaunchedEffect(imeVisible) {
         if (imeVisible && isAtBottomBeforeIme) {
             delay(80) // let layout settle after IME resize
-            if (listState.layoutInfo.totalItemsCount > 0) {
-                listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
-            }
+            listState.scrollToBottom()
         }
     }
 
@@ -905,7 +906,7 @@ fun ChatScreen(
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messageCount) {
         if (messageCount > 0 && isAtBottom) {
-            listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+            listState.scrollToBottom()
         }
     }
 
@@ -1179,9 +1180,7 @@ Box {
                             // so the user can see the latest messages while composing.
                             if (wasEmpty && normalizedValue.text.isNotEmpty()) {
                                 coroutineScope.launch {
-                                    if (listState.layoutInfo.totalItemsCount > 0) {
-                                        listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                                    }
+                                    listState.scrollToBottom()
                                 }
                             }
 
@@ -1287,9 +1286,7 @@ Box {
                                 attachments.clear()
                                 // Scroll to bottom after sending
                                 coroutineScope.launch {
-                                    if (listState.layoutInfo.totalItemsCount > 0) {
-                                        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                                    }
+                                    listState.scrollToBottom()
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -2051,19 +2048,19 @@ Box {
                                 }
                                   } // PullToRefreshBox
   
-                         // Scroll-to-bottom FAB
-                          if (!isAtBottom) {
-                             SmallFloatingActionButton(
-                                 onClick = {
-                                     coroutineScope.launch {
-                                         listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                                     }
-                                 },
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 8.dp),
-                              containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                              contentColor = MaterialTheme.colorScheme.onSurface
+                        // Scroll-to-bottom FAB
+                         if (!isAtBottom) {
+                                       SmallFloatingActionButton(
+                                           onClick = {
+                                               coroutineScope.launch {
+                                                   listState.scrollToBottom()
+                                               }
+                                           },
+                                 modifier = Modifier
+                                     .align(Alignment.BottomCenter)
+                                     .padding(bottom = 8.dp),
+                               containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                               contentColor = MaterialTheme.colorScheme.onSurface
                           ) {
                               Icon(
                                   Icons.Default.KeyboardArrowDown,
@@ -2271,19 +2268,19 @@ Box {
                                 }
                                   } // PullToRefreshBox
 
-                               // Scroll-to-bottom FAB
-                                 if (!isAtBottom) {
-                                     SmallFloatingActionButton(
-                                         onClick = {
-                                             coroutineScope.launch {
-                                                 listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-                                             }
-                                         },
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                           .padding(bottom = 8.dp),
-                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                     contentColor = MaterialTheme.colorScheme.onSurface
+                            // Scroll-to-bottom FAB
+                                  if (!isAtBottom) {
+                                      SmallFloatingActionButton(
+                                          onClick = {
+                                               coroutineScope.launch {
+                                                   listState.scrollToBottom()
+                                               }
+                                           },
+                                         modifier = Modifier
+                                             .align(Alignment.BottomCenter)
+                                            .padding(bottom = 8.dp),
+                                      containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                      contentColor = MaterialTheme.colorScheme.onSurface
                                  ) {
                                      Icon(
                                          Icons.Default.KeyboardArrowDown,
