@@ -125,30 +125,6 @@ internal fun ChatMessageBubble(
                     ),
                     verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp)
                 ) {
-                    // QUEUED badge for user messages
-                    if (isQueued) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = QueuedBadgeColor,
-                                modifier = Modifier.padding(end = 8.dp)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.chat_queued),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = QueuedBadgeTextColor
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
                     // Content parts (text, reasoning, patches, etc.)
                     // Group image file parts into a compact thumbnail row
                     val imageFiles = contentParts.filterIsInstance<Part.File>()
@@ -231,6 +207,25 @@ internal fun ChatMessageBubble(
                                     text = formatDuration(durationMs),
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
+                        }
+
+                        // QUEUED badge
+                        if (isQueued) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = QueuedBadgeColor,
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.chat_queued),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 8.sp,
+                                        color = QueuedBadgeTextColor
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                 )
                             }
                         }

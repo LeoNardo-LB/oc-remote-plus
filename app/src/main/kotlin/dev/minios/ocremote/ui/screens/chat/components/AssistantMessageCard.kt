@@ -81,50 +81,6 @@ internal fun AssistantMessageCard(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp)
         ) {
-                // "Response" header — only on the first of a consecutive sequence
-                if (!isContinuation) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            if (assistantMsg?.providerId != null) {
-                                ProviderIcon(
-                                    providerId = assistantMsg.providerId,
-                                    size = 12.dp,
-                                    tint = textColor.copy(alpha = 0.4f)
-                                )
-                            }
-                            Text(
-                                text = stringResource(R.string.chat_response),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    letterSpacing = 0.8.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = textColor.copy(alpha = 0.4f)
-                            )
-                            // Local timestamp from message creation time
-                            assistantMsg?.time?.created?.let { createdMs ->
-                                val timeText = remember(createdMs) {
-                                    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-                                        .format(java.util.Date(createdMs))
-                                }
-                                Text(
-                                    text = timeText,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp
-                                    ),
-                                    color = textColor.copy(alpha = 0.3f)
-                                )
-                            }
-                        }
-                    }
-                }
-
                 // Render parts in original order
                 for (part in renderableParts) {
                     key(part.id) {
@@ -177,6 +133,18 @@ internal fun AssistantMessageCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // 时间
+                            assistantMsg?.time?.created?.let { createdMs ->
+                                val timeText = remember(createdMs) {
+                                    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                                        .format(java.util.Date(createdMs))
+                                }
+                                Text(
+                                    text = timeText,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
                             if (assistantMsg?.providerId != null) {
                                 ProviderIcon(
                                     providerId = assistantMsg.providerId,
@@ -190,15 +158,7 @@ internal fun AssistantMessageCard(
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                            }
-                            if (durationMs != null && durationMs > 0) {
-                                Text(
-                                    text = formatDuration(durationMs),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             if (totalInput > 0 || totalOutput > 0) {
@@ -215,8 +175,15 @@ internal fun AssistantMessageCard(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                 )
                             }
+                            if (durationMs != null && durationMs > 0) {
+                                Text(
+                                    text = formatDuration(durationMs),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
                             if (onCopyText != null) {
-                                Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     Icons.Default.ContentCopy,
                                     contentDescription = stringResource(R.string.chat_copy),
@@ -236,9 +203,22 @@ internal fun AssistantMessageCard(
                         Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // 时间
+                            assistantMsg?.time?.created?.let { createdMs ->
+                                val timeText = remember(createdMs) {
+                                    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                                        .format(java.util.Date(createdMs))
+                                }
+                                Text(
+                                    text = timeText,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
                             Icon(
                                 Icons.Default.ContentCopy,
                                 contentDescription = stringResource(R.string.chat_copy),
