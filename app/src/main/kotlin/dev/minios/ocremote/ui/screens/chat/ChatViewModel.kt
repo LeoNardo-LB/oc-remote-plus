@@ -215,8 +215,8 @@ class ChatViewModel @Inject constructor(
     private val _toolExpandedStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val toolExpandedStates: StateFlow<Map<String, Boolean>> = _toolExpandedStates
 
-    fun toggleToolExpanded(toolId: String) {
-        _toolExpandedStates.update { it + (toolId to !(it[toolId] ?: false)) }
+    fun toggleToolExpanded(toolId: String, defaultExpanded: Boolean = false) {
+        _toolExpandedStates.update { it + (toolId to !(it[toolId] ?: defaultExpanded)) }
     }
 
     fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean {

@@ -66,10 +66,11 @@ internal fun PartContent(
                 }
                 val toolExpandedStates = LocalToolExpandedStates.current
                 val onToggleToolExpanded = LocalOnToggleToolExpanded.current
+                val expandReasoningDefault = LocalExpandReasoning.current
                 ReasoningBlock(
                     text = part.text,
-                    isExpanded = toolExpandedStates[part.id] ?: LocalExpandReasoning.current,
-                    onToggleExpand = { onToggleToolExpanded(part.id) },
+                    isExpanded = toolExpandedStates[part.id] ?: expandReasoningDefault,
+                    onToggleExpand = { onToggleToolExpanded(part.id, expandReasoningDefault) },
                     durationMs = reasoningDuration
                 )
             }
@@ -84,7 +85,7 @@ internal fun PartContent(
                 TodoListCard(
                     tool = part,
                     isExpanded = toolExpandedStates[part.id] ?: true,
-                    onToggleExpand = { onToggleToolExpanded(part.id) }
+                    onToggleExpand = { onToggleToolExpanded(part.id, true) }
                 )
             } else {
                 // Dispatch to tool-specific renderers (like WebUI)
@@ -93,39 +94,39 @@ internal fun PartContent(
                     "edit", "multiedit" -> EditToolCard(
                         tool = part,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                     "write" -> WriteToolCard(
                         tool = part,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                     "bash" -> BashToolCard(
                         tool = part,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                     "read" -> ReadToolCard(
                         tool = part,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                     "glob", "grep" -> SearchToolCard(
                         tool = part,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                     "task" -> TaskToolCard(
                         tool = part,
                         onViewSubSession = onViewSubSession,
                         turnAgentName = turnAgentName,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                     else -> ToolCallCard(
                         tool = part,
                         isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id) }
+                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
                     )
                 }
             }
@@ -143,7 +144,7 @@ internal fun PartContent(
             PatchCard(
                 patch = part,
                 isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                onToggleExpand = { onToggleToolExpanded(part.id) }
+                onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
             )
         }
         is Part.File -> {

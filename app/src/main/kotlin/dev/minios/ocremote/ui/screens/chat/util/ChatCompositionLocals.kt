@@ -29,4 +29,4 @@ val LocalImageSaveRequest = compositionLocalOf<(ByteArray, String, String?) -> U
 val LocalToolExpandedStates = compositionLocalOf<Map<String, Boolean>> { emptyMap() }
 
 /** Callback to toggle a tool card's expanded state by its part id. */
-val LocalOnToggleToolExpanded = compositionLocalOf<(String) -> Unit> { { } }
+val LocalOnToggleToolExpanded = compositionLocalOf<(String, Boolean) -> Unit> { { _, _ -> } }

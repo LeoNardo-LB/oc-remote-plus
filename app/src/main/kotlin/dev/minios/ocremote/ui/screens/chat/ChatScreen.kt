@@ -866,7 +866,7 @@ fun ChatScreen(
         LocalHapticFeedbackEnabled provides hapticEnabled,
         LocalImageSaveRequest provides requestSaveImage,
         LocalToolExpandedStates provides uiState.toolExpandedStates,
-        LocalOnToggleToolExpanded provides { viewModel.toggleToolExpanded(it) },
+        LocalOnToggleToolExpanded provides { toolId, defaultExpanded -> viewModel.toggleToolExpanded(toolId, defaultExpanded) },
     ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
