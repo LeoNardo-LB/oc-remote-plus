@@ -254,26 +254,21 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  */
 
 /**
- * Scroll to the absolute pixel bottom of the LazyColumn.
- * Uses only pixel-based scrolling — no item index estimation involved.
- * Suitable when layout is already stable (e.g. FAB click).
+ * Scroll to the visual bottom of the LazyColumn.
+ *
+ * Step 1: scrollToItem(lastIndex) — jumps to the last item (top-aligned).
+ * Step 2: scrollBy(10000f) — nudges downward by a large-but-safe delta.
+ *         Compose clamps this to the valid range; 10000f avoids the
+ *         Int-overflow that occurs when using Float.MAX_VALUE (3.4e38
+ *         overflows fastRoundToInt() inside onScroll).
+ *
+ * All scenarios (FAB click, entry, streaming, IME, send) use this one function.
  */
-private suspend fun LazyListState.scrollToBottomPixel() {
-    scroll { scrollBy(Float.MAX_VALUE) }
-}
-
-/**
- * Scroll to the bottom with a two-step approach for unstable-layout scenarios.
- * Step 1: scrollToItem jumps to the last item (estimated, correct direction).
- * Step 2: After a frame delay for layout to settle, scrollBy compensates estimation error.
- */
-private suspend fun LazyListState.scrollToBottomWithLayout() {
+private suspend fun LazyListState.scrollToBottom() {
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
     scrollToItem(lastIndex)
-    // Wait one frame for layout to recalculate after scrollToItem
-    kotlinx.coroutines.delay(32)
-    scroll { scrollBy(Float.MAX_VALUE) }
+    scroll { scrollBy(10000f) }
 }
 
 private data class ImageSaveRequest(
@@ -316,13 +311,14 @@ fun ChatScreen(
     }
     val listState = rememberLazyListState()
 
-    // Detect if user is at the bottom of the list (last item visible)
+    // Detect if user is truly at the bottom — canScrollForward is the
+    // authoritative Compose API (updated after each measure pass); unlike
+    // checking visibleItemsInfo.last index, it correctly accounts for item
+    // heights and won't trigger when only the top of a tall last item is visible.
     val isAtBottom by remember {
         derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            if (layoutInfo.totalItemsCount == 0) return@derivedStateOf true
-            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisible != null && lastVisible.index >= layoutInfo.totalItemsCount - 1
+            if (listState.layoutInfo.totalItemsCount == 0) true
+            else !listState.canScrollForward
         }
     }
 
@@ -363,7 +359,7 @@ fun ChatScreen(
                     listState.scrollToItem(displayIndex, viewModel.savedScrollOffset)
                 } else {
                     // Fallback: scroll to bottom
-                    listState.scrollToBottomWithLayout()
+                    listState.scrollToBottom()
                 }
             }
         } else {
@@ -371,7 +367,7 @@ fun ChatScreen(
             // reverseLayout=false anchors at top, so we must explicitly scroll.
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .first { it > 0 }
-            listState.scrollToBottomWithLayout()
+            listState.scrollToBottom()
         }
     }
 
@@ -437,7 +433,7 @@ fun ChatScreen(
     LaunchedEffect(imeVisible) {
         if (imeVisible && isAtBottomBeforeIme) {
             delay(80) // let layout settle after IME resize
-            listState.scrollToBottomWithLayout()
+            listState.scrollToBottom()
         }
     }
 
@@ -925,7 +921,7 @@ fun ChatScreen(
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messageCount) {
         if (messageCount > 0 && isAtBottom) {
-            listState.scrollToBottomWithLayout()
+            listState.scrollToBottom()
         }
     }
 
@@ -1199,7 +1195,7 @@ Box {
                             // so the user can see the latest messages while composing.
                             if (wasEmpty && normalizedValue.text.isNotEmpty()) {
                                 coroutineScope.launch {
-                                    listState.scrollToBottomWithLayout()
+                                    listState.scrollToBottom()
                                 }
                             }
 
@@ -1305,7 +1301,7 @@ Box {
                                 attachments.clear()
                                 // Scroll to bottom after sending
                                 coroutineScope.launch {
-                                    listState.scrollToBottomWithLayout()
+                                    listState.scrollToBottom()
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -2072,7 +2068,7 @@ Box {
                                         SmallFloatingActionButton(
                                             onClick = {
                                                 coroutineScope.launch {
-                                                    listState.scrollToBottomPixel()
+                                                    listState.scrollToBottom()
                                                 }
                                             },
                                  modifier = Modifier
@@ -2292,7 +2288,7 @@ Box {
                                        SmallFloatingActionButton(
                                            onClick = {
                                                 coroutineScope.launch {
-                                                    listState.scrollToBottomPixel()
+                                                    listState.scrollToBottom()
                                                 }
                                             },
                                          modifier = Modifier
