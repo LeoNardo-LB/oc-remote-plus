@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -51,6 +52,8 @@ import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 internal fun AssistantMessageCard(
     chatMessage: ChatMessage,
     isContinuation: Boolean,
+    isTurnLast: Boolean = false,
+    turnMessages: List<ChatMessage>? = null,
     onViewSubSession: ((String) -> Unit)? = null,
     onCopyText: (() -> Unit)? = null,
 ) {
@@ -148,19 +151,34 @@ internal fun AssistantMessageCard(
                     }
                 }
 
-                // Token/cost/duration footer from all StepFinish parts in this message
-                val stepFinishes = chatMessage.parts.filterIsInstance<Part.StepFinish>()
+                // Token/cost/duration footer — only on the last message of a turn
+                val stepFinishes = if (isTurnLast && turnMessages != null) {
+                    turnMessages.flatMap { msg ->
+                        msg.parts.filterIsInstance<Part.StepFinish>()
+                    }
+                } else {
+                    emptyList()
+                }
+
                 if (stepFinishes.isNotEmpty()) {
                     val totalInput = stepFinishes.sumOf { it.tokens?.input ?: 0 }
                     val totalOutput = stepFinishes.sumOf { it.tokens?.output ?: 0 }
                     val totalCost = stepFinishes.sumOf { it.cost ?: 0.0 }
                     val hasTokenStats = totalInput > 0 || totalOutput > 0 || totalCost > 0.0
 
-                    // Duration from message time
-                    val durationMs = assistantMsg?.time?.let { t ->
-                        t.completed?.let { end -> end - t.created }
-                    }
-                    val hasFooter = hasTokenStats || durationMs != null || !assistantMsg?.modelId.isNullOrBlank()
+                    val durationMs = if (isTurnLast && turnMessages != null) {
+                        val first = turnMessages.firstOrNull()?.message
+                        val last = turnMessages.lastOrNull()?.message
+                        if (first is Message.Assistant && last is Message.Assistant) {
+                            last.time.completed?.let { end -> end - first.time.created }
+                        } else null
+                    } else null
+
+                    val modelId = if (isTurnLast && turnMessages != null) {
+                        (turnMessages.lastOrNull()?.message as? Message.Assistant)?.modelId
+                    } else null
+
+                    val hasFooter = hasTokenStats || durationMs != null || !modelId.isNullOrBlank()
 
                     if (hasFooter) {
                         Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
@@ -169,7 +187,6 @@ internal fun AssistantMessageCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Provider icon (small, in footer)
                             if (assistantMsg?.providerId != null) {
                                 ProviderIcon(
                                     providerId = assistantMsg.providerId,
@@ -177,10 +194,9 @@ internal fun AssistantMessageCard(
                                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                 )
                             }
-                            // Model name
-                            if (!assistantMsg?.modelId.isNullOrBlank()) {
+                            if (!modelId.isNullOrBlank()) {
                                 Text(
-                                    text = assistantMsg.modelId,
+                                    text = modelId,
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                                     maxLines = 1,
@@ -188,7 +204,6 @@ internal fun AssistantMessageCard(
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
                             }
-                            // Duration
                             if (durationMs != null && durationMs > 0) {
                                 Text(
                                     text = formatDuration(durationMs),
@@ -196,7 +211,6 @@ internal fun AssistantMessageCard(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                 )
                             }
-                            // Tokens
                             if (totalInput > 0 || totalOutput > 0) {
                                 Text(
                                     text = stringResource(R.string.chat_tokens_format, totalInput, totalOutput),
@@ -204,12 +218,26 @@ internal fun AssistantMessageCard(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                 )
                             }
-                            // Cost
                             if (totalCost > 0.0 && totalCost.isFinite()) {
                                 Text(
                                     text = stringResource(R.string.chat_cost_format, String.format("%.4f", totalCost)),
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                )
+                            }
+                            // Footer copy button
+                            if (onCopyText != null) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = stringResource(R.string.chat_copy),
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clickable {
+                                            performHaptic(hapticView, hapticOn)
+                                            onCopyText()
+                                        },
+                                    tint = textColor.copy(alpha = 0.3f)
                                 )
                             }
                         }
