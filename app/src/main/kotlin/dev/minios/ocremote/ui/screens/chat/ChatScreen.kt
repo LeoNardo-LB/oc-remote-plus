@@ -182,6 +182,7 @@ import dev.minios.ocremote.ui.screens.chat.terminal.applyTermuxFnBindings
 import dev.minios.ocremote.ui.screens.chat.terminal.FnBindingResult
 import dev.minios.ocremote.ui.screens.chat.terminal.ctrlTransform
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
+import dev.minios.ocremote.ui.screens.chat.util.computeTurnGroups
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import dev.minios.ocremote.ui.screens.chat.util.agentColor
 import dev.minios.ocremote.ui.screens.chat.util.agentColorCycle
@@ -1748,13 +1749,16 @@ Box {
                       // Tag each assistant message with whether it follows another assistant
                       // in reverseLayout chronological order. Used for visual continuity:
                       // consecutive assistants share reduced spacing, no card separation.
-                      val isAssistantContinuation = remember(uiState.messages.size) {
+                       val isAssistantContinuation = remember(uiState.messages.map { it.message.id }) {
                           uiState.messages.mapIndexed { index, msg ->
                               val prevMsg = uiState.messages.getOrNull(index + 1)
                               msg.isAssistant && prevMsg?.isAssistant == true
                           }
-                      }
-                      // Use raw messages directly — each Message is one LazyColumn item.
+                       }
+                       val turnGroups = remember(uiState.messages.map { it.message.id }) {
+                           computeTurnGroups(uiState.messages)
+                       }
+                       // Use raw messages directly — each Message is one LazyColumn item.
                       val rawMessages = uiState.messages
 
                       if (uiState.sessionParentId == null) {
@@ -1832,13 +1836,20 @@ Box {
                                 when {
                                     msg.isAssistant -> {
                                         val isContinuation = isAssistantContinuation.getOrElse(index) { false }
+                                        val isTurnLast = uiState.messages.getOrNull(index)?.isAssistant == true &&
+                                                         uiState.messages.getOrNull(index + 1)?.isAssistant != true
+                                        val turnMessagesForMsg = turnGroups[index]
                                         AssistantMessageCard(
                                             chatMessage = msg,
                                             isContinuation = isContinuation,
+                                            isTurnLast = isTurnLast,
+                                            turnMessages = turnMessagesForMsg,
                                             onViewSubSession = navigateToChildSessionWithSave,
                                             onCopyText = {
-                                                val text = msg.parts.filterIsInstance<Part.Text>()
-                                                    .joinToString("\n\n") { it.text }
+                                                val messages = turnMessagesForMsg ?: listOf(msg)
+                                                val text = messages.flatMap { m ->
+                                                    m.parts.filterIsInstance<Part.Text>().map { it.text }
+                                                }.joinToString("\n\n")
                                                 if (text.isNotBlank()) {
                                                     markdownPreviewText = text
                                                 }
@@ -2076,26 +2087,33 @@ Box {
                                       contentType = { _, msg -> if (msg.isUser) "user" else "assistant" }
                                   ) { index, msg ->
                                       when {
-                                          msg.isAssistant -> {
-                                              val isContinuation = isAssistantContinuation.getOrElse(index) { false }
-                                               AssistantMessageCard(
-                                                   chatMessage = msg,
-                                                   isContinuation = isContinuation,
-                                                   onViewSubSession = navigateToChildSessionWithSave,
-                                                   onCopyText = {
-                                                       val text = msg.parts.filterIsInstance<Part.Text>()
-                                                           .joinToString("\n\n") { it.text }
-                                                       if (text.isNotBlank()) {
-                                                           markdownPreviewText = text
-                                                       }
-                                                   }
-                                               )
-                                           }
-                                           msg.isUser -> {
-                                              val chatMessage = msg
+                                           msg.isAssistant -> {
+                                                val isContinuation = isAssistantContinuation.getOrElse(index) { false }
+                                                val isTurnLast = uiState.messages.getOrNull(index)?.isAssistant == true &&
+                                                                 uiState.messages.getOrNull(index + 1)?.isAssistant != true
+                                                val turnMessagesForMsg = turnGroups[index]
+                                                AssistantMessageCard(
+                                                    chatMessage = msg,
+                                                    isContinuation = isContinuation,
+                                                    isTurnLast = isTurnLast,
+                                                    turnMessages = turnMessagesForMsg,
+                                                    onViewSubSession = navigateToChildSessionWithSave,
+                                                    onCopyText = {
+                                                        val messages = turnMessagesForMsg ?: listOf(msg)
+                                                        val text = messages.flatMap { m ->
+                                                            m.parts.filterIsInstance<Part.Text>().map { it.text }
+                                                        }.joinToString("\n\n")
+                                                        if (text.isNotBlank()) {
+                                                            markdownPreviewText = text
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                            msg.isUser -> {
+                                               val chatMessage = msg
 
-                                              // Detect compaction trigger messages (user messages with Part.Compaction)
-                                              val isCompactionTrigger = chatMessage.parts.any { it is Part.Compaction }
+                                               // Detect compaction trigger messages (user messages with Part.Compaction)
+                                               val isCompactionTrigger = chatMessage.parts.any { it is Part.Compaction }
 
                                               // Show compact system-style divider for compaction triggers
                                               if (isCompactionTrigger) {
