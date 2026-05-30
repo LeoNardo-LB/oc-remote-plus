@@ -1741,7 +1741,7 @@ Box {
                     }
                 }
                 else -> {
-                     val messageSpacing = if (LocalCompactMessages.current) 4.dp else 12.dp
+                     val messageSpacing = if (LocalCompactMessages.current) 2.dp else 8.dp
 
                       // Tag each assistant message with whether it follows another assistant
                       // in reverseLayout chronological order. Used for visual continuity:
