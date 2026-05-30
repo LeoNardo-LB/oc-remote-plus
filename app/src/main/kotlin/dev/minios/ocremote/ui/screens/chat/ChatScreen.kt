@@ -809,6 +809,13 @@ fun ChatScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Sync session status when entering a session (REST fallback for missed SSE events)
+    LaunchedEffect(viewModel.sessionId) {
+        if (viewModel.sessionId.isNotBlank()) {
+            viewModel.syncSessionStatus()
+        }
+    }
+
     // Refresh session when returning from background (lock screen / app switch)
     var hasResumedOnce by remember { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner) {
@@ -816,6 +823,7 @@ fun ChatScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 if (hasResumedOnce) {
                     viewModel.refreshSession()
+                    viewModel.syncSessionStatus()
                 } else {
                     hasResumedOnce = true
                 }
