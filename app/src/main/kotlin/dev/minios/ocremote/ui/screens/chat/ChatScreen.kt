@@ -1756,9 +1756,22 @@ Box {
                            computeTurnGroups(uiState.messages)
                        }
                        // Use raw messages directly — each Message is one LazyColumn item.
-                      val rawMessages = uiState.messages
+                       val rawMessages = uiState.messages
 
-                      if (uiState.sessionParentId == null) {
+                       // Filter: keep user messages + first assistant in each turn group
+                       // to avoid zero-height items creating blank gaps from spacedBy
+                       val displayItems = rawMessages.mapIndexedNotNull { index, msg ->
+                           when {
+                               msg.isUser -> index to msg
+                               msg.isAssistant -> {
+                                   val nextMsg = rawMessages.getOrNull(index - 1)
+                                   if (nextMsg?.isAssistant != true) index to msg else null
+                               }
+                               else -> null
+                           }
+                       }
+
+                       if (uiState.sessionParentId == null) {
                           // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB
                           Box(
                               modifier = Modifier.fillMaxSize()
@@ -1823,21 +1836,18 @@ Box {
                               }
                           }
 
-                            // Chat messages: newest-first (rawMessages is sorted newest-first).
+                            // Chat messages: newest-first (displayItems is sorted newest-first).
                             // In reverseLayout=true, newest at index 0 = bottom. Correct.
                             itemsIndexed(
-                                rawMessages,
-                                key = { _, msg -> msg.message.id },
-                                contentType = { _, msg -> if (msg.isUser) "user" else "assistant" }
-                            ) { index, msg ->
+                                displayItems,
+                                key = { _, item -> item.second.message.id },
+                                contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
+                            ) { _, (rawIndex, msg) ->
                                 when {
                                     msg.isAssistant -> {
-                                        // Skip non-first assistant messages — render the whole turn at the first one
-                                        val prevMsg = rawMessages.getOrNull(index + 1)
-                                        if (prevMsg?.isAssistant == true) return@itemsIndexed
-
-                                        val turnMessagesForMsg = turnGroups[index] ?: listOf(msg)
-                                        val isTurnLast = index == 0 || rawMessages.getOrNull(index - 1)?.isAssistant != true
+                                        val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
+                                        // The first assistant in a turn IS the last (newest) message of the turn
+                                        val isTurnLast = rawIndex == 0 || rawMessages.getOrNull(rawIndex - 1)?.isAssistant != true
 
                                         MessageCard(
                                             role = MessageCardRole.ASSISTANT,
@@ -2082,21 +2092,17 @@ Box {
                                       }
                                   }
 
-                                  // Chat messages: newest-first (rawMessages is sorted newest-first).
+                                  // Chat messages: newest-first (displayItems is sorted newest-first).
                                   // In reverseLayout=true, newest at index 0 = bottom. Correct.
                                   itemsIndexed(
-                                      rawMessages,
-                                      key = { _, msg -> msg.message.id },
-                                      contentType = { _, msg -> if (msg.isUser) "user" else "assistant" }
-                                  ) { index, msg ->
+                                      displayItems,
+                                      key = { _, item -> item.second.message.id },
+                                      contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
+                                  ) { _, (rawIndex, msg) ->
                                       when {
                                             msg.isAssistant -> {
-                                                // Skip non-first assistant messages — render the whole turn at the first one
-                                                val prevMsg = rawMessages.getOrNull(index + 1)
-                                                if (prevMsg?.isAssistant == true) return@itemsIndexed
-
-                                                val turnMessagesForMsg = turnGroups[index] ?: listOf(msg)
-                                                val isTurnLast = index == 0 || rawMessages.getOrNull(index - 1)?.isAssistant != true
+                                                val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
+                                                val isTurnLast = rawIndex == 0 || rawMessages.getOrNull(rawIndex - 1)?.isAssistant != true
 
                                                 MessageCard(
                                                     role = MessageCardRole.ASSISTANT,
