@@ -134,7 +134,7 @@ internal fun PartContent(
             // Visual separator between steps (hidden - WebUI doesn't show these)
         }
         is Part.StepFinish -> {
-            // Token/cost info is aggregated at the bottom of AssistantMessageCard
+            // Token/cost info is aggregated at the bottom of the assistant message
         }
         is Part.Patch -> {
             val autoExpand = LocalCollapseTools.current
