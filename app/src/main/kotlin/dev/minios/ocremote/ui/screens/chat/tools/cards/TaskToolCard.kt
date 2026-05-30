@@ -93,13 +93,13 @@ internal fun TaskToolCard(
             ?.takeIf { it?.isNotBlank() == true }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
         tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(4.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -115,7 +115,7 @@ internal fun TaskToolCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -174,7 +174,7 @@ internal fun TaskToolCard(
                     border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp)
+                        .padding(top = 3.dp)
                         .heightIn(max = halfScreenHeight)
                         .consumeBoundaryScroll(scrollState)
                         .verticalScroll(scrollState)
