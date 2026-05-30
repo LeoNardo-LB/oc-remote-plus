@@ -1,14 +1,9 @@
 package dev.minios.ocremote.ui.screens.chat.markdown
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.selection.LocalTextSelectionColors
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -251,50 +246,17 @@ internal fun MarkdownContent(
         tableMaxWidth = screenWidthDp * 1.5f
     )
 
-    // Text selection: transparent SelectionContainer overlay (方案D).
-    // Direct SelectionContainer wrapping breaks click handling on sibling
-    // composables (tool cards, expand/collapse) due to selectableGroup()
-    // pointer-input leaking into LazyColumn's scope. Instead, we overlay a
-    // transparent text layer on top of the rendered Markdown — same pattern
-    // used by the terminal component.
-    //
-    // retainState = true keeps the previous rendered content visible while
-    // new markdown is being parsed, preventing the Loading→Success flicker
-    // that causes screen flashing during streaming output.
     val markdownState = rememberMarkdownState(
         content = normalizedMarkdown,
         retainState = true
     )
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // Layer 1: Visible Markdown rendering
-        Markdown(
-            markdownState = markdownState,
-            colors = colors,
-            typography = typography,
-            components = components,
-            dimens = dimens,
-            imageTransformer = Coil3ImageTransformerImpl,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Layer 2: Transparent text selection overlay — only for assistant messages
-        if (!isUser) {
-            val selectionColors = TextSelectionColors(
-                handleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            )
-            CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                SelectionContainer(
-                    modifier = Modifier.matchParentSize()
-                ) {
-                    Text(
-                        text = normalizedMarkdown,
-                        color = Color.Transparent,
-                        style = bodyStyle,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-    }
+    Markdown(
+        markdownState = markdownState,
+        colors = colors,
+        typography = typography,
+        components = components,
+        dimens = dimens,
+        imageTransformer = Coil3ImageTransformerImpl,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
