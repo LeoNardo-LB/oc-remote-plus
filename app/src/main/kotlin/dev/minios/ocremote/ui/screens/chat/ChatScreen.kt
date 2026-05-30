@@ -237,9 +237,8 @@ import dev.minios.ocremote.ui.screens.chat.input.ChatInputBar
 import dev.minios.ocremote.ui.screens.chat.input.ChatInputMode
 import dev.minios.ocremote.ui.screens.chat.input.SlashCommand
 import dev.minios.ocremote.ui.screens.chat.input.buildPromptParts
-import dev.minios.ocremote.ui.screens.chat.components.ChatMessageBubble
-import dev.minios.ocremote.ui.screens.chat.components.AssistantMessageCard
-import dev.minios.ocremote.ui.screens.chat.components.AssistantTurnBubble
+import dev.minios.ocremote.ui.screens.chat.components.MessageCard
+import dev.minios.ocremote.ui.screens.chat.components.MessageCardRole
 import dev.minios.ocremote.ui.screens.chat.components.ErrorPayloadContent
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
@@ -1753,16 +1752,7 @@ Box {
                 else -> {
                      val messageSpacing = if (LocalCompactMessages.current) 2.dp else 8.dp
 
-                      // Tag each assistant message with whether it follows another assistant
-                      // in reverseLayout chronological order. Used for visual continuity:
-                      // consecutive assistants share reduced spacing, no card separation.
-                       val isAssistantContinuation = remember(uiState.messages.map { it.message.id }) {
-                          uiState.messages.mapIndexed { index, msg ->
-                              val prevMsg = uiState.messages.getOrNull(index + 1)
-                              msg.isAssistant && prevMsg?.isAssistant == true
-                          }
-                       }
-                       val turnGroups = remember(uiState.messages.map { it.message.id }) {
+                        val turnGroups = remember(uiState.messages.map { it.message.id }) {
                            computeTurnGroups(uiState.messages)
                        }
                        // Use raw messages directly — each Message is one LazyColumn item.
@@ -1842,25 +1832,29 @@ Box {
                             ) { index, msg ->
                                 when {
                                     msg.isAssistant -> {
-                                        val isContinuation = isAssistantContinuation.getOrElse(index) { false }
-                                        val isTurnLast = uiState.messages.getOrNull(index)?.isAssistant == true &&
-                                                         (index == 0 || uiState.messages.getOrNull(index - 1)?.isAssistant != true)
-                                        val turnMessagesForMsg = turnGroups[index]
-                                        AssistantMessageCard(
-                                            chatMessage = msg,
-                                            isContinuation = isContinuation,
-                                            isTurnLast = isTurnLast,
+                                        // Skip non-first assistant messages — render the whole turn at the first one
+                                        val prevMsg = rawMessages.getOrNull(index + 1)
+                                        if (prevMsg?.isAssistant == true) return@itemsIndexed
+
+                                        val turnMessagesForMsg = turnGroups[index] ?: listOf(msg)
+                                        val isTurnLast = index == 0 || rawMessages.getOrNull(index - 1)?.isAssistant != true
+
+                                        MessageCard(
+                                            role = MessageCardRole.ASSISTANT,
                                             turnMessages = turnMessagesForMsg,
+                                            currentMessage = msg,
                                             onViewSubSession = navigateToChildSessionWithSave,
-                                            onCopyText = {
-                                                val messages = (turnMessagesForMsg ?: listOf(msg)).reversed()
-                                                val text = messages.flatMap { m ->
-                                                    m.parts.filterIsInstance<Part.Text>().map { it.text }
-                                                }.joinToString("\n\n")
-                                                if (text.isNotBlank()) {
-                                                    markdownPreviewText = text
+                                            isAmoled = isAmoled,
+                                            isTurnLast = isTurnLast,
+                                            onCopyText = if (isTurnLast) {
+                                                {
+                                                    val messages = turnMessagesForMsg.reversed()
+                                                    val text = messages.flatMap { m ->
+                                                        m.parts.filterIsInstance<Part.Text>().map { it.text }
+                                                    }.joinToString("\n\n")
+                                                    if (text.isNotBlank()) { markdownPreviewText = text }
                                                 }
-                                            }
+                                            } else null
                                         )
                                     }
                                     msg.isUser -> {
@@ -1930,8 +1924,9 @@ Box {
                                             return@itemsIndexed
                                         }
 
-                                        ChatMessageBubble(
-                                            chatMessage = chatMessage,
+                                        MessageCard(
+                                            role = MessageCardRole.USER,
+                                            currentMessage = chatMessage,
                                             isQueued = chatMessage.message.id in uiState.queuedMessageIds,
                                             onViewSubSession = navigateToChildSessionWithSave,
                                             onRevert = if (uiState.sessionParentId == null) {{
@@ -1958,7 +1953,8 @@ Box {
                                                         snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
                                                     }
                                                 }
-                                            }
+                                            },
+                                            isAmoled = isAmoled
                                         )
                                     }
                                 }
@@ -2094,26 +2090,30 @@ Box {
                                       contentType = { _, msg -> if (msg.isUser) "user" else "assistant" }
                                   ) { index, msg ->
                                       when {
-                                           msg.isAssistant -> {
-                                                val isContinuation = isAssistantContinuation.getOrElse(index) { false }
-                                                val isTurnLast = uiState.messages.getOrNull(index)?.isAssistant == true &&
-                                                                 (index == 0 || uiState.messages.getOrNull(index - 1)?.isAssistant != true)
-                                                val turnMessagesForMsg = turnGroups[index]
-                                                AssistantMessageCard(
-                                                    chatMessage = msg,
-                                                    isContinuation = isContinuation,
-                                                    isTurnLast = isTurnLast,
+                                            msg.isAssistant -> {
+                                                // Skip non-first assistant messages — render the whole turn at the first one
+                                                val prevMsg = rawMessages.getOrNull(index + 1)
+                                                if (prevMsg?.isAssistant == true) return@itemsIndexed
+
+                                                val turnMessagesForMsg = turnGroups[index] ?: listOf(msg)
+                                                val isTurnLast = index == 0 || rawMessages.getOrNull(index - 1)?.isAssistant != true
+
+                                                MessageCard(
+                                                    role = MessageCardRole.ASSISTANT,
                                                     turnMessages = turnMessagesForMsg,
+                                                    currentMessage = msg,
                                                     onViewSubSession = navigateToChildSessionWithSave,
-                                                    onCopyText = {
-                                                        val messages = (turnMessagesForMsg ?: listOf(msg)).reversed()
-                                                        val text = messages.flatMap { m ->
-                                                            m.parts.filterIsInstance<Part.Text>().map { it.text }
-                                                        }.joinToString("\n\n")
-                                                        if (text.isNotBlank()) {
-                                                            markdownPreviewText = text
+                                                    isAmoled = isAmoled,
+                                                    isTurnLast = isTurnLast,
+                                                    onCopyText = if (isTurnLast) {
+                                                        {
+                                                            val messages = turnMessagesForMsg.reversed()
+                                                            val text = messages.flatMap { m ->
+                                                                m.parts.filterIsInstance<Part.Text>().map { it.text }
+                                                            }.joinToString("\n\n")
+                                                            if (text.isNotBlank()) { markdownPreviewText = text }
                                                         }
-                                                    }
+                                                    } else null
                                                 )
                                             }
                                             msg.isUser -> {
@@ -2185,25 +2185,27 @@ Box {
                                                   return@itemsIndexed
                                               }
 
-                                              ChatMessageBubble(
-                                                  chatMessage = chatMessage,
-                                                  isQueued = chatMessage.message.id in uiState.queuedMessageIds,
-                                                  onViewSubSession = navigateToChildSessionWithSave,
-                                                  onRevert = null,
-                                                  onCopyText = {
-                                                      val text = chatMessage.parts
-                                                          .filterIsInstance<Part.Text>()
-                                                          .joinToString("\n") { it.text }
-                                                      if (text.isNotBlank()) {
-                                                          clipboardManager.setText(
-                                                              androidx.compose.ui.text.AnnotatedString(text)
-                                                          )
-                                                          coroutineScope.launch {
-                                                              snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
-                                                          }
-                                                      }
-                                                  }
-                                              )
+                                               MessageCard(
+                                                   role = MessageCardRole.USER,
+                                                   currentMessage = chatMessage,
+                                                   isQueued = chatMessage.message.id in uiState.queuedMessageIds,
+                                                   onViewSubSession = navigateToChildSessionWithSave,
+                                                   onRevert = null,
+                                                   onCopyText = {
+                                                       val text = chatMessage.parts
+                                                           .filterIsInstance<Part.Text>()
+                                                           .joinToString("\n") { it.text }
+                                                       if (text.isNotBlank()) {
+                                                           clipboardManager.setText(
+                                                               androidx.compose.ui.text.AnnotatedString(text)
+                                                           )
+                                                           coroutineScope.launch {
+                                                               snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
+                                                           }
+                                                       }
+                                                   },
+                                                   isAmoled = isAmoled
+                                               )
                                           }
                                       }
                                   }
