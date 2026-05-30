@@ -1752,11 +1752,14 @@ Box {
                 else -> {
                      val messageSpacing = if (LocalCompactMessages.current) 2.dp else 8.dp
 
-                        val turnGroups = remember(uiState.messages.map { it.message.id }) {
-                           computeTurnGroups(uiState.messages)
-                       }
-                       // Use raw messages directly — each Message is one LazyColumn item.
-                       val rawMessages = uiState.messages
+                        // Use raw messages directly — each Message is one LazyColumn item.
+                        val rawMessages = uiState.messages
+
+                        // Compute turn groups every recompose (no remember!).
+                        // SSE text-delta updates Part content without changing message IDs,
+                        // so a remembered turnGroups would hold stale ChatMessage objects,
+                        // breaking streaming (content appears in chunks) and causing flicker.
+                        val turnGroups = computeTurnGroups(rawMessages)
 
                        // Filter: keep user messages + first assistant in each turn group
                        // to avoid zero-height items creating blank gaps from spacedBy
