@@ -4,12 +4,16 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
@@ -23,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +40,7 @@ import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
+import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
@@ -74,13 +80,13 @@ internal fun ReadToolCard(
     val isCompleted = tool.state is ToolState.Completed
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
         tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(4.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -89,7 +95,7 @@ internal fun ReadToolCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -127,44 +133,54 @@ internal fun ReadToolCard(
             AnimatedVisibility(
                 visible = expanded,
             ) {
-                Column(
-                    modifier = Modifier.padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                val halfScreenHeight = maxOf(LocalConfiguration.current.screenHeightDp.dp / 2, 200.dp)
+                val scrollState = rememberScrollState()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = halfScreenHeight)
+                        .consumeBoundaryScroll(scrollState)
+                        .verticalScroll(scrollState)
                 ) {
-                    if (filePath.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = toolOutputContainerColor(isAmoled),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = filePath,
-                                style = CodeTypography.copy(
-                                    fontSize = 11.sp,
-                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                                ),
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .codeHorizontalScroll()
-                            )
+                    Column(
+                        modifier = Modifier.padding(top = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        if (filePath.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = toolOutputContainerColor(isAmoled),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = filePath,
+                                    style = CodeTypography.copy(
+                                        fontSize = 11.sp,
+                                        color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    ),
+                                    modifier = Modifier
+                                        .padding(4.dp)
+                                        .codeHorizontalScroll()
+                                )
+                            }
                         }
-                    }
-                    if (args != null) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = toolOutputContainerColor(isAmoled),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = args,
-                                style = CodeTypography.copy(
-                                    fontSize = 11.sp,
-                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                                ),
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .codeHorizontalScroll()
-                            )
+                        if (args != null) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = toolOutputContainerColor(isAmoled),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = args,
+                                    style = CodeTypography.copy(
+                                        fontSize = 11.sp,
+                                        color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    ),
+                                    modifier = Modifier
+                                        .padding(4.dp)
+                                        .codeHorizontalScroll()
+                                )
+                            }
                         }
                     }
                 }
