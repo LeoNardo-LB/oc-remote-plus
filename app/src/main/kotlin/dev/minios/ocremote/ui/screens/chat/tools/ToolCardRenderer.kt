@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools
+package dev.minios.ocremote.ui.screens.chat.tools
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -38,7 +38,7 @@ import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryFling
+import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
@@ -160,7 +160,7 @@ internal fun ToolCallCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = halfScreenHeight)
-                        .consumeBoundaryFling(toolCardScrollState)
+                        .consumeBoundaryScroll(toolCardScrollState)
                         .verticalScroll(toolCardScrollState)
                 ) {
                     Column(

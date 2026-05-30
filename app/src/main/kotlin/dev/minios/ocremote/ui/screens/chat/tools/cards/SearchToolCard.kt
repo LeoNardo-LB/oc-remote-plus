@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
+package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -39,7 +39,7 @@ import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolOutput
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
-import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryFling
+import dev.minios.ocremote.ui.screens.chat.util.consumeBoundaryScroll
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
@@ -144,7 +144,7 @@ internal fun SearchToolCard(
                         .fillMaxWidth()
                         .padding(top = 6.dp)
                         .heightIn(max = halfScreenHeight)
-                        .consumeBoundaryFling(scrollState)
+                        .consumeBoundaryScroll(scrollState)
                         .verticalScroll(scrollState)
                 ) {
                     MarkdownContent(
