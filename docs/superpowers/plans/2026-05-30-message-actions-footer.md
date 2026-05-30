@@ -63,113 +63,134 @@ import java.util.Locale
 
 - [ ] **Step 3: 添加统计栏和 AlertDialog**
 
-在 `bubbleContent()` 调用（即 `bubbleContent()` 这一行的位置）之后，添加统计栏 + 保留的撤回确认对话框。整体结构：
+#### 统计栏位置（关键！）
+
+统计栏必须放在 `bubbleContent()` **内部的 Column 末尾**（即 Surface → Column 的最后一个子项），而不是 `bubbleContent()` 之后。原因：外层 Column 是 `fillMaxWidth()` + `Alignment.End`，bubbleContent() 内的 Surface 也是 `fillMaxWidth()`。如果统计栏放在外层 Column 中使用 `fillMaxWidth`，会通栏占满屏幕宽度。
+
+#### 改动方式
+
+1. 在 `bubbleContent()` lambda 内的 Column 末尾（L207 `}` 之前），添加统计栏 Row
+2. `showRevertConfirmation` state 声明提到 `bubbleContent()` 之前（Composable scope 内）
+3. AlertDialog 放在外层 Column 中（`bubbleContent()` 之后），因为它需要在气泡外弹出
+
+#### 代码结构
 
 ```kotlin
-    bubbleContent()
+// === 在 bubbleContent() 之前声明 ===
+var showRevertConfirmation by remember { mutableStateOf(false) }
 
-    // 统计栏
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 左侧：时间
-        val timeText = remember(chatMessage.message.time.created) {
-            SimpleDateFormat("HH:mm", Locale.getDefault())
-                .format(Date(chatMessage.message.time.created))
-        }
-        Text(
-            text = timeText,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-        )
+val bubbleContent: @Composable () -> Unit = {
+    Surface(...) {
+        val compact = LocalCompactMessages.current
+        Column(...) {
+            // ... 现有内容（QUEUED badge, parts, fallback text 等）...
 
-        // 左侧：耗时
-        val completed = chatMessage.message.time.completed
-        if (completed != null) {
-            val durationMs = completed - chatMessage.message.time.created
-            if (durationMs > 0) {
+            // === 新增：统计栏（Column 的最后一个子项）===
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (compact) 4.dp else 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 左侧：时间
+                val timeText = remember(chatMessage.message.time.created) {
+                    SimpleDateFormat("HH:mm", Locale.getDefault())
+                        .format(Date(chatMessage.message.time.created))
+                }
                 Text(
-                    text = formatDuration(durationMs),
+                    text = timeText,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
-            }
-        }
 
-        // 弹性空白
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Undo 按钮
-        if (onRevert != null) {
-            Icon(
-                Icons.AutoMirrored.Outlined.Undo,
-                contentDescription = stringResource(R.string.chat_revert),
-                modifier = Modifier
-                    .size(14.dp)
-                    .clickable {
-                        performHaptic(hapticView, hapticOn)
-                        showRevertConfirmation = true
-                    },
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-            )
-        }
-
-        // Copy 按钮
-        if (onCopyText != null) {
-            Icon(
-                Icons.Default.ContentCopy,
-                contentDescription = stringResource(R.string.chat_copy),
-                modifier = Modifier
-                    .size(14.dp)
-                    .clickable {
-                        performHaptic(hapticView, hapticOn)
-                        onCopyText()
-                    },
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-            )
-        }
-    }
-
-    // 撤回确认对话框（保留原有逻辑）
-    if (showRevertConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showRevertConfirmation = false },
-            title = { Text(stringResource(R.string.chat_revert)) },
-            text = { Text(stringResource(R.string.chat_revert_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showRevertConfirmation = false
-                    onRevert?.invoke()
-                }) {
-                    Text(stringResource(R.string.chat_revert))
+                // 左侧：耗时
+                val completed = chatMessage.message.time.completed
+                if (completed != null) {
+                    val durationMs = completed - chatMessage.message.time.created
+                    if (durationMs > 0) {
+                        Text(
+                            text = formatDuration(durationMs),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                        )
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRevertConfirmation = false }) {
-                    Text(stringResource(android.R.string.cancel))
+
+                // 弹性空白
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Undo 按钮（仅主会话，onRevert != null 时显示）
+                if (onRevert != null) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = stringResource(R.string.chat_revert),
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clickable {
+                                performHaptic(hapticView, hapticOn)
+                                showRevertConfirmation = true
+                            },
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    )
+                }
+
+                // Copy 按钮（最右侧）
+                if (onCopyText != null) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = stringResource(R.string.chat_copy),
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clickable {
+                                performHaptic(hapticView, hapticOn)
+                                onCopyText()
+                            },
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    )
                 }
             }
-        )
+        }
     }
-```
+}
 
-同时需要保留 `showRevertConfirmation` state 声明（在 bubbleContent 之前）：
-```kotlin
-var showRevertConfirmation by remember { mutableStateOf(false) }
+// === 在 bubbleContent() 调用之后（外层 Column 中）===
+// 只放 AlertDialog，不放统计栏
+
+// 撤回确认对话框
+if (showRevertConfirmation && onRevert != null) {
+    AlertDialog(
+        onDismissRequest = { showRevertConfirmation = false },
+        title = { Text(stringResource(R.string.chat_revert)) },
+        text = { Text(stringResource(R.string.chat_revert_confirm)) },
+        confirmButton = {
+            TextButton(onClick = {
+                showRevertConfirmation = false
+                onRevert()
+            }) {
+                Text(stringResource(R.string.chat_revert))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { showRevertConfirmation = false }) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
+    )
+}
 ```
 
 **关键注意事项：**
 - `hapticView` 和 `hapticOn` 已在 L86-87 定义（`LocalView.current` 和 `LocalHapticFeedbackEnabled.current`），直接复用
 - `performHaptic` 已在 L55 导入
 - `chatMessage` 是函数参数
-- `formatDuration` 来自 `ChatFormatters.kt`（同一 `chat.util` 包），需要确认 import 是否已存在
+- `formatDuration` 来自 `ChatFormatters.kt`（`chat.util` 包），需要 import：`import dev.minios.ocremote.ui.screens.chat.util.formatDuration`
+- `Icons.AutoMirrored.Filled.Undo` — 项目已引入 `material-icons-extended`（build.gradle.kts L116），且 `Icons.AutoMirrored` 已在 ChatMessageBubble.kt L289 使用
 - `stringResource(R.string.chat_revert)` 和 `stringResource(R.string.chat_revert_confirm)` 已在原 SwipeToDismissBox 中使用，无需新增字符串资源
-- `onRevert` 和 `onCopyText` 是现有函数参数
-- 统计栏不在 `Surface` 内部（在 `bubbleContent()` 之后），需要确认它在气泡外部还是内部。根据原结构，`bubbleContent()` 包含 Surface + Column，统计栏应在其外部——这样统计栏不会被气泡背景色影响
+- `onRevert` 和 `onCopyText` 是现有函数参数（L64-65）
+- 子会话传入 `onRevert=null`，Undo 按钮自动不显示
+- `chatMessage.message.time.completed` 是 `Long?`（可空），`null` 时 duration 不显示
+- AlertDialog 中 `onRevert()` 直接调用（此时在 `onRevert != null` 条件内，非空断言安全）
 
 - [ ] **Step 4: 清理无用 import**
 
