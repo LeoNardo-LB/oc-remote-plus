@@ -328,12 +328,24 @@ private fun MessageCardAssistant(
 ) {
     val textColor = if (isAmoled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface
 
-    val assistantMsg = currentMessage.message as? Message.Assistant
-    val errorText = formatAssistantErrorMessage(assistantMsg?.error)
-
     // Reverse turnMessages to correct newest-first order
     val orderedTurnMessages = turnMessages?.reversed()
-    val renderableParts = filterRenderableParts(currentMessage.parts)
+
+    // Collect parts from ALL messages in the turn, not just currentMessage
+    val allTurnParts = orderedTurnMessages?.flatMap { msg -> filterRenderableParts(msg.parts) }
+        ?: filterRenderableParts(currentMessage.parts)
+    val renderableParts = allTurnParts
+
+    // Check for errors across all messages in the turn
+    val errorText = orderedTurnMessages
+        ?.firstNotNullOfOrNull { msg ->
+            val am = msg.message as? Message.Assistant
+            formatAssistantErrorMessage(am?.error)
+        }
+        ?: formatAssistantErrorMessage((currentMessage.message as? Message.Assistant)?.error)
+
+    // Keep for footer display (time, provider icon)
+    val assistantMsg = currentMessage.message as? Message.Assistant
 
     if (renderableParts.isEmpty() && errorText == null) return
 
@@ -367,7 +379,9 @@ private fun MessageCardAssistant(
                             isUser = false,
                             onViewSubSession = onViewSubSession,
                             turnAgentName = if (part is Part.Tool && part.tool == "task") {
-                                val agentParts = currentMessage.parts.filterIsInstance<Part.Agent>()
+                                val agentParts = orderedTurnMessages?.flatMap { it.parts }
+                                    ?.filterIsInstance<Part.Agent>()
+                                    ?: currentMessage.parts.filterIsInstance<Part.Agent>()
                                 agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
                             } else null
                         )
