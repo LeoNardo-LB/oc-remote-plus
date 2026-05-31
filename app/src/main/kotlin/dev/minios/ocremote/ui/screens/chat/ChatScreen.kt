@@ -915,28 +915,37 @@ fun ChatScreen(
     }
 
     // Track whether user is at bottom, updated only when manual scroll ends.
-    // This avoids the bug where isAtBottom and canScrollBackward are mutually exclusive.
-    // programmatic scrollToItem does NOT trigger isScrollInProgress, so this flag
-    // is only updated by genuine user interaction.
     var userAtBottom by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         snapshotFlow { listState.isScrollInProgress }
             .collect { scrolling ->
                 if (!scrolling) {
-                    // Scroll gesture ended — snapshot the bottom state
                     userAtBottom = !listState.canScrollBackward
                 }
             }
     }
 
+    // requestScrollToItem (Foundation 1.7.0+) tells LazyColumn BEFORE measurement
+    // to ignore key anchoring and stay at this exact index+offset.
+    // SideEffect runs after every recomposition, before the next measure pass.
+    // When user scrolled away from bottom, this PREVENTS SSE content changes
+    // from shifting the viewport — zero fighting, zero bouncing.
+    if (!userAtBottom) {
+        SideEffect {
+            listState.requestScrollToItem(
+                index = listState.firstVisibleItemIndex,
+                scrollOffset = listState.firstVisibleItemScrollOffset
+            )
+        }
+    }
+
     // When message count increases (new message from send or QUEUE auto-submit),
-    // scroll to absolute bottom if user is already at/near bottom.
+    // scroll to bottom if user is at bottom.
     LaunchedEffect(Unit) {
         var lastCount = 0
         snapshotFlow { uiState.messages.size }
             .collect { count ->
                 if (count > lastCount && lastCount > 0 && userAtBottom) {
-                    // New messages appeared while user is at bottom → stay at bottom
                     listState.scrollToItem(0)
                     while (listState.canScrollBackward) {
                         listState.scroll { scrollBy(-10_000f) }
@@ -944,27 +953,6 @@ fun ChatScreen(
                 }
                 lastCount = count
             }
-    }
-
-    // SSE auto-follow: when the last message content changes (streaming tokens)
-    // and user was at bottom before SSE started, scroll back to bottom.
-    // If user scrolled away even one pixel, userAtBottom=false → do nothing.
-    // Key anchoring keeps user's position when they've scrolled away.
-    LaunchedEffect(Unit) {
-        var lastHash = 0
-        snapshotFlow {
-            val msgs = uiState.messages
-            var h = msgs.size
-            msgs.lastOrNull()?.parts?.forEach { h = 31 * h + it.hashCode() }
-            h
-        }.collect { hash ->
-            val changed = hash != lastHash && lastHash != 0
-            lastHash = hash
-            if (changed && userAtBottom) {
-                // User was at bottom, content changed → scroll back to bottom
-                listState.scrollToItem(0)
-            }
-        }
     }
 
     CompositionLocalProvider(
