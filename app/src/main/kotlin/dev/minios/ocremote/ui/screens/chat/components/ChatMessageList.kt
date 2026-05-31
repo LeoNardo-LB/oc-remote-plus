@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -325,10 +326,13 @@ fun ChatMessageList(
     } // Column
 }
 
-/** Snap scroll to bottom for reverseLayout LazyColumn. */
+/** Snap scroll to absolute bottom for reverseLayout LazyColumn. */
 private suspend fun LazyListState.snapToBottom() {
     if (layoutInfo.totalItemsCount == 0) return
-    val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return
-    if (lastVisibleIndex == 0) return
     scrollToItem(0)
+    repeat(3) {
+        delay(16)
+        if (!canScrollBackward) return
+        scroll { scrollBy(-10_000f) }
+    }
 }

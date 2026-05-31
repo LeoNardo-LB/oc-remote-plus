@@ -1139,7 +1139,11 @@ fun ChatScreen(
  */
 private suspend fun LazyListState.snapToBottom() {
     scrollToItem(0)
-    while (canScrollBackward) {
+    // Small delay lets LazyColumn complete layout after new items appear,
+    // then retry until fully at bottom (no remaining sub-pixel offset).
+    repeat(3) {
+        delay(16)
+        if (!canScrollBackward) return
         scroll { scrollBy(-10_000f) }
     }
 }
