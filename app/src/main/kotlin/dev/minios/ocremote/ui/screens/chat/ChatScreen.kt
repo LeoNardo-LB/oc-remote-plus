@@ -922,12 +922,22 @@ fun ChatScreen(
             .collect { count ->
                 if (count > lastCount && lastCount > 0 && isAtBottom) {
                     // New messages appeared while user is at bottom → stay at bottom
-                    listState.scrollToItem(0)
-                    while (listState.canScrollBackward) {
-                        listState.scroll { scrollBy(-10_000f) }
-                    }
+                    listState.snapToBottom()
                 }
                 lastCount = count
+            }
+    }
+
+    // When SSE streaming ends, the detached streaming message merges back into LazyColumn.
+    // If user was at/near bottom, snap to the new bottom.
+    LaunchedEffect(Unit) {
+        var wasStreaming = false
+        snapshotFlow { uiState.sessionStatus is SessionStatus.Busy }
+            .collect { streaming ->
+                if (wasStreaming && !streaming && isAtBottom) {
+                    listState.snapToBottom()
+                }
+                wasStreaming = streaming
             }
     }
 
@@ -1305,12 +1315,7 @@ Box {
                                     snapshotFlow { listState.layoutInfo.totalItemsCount }
                                         .first { it > currentCount }
                                     Log.w("CHAT_DEBUG", "[afterSend] new items detected: count=${listState.layoutInfo.totalItemsCount} canBackward=${listState.canScrollBackward}")
-                                    listState.scrollToItem(0)
-                                    Log.w("CHAT_DEBUG", "[afterSend] after scrollToItem(0): canBackward=${listState.canScrollBackward} first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
-                                    // reverseLayout=true: scroll backward to reach absolute bottom
-                                    while (listState.canScrollBackward) {
-                                        listState.scroll { scrollBy(-10_000f) }
-                                    }
+                                    listState.snapToBottom()
                                     Log.w("CHAT_DEBUG", "[afterSend] DONE: canBackward=${listState.canScrollBackward} first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
                                 }
                                 viewModel.clearConfirmedPaths()
@@ -1862,11 +1867,25 @@ Box {
                            }
                        }
 
+                       // SSE streaming detach: when busy, split the last display item out
+                       // so LazyColumn only contains static historical messages.
+                       val isStreaming = uiState.sessionStatus is SessionStatus.Busy
+                       val (historicalItems, streamingItem) = if (isStreaming && displayItems.isNotEmpty()) {
+                           displayItems.dropLast(1) to displayItems.last()
+                       } else {
+                           displayItems to null
+                       }
+
                        if (uiState.sessionParentId == null) {
                            // Main session: Scaffold bottomBar contains ChatInputBar; content is LazyColumn + FAB
-                           Box(
+                           Column(
                                modifier = Modifier.fillMaxSize()
                            ) {
+                               Box(
+                                   modifier = Modifier
+                                       .weight(1f)
+                                       .fillMaxWidth()
+                               ) {
                                    @OptIn(ExperimentalMaterial3Api::class)
                                    val pullToRefreshState = rememberPullToRefreshState()
                                     PullToRefreshBox(
@@ -1938,10 +1957,11 @@ Box {
                                }
                            }
 
-                              // Chat messages: displayItems.reversed() so newest is at index 0 (bottom in reverseLayout).
+                              // Chat messages: historicalItems.reversed() so newest is at index 0 (bottom in reverseLayout).
                               // Visual result: oldest at top, newest at bottom.
+                              // (streaming item is rendered outside LazyColumn when active)
                               itemsIndexed(
-                                 displayItems.reversed(),
+                                 historicalItems.reversed(),
                                  key = { _, item -> item.second.message.id },
                                  contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
                              ) { _, (rawIndex, msg) ->
@@ -2080,7 +2100,7 @@ Box {
                                              onClick = {
                                                  coroutineScope.launch {
                                                      // reverseLayout=true: item 0 = bottom (newest messages)
-                                                     listState.animateScrollToItem(0)
+                                                     listState.snapToBottom()
                                                  }
                                              },
                                   modifier = Modifier
@@ -2095,12 +2115,41 @@ Box {
                                            modifier = Modifier.size(20.dp)
                                       )
                                   }
-                              }
+                               }
 
-                           }
-                       } else {
-                             // Sub-session (no input bar): just LazyColumn + FAB
-                             Box(modifier = Modifier.fillMaxSize()) {
+                         } // Box(weight) — contains PullToRefreshBox + FAB
+
+                        // Streaming message card: detached from LazyColumn to prevent layout jitter
+                        if (streamingItem != null) {
+                            val (rawIndex, msg) = streamingItem
+                            val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 280.dp)
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                MessageCard(
+                                    role = MessageCardRole.ASSISTANT,
+                                    turnMessages = turnMessagesForMsg,
+                                    currentMessage = msg,
+                                    onViewSubSession = navigateToChildSessionWithSave,
+                                    isAmoled = isAmoled,
+                                    isTurnLast = true,
+                                    onCopyText = null  // No copy while streaming
+                                )
+                            }
+                        }
+                    } // Column
+                        } else {
+                              // Sub-session (no input bar): just LazyColumn + FAB
+                              Column(modifier = Modifier.fillMaxSize()) {
+                                  Box(
+                                      modifier = Modifier
+                                          .weight(1f)
+                                          .fillMaxWidth()
+                                  ) {
                                   @OptIn(ExperimentalMaterial3Api::class)
                                   val pullToRefreshState = rememberPullToRefreshState()
                                    PullToRefreshBox(
@@ -2170,10 +2219,11 @@ Box {
                                          }
                                      }
 
-                                     // Chat messages: displayItems.reversed() so newest is at index 0 (bottom in reverseLayout).
-                                     // Visual result: oldest at top, newest at bottom.
-                                     itemsIndexed(
-                                       displayItems.reversed(),
+                                      // Chat messages: historicalItems.reversed() so newest is at index 0 (bottom in reverseLayout).
+                                      // Visual result: oldest at top, newest at bottom.
+                                      // (streaming item is rendered outside LazyColumn when active)
+                                      itemsIndexed(
+                                        historicalItems.reversed(),
                                        key = { _, item -> item.second.message.id },
                                        contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
                                    ) { _, (rawIndex, msg) ->
@@ -2294,37 +2344,61 @@ Box {
                                       }
                                    }
                                  }
-                                   } // PullToRefreshBox
+                                  } // PullToRefreshBox
 
-                             // Scroll-to-bottom FAB
-                                    if (!isAtBottom) {
-                                           SmallFloatingActionButton(
-                                              onClick = {
-                                                   coroutineScope.launch {
-                                                       // reverseLayout=true: item 0 = bottom (newest messages)
-                                                       listState.animateScrollToItem(0)
-                                                   }
-                                              },
-                                          modifier = Modifier
-                                              .align(Alignment.BottomCenter)
-                                             .padding(bottom = 8.dp),
-                                       containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                       contentColor = MaterialTheme.colorScheme.onSurface
-                                 ) {
-                                     Icon(
-                                         Icons.Default.KeyboardArrowDown,
-                                         contentDescription = stringResource(R.string.chat_scroll_bottom),
-                                         modifier = Modifier.size(20.dp)
-                                     )
-                                 }
-                             }
+                              // Scroll-to-bottom FAB
+                                     if (!isAtBottom) {
+                                            SmallFloatingActionButton(
+                                               onClick = {
+                                                    coroutineScope.launch {
+                                                        // reverseLayout=true: item 0 = bottom (newest messages)
+                                                        listState.snapToBottom()
+                                                    }
+                                               },
+                                           modifier = Modifier
+                                               .align(Alignment.BottomCenter)
+                                              .padding(bottom = 8.dp),
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                  ) {
+                                      Icon(
+                                          Icons.Default.KeyboardArrowDown,
+                                          contentDescription = stringResource(R.string.chat_scroll_bottom),
+                                          modifier = Modifier.size(20.dp)
+                                      )
+                                  }
+                              }
 
-                         }
-                     }
-                 }
-             }
-         }
-      }
+                          } // Box(weight)
+
+                          // Streaming message card for sub-session
+                          if (streamingItem != null) {
+                              val (rawIndex, msg) = streamingItem
+                              val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
+                              Box(
+                                  modifier = Modifier
+                                      .fillMaxWidth()
+                                      .heightIn(max = 280.dp)
+                                      .verticalScroll(rememberScrollState())
+                                      .padding(horizontal = 12.dp, vertical = 4.dp)
+                              ) {
+                                  MessageCard(
+                                      role = MessageCardRole.ASSISTANT,
+                                      turnMessages = turnMessagesForMsg,
+                                      currentMessage = msg,
+                                      onViewSubSession = navigateToChildSessionWithSave,
+                                      isAmoled = isAmoled,
+                                      isTurnLast = true,
+                                      onCopyText = null  // No copy while streaming
+                                  )
+                              }
+                          }
+                          } // Column
+                      }
+                  }
+              }
+          }
+       }
 
 
     // Model picker dialog
@@ -2424,4 +2498,16 @@ Box {
         )
     }
     } // CompositionLocalProvider
+}
+
+/**
+ * Scrolls the LazyColumn to the absolute bottom.
+ * With reverseLayout=true, "bottom" = item 0.
+ * Uses scrollToItem(0) + scrollBy to overcome any remaining offset.
+ */
+private suspend fun LazyListState.snapToBottom() {
+    scrollToItem(0)
+    while (canScrollBackward) {
+        scroll { scrollBy(-10_000f) }
+    }
 }
