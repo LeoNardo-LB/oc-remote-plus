@@ -1284,8 +1284,11 @@ Box {
                                 viewModel.sendMessage(allParts, attachmentParts)
                                 inputText = TextFieldValue("")
                                 attachments.clear()
-                                // Scroll to bottom after sending (reverseLayout: item 0 = bottom)
+                                // Scroll to bottom after sending: wait for new item to appear, then scroll
                                 coroutineScope.launch {
+                                    val currentCount = listState.layoutInfo.totalItemsCount
+                                    snapshotFlow { listState.layoutInfo.totalItemsCount }
+                                        .first { it > currentCount }
                                     listState.scrollToItem(0)
                                 }
                                 viewModel.clearConfirmedPaths()
