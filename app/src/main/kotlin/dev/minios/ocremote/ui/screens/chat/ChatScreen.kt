@@ -914,8 +914,22 @@ fun ChatScreen(
         }
     }
 
-    // messageCount / autoFollow LaunchedEffect removed — reverseLayout=true handles
-    // auto-follow natively (new items appear at bottom, no programmatic scroll needed).
+    // When message count increases (new message from send or QUEUE auto-submit),
+    // scroll to absolute bottom if user is already at/near bottom.
+    LaunchedEffect(Unit) {
+        var lastCount = 0
+        snapshotFlow { uiState.messages.size }
+            .collect { count ->
+                if (count > lastCount && lastCount > 0 && isAtBottom) {
+                    // New messages appeared while user is at bottom → stay at bottom
+                    listState.scrollToItem(0)
+                    while (listState.canScrollBackward) {
+                        listState.scroll { scrollBy(-10_000f) }
+                    }
+                }
+                lastCount = count
+            }
+    }
 
     CompositionLocalProvider(
         LocalChatFontSize provides chatFontSize,
@@ -1287,13 +1301,17 @@ Box {
                                 // Scroll to bottom after sending: wait for new item to appear, then scroll
                                 coroutineScope.launch {
                                     val currentCount = listState.layoutInfo.totalItemsCount
+                                    Log.w("CHAT_DEBUG", "[afterSend] waiting: currentCount=$currentCount canBackward=${listState.canScrollBackward}")
                                     snapshotFlow { listState.layoutInfo.totalItemsCount }
                                         .first { it > currentCount }
+                                    Log.w("CHAT_DEBUG", "[afterSend] new items detected: count=${listState.layoutInfo.totalItemsCount} canBackward=${listState.canScrollBackward}")
                                     listState.scrollToItem(0)
+                                    Log.w("CHAT_DEBUG", "[afterSend] after scrollToItem(0): canBackward=${listState.canScrollBackward} first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
                                     // reverseLayout=true: scroll backward to reach absolute bottom
                                     while (listState.canScrollBackward) {
                                         listState.scroll { scrollBy(-10_000f) }
                                     }
+                                    Log.w("CHAT_DEBUG", "[afterSend] DONE: canBackward=${listState.canScrollBackward} first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
