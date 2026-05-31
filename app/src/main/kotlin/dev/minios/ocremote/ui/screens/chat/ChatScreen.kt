@@ -1284,7 +1284,10 @@ Box {
                                 viewModel.sendMessage(allParts, attachmentParts)
                                 inputText = TextFieldValue("")
                                 attachments.clear()
-                                // reverseLayout=true anchors at bottom; no explicit scroll needed after send.
+                                // Scroll to bottom after sending (reverseLayout: item 0 = bottom)
+                                coroutineScope.launch {
+                                    listState.scrollToItem(0)
+                                }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
                                 viewModel.clearDraft()
