@@ -151,7 +151,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -257,26 +256,14 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
 /**
  * Scroll to the visual bottom of the LazyColumn.
  *
- * Step 1: scrollToItem(lastIndex) — jumps to the last item (top-aligned).
- * Step 2: Wait until the target item is actually measured by the layout
- *         engine (snapshotFlow on visibleItemsInfo).
- * Step 3: scrollBy(10000f) — nudges downward to the pixel bottom.
- *         With the target item now measured, the max offset is precisely known.
- *
- * All scenarios use this one function.
+ * Uses animateScrollToItem with a large within-item offset. The animation gives
+ * the layout engine multiple measurement passes, so the final position naturally
+ * clamps to the true pixel bottom — no estimation errors, no overflow risks.
  */
 private suspend fun LazyListState.scrollToBottom() {
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
-    scrollToItem(lastIndex)
-    // Wait until the layout engine has measured the last item.
-    // Without this wait scrollBy would compute its max offset from the
-    // pre-scrollToItem layout state, resulting in a clamped-too-early scroll.
-    snapshotFlow { layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-        .first { it == lastIndex }
-    // Safe large value: Compose clamps to the valid scroll range without
-    // the Int-overflow that Float.MAX_VALUE causes in fastRoundToInt().
-    scroll { scrollBy(10000f) }
+    animateScrollToItem(lastIndex, Int.MAX_VALUE)
 }
 
 private data class ImageSaveRequest(
@@ -927,33 +914,20 @@ fun ChatScreen(
     val messageCount = uiState.messages.size
     val isStreaming = uiState.sessionStatus is SessionStatus.Busy
 
-    // Derived key that changes whenever the last message's parts are mutated
-    // (e.g. SSE text-delta tokens arrive and update Part.Text.content).
-    // LaunchedEffect with this key triggers even when messageCount stays the same
-    // but the last message grows during streaming.
-    val lastMessagePartsKey = remember(uiState.messages) {
-        uiState.messages.lastOrNull()?.let { msg ->
-            msg.parts.sumOf { it.hashCode() }
-        } ?: 0
-    }
-
-    // Scroll to bottom when new messages arrive OR last message content grows
-    LaunchedEffect(messageCount, lastMessagePartsKey) {
-        if (messageCount > 0 && isAtBottom) {
-            listState.scrollToBottom()
+    // Content version: changes whenever messages or parts are mutated (SSE text-deltas,
+    // new parts, new messages). Used as LaunchedEffect key to scroll during streaming.
+    val contentVersion = remember(uiState.messages) {
+        uiState.messages.sumOf { msg ->
+            var h = 31 * (msg.message.id.hashCode() xor (msg.message.id.hashCode() ushr 16))
+            msg.parts.forEach { h = 31 * h + it.hashCode() }
+            h
         }
     }
 
-    // During streaming: if the user manually scrolls back to the bottom,
-    // resume auto-following immediately (single scroll, not per-frame).
-    LaunchedEffect(isStreaming) {
-        if (isStreaming) {
-            snapshotFlow { isAtBottom }
-                .filter { it }   // only when isAtBottom becomes true
-                .drop(1)         // skip initial emission (already at bottom)
-                .collect {
-                    listState.scrollToBottom()
-                }
+    // Scroll to bottom when flow changes AND user is at bottom
+    LaunchedEffect(messageCount, contentVersion) {
+        if (messageCount > 0 && isAtBottom) {
+            listState.scrollToBottom()
         }
     }
 
