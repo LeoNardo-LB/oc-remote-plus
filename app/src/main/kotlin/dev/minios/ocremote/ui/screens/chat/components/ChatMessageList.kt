@@ -69,8 +69,7 @@ fun ChatMessageList(
     listState: LazyListState,
     uiState: ChatUiState,
     rawMessages: List<ChatMessage>,
-    historicalItems: List<Pair<Int, ChatMessage>>,
-    streamingItem: Pair<Int, ChatMessage>?,
+    displayItems: List<Pair<Int, ChatMessage>>,
     isAtBottom: Boolean,
     isAmoled: Boolean,
     messageSpacing: Dp,
@@ -163,11 +162,10 @@ fun ChatMessageList(
                         }
                     }
 
-                    // Chat messages: historicalItems.reversed() so newest is at index 0 (bottom in reverseLayout).
+                    // Chat messages: displayItems.reversed() so newest is at index 0 (bottom in reverseLayout).
                     // Visual result: oldest at top, newest at bottom.
-                    // (streaming item is rendered outside LazyColumn when active)
                     itemsIndexed(
-                        historicalItems.reversed(),
+                        displayItems.reversed(),
                         key = { _, item -> item.second.message.id },
                         contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
                     ) { _, (rawIndex, msg) ->
@@ -324,29 +322,6 @@ fun ChatMessageList(
                 }
             }
         } // Box(weight)
-
-        // Streaming message card: visually seamless with LazyColumn
-        if (streamingItem != null) {
-            val (rawIndex, msg) = streamingItem
-            val turnMessagesForMsg = turnGroups[rawIndex] ?: listOf(msg)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-            ) {
-                Spacer(modifier = Modifier.height(messageSpacing))
-                MessageCard(
-                    role = MessageCardRole.ASSISTANT,
-                    turnMessages = turnMessagesForMsg,
-                    currentMessage = msg,
-                    onViewSubSession = navigateToChildSession,
-                    isAmoled = isAmoled,
-                    isTurnLast = true,
-                    onCopyText = null
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
     } // Column
 }
 

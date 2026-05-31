@@ -510,18 +510,7 @@ fun ChatScreen(
             }
     }
 
-    // When SSE streaming ends, the detached streaming message merges back into LazyColumn.
-    // If user was at/near bottom, snap to the new bottom.
-    LaunchedEffect(Unit) {
-        var wasStreaming = false
-        snapshotFlow { uiState.sessionStatus is SessionStatus.Busy }
-            .collect { streaming ->
-                if (wasStreaming && !streaming && isAtBottom) {
-                    listState.snapToBottom()
-                }
-                wasStreaming = streaming
-            }
-    }
+
 
     CompositionLocalProvider(
         LocalChatFontSize provides chatFontSize,
@@ -1034,58 +1023,49 @@ fun ChatScreen(
                            }
                        }
 
-                       // SSE streaming detach: when busy, split the last display item out
-                       // so LazyColumn only contains static historical messages.
-                       val isStreaming = uiState.sessionStatus is SessionStatus.Busy
-                       val (historicalItems, streamingItem) = if (isStreaming && displayItems.isNotEmpty()) {
-                           displayItems.dropLast(1) to displayItems.last()
-                       } else {
-                           displayItems to null
-                       }
 
-                       if (uiState.sessionParentId == null) {
-                           ChatMessageList(
-                               listState = listState,
-                               uiState = uiState,
-                               rawMessages = rawMessages,
-                               historicalItems = historicalItems,
-                               streamingItem = streamingItem,
-                               isAtBottom = isAtBottom,
-                               isAmoled = isAmoled,
-                               messageSpacing = messageSpacing,
-                               isMainSession = true,
-                               coroutineScope = coroutineScope,
-                               snackbarHostState = snackbarHostState,
-                               context = context,
-                               clipboardManager = clipboardManager,
-                               keyboardController = keyboardController,
-                               viewModel = viewModel,
-                               navigateToChildSession = navigateToChildSessionWithSave,
-                               onMarkdownPreviewText = { markdownPreviewText = it },
-                               modifier = Modifier.fillMaxSize(),
-                           )
-                       } else {
-                           ChatMessageList(
-                               listState = listState,
-                               uiState = uiState,
-                               rawMessages = rawMessages,
-                               historicalItems = historicalItems,
-                               streamingItem = streamingItem,
-                               isAtBottom = isAtBottom,
-                               isAmoled = isAmoled,
-                               messageSpacing = messageSpacing,
-                               isMainSession = false,
-                               coroutineScope = coroutineScope,
-                               snackbarHostState = snackbarHostState,
-                               context = context,
-                               clipboardManager = clipboardManager,
-                               keyboardController = keyboardController,
-                               viewModel = viewModel,
-                               navigateToChildSession = navigateToChildSessionWithSave,
-                               onMarkdownPreviewText = { markdownPreviewText = it },
-                               modifier = Modifier.fillMaxSize(),
-                           )
-                       }
+
+                        if (uiState.sessionParentId == null) {
+                            ChatMessageList(
+                                listState = listState,
+                                uiState = uiState,
+                                rawMessages = rawMessages,
+                                displayItems = displayItems,
+                                isAtBottom = isAtBottom,
+                                isAmoled = isAmoled,
+                                messageSpacing = messageSpacing,
+                                isMainSession = true,
+                                coroutineScope = coroutineScope,
+                                snackbarHostState = snackbarHostState,
+                                context = context,
+                                clipboardManager = clipboardManager,
+                                keyboardController = keyboardController,
+                                viewModel = viewModel,
+                                navigateToChildSession = navigateToChildSessionWithSave,
+                                onMarkdownPreviewText = { markdownPreviewText = it },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            ChatMessageList(
+                                listState = listState,
+                                uiState = uiState,
+                                rawMessages = rawMessages,
+                                displayItems = displayItems,
+                                isAtBottom = isAtBottom,
+                                isAmoled = isAmoled,
+                                messageSpacing = messageSpacing,
+                                isMainSession = false,
+                                coroutineScope = coroutineScope,
+                                snackbarHostState = snackbarHostState,
+                                context = context,
+                                clipboardManager = clipboardManager,
+                                keyboardController = keyboardController,
+                                viewModel = viewModel,
+                                navigateToChildSession = navigateToChildSessionWithSave,
+                                onMarkdownPreviewText = { markdownPreviewText = it },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                   }
               }
            }
