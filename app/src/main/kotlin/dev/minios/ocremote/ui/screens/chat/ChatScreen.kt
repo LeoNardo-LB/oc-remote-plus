@@ -254,16 +254,30 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  */
 
 /**
- * Scroll to the visual bottom of the LazyColumn.
+ * Instant jump to pixel bottom — mirrors web's `scrollTop = scrollHeight`.
  *
- * Uses animateScrollToItem with a large within-item offset. The animation gives
- * the layout engine multiple measurement passes, so the final position naturally
- * clamps to the true pixel bottom — no estimation errors, no overflow risks.
+ * Two-step approach:
+ *   scrollToItem(lastIndex)  — jump to last item (top-aligned)
+ *   scroll { scrollBy(…) }   — nudge to pixel bottom (clamped by Compose)
+ *
+ * No animation, no snapshotFlow wait, no estimation. scrollToItem returns
+ * only after layout settles, so scrollBy sees accurate geometry.
  */
-private suspend fun LazyListState.scrollToBottom() {
+private suspend fun LazyListState.jumpToBottom() {
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
-    animateScrollToItem(lastIndex, Int.MAX_VALUE)
+    scrollToItem(lastIndex)
+    scroll { scrollBy(100_000f) }
+}
+
+/**
+ * Animated scroll to bottom — used for FAB clicks and user-initiated actions.
+ */
+private suspend fun LazyListState.animateScrollToBottom() {
+    val lastIndex = layoutInfo.totalItemsCount - 1
+    if (lastIndex < 0) return
+    animateScrollToItem(lastIndex)
+    scroll { scrollBy(100_000f) }
 }
 
 private data class ImageSaveRequest(
@@ -354,7 +368,7 @@ fun ChatScreen(
                     listState.scrollToItem(displayIndex, viewModel.savedScrollOffset)
                 } else {
                     // Fallback: scroll to bottom
-                    listState.scrollToBottom()
+                    listState.jumpToBottom()
                 }
             }
         } else {
@@ -362,7 +376,7 @@ fun ChatScreen(
             // reverseLayout=false anchors at top, so we must explicitly scroll.
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .first { it > 0 }
-            listState.scrollToBottom()
+            listState.jumpToBottom()
         }
     }
 
@@ -428,7 +442,7 @@ fun ChatScreen(
     LaunchedEffect(imeVisible) {
         if (imeVisible && isAtBottomBeforeIme) {
             delay(80) // let layout settle after IME resize
-            listState.scrollToBottom()
+            listState.jumpToBottom()
         }
     }
 
@@ -912,22 +926,24 @@ fun ChatScreen(
     }
 
     val messageCount = uiState.messages.size
-    val isStreaming = uiState.sessionStatus is SessionStatus.Busy
 
-    // Content version: changes whenever messages or parts are mutated (SSE text-deltas,
-    // new parts, new messages). Used as LaunchedEffect key to scroll during streaming.
-    val contentVersion = remember(uiState.messages) {
-        uiState.messages.sumOf { msg ->
-            var h = 31 * (msg.message.id.hashCode() xor (msg.message.id.hashCode() ushr 16))
-            msg.parts.forEach { h = 31 * h + it.hashCode() }
-            h
-        }
-    }
-
-    // Scroll to bottom when flow changes AND user is at bottom
-    LaunchedEffect(messageCount, contentVersion) {
-        if (messageCount > 0 && isAtBottom) {
-            listState.scrollToBottom()
+    // Auto-follow: content changes while at bottom → scroll to bottom.
+    // Uses a long-lived snapshotFlow instead of LaunchedEffect(key) to avoid
+    // cancellation races during rapid SSE token updates (the web equivalent is
+    // ResizeObserver → scrollToBottom in requestAnimationFrame).
+    LaunchedEffect(Unit) {
+        var lastHash = 0
+        snapshotFlow {
+            var h = messageCount
+            uiState.messages.lastOrNull()?.parts?.forEach { h = 31 * h + it.hashCode() }
+            h to isAtBottom
+        }.collect { (hash, atBottom) ->
+            if (hash != lastHash) {
+                lastHash = hash
+                if (atBottom && messageCount > 0) {
+                    listState.jumpToBottom()
+                }
+            }
         }
     }
 
@@ -1201,7 +1217,7 @@ Box {
                             // so the user can see the latest messages while composing.
                             if (wasEmpty && normalizedValue.text.isNotEmpty()) {
                                 coroutineScope.launch {
-                                    listState.scrollToBottom()
+                                    listState.jumpToBottom()
                                 }
                             }
 
@@ -1307,7 +1323,7 @@ Box {
                                 attachments.clear()
                                 // Scroll to bottom after sending
                                 coroutineScope.launch {
-                                    listState.scrollToBottom()
+                                    listState.jumpToBottom()
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -2074,14 +2090,14 @@ Box {
                                         SmallFloatingActionButton(
                                             onClick = {
                                                 coroutineScope.launch {
-                                                    listState.scrollToBottom()
+                                                    listState.animateScrollToBottom()
                                                 }
                                             },
-                                 modifier = Modifier
-                                     .align(Alignment.BottomCenter)
-                                     .padding(bottom = 8.dp),
-                               containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                               contentColor = MaterialTheme.colorScheme.onSurface
+                                  modifier = Modifier
+                                      .align(Alignment.BottomCenter)
+                                      .padding(bottom = 8.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface
                           ) {
                               Icon(
                                   Icons.Default.KeyboardArrowDown,
@@ -2291,17 +2307,17 @@ Box {
 
                             // Scroll-to-bottom FAB
                                   if (!isAtBottom) {
-                                       SmallFloatingActionButton(
-                                           onClick = {
-                                                coroutineScope.launch {
-                                                    listState.scrollToBottom()
-                                                }
-                                            },
-                                         modifier = Modifier
-                                             .align(Alignment.BottomCenter)
-                                            .padding(bottom = 8.dp),
-                                      containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                      contentColor = MaterialTheme.colorScheme.onSurface
+                                        SmallFloatingActionButton(
+                                            onClick = {
+                                                 coroutineScope.launch {
+                                                     listState.animateScrollToBottom()
+                                                 }
+                                             },
+                                          modifier = Modifier
+                                              .align(Alignment.BottomCenter)
+                                             .padding(bottom = 8.dp),
+                                       containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                       contentColor = MaterialTheme.colorScheme.onSurface
                                  ) {
                                      Icon(
                                          Icons.Default.KeyboardArrowDown,
