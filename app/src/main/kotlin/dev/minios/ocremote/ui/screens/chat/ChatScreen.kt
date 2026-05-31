@@ -931,6 +931,28 @@ fun ChatScreen(
             }
     }
 
+    // SSE auto-follow: when the last message content changes (streaming tokens)
+    // and user is exactly at bottom, scroll back to bottom.
+    // If user scrolled away even one pixel, do nothing — key anchoring keeps their position.
+    // This is the GetStream pattern: conditional scrollToItem(0) on content change.
+    LaunchedEffect(Unit) {
+        var lastHash = 0
+        snapshotFlow {
+            val msgs = uiState.messages
+            var h = msgs.size
+            msgs.lastOrNull()?.parts?.forEach { h = 31 * h + it.hashCode() }
+            h
+        }.collect { hash ->
+            val changed = hash != lastHash && lastHash != 0
+            lastHash = hash
+            if (changed && isAtBottom && listState.canScrollBackward) {
+                // Content changed while at bottom but scroll drifted (key anchoring shifted index)
+                // → scroll back to item 0 (newest message at bottom in reverseLayout)
+                listState.scrollToItem(0)
+            }
+        }
+    }
+
     CompositionLocalProvider(
         LocalChatFontSize provides chatFontSize,
         LocalCodeWordWrap provides codeWordWrap,
