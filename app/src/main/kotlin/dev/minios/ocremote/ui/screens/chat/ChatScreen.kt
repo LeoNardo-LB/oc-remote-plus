@@ -151,6 +151,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -257,17 +258,24 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  * Scroll to the visual bottom of the LazyColumn.
  *
  * Step 1: scrollToItem(lastIndex) — jumps to the last item (top-aligned).
- * Step 2: scrollBy(10000f) — nudges downward by a large-but-safe delta.
- *         Compose clamps this to the valid range; 10000f avoids the
- *         Int-overflow that occurs when using Float.MAX_VALUE (3.4e38
- *         overflows fastRoundToInt() inside onScroll).
+ * Step 2: Wait until the target item is actually measured by the layout
+ *         engine (snapshotFlow on visibleItemsInfo).
+ * Step 3: scrollBy(10000f) — nudges downward to the pixel bottom.
+ *         With the target item now measured, the max offset is precisely known.
  *
- * All scenarios (FAB click, entry, streaming, IME, send) use this one function.
+ * All scenarios use this one function.
  */
 private suspend fun LazyListState.scrollToBottom() {
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
     scrollToItem(lastIndex)
+    // Wait until the layout engine has measured the last item.
+    // Without this wait scrollBy would compute its max offset from the
+    // pre-scrollToItem layout state, resulting in a clamped-too-early scroll.
+    snapshotFlow { layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+        .first { it == lastIndex }
+    // Safe large value: Compose clamps to the valid scroll range without
+    // the Int-overflow that Float.MAX_VALUE causes in fastRoundToInt().
     scroll { scrollBy(10000f) }
 }
 
@@ -917,11 +925,35 @@ fun ChatScreen(
     }
 
     val messageCount = uiState.messages.size
+    val isStreaming = uiState.sessionStatus is SessionStatus.Busy
 
-    // Scroll to bottom when new messages arrive
-    LaunchedEffect(messageCount) {
+    // Derived key that changes whenever the last message's parts are mutated
+    // (e.g. SSE text-delta tokens arrive and update Part.Text.content).
+    // LaunchedEffect with this key triggers even when messageCount stays the same
+    // but the last message grows during streaming.
+    val lastMessagePartsKey = remember(uiState.messages) {
+        uiState.messages.lastOrNull()?.let { msg ->
+            msg.parts.sumOf { it.hashCode() }
+        } ?: 0
+    }
+
+    // Scroll to bottom when new messages arrive OR last message content grows
+    LaunchedEffect(messageCount, lastMessagePartsKey) {
         if (messageCount > 0 && isAtBottom) {
             listState.scrollToBottom()
+        }
+    }
+
+    // During streaming: if the user manually scrolls back to the bottom,
+    // resume auto-following immediately (single scroll, not per-frame).
+    LaunchedEffect(isStreaming) {
+        if (isStreaming) {
+            snapshotFlow { isAtBottom }
+                .filter { it }   // only when isAtBottom becomes true
+                .drop(1)         // skip initial emission (already at bottom)
+                .collect {
+                    listState.scrollToBottom()
+                }
         }
     }
 
