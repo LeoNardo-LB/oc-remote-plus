@@ -253,31 +253,44 @@ import dev.minios.ocremote.ui.screens.chat.components.RevertBanner
  * Shows messages with streaming text rendered via mikepenz markdown renderer.
  */
 
+private const val TAG_SCROLL = "ChatScroll"
+
 /**
  * Instant jump to pixel bottom — mirrors web's `scrollTop = scrollHeight`.
- *
- * Two-step approach:
- *   scrollToItem(lastIndex)  — jump to last item (top-aligned)
- *   scroll { scrollBy(…) }   — nudge to pixel bottom (clamped by Compose)
- *
- * No animation, no snapshotFlow wait, no estimation. scrollToItem returns
- * only after layout settles, so scrollBy sees accurate geometry.
  */
-private suspend fun LazyListState.jumpToBottom() {
-    val lastIndex = layoutInfo.totalItemsCount - 1
-    if (lastIndex < 0) return
+private suspend fun LazyListState.jumpToBottom(label: String = "") {
+    val totalItems = layoutInfo.totalItemsCount
+    val lastIndex = totalItems - 1
+    if (lastIndex < 0) {
+        Log.w("CHAT_DEBUG", "[$label] jumpToBottom SKIP: no items")
+        return
+    }
+    val beforeFirst = firstVisibleItemIndex
+    val beforeOffset = firstVisibleItemScrollOffset
+    val canFwd = canScrollForward
+    Log.w("CHAT_DEBUG", "[$label] jumpToBottom START: items=$totalItems lastIndex=$lastIndex first=$beforeFirst offset=$beforeOffset canForward=$canFwd")
     scrollToItem(lastIndex)
-    scroll { scrollBy(100_000f) }
+    val afterFirst = firstVisibleItemIndex
+    val afterOffset = firstVisibleItemScrollOffset
+    val afterCanFwd = canScrollForward
+    Log.w("CHAT_DEBUG", "[$label] jumpToBottom after scrollToItem($lastIndex): first=$afterFirst offset=$afterOffset canForward=$afterCanFwd")
+    val scrollResult = scroll { scrollBy(100_000f) }
+    val finalFirst = firstVisibleItemIndex
+    val finalOffset = firstVisibleItemScrollOffset
+    val finalCanFwd = canScrollForward
+    Log.w("CHAT_DEBUG", "[$label] jumpToBottom DONE: scrollBy consumed=$scrollResult first=$finalFirst offset=$finalOffset canForward=$finalCanFwd")
 }
 
 /**
  * Animated scroll to bottom — used for FAB clicks and user-initiated actions.
  */
-private suspend fun LazyListState.animateScrollToBottom() {
+private suspend fun LazyListState.animateScrollToBottom(label: String = "") {
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
+    Log.w("CHAT_DEBUG", "[$label] animateScrollToBottom: lastIndex=$lastIndex")
     animateScrollToItem(lastIndex)
     scroll { scrollBy(100_000f) }
+    Log.w("CHAT_DEBUG", "[$label] animateScrollToBottom DONE: canForward=${canScrollForward}")
 }
 
 private data class ImageSaveRequest(
@@ -331,12 +344,41 @@ fun ChatScreen(
         }
     }
 
+    // Controls whether auto-scroll should follow content changes.
+    // Set to true on: first entry, send message, FAB click.
+    // Set to false ONLY when user physically drags the scroll thumb (isScrollInProgress).
+    // NOT set to false on LazyColumn relayout bounce (isAtBottom changing without user touch).
+    var shouldFollow by remember { mutableStateOf(true) }
+
+    // Detect genuine user scroll: only when isScrollInProgress (finger on screen).
+    // LazyColumn relayouts can change isAtBottom without user interaction — must ignore those.
+    LaunchedEffect(Unit) {
+        snapshotFlow { listState.isScrollInProgress to isAtBottom }
+            .collect { (scrolling, bottom) ->
+                if (scrolling && !bottom) {
+                    shouldFollow = false
+                    Log.d(TAG_SCROLL, "[shouldFollow] set false (user touch scroll)")
+                }
+            }
+    }
+
+    // Debug: log isAtBottom changes
+    LaunchedEffect(Unit) {
+        Log.w("CHAT_DEBUG", "=== ChatScreen LaunchedEffect(Unit) started === viewModel=${viewModel.sessionId} scrollVersion=${viewModel.scrollRestoreVersion}")
+        snapshotFlow { isAtBottom }
+            .collect { bottom ->
+                Log.w("CHAT_DEBUG", "[isAtBottom] changed to=$bottom items=${listState.layoutInfo.totalItemsCount} canForward=${listState.canScrollForward}")
+            }
+    }
+
     // Restore scroll position when returning from sub-session navigation.
     // Using LaunchedEffect(scrollRestoreVersion) instead of rememberLazyListState(initial...)
     // because `remember` caches the initial state and ignores new values on recomposition,
     // causing unreliable restoration when the composable is recomposed (not recreated).
     LaunchedEffect(viewModel.scrollRestoreVersion) {
-        if (viewModel.scrollRestoreVersion > 0) {
+        val version = viewModel.scrollRestoreVersion
+        Log.w("CHAT_DEBUG", "[scrollRestore] LaunchedEffect fired: version=$version msgs=${uiState.messages.size}")
+        if (version > 0) {
             val savedId = viewModel.savedMessageId
             if (savedId != null) {
                 // Reconstruct displayItems filtering to find the target's LazyColumn index.
@@ -368,15 +410,18 @@ fun ChatScreen(
                     listState.scrollToItem(displayIndex, viewModel.savedScrollOffset)
                 } else {
                     // Fallback: scroll to bottom
-                    listState.jumpToBottom()
+                    listState.jumpToBottom("restoreFallback")
                 }
             }
         } else {
             // First entry (scrollRestoreVersion == 0): wait for layout then scroll to bottom.
             // reverseLayout=false anchors at top, so we must explicitly scroll.
-            snapshotFlow { listState.layoutInfo.totalItemsCount }
+            Log.w("CHAT_DEBUG", "[firstEntry] Waiting for items... current totalItemsCount=${listState.layoutInfo.totalItemsCount}")
+            val itemCount = snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .first { it > 0 }
-            listState.jumpToBottom()
+            Log.w("CHAT_DEBUG", "[firstEntry] Items loaded: $itemCount, about to jumpToBottom")
+            listState.jumpToBottom("firstEntry")
+            Log.w("CHAT_DEBUG", "[firstEntry] jumpToBottom completed, canForward=${listState.canScrollForward}")
         }
     }
 
@@ -442,7 +487,7 @@ fun ChatScreen(
     LaunchedEffect(imeVisible) {
         if (imeVisible && isAtBottomBeforeIme) {
             delay(80) // let layout settle after IME resize
-            listState.jumpToBottom()
+            listState.jumpToBottom("imeVisible")
         }
     }
 
@@ -927,21 +972,36 @@ fun ChatScreen(
 
     val messageCount = uiState.messages.size
 
-    // Auto-follow: content changes while at bottom → scroll to bottom.
+    // Auto-follow: content changes + shouldFollow → scroll to bottom.
     // Uses a long-lived snapshotFlow instead of LaunchedEffect(key) to avoid
     // cancellation races during rapid SSE token updates (the web equivalent is
     // ResizeObserver → scrollToBottom in requestAnimationFrame).
+    // IMPORTANT: read uiState.messages INSIDE snapshotFlow lambda, not outside,
+    // because LaunchedEffect(Unit) captures outer vals at launch time.
+    // Also tracks canScrollForward to detect layout bounce-back after jumpToBottom.
     LaunchedEffect(Unit) {
         var lastHash = 0
+        var emitCount = 0
+        var lastCanForward = false
         snapshotFlow {
-            var h = messageCount
-            uiState.messages.lastOrNull()?.parts?.forEach { h = 31 * h + it.hashCode() }
-            h to isAtBottom
-        }.collect { (hash, atBottom) ->
-            if (hash != lastHash) {
+            val msgs = uiState.messages
+            var h = msgs.size
+            msgs.lastOrNull()?.parts?.forEach { h = 31 * h + it.hashCode() }
+            Triple(h, msgs.size, listState.canScrollForward)
+        }.collect { (hash, count, canForward) ->
+            emitCount++
+            val hashChanged = hash != lastHash
+            val bounced = !canForward != lastCanForward && canForward && lastHash != 0
+            if (hashChanged || bounced) {
+                val reason = if (hashChanged) "hash" else "bounce-fix"
+                val changed = lastHash
                 lastHash = hash
-                if (atBottom && messageCount > 0) {
-                    listState.jumpToBottom()
+                lastCanForward = canForward
+                Log.d(TAG_SCROLL, "[autoFollow] emit #$emitCount ($reason): hash $changed→$hash shouldFollow=$shouldFollow msgs=$count canFwd=$canForward")
+                if (shouldFollow && count > 0) {
+                    listState.jumpToBottom("autoFollow-$reason")
+                } else {
+                    Log.d(TAG_SCROLL, "[autoFollow] SKIP: shouldFollow=$shouldFollow msgs=$count")
                 }
             }
         }
@@ -1216,8 +1276,9 @@ Box {
                             // reverseLayout=false anchors at top; typing should auto-scroll to bottom
                             // so the user can see the latest messages while composing.
                             if (wasEmpty && normalizedValue.text.isNotEmpty()) {
+                                shouldFollow = true
                                 coroutineScope.launch {
-                                    listState.jumpToBottom()
+                                    listState.jumpToBottom("firstTyping")
                                 }
                             }
 
@@ -1322,8 +1383,9 @@ Box {
                                 inputText = TextFieldValue("")
                                 attachments.clear()
                                 // Scroll to bottom after sending
+                                shouldFollow = true
                                 coroutineScope.launch {
-                                    listState.jumpToBottom()
+                                    listState.jumpToBottom("afterSend")
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -2090,7 +2152,8 @@ Box {
                                         SmallFloatingActionButton(
                                             onClick = {
                                                 coroutineScope.launch {
-                                                    listState.animateScrollToBottom()
+                                                    shouldFollow = true
+                                                    listState.animateScrollToBottom("fabClick")
                                                 }
                                             },
                                   modifier = Modifier
@@ -2306,13 +2369,14 @@ Box {
                                   } // PullToRefreshBox
 
                             // Scroll-to-bottom FAB
-                                  if (!isAtBottom) {
-                                        SmallFloatingActionButton(
-                                            onClick = {
-                                                 coroutineScope.launch {
-                                                     listState.animateScrollToBottom()
-                                                 }
-                                             },
+                                   if (!isAtBottom) {
+                                          SmallFloatingActionButton(
+                                             onClick = {
+                                                  coroutineScope.launch {
+                                                      shouldFollow = true
+                                                      listState.animateScrollToBottom("fabClick")
+                                                  }
+                                              },
                                           modifier = Modifier
                                               .align(Alignment.BottomCenter)
                                              .padding(bottom = 8.dp),
