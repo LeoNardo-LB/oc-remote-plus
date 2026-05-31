@@ -1290,6 +1290,10 @@ Box {
                                     snapshotFlow { listState.layoutInfo.totalItemsCount }
                                         .first { it > currentCount }
                                     listState.scrollToItem(0)
+                                    // reverseLayout=true: scroll backward to reach absolute bottom
+                                    while (listState.canScrollBackward) {
+                                        listState.scroll { scrollBy(-10_000f) }
+                                    }
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
