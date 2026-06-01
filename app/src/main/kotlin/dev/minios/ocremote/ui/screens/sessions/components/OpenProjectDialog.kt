@@ -85,6 +85,7 @@ internal fun OpenProjectDialog(
     var homeDir by remember { mutableStateOf<String?>(null) }
     var directories by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     var searchResults by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pathNavigatedDirs by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
@@ -93,6 +94,42 @@ internal fun OpenProjectDialog(
     val focusRequester = remember { FocusRequester() }
 
     val isSearching = searchQuery.isNotBlank()
+
+    fun isPathLike(input: String): Boolean {
+        val trimmed = input.trim()
+        return trimmed.startsWith("/") ||
+               trimmed.startsWith("~") ||
+               trimmed.matches(Regex("[A-Za-z]:.*"))
+    }
+
+    fun resolvePath(input: String, home: String?): Pair<String, String?> {
+        val trimmed = input.trim()
+        val expanded = if (trimmed.startsWith("~")) {
+            (home ?: "") + trimmed.removePrefix("~")
+        } else {
+            trimmed
+        }
+
+        val normalized = expanded.replace('\\', '/')
+
+        return if (normalized.endsWith("/")) {
+            expanded to null
+        } else {
+            val lastSlash = normalized.lastIndexOf('/')
+            if (lastSlash > 0) {
+                var parent = expanded.substring(0, lastSlash)
+                // Windows 盘符修复：D: → D:/
+                if (parent.length == 2 && parent[1] == ':') {
+                    parent = "$parent/"
+                }
+                parent = parent.replace('/', java.io.File.separatorChar)
+                val fragment = normalized.substring(lastSlash + 1)
+                parent to fragment
+            } else {
+                expanded to null
+            }
+        }
+    }
 
     // Load home directory and initial listing
     LaunchedEffect(Unit) {
@@ -118,7 +155,7 @@ internal fun OpenProjectDialog(
     LaunchedEffect(searchQuery) {
         if (searchQuery.isBlank()) {
             searchResults = emptyList()
-            // Re-list current dir
+            pathNavigatedDirs = emptyList()
             currentDir?.let {
                 isLoading = true
                 directories = viewModel.listDirectories(it)
@@ -128,8 +165,23 @@ internal fun OpenProjectDialog(
         }
         delay(300)
         isLoading = true
-        val baseDir = homeDir ?: "/"
-        searchResults = viewModel.searchDirectories(searchQuery, baseDir)
+
+        if (isPathLike(searchQuery)) {
+            // 路径导航模式
+            val (resolvedPath, fragment) = resolvePath(searchQuery, homeDir)
+            val allDirs = viewModel.listDirectories(resolvedPath)
+            pathNavigatedDirs = if (fragment != null) {
+                allDirs.filter { it.name.startsWith(fragment, ignoreCase = true) }
+            } else {
+                allDirs
+            }
+            searchResults = emptyList()
+        } else {
+            // 文件名模糊搜索模式
+            val baseDir = homeDir ?: "/"
+            searchResults = viewModel.searchDirectories(searchQuery, baseDir)
+            pathNavigatedDirs = emptyList()
+        }
         isLoading = false
     }
 
@@ -298,8 +350,10 @@ internal fun OpenProjectDialog(
                             }
                         }
                         isSearching -> {
-                            // Search results
-                            if (searchResults.isEmpty()) {
+                            val displayDirs = if (pathNavigatedDirs.isNotEmpty()) pathNavigatedDirs else emptyList()
+                            val displayPaths = if (searchResults.isNotEmpty()) searchResults else emptyList()
+
+                            if (displayDirs.isEmpty() && displayPaths.isEmpty()) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
@@ -315,9 +369,20 @@ internal fun OpenProjectDialog(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(vertical = 4.dp)
                                 ) {
-                                    items(searchResults) { path ->
-                                        // Paths from find/file are relative to the directory context (homeDir).
-                                        // Join properly: strip trailing slashes from both parts.
+                                    // 路径导航结果（FileNode 列表）
+                                    items(displayDirs, key = { it.path }) { node ->
+                                        val absPath = node.absolute ?: node.path
+                                        DirectoryRow(
+                                            displayPath = tildeReplace(absPath) + "/",
+                                            onClick = { onSelect(absPath) },
+                                            onNavigate = {
+                                                searchQuery = ""
+                                                currentDir = absPath
+                                            }
+                                        )
+                                    }
+                                    // 模糊搜索结果（路径字符串列表）
+                                    items(displayPaths) { path ->
                                         val base = (homeDir ?: "").trimEnd('/')
                                         val rel = path.trimStart('/').trimEnd('/')
                                         val absolutePath = "$base/$rel"
@@ -325,7 +390,6 @@ internal fun OpenProjectDialog(
                                             displayPath = tildeReplace(absolutePath) + "/",
                                             onClick = { onSelect(absolutePath) },
                                             onNavigate = {
-                                                // Navigate into this directory for further browsing
                                                 searchQuery = ""
                                                 currentDir = absolutePath
                                             }
