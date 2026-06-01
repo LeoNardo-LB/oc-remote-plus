@@ -12,6 +12,15 @@
 
 ---
 
+## Prerequisites
+
+- **JDK 21** — `build.gradle.kts` sets `jvmToolchain(21)`. Verify: `java -version`
+- **Gradle proxy** — `gradle.properties` hardcodes `127.0.0.1:7897` HTTP proxy. If proxy is unreachable, comment out the 4 `systemProp.*` lines before building
+- **KSP** — Project uses KSP (not kapt) for Hilt annotation processing. No special action needed
+- **Compose BOM 2026.05.01** — Provides Material3 1.3+ (DropdownMenu, BasicAlertDialog stable)
+
+---
+
 ## File Structure
 
 > **Path prefix:** `app/src/main/kotlin/dev/minios/ocremote/ui/screens/` for Kotlin files, `app/src/main/res/values/` for resources, `app/src/test/kotlin/dev/minios/ocremote/ui/screens/sessions/` for tests.
@@ -27,6 +36,21 @@
 | `sessions/components/ProjectHeader.kt` | Delete | Dead code, unused |
 | `app/src/main/res/values/strings.xml` | Modify | Add new menu strings |
 | Test file | Create | Unit tests for `buildTreeNodes()` |
+
+### Task Dependencies
+
+```
+Task 1 (TreeNode model) ──→ Task 2 (Unit tests)
+     │
+     ├──→ Task 4 (DirectoryTreeNode) ──┐
+     │                                  ├──→ Task 6 (ViewModel) ──→ Task 7 (Screen) ──→ Task 8 (Cleanup)
+     ├──→ Task 3 (Strings) ────────────┘         ↑
+     │                                           │
+     └──→ Task 5 (SessionRow) ──────────────────┘
+
+Parallelizable: Task 3 || Task 4 || Task 5 (after Task 1)
+Sequential: Task 6 → Task 7 → Task 8 → Task 9
+```
 
 ---
 
@@ -554,7 +578,7 @@ internal fun DirectoryTreeNode(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = (node.depth * 16).dp, end = 8.dp)
+            .padding(start = minOf(node.depth * 16, 160).dp, end = 8.dp)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -828,7 +852,7 @@ internal fun SessionRow(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(start = (depth * 16).dp, end = 8.dp)
+            .padding(start = minOf(depth * 16, 160).dp, end = 8.dp)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1235,6 +1259,9 @@ class SessionListViewModel @Inject constructor(
         val expandedPaths = values[7] as Set<String>
         val selectedIds = values[8] as Set<String>
 
+        // Performance: buildTreeNodes is O(N) where N = unique path segments.
+        // For typical loads (<500 sessions) this is negligible.
+        // If profiling shows issues, extract sessions→sortedList with distinctUntilChanged.
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
         val filteredSessions = allSessions
@@ -1776,6 +1803,7 @@ fun SessionListScreen(
                     val untitledLabel = stringResource(R.string.session_untitled)
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
+                        // TODO: Add LazyListState scroll listener to close DropdownMenu on scroll
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         items(uiState.treeNodes, key = { it.id }) { node ->
@@ -2028,6 +2056,15 @@ git commit -m "chore: delete dead code (ProjectGroupRow, ProjectHeader)"
 
 ### Task 9: Run Unit Tests + Final Verification
 
+**Manual verification checklist (after all tests pass):**
+- [ ] Directory nodes render with correct indentation
+- [ ] Clicking directory expands/collapses, arrow rotates 90°
+- [ ] Three-dot menu appears and all items work (Copy path, View details)
+- [ ] Session row shows correct status indicators (Busy=dot, Retry=error)
+- [ ] Long-press enters selection mode, checkboxes animate in
+- [ ] AMOLED theme: black backgrounds, no shadows, correct borders
+- [ ] Empty state shows "Empty directory" message
+
 - [ ] **Step 1: Run all unit tests**
 
 Run: `.\gradlew :app:testDevDebugUnitTest --rerun`
@@ -2037,6 +2074,11 @@ Expected: All tests PASS (including the new TreeNodeTest)
 
 Run: `.\gradlew :app:compileDevDebugKotlin`
 Expected: PASS with no errors
+
+- [ ] **Step 2.5: Run Release build check**
+
+Run: `.\gradlew :app:assembleDevRelease`
+Expected: PASS — verifies R8/ProGuard rules preserve all required classes
 
 - [ ] **Step 3: Final commit (if any cleanup needed)**
 
