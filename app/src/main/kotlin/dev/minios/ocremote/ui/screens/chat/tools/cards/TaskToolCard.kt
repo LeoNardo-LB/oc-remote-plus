@@ -99,7 +99,7 @@ internal fun TaskToolCard(
         copyText = if (showNavArrow) "" else longPressCopyText,
         isExpanded = isExpanded,
         isRunning = isRunning,
-        hasContent = if (showNavArrow) true else hasOutput,
+        hasContent = hasOutput,
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
         onClick = clickAction,

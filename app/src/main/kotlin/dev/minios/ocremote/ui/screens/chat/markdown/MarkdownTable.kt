@@ -7,7 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.Layout
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -44,9 +44,12 @@ private data class TableRow(
 /**
  * Table component — uniform column widths driven by the widest cell content.
  *
- * Uses a custom [Layout] with [MeasurePolicy] to measure all cells in a
- * single pass, compute per-column max widths, and place them on a uniform
- * grid.  Horizontal scroll is enabled when the table exceeds the parent width.
+ * Uses a custom [Layout] with inline [MeasurePolicy] to measure all cells in a
+ * single composition pass.  Column widths are determined via
+ * [androidx.compose.ui.layout.Measurable.minIntrinsicWidth] (no probe pass),
+ * then a "fill parent" scaling is applied when the natural width is narrower
+ * than the container.  Horizontal scroll is enabled when the table exceeds
+ * the parent width.
  */
 @Composable
 internal fun SimpleMarkdownTable(
@@ -60,6 +63,8 @@ internal fun SimpleMarkdownTable(
     val pad = 10.dp
     val shape = RoundedCornerShape(6.dp)
     val border = BorderStroke(1.dp, dividerColor)
+    // annotatorSettings() is @Composable; called directly so Compose tracks its
+    // CompositionLocal dependencies.  The result is cheap (no IO / allocation).
     val annotator = annotatorSettings()
 
     val columnCount = remember(tableNode) {
@@ -98,83 +103,84 @@ internal fun SimpleMarkdownTable(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .onSizeChanged { /* consumed to capture container width for fill strategy below */ }
             .border(border, shape)
             .clip(shape)
     ) {
         var containerWidth by remember { mutableIntStateOf(0) }
 
+        // Inner box: captures container width once, then applies horizontal scroll.
+        // onSizeChanged fires only on the first layout pass (0 → actual), producing
+        // a single cheap recomposition (cellContent is fully remembered).
         Box(
             modifier = Modifier
                 .onSizeChanged { containerWidth = it.width }
                 .horizontalScroll(scrollState)
         ) {
-            val cellContent: @Composable () -> Unit = {
-                rows.forEachIndexed { rowIdx, row ->
-                    val cellCount = minOf(row.cells.size, columnCount)
-                    repeat(cellCount) { colIdx ->
-                        val cell = row.cells[colIdx]
-                        val isLastCol = colIdx == cellCount - 1
-                        val cellStyle = if (row.isHeader) {
-                            style.copy(fontWeight = FontWeight.SemiBold)
-                        } else {
-                            style
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    when {
-                                        row.isHeader -> headerBg
-                                        row.rowIndex % 2 == 1 -> rowBgOdd
-                                        else -> Color.Transparent
-                                    }
-                                )
-                                .then(
-                                    if (!isLastCol) Modifier.drawBehind {
-                                        drawLine(
-                                            dividerColor,
-                                            Offset(size.width, 0f),
-                                            Offset(size.width, size.height),
-                                            strokeWidth = 1f
-                                        )
-                                    } else Modifier
-                                )
-                                .padding(horizontal = pad, vertical = if (row.isHeader) 8.dp else 6.dp)
-                        ) {
-                            MarkdownBasicText(
-                                text = content.buildMarkdownAnnotatedString(
-                                    textNode = cell,
+            Layout(
+                content = {
+                    rows.forEachIndexed { rowIdx, row ->
+                        val cellCount = minOf(row.cells.size, columnCount)
+                        repeat(cellCount) { colIdx ->
+                            val cell = row.cells[colIdx]
+                            val isLastCol = colIdx == cellCount - 1
+                            val cellStyle = if (row.isHeader) {
+                                style.copy(fontWeight = FontWeight.SemiBold)
+                            } else {
+                                style
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        when {
+                                            row.isHeader -> headerBg
+                                            row.rowIndex % 2 == 1 -> rowBgOdd
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                                    .then(
+                                        if (!isLastCol) Modifier.drawBehind {
+                                            drawLine(
+                                                dividerColor,
+                                                Offset(size.width, 0f),
+                                                Offset(size.width, size.height),
+                                                strokeWidth = 1f
+                                            )
+                                        } else Modifier
+                                    )
+                                    .padding(horizontal = pad, vertical = if (row.isHeader) 8.dp else 6.dp)
+                            ) {
+                                MarkdownBasicText(
+                                    text = content.buildMarkdownAnnotatedString(
+                                        textNode = cell,
+                                        style = cellStyle,
+                                        annotatorSettings = annotator,
+                                    ),
                                     style = cellStyle,
-                                    annotatorSettings = annotator,
-                                ),
-                                style = cellStyle,
-                            )
+                                )
+                            }
                         }
                     }
-                }
-            }
+                },
+            ) { measurables, constraints ->
+                if (measurables.isEmpty()) return@Layout layout(0, 0) {}
 
-            SubcomposeLayout { constraints ->
-                if (rows.isEmpty()) return@SubcomposeLayout layout(0, 0) {}
-
-                val looseConstraints = Constraints(
-                    minWidth = 0,
-                    maxWidth = constraints.maxWidth,
-                    minHeight = 0,
-                    maxHeight = constraints.maxHeight,
-                )
-                val probeMeasurables = subcompose("probe", cellContent)
-                val probePlaceables = probeMeasurables.map { it.measure(looseConstraints) }
-
+                // Single pass: determine column widths from intrinsic widths.
                 val colWidths = IntArray(columnCount) { 0 }
-                probePlaceables.forEachIndexed { index, placeable ->
-                    val col = index % columnCount
-                    colWidths[col] = maxOf(colWidths[col], placeable.width)
+                for (i in measurables.indices) {
+                    val col = i % columnCount
+                    val intrinsic = measurables[i].minIntrinsicWidth(0)
+                    if (intrinsic > colWidths[col]) colWidths[col] = intrinsic
                 }
 
-                // 填满策略：使用 containerWidth 而非 constraints.maxWidth
+                // Fill strategy: scale columns to fill the parent width when narrower.
                 val naturalWidth = colWidths.sum()
                 val parentWidth = containerWidth
-                val finalColWidths = if (naturalWidth > 0 && parentWidth > 0 && naturalWidth < parentWidth) {
+                val finalColWidths = if (
+                    naturalWidth > 0 &&
+                    parentWidth > 0 &&
+                    naturalWidth < parentWidth
+                ) {
                     val scale = parentWidth.toFloat() / naturalWidth.toFloat()
                     val scaled = IntArray(columnCount) { col ->
                         (colWidths[col] * scale).toInt()
@@ -188,23 +194,26 @@ internal fun SimpleMarkdownTable(
                     colWidths
                 }
 
-                val finalMeasurables = subcompose("final", cellContent)
-                val finalPlaceables = finalMeasurables.mapIndexed { index, measurable ->
+                // Measure each cell with its final column width.
+                val placeables = measurables.mapIndexed { index, measurable ->
                     val col = index % columnCount
-                    val colConstraint = Constraints(
-                        minWidth = finalColWidths[col],
-                        maxWidth = finalColWidths[col],
-                        minHeight = 0,
-                        maxHeight = constraints.maxHeight,
+                    measurable.measure(
+                        Constraints(
+                            minWidth = finalColWidths[col],
+                            maxWidth = finalColWidths[col],
+                            minHeight = 0,
+                            maxHeight = constraints.maxHeight,
+                        )
                     )
-                    measurable.measure(colConstraint)
                 }
 
-                val actualRowCount = rows.size
-                val rowHeights = IntArray(actualRowCount) { 0 }
-                finalPlaceables.forEachIndexed { index, placeable ->
-                    val row = index / columnCount
-                    rowHeights[row] = maxOf(rowHeights[row], placeable.height)
+                // Compute row heights (max cell height in each row).
+                val rowHeights = IntArray(rowCount) { 0 }
+                for (i in placeables.indices) {
+                    val row = i / columnCount
+                    if (placeables[i].height > rowHeights[row]) {
+                        rowHeights[row] = placeables[i].height
+                    }
                 }
 
                 val totalWidth = finalColWidths.sum()
@@ -212,12 +221,12 @@ internal fun SimpleMarkdownTable(
 
                 layout(totalWidth, totalHeight) {
                     var y = 0
-                    for (row in 0 until actualRowCount) {
+                    for (row in 0 until rowCount) {
                         var x = 0
                         for (col in 0 until columnCount) {
                             val idx = row * columnCount + col
-                            if (idx < finalPlaceables.size) {
-                                finalPlaceables[idx].placeRelative(x, y)
+                            if (idx < placeables.size) {
+                                placeables[idx].placeRelative(x, y)
                             }
                             x += finalColWidths[col]
                         }

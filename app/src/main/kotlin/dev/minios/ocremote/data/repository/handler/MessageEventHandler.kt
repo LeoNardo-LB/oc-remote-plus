@@ -64,8 +64,41 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         _parts.update { current ->
             val messageParts = current[messageId]?.toMutableList() ?: mutableListOf()
             val idx = messageParts.indexOfFirst { it.id == event.part.id }
-            if (idx >= 0) messageParts[idx] = event.part else messageParts.add(event.part)
+            if (idx >= 0) {
+                messageParts[idx] = mergeToolInput(messageParts[idx], event.part)
+            } else {
+                messageParts.add(event.part)
+            }
             current + (messageId to messageParts)
+        }
+    }
+
+    /**
+     * Preserve tool input from previous state when the new state has empty input.
+     * Server may omit input in running/completed events, causing deserialization to default to emptyMap().
+     */
+    private fun mergeToolInput(old: Part, new: Part): Part {
+        if (old is Part.Tool && new is Part.Tool) {
+            val oldInput = toolStateInput(old.state)
+            if (oldInput.isNotEmpty()) {
+                val newState = when (val s = new.state) {
+                    is ToolState.Pending -> if (s.input.isEmpty()) s.copy(input = oldInput) else s
+                    is ToolState.Running -> if (s.input.isEmpty()) s.copy(input = oldInput) else s
+                    is ToolState.Completed -> if (s.input.isEmpty()) s.copy(input = oldInput) else s
+                    is ToolState.Error -> if (s.input.isEmpty()) s.copy(input = oldInput) else s
+                }
+                return if (newState !== new.state) new.copy(state = newState) else new
+            }
+        }
+        return new
+    }
+
+    private fun toolStateInput(state: ToolState): Map<String, kotlinx.serialization.json.JsonElement> {
+        return when (state) {
+            is ToolState.Pending -> state.input
+            is ToolState.Running -> state.input
+            is ToolState.Completed -> state.input
+            is ToolState.Error -> state.input
         }
     }
 

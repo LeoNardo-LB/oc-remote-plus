@@ -29,8 +29,25 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalChatFontSize
 import dev.minios.ocremote.ui.screens.chat.util.LocalCodeWordWrap
 import dev.minios.ocremote.ui.theme.CodeTypography
 import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import org.intellij.markdown.ast.ASTNode
+import org.intellij.markdown.MarkdownTokenTypes
+import org.intellij.markdown.ast.findChildOfType
+import org.intellij.markdown.ast.getTextInNode
 
 private val HtmlDocumentHintRegex = Regex("(?is)<!doctype\\s+html\\b|<\\s*html\\b")
 private val HtmlTagRegex = Regex("(?is)<\\s*/?\\s*[a-z][^>]*>")
@@ -224,27 +241,48 @@ internal fun MarkdownContent(
 
     val highlightsBuilder = remember { Highlights.Builder() }
 
+    val headerFg = when {
+        isAmoled -> MaterialTheme.colorScheme.onSurfaceVariant
+        isUser -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
     val components = if (wordWrap) {
         markdownComponents(
             codeBlock = { model ->
-                MarkdownHighlightedCodeBlock(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    true
-                )
+                val codeText = extractCodeText(model.content, model.node)
+                CodeBlockWithCopyButton(
+                    language = null,
+                    content = codeText,
+                    headerFg = headerFg,
+                ) {
+                    MarkdownHighlightedCodeBlock(
+                        model.content,
+                        model.node,
+                        typography.code,
+                        highlightsBuilder,
+                        false,
+                        true
+                    )
+                }
             },
             codeFence = { model ->
-                MarkdownHighlightedCodeFence(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    true
-                )
+                val language = extractFenceLanguage(model.content, model.node)
+                val codeText = extractCodeText(model.content, model.node)
+                CodeBlockWithCopyButton(
+                    language = language,
+                    content = codeText,
+                    headerFg = headerFg,
+                ) {
+                    MarkdownHighlightedCodeFence(
+                        model.content,
+                        model.node,
+                        typography.code,
+                        highlightsBuilder,
+                        false,
+                        true
+                    )
+                }
             },
             table = { model ->
                 // Fallback table for 0.41.0: use simplified rendering since
@@ -255,24 +293,39 @@ internal fun MarkdownContent(
     } else {
         markdownComponents(
             codeBlock = { model ->
-                MarkdownHighlightedCodeBlock(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    false
-                )
+                val codeText = extractCodeText(model.content, model.node)
+                CodeBlockWithCopyButton(
+                    language = null,
+                    content = codeText,
+                    headerFg = headerFg,
+                ) {
+                    MarkdownHighlightedCodeBlock(
+                        model.content,
+                        model.node,
+                        typography.code,
+                        highlightsBuilder,
+                        false,
+                        false
+                    )
+                }
             },
             codeFence = { model ->
-                MarkdownHighlightedCodeFence(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    false
-                )
+                val language = extractFenceLanguage(model.content, model.node)
+                val codeText = extractCodeText(model.content, model.node)
+                CodeBlockWithCopyButton(
+                    language = language,
+                    content = codeText,
+                    headerFg = headerFg,
+                ) {
+                    MarkdownHighlightedCodeFence(
+                        model.content,
+                        model.node,
+                        typography.code,
+                        highlightsBuilder,
+                        false,
+                        false
+                    )
+                }
             },
             table = { model ->
                 SimpleMarkdownTable(model.content, model.node, model.typography.table)
@@ -300,4 +353,85 @@ internal fun MarkdownContent(
         imageTransformer = Coil3ImageTransformerImpl,
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+/**
+ * Wraps a code block with a custom header bar containing language label and copy button.
+ * The copy button uses ClipboardManager + Toast for user feedback.
+ */
+@Composable
+private fun CodeBlockWithCopyButton(
+    language: String?,
+    content: String,
+    headerFg: Color,
+    codeContent: @Composable () -> Unit,
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val displayLanguage = language?.takeIf { it.isNotBlank() }
+
+    androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxWidth()) {
+        // Header bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (displayLanguage != null) {
+                Text(
+                    text = displayLanguage,
+                    color = headerFg,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            } else {
+                androidx.compose.foundation.layout.Spacer(Modifier)
+            }
+            IconButton(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(content))
+                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.size(32.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = headerFg
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy code",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        codeContent()
+    }
+}
+
+/**
+ * Extracts the language identifier from a fenced code block's ASTNode.
+ * Uses the same approach as mikepenz: findChildOfType with FENCE_LANG.
+ */
+private fun extractFenceLanguage(content: String, node: ASTNode): String? {
+    val fenceLangNode = node.findChildOfType(MarkdownTokenTypes.FENCE_LANG)
+        ?: return null
+    val language = fenceLangNode.getTextInNode(content).toString().trim()
+    return language.ifBlank { null }
+}
+
+/**
+ * Extracts the actual code text from a fenced code block's ASTNode.
+ * The code is between the first child's startOffset and the last child's endOffset.
+ */
+private fun extractCodeText(content: String, node: ASTNode): String {
+    val children = node.children
+    if (children.size < 3) return content
+    val start = children[1].startOffset
+    val end = children[children.size - 2].endOffset
+    return if (start in content.indices && end in start..content.length) {
+        content.substring(start, end)
+    } else {
+        content
+    }
 }

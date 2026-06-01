@@ -52,7 +52,7 @@ internal fun resolveToolDisplay(
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
         ?: input["path"]?.jsonPrimitive?.contentOrNull
         ?: input["file"]?.jsonPrimitive?.contentOrNull
-    val shortPath = filePath?.substringAfterLast('/')
+    val shortPath = filePath?.let { java.io.File(it).name }
 
     return when (toolName) {
         "read" -> {
