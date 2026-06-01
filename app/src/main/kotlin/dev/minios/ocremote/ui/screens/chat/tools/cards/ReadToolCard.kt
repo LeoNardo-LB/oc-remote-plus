@@ -104,7 +104,7 @@ internal fun ReadToolCard(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = filePath,
+                                text = shortPath,
                                 style = CodeTypography.copy(
                                     fontSize = 11.sp,
                                     color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)

@@ -89,7 +89,7 @@ internal fun EditToolCard(
     ToolCardScaffold(
         icon = if (isError) Icons.Default.Error else Icons.Default.Edit,
         iconTint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-        title = stringResource(R.string.chat_edit_label),
+        title = if (shortPath.isNotBlank()) "${stringResource(R.string.chat_edit_label)} · $shortPath" else stringResource(R.string.chat_edit_label),
         copyText = copyText,
         isExpanded = isExpanded,
         isRunning = isRunning,
