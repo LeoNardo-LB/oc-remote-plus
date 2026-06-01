@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.settings.components
+﻿package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.BasicAlertDialog
@@ -35,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Reusable single-selection picker dialog styled to match
@@ -72,7 +72,7 @@ internal fun <K> SettingsPickerDialog(
 
     BasicAlertDialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = ShapeTokens.largeMedium,
             color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
             border = if (isAmoled) BorderStroke(
                 1.dp,
@@ -113,7 +113,7 @@ internal fun <K> SettingsPickerDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(ShapeTokens.medium)
                                 .background(
                                     when {
                                         isSelected && isAmoled -> Color.Black
@@ -126,7 +126,7 @@ internal fun <K> SettingsPickerDialog(
                                         Modifier.border(
                                             width = 1.dp,
                                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                                            shape = RoundedCornerShape(12.dp),
+                                            shape = ShapeTokens.medium,
                                         )
                                     } else {
                                         Modifier

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.tools
+﻿package dev.minios.ocremote.ui.screens.chat.tools
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.theme.CodeTypography
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Inline diff change counts: +N -N with colors.
@@ -71,7 +71,7 @@ internal fun DiffView(before: String, after: String) {
 
     AmoledSurface(
         isAmoledDark = isAmoled,
-        shape = RoundedCornerShape(4.dp),
+        shape = ShapeTokens.extraSmall,
         normalColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
         modifier = Modifier
             .fillMaxWidth()

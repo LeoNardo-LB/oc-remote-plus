@@ -37,8 +37,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.content.ContextCompat
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.repository.LocalServerManager
+import androidx.compose.ui.graphics.Color
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.home.components.*
+import dev.minios.ocremote.ui.screens.sessions.components.isAmoledTheme
 
 /**
  * Home Screen - Server list and management
@@ -123,10 +125,15 @@ fun HomeScreen(
         runCommandPermissionLauncher.launch("com.termux.permission.RUN_COMMAND")
     }
 
+    val isAmoled = isAmoledTheme()
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.home_title)) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface
+                ),
                 actions = {
                     IconButton(onClick = { viewModel.showAddServerDialog() }) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_add_server))

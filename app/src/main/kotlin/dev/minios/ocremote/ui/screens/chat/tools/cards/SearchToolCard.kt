@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.tools.cards
+﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,6 +33,7 @@ import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Search tool card (glob/grep) — shows pattern + expandable output.
@@ -79,7 +79,7 @@ internal fun SearchToolCard(
             // 入参信息块
         if (pattern != null || !dirPath.isNullOrBlank()) {
             Surface(
-                shape = RoundedCornerShape(4.dp),
+                shape = ShapeTokens.extraSmall,
                 color = toolOutputContainerColor(isAmoled),
                 border = if (isAmoled) AmoledDefaultBorder else null,
                 modifier = Modifier.fillMaxWidth()
@@ -113,7 +113,7 @@ internal fun SearchToolCard(
         val halfScreenHeight = halfScreenHeight()
         val scrollState = rememberScrollState()
         Surface(
-            shape = RoundedCornerShape(4.dp),
+            shape = ShapeTokens.extraSmall,
             color = toolOutputContainerColor(isAmoled),
             border = if (isAmoled) AmoledDefaultBorder else null,
             modifier = Modifier

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.home.components
+﻿package dev.minios.ocremote.ui.screens.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,6 +33,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -311,7 +311,7 @@ internal fun LocalLaunchOptionsDialog(
     if (showTimeoutDialog) {
         BasicAlertDialog(onDismissRequest = { showTimeoutDialog = false }) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
                 border = if (isAmoled) AmoledDefaultBorder else null,                tonalElevation = if (isAmoled) 0.dp else 6.dp,
                 modifier = Modifier
@@ -336,7 +336,7 @@ internal fun LocalLaunchOptionsDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(ShapeTokens.medium)
                                     .background(
                                         when {
                                             selected && isAmoled -> Color.Black
@@ -349,7 +349,7 @@ internal fun LocalLaunchOptionsDialog(
                                             Modifier.border(
                                                 width = 1.dp,
                                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = ShapeTokens.medium,
                                             )
                                         } else Modifier
                                     )

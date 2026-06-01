@@ -1,0 +1,44 @@
+appId: dev.minios.ocremote.dev
+name: "E2E Chat Screen Verification"
+tags:
+  - e2e
+  - chat
+---
+# Chat 界面验证
+
+- launchApp
+- waitForAnimationToEnd
+
+# 进入 Sessions
+- tapOn: "Sessions"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/06-session-list
+
+# 点击第一个会话
+- tapOn:
+    point: "540,600"
+- waitForAnimationToEnd
+
+# 截图：聊天界面
+- takeScreenshot: e2e/06-chat-initial
+
+# 滚动查看更多
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: e2e/06-chat-scrolled
+
+# 再次滚动
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: e2e/06-chat-scrolled-2
+
+# 返回会话列表
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+
+# 返回主页
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/06-back-home

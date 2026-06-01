@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.server
+﻿package dev.minios.ocremote.ui.screens.server
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -45,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.AmoledCard
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +141,7 @@ fun ServerModelFilterScreen(
                         items(filteredGroups, key = { it.providerId }) { group ->
                             AmoledCard(
                                 isAmoledDark = isAmoled,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = ShapeTokens.medium,
                                 normalContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             ) {
                                 Column(modifier = Modifier.padding(vertical = 8.dp)) {

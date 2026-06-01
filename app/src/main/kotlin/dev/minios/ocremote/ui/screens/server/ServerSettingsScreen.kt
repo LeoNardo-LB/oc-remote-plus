@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.server
+﻿package dev.minios.ocremote.ui.screens.server
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.AmoledCard
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +60,7 @@ fun ServerSettingsScreen(
         ) {
             AmoledCard(
                 isAmoledDark = isAmoled,
-                shape = RoundedCornerShape(12.dp),
+                shape = ShapeTokens.medium,
                 normalContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -94,7 +94,7 @@ fun ServerSettingsScreen(
 
             AmoledCard(
                 isAmoledDark = isAmoled,
-                shape = RoundedCornerShape(12.dp),
+                shape = ShapeTokens.medium,
                 normalContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .fillMaxWidth()

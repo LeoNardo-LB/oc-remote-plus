@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.components
+﻿package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
@@ -48,6 +47,7 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleExpand: () -> Unit = {}, durationMs: Long? = null) {
@@ -86,7 +86,7 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
     }
 
     Surface(
-        shape = RoundedCornerShape(0.dp),
+        shape = ShapeTokens.none,
         color = containerColor,
         modifier = Modifier.fillMaxWidth()
     ) {

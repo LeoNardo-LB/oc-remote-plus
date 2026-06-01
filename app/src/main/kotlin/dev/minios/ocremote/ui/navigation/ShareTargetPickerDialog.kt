@@ -1,10 +1,9 @@
-package dev.minios.ocremote.ui.navigation
+﻿package dev.minios.ocremote.ui.navigation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
@@ -24,6 +23,7 @@ import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.model.Session
 import java.text.SimpleDateFormat
 import java.util.*
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Dialog shown when images are shared into the app via ACTION_SEND.
@@ -73,7 +73,7 @@ internal fun ShareTargetPickerDialog(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .fillMaxHeight(0.7f),
-            shape = RoundedCornerShape(16.dp),
+            shape = ShapeTokens.large,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
         ) {

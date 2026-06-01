@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.dialog
+﻿package dev.minios.ocremote.ui.screens.chat.dialog
 
 import android.util.Base64
 import android.util.Log
@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Close
@@ -43,6 +42,7 @@ import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.ui.screens.chat.util.LocalImageSaveRequest
 import dev.minios.ocremote.ui.screens.chat.util.decodePartFileBytes
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Compact horizontal row of image thumbnails with tap-to-preview.
@@ -77,7 +77,7 @@ internal fun ImageThumbnailRow(
                     contentDescription = file.filename ?: stringResource(R.string.chat_image),
                     modifier = Modifier
                         .size(80.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ShapeTokens.small)
                         .clickable { previewIndex = index },
                     contentScale = ContentScale.Crop
                 )
@@ -86,7 +86,7 @@ internal fun ImageThumbnailRow(
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ShapeTokens.small)
                         .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
@@ -138,7 +138,7 @@ internal fun ImagePreviewDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
-            shape = RoundedCornerShape(24.dp),
+            shape = ShapeTokens.largeMedium,
             color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
             border = if (isAmoled) {
                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
@@ -154,7 +154,7 @@ internal fun ImagePreviewDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 520.dp)
-                        .clip(RoundedCornerShape(14.dp)),
+                        .clip(ShapeTokens.medium),
                     contentScale = ContentScale.Fit,
                 )
 
@@ -170,7 +170,7 @@ internal fun ImagePreviewDialog(
                     val actionTintColor = MaterialTheme.colorScheme.onSurface
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = ShapeTokens.mediumSmall,
                         color = actionContainerColor,
                         border = BorderStroke(1.dp, actionBorderColor),
                     ) {
@@ -184,7 +184,7 @@ internal fun ImagePreviewDialog(
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = ShapeTokens.mediumSmall,
                         color = actionContainerColor,
                         border = BorderStroke(1.dp, actionBorderColor),
                     ) {

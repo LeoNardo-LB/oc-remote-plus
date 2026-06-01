@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.dialog
+﻿package dev.minios.ocremote.ui.screens.chat.dialog
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -54,6 +53,7 @@ import dev.minios.ocremote.ui.components.AmoledCard
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Interactive card for answering agent questions.
@@ -88,7 +88,7 @@ internal fun QuestionCard(
     AmoledCard(
         isAmoledDark = isAmoled,
         normalContainerColor = containerColor,
-        shape = RoundedCornerShape(12.dp),
+        shape = ShapeTokens.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -148,7 +148,7 @@ internal fun QuestionCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(ShapeTokens.small)
                                 .background(
                                     if (checked) accentColor.copy(alpha = 0.12f)
                                     else Color.Transparent
@@ -211,7 +211,7 @@ internal fun QuestionCard(
                                 }
                             },
                                 enabled = !submitted,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = ShapeTokens.small,
                                 color = if (isSelected) accentColor.copy(alpha = 0.12f) else if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
                                 border = if (!isSelected && isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)) else null,
                                 modifier = Modifier.fillMaxWidth()
@@ -254,7 +254,7 @@ internal fun QuestionCard(
                     if (customAnswer != null) {
                         // Show selected custom answer
                          Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = ShapeTokens.small,
                             color = accentColor.copy(alpha = 0.12f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -303,7 +303,7 @@ internal fun QuestionCard(
                                     isEditingCustom = true
                                 },
                                 enabled = !submitted,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = ShapeTokens.small,
                                 color = Color.Transparent,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -339,7 +339,7 @@ internal fun QuestionCard(
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 textStyle = MaterialTheme.typography.bodySmall,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = ShapeTokens.small,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                 trailingIcon = {
                                     Row {

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.tools.cards
+﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ExpandLess
@@ -33,6 +32,7 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.theme.CodeTypography
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun PatchCard(
@@ -46,7 +46,7 @@ internal fun PatchCard(
     val expanded = isExpanded
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = ShapeTokens.small,
         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
         border = if (isAmoled) AmoledDefaultBorder else null,        tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()

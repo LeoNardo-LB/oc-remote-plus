@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.server
+﻿package dev.minios.ocremote.ui.screens.server
 
 import android.util.Log
 import android.widget.Toast
@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -62,6 +61,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.server.components.ProviderRow
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,7 +147,7 @@ fun ServerProvidersScreen(
         }
         BasicAlertDialog(onDismissRequest = { connectProvider = null }) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
                 border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)) else null,
                 tonalElevation = if (isAmoled) 0.dp else 6.dp,
@@ -174,7 +174,7 @@ fun ServerProvidersScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !uiState.isSaving,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ShapeTokens.medium,
                         ) {
                             Text(method.label)
                         }
@@ -202,7 +202,7 @@ fun ServerProvidersScreen(
             apiKey = ""
         }) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
                 border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)) else null,
                 tonalElevation = if (isAmoled) 0.dp else 6.dp,
@@ -255,7 +255,7 @@ fun ServerProvidersScreen(
             viewModel.cancelProviderOauth()
         }) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
                 border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)) else null,
                 tonalElevation = if (isAmoled) 0.dp else 6.dp,
@@ -277,7 +277,7 @@ fun ServerProvidersScreen(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         )
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ShapeTokens.medium,
                             color = if (isAmoled) {
                                 MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.3f)
                             } else {
@@ -350,7 +350,7 @@ fun ServerProvidersScreen(
                                 uriHandler.openUri(pending.authorization.url)
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ShapeTokens.medium,
                         ) {
                             Text(stringResource(R.string.server_settings_oauth_open_browser))
                         }

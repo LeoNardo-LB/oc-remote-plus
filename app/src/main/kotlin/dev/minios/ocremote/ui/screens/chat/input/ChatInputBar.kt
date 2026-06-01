@@ -32,7 +32,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -99,6 +98,7 @@ import dev.minios.ocremote.ui.screens.chat.util.imageThumbnailModel
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Slash command definition for the suggestion popup.
@@ -605,7 +605,7 @@ internal fun ChatInputBar(
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(ShapeTokens.smallMedium)
                                     .background(agentColor.copy(alpha = 0.18f))
                                     .clickable {
                                         val currentIndex = agents.indexOfFirst { it.name == selectedAgent }
@@ -635,7 +635,7 @@ internal fun ChatInputBar(
                         if (modelLabel.isNotEmpty()) {
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(ShapeTokens.smallMedium)
                                     .clickable { onModelClick() }
                                     .padding(horizontal = 3.dp, vertical = 3.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -673,7 +673,7 @@ internal fun ChatInputBar(
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 },
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(ShapeTokens.smallMedium)
                                     .clickable { onCycleVariant() }
                                     .padding(horizontal = 3.dp, vertical = 3.dp)
                             )
@@ -712,7 +712,7 @@ internal fun ChatInputBar(
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(ShapeTokens.mediumSmall)
                         ) {
                             AsyncImage(
                                 model = imageThumbnailModel(attachment),
@@ -728,7 +728,7 @@ internal fun ChatInputBar(
                                     .padding(2.dp)
                                     .size(18.dp)
                                     .clickable { onRemoveAttachment(index) },
-                                shape = RoundedCornerShape(9.dp),
+                                shape = ShapeTokens.mediumSmall,
                                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -775,7 +775,7 @@ internal fun ChatInputBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(ShapeTokens.mediumSmall)
                         .background(
                             if (isAmoled) {
                                 Color.Black
@@ -788,7 +788,7 @@ internal fun ChatInputBar(
                                 Modifier.border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = ShapeTokens.mediumSmall,
                                 )
                             } else {
                                 Modifier
@@ -831,7 +831,7 @@ internal fun ChatInputBar(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(22.dp))
+                        .clip(ShapeTokens.largeMedium)
                         .background(
                             if (isAmoled) {
                                 Color.Black
@@ -848,12 +848,12 @@ internal fun ChatInputBar(
                                     } else {
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
                                     },
-                                    shape = RoundedCornerShape(22.dp)
+                                    shape = ShapeTokens.largeMedium
                                 )
                                 isAmoled -> Modifier.border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-                                    shape = RoundedCornerShape(22.dp)
+                                    shape = ShapeTokens.largeMedium
                                 )
                                 else -> Modifier
                             }
@@ -892,7 +892,7 @@ internal fun ChatInputBar(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(22.dp))
+                        .clip(ShapeTokens.largeMedium)
                         .background(
                             if (showStop) {
                                 MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
@@ -913,25 +913,25 @@ internal fun ChatInputBar(
                                 Modifier.border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(22.dp),
+                                    shape = ShapeTokens.largeMedium,
                                 )
                             } else if (isShellMode && !isSending) {
                                 Modifier.border(
                                     width = if (isAmoled) 1.2.dp else 1.dp,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = if (isAmoled) 0.88f else 0.75f),
-                                    shape = RoundedCornerShape(22.dp),
+                                    shape = ShapeTokens.largeMedium,
                                 )
                             } else if (isAmoled) {
                                 Modifier.border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(22.dp),
+                                    shape = ShapeTokens.largeMedium,
                                 )
                             } else {
                                 Modifier.border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                                    shape = RoundedCornerShape(22.dp),
+                                    shape = ShapeTokens.largeMedium,
                                 )
                             }
                         )

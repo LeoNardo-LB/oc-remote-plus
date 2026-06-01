@@ -1,0 +1,133 @@
+appId: dev.minios.ocremote.dev
+name: "E2E Dark + AMOLED Full Verification"
+tags:
+  - e2e
+  - amoled
+  - visual
+---
+
+# === 1. Light 模式基线 ===
+- launchApp
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-light-home
+
+# === 2. 切换到 Dark 主题 ===
+- tapOn:
+    point: "880,150"
+- waitForAnimationToEnd
+
+- tapOn:
+    point: "540,950"
+- waitForAnimationToEnd
+
+- tapOn:
+    point: "540,1276"
+- waitForAnimationToEnd
+
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-dark-home
+
+# 重新连接服务器（主题切换可能导致断连）
+- runFlow:
+    when:
+      visible: "Connect"
+    commands:
+      - tapOn: "Connect"
+      - extendedWaitUntil:
+          visible: "Connected"
+          timeout: 15000
+      - waitForAnimationToEnd
+
+- takeScreenshot: e2e/10-dark-home-connected
+
+# === 3. Dark 模式下 Sessions + Chat ===
+- tapOn: "Sessions"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-dark-sessions
+
+- tapOn:
+    point: "540,600"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-dark-chat
+
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-dark-chat-scrolled
+
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+
+# === 4. 启用 AMOLED ===
+- tapOn:
+    point: "880,150"
+- waitForAnimationToEnd
+- assertVisible: "AMOLED dark mode"
+- tapOn: "AMOLED dark mode"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-amoled-settings
+
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+
+# 重新连接
+- runFlow:
+    when:
+      visible: "Connect"
+    commands:
+      - tapOn: "Connect"
+      - extendedWaitUntil:
+          visible: "Connected"
+          timeout: 15000
+      - waitForAnimationToEnd
+
+- takeScreenshot: e2e/10-amoled-home
+
+# AMOLED Sessions
+- tapOn: "Sessions"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-amoled-sessions
+
+# AMOLED Chat
+- tapOn:
+    point: "540,600"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-amoled-chat
+
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-amoled-chat-scrolled
+
+# === 5. 恢复 ===
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+
+# 关闭 AMOLED + 切回 Light
+- tapOn:
+    point: "880,150"
+- waitForAnimationToEnd
+- assertVisible: "AMOLED dark mode"
+- tapOn: "AMOLED dark mode"
+- waitForAnimationToEnd
+
+- tapOn:
+    point: "540,950"
+- waitForAnimationToEnd
+- tapOn:
+    point: "540,1017"
+- waitForAnimationToEnd
+
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/10-restored-home

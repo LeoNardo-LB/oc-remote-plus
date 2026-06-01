@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.terminal
+﻿package dev.minios.ocremote.ui.screens.chat.terminal
 
 import android.media.AudioManager
 import android.os.SystemClock
@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -89,6 +88,7 @@ import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import kotlinx.coroutines.launch
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Extracted terminal-mode view for ChatScreen.
@@ -336,7 +336,7 @@ fun ChatTerminalView(
                 drawerContainerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface,
                 drawerTonalElevation = 0.dp,
-                drawerShape = RoundedCornerShape(0.dp)
+                drawerShape = ShapeTokens.none
             ) {
                 Box(
                     modifier = Modifier
@@ -357,7 +357,7 @@ fun ChatTerminalView(
                         ) {
                             items(terminalTabs, key = { it.id }) { tab ->
                                 val selected = tab.id == activeTerminalTabId
-                                val drawerItemShape = RoundedCornerShape(12.dp)
+                                val drawerItemShape = ShapeTokens.medium
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -391,7 +391,7 @@ fun ChatTerminalView(
                                                     )
                                                     if (!tab.connected) {
                                                         Surface(
-                                                            shape = RoundedCornerShape(999.dp),
+                                                            shape = CircleShape,
                                                             color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
                                                         ) {
@@ -495,7 +495,7 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = ShapeTokens.mediumSmall,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
@@ -514,7 +514,7 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = ShapeTokens.mediumSmall,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,

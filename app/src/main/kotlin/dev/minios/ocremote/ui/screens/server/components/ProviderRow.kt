@@ -1,11 +1,10 @@
-package dev.minios.ocremote.ui.screens.server.components
+﻿package dev.minios.ocremote.ui.screens.server.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
 import dev.minios.ocremote.ui.screens.server.ProviderToggle
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun ProviderRow(
@@ -33,7 +33,7 @@ internal fun ProviderRow(
     showSource: Boolean
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = ShapeTokens.medium,
         colors = CardDefaults.cardColors(
             containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh
         ),

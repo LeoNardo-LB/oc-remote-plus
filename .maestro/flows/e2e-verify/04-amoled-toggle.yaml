@@ -1,0 +1,51 @@
+appId: dev.minios.ocremote.dev
+name: "E2E AMOLED Mode Toggle Verification"
+tags:
+  - e2e
+  - amoled
+  - visual
+---
+
+# 第一阶段：默认模式截图 + 启用 AMOLED
+- launchApp
+- waitForAnimationToEnd
+- assertVisible: "OC Remote"
+- takeScreenshot: e2e/04-default-mode-home
+
+# 进入 Settings
+- tapOn:
+    point: "880,150"
+- waitForAnimationToEnd
+- assertVisible: "AMOLED dark mode"
+- takeScreenshot: e2e/04-default-mode-settings
+
+# 启用 AMOLED
+- tapOn: "AMOLED dark mode"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/04-amoled-enabled-settings
+
+# 回到主页（用 Settings 页面顶部的 Close 按钮）
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/04-amoled-enabled-home
+
+# 第二阶段：再次进入 Settings 确认 AMOLED 状态
+- tapOn:
+    point: "880,150"
+- waitForAnimationToEnd
+
+# 确认 AMOLED 已开启（通过 checked 状态）
+- assertVisible: "AMOLED dark mode"
+- takeScreenshot: e2e/04-amoled-confirm-on
+
+# 关闭 AMOLED
+- tapOn: "AMOLED dark mode"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/04-amoled-disabled-settings
+
+# 回到主页确认恢复
+- tapOn:
+    point: "70,150"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/04-amoled-disabled-home

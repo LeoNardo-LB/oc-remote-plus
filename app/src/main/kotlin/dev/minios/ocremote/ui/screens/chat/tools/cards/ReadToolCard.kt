@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +36,7 @@ import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Read tool card — shows "读取" title, file name subtitle, expandable for details.
@@ -99,7 +99,7 @@ internal fun ReadToolCard(
                 ) {
                     if (filePath.isNotBlank()) {
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
+                            shape = ShapeTokens.extraSmall,
                             color = toolOutputContainerColor(isAmoled),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -117,7 +117,7 @@ internal fun ReadToolCard(
                     }
                     if (args != null) {
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
+                            shape = ShapeTokens.extraSmall,
                             color = toolOutputContainerColor(isAmoled),
                             modifier = Modifier.fillMaxWidth()
                         ) {

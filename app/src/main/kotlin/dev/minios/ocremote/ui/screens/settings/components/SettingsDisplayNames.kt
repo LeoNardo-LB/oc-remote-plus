@@ -1,10 +1,9 @@
-package dev.minios.ocremote.ui.screens.settings.components
+﻿package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
@@ -13,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import java.util.Locale
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun getThemeDisplayName(theme: String): String {
@@ -82,7 +82,7 @@ internal fun amoledDialogModifier(): Modifier {
         Modifier.border(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f),
-            shape = RoundedCornerShape(28.dp),
+            shape = ShapeTokens.extraLarge,
         )
     } else {
         Modifier

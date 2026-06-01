@@ -20,28 +20,19 @@ import androidx.core.view.WindowCompat
 
 val LocalAmoledMode = staticCompositionLocalOf { false }
 
+/**
+ * Dark color scheme — only brand-differentiated tokens are overridden.
+ * All other tokens fall back to Material3 [darkColorScheme] defaults,
+ * which are designed and tested for correct contrast and elevation semantics.
+ */
 private val DarkColorScheme = darkColorScheme(
+    // Brand colors: Indigo primary + Cyan tertiary (OpenCode identity)
     primary = Color(0xFF9DA3FF),
     onPrimary = Color(0xFF1A1B4B),
     primaryContainer = Color(0xFF2D2F6E),
     onPrimaryContainer = Color(0xFFDEE0FF),
-    secondary = Color(0xFFCAC3DC),
-    onSecondary = Color(0xFF322E41),
-    secondaryContainer = Color(0xFF494559),
-    onSecondaryContainer = Color(0xFFE7DFF8),
     tertiary = Color(0xFF7DD0E1),
     onTertiary = Color(0xFF003640),
-    surface = Color(0xFF121218),
-    onSurface = Color(0xFFE5E1E9),
-    surfaceVariant = Color(0xFF2B2B35),
-    onSurfaceVariant = Color(0xFFC8C5D0),
-    surfaceContainer = Color(0xFF1E1E25),
-    surfaceContainerHigh = Color(0xFF262630),
-    surfaceContainerHighest = Color(0xFF31313B),
-    outline = Color(0xFF918F9A),
-    outlineVariant = Color(0xFF47464F),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -76,13 +67,12 @@ private val LightColorScheme = lightColorScheme(
 private val AmoledDarkColorScheme = DarkColorScheme.copy(
     background = Color.Black,
     surface = Color.Black,
-    onSurface = Color(0xFFE5E1E9),
     surfaceVariant = Color(0xFF1A1A22),
     surfaceContainer = Color(0xFF0D0D12),
     surfaceContainerLow = Color(0xFF080810),
     surfaceContainerLowest = Color.Black,
     surfaceContainerHigh = Color(0xFF141419),
-    surfaceContainerHighest = Color(0xFF1C1C24)
+    surfaceContainerHighest = Color(0xFF2A2A36)
 )
 
 /**
@@ -106,6 +96,9 @@ fun OpenCodeTheme(
             val context = LocalContext.current
             val scheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             if (darkTheme && amoledDark) {
+                // Only override surface/container tokens for AMOLED pure-black effect.
+                // Preserve dynamic color's onSurface/onSurfaceVariant so the
+                // wallpaper-generated palette remains consistent.
                 scheme.copy(
                     background = Color.Black,
                     surface = Color.Black,
@@ -114,7 +107,7 @@ fun OpenCodeTheme(
                     surfaceContainerLow = Color(0xFF080810),
                     surfaceContainerLowest = Color.Black,
                     surfaceContainerHigh = Color(0xFF141419),
-                    surfaceContainerHighest = Color(0xFF1C1C24)
+                    surfaceContainerHighest = Color(0xFF2A2A36)
                 )
             } else {
                 scheme

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.components
+﻿package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.Icon
@@ -22,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun FileCard(file: Part.File) {
@@ -49,7 +49,7 @@ internal fun FileCardFallback(file: Part.File) {
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = ShapeTokens.medium,
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
         tonalElevation = 0.dp,

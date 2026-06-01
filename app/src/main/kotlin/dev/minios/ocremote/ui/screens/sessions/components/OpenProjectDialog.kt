@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.sessions.components
+﻿package dev.minios.ocremote.ui.screens.sessions.components
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -65,6 +64,7 @@ import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.sessions.SessionListViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Directory browser dialog for opening a project.
@@ -204,7 +204,7 @@ internal fun OpenProjectDialog(
     ) {
         AmoledSurface(
             isAmoledDark = isAmoled,
-            shape = RoundedCornerShape(16.dp),
+            shape = ShapeTokens.large,
             normalTonalElevation = 6.dp,
             modifier = Modifier
                 .fillMaxWidth(0.92f)
@@ -233,7 +233,7 @@ internal fun OpenProjectDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ShapeTokens.small)
                         .background(
                             if (isAmoled) {
                                 Color.Black
@@ -246,7 +246,7 @@ internal fun OpenProjectDialog(
                                 Modifier.border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = ShapeTokens.small
                                 )
                             } else {
                                 Modifier
@@ -305,7 +305,7 @@ internal fun OpenProjectDialog(
                             .padding(horizontal = 20.dp, vertical = 4.dp)
                             .then(
                                 if (canGoUp) Modifier
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .clip(ShapeTokens.extraSmall)
                                     .clickable {
                                         // Navigate up
                                         val parent = currentDir!!.trimEnd('/').substringBeforeLast('/')

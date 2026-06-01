@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.components
+﻿package dev.minios.ocremote.ui.screens.chat.components
 
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -44,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.SoftwareKeyboardController
@@ -61,6 +61,7 @@ import dev.minios.ocremote.ui.screens.chat.dialog.QuestionCard
 import dev.minios.ocremote.ui.screens.chat.util.computeTurnGroups
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Shared composable for both main-session and sub-session message lists.
@@ -128,6 +129,7 @@ fun ChatMessageList(
                         item(key = "question_batch_actions") {
                             QuestionBatchActionBar(
                                 count = uiState.pendingQuestions.size,
+                                isAmoled = isAmoled,
                                 onSkipAll = {
                                     uiState.pendingQuestions.forEach { question ->
                                         viewModel.rejectQuestion(question.id)
@@ -156,6 +158,7 @@ fun ChatMessageList(
                         item(key = "perm_batch_actions") {
                             PermissionBatchActionBar(
                                 count = uiState.pendingPermissions.size,
+                                isAmoled = isAmoled,
                                 onAllowAll = {
                                     uiState.pendingPermissions.forEach { perm ->
                                         viewModel.replyToPermission(perm.id, "once")
@@ -384,6 +387,7 @@ private suspend fun LazyListState.snapToBottom() {
 @Composable
 private fun PermissionBatchActionBar(
     count: Int,
+    isAmoled: Boolean,
     onAllowAll: () -> Unit,
     onRejectAll: () -> Unit,
 ) {
@@ -391,8 +395,8 @@ private fun PermissionBatchActionBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = ShapeTokens.medium,
+        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.secondaryContainer,
         tonalElevation = 1.dp,
     ) {
         Row(
@@ -423,14 +427,15 @@ private fun PermissionBatchActionBar(
 @Composable
 private fun QuestionBatchActionBar(
     count: Int,
+    isAmoled: Boolean,
     onSkipAll: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shape = ShapeTokens.medium,
+        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.tertiaryContainer,
         tonalElevation = 1.dp,
     ) {
         Row(

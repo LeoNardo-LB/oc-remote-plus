@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.components
+﻿package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -37,6 +37,7 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.formatAssistantErrorMessage
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun AssistantTurnBubble(
@@ -188,7 +189,7 @@ internal fun AssistantTurnBubble(
                     if (errorText != null) {
                         Surface(
                             color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = ShapeTokens.mediumSmall,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = if (isAmoled) 0.75f else 0.35f)),
                             tonalElevation = 0.dp,
                         ) {

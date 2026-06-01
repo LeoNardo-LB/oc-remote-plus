@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.components
+﻿package dev.minios.ocremote.ui.screens.chat.components
 
 import android.view.MotionEvent
 import android.webkit.WebView
@@ -27,11 +27,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.markdown.looksLikeHtmlPayload
 import dev.minios.ocremote.ui.screens.chat.markdown.normalizeHtmlForEmbeddedPreview
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 private enum class HtmlErrorViewMode {
     Page,
@@ -118,9 +118,9 @@ internal fun ErrorPayloadContent(
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = ShapeTokens.small,
                     )
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(ShapeTokens.small),
             )
         } else {
             SelectionContainer {

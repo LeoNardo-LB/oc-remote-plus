@@ -4,6 +4,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -56,6 +56,7 @@ import dev.minios.ocremote.ui.screens.sessions.components.isAmoledTheme
 import dev.minios.ocremote.ui.screens.sessions.components.OpenProjectDialog
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Session List Screen - shows all sessions for a connected server,
@@ -243,7 +244,10 @@ fun SessionListScreen(
                             )
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
                             items(uiState.projectGroups, key = { it.directory }) { group ->
                                 ProjectGroupRow(
                                     group = group,
@@ -267,7 +271,10 @@ fun SessionListScreen(
                             )
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
                             items(uiState.sessions, key = { it.session.id }) { item ->
                                 SessionRow(
                                     item = item,
@@ -321,7 +328,7 @@ fun SessionListScreen(
         BasicAlertDialog(onDismissRequest = { showDeleteSelectedDialog = false }) {
             AmoledSurface(
                 isAmoledDark = isAmoled,
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 normalTonalElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -361,7 +368,7 @@ fun SessionListScreen(
         BasicAlertDialog(onDismissRequest = { showRenameDialog = false }) {
             AmoledSurface(
                 isAmoledDark = isAmoled,
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 normalTonalElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -407,7 +414,7 @@ fun SessionListScreen(
         BasicAlertDialog(onDismissRequest = { showDeleteDialog = false }) {
             AmoledSurface(
                 isAmoledDark = isAmoled,
-                shape = RoundedCornerShape(20.dp),
+                shape = ShapeTokens.largeMedium,
                 normalTonalElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {

@@ -35,6 +35,7 @@ import dev.minios.ocremote.data.dto.response.ProviderModel
 import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +63,7 @@ internal fun ModelPickerDialog(
     BasicAlertDialog(onDismissRequest = onDismiss) {
         AmoledSurface(
             isAmoledDark = isAmoled,
-            shape = RoundedCornerShape(20.dp),
+            shape = ShapeTokens.largeMedium,
             normalTonalElevation = 6.dp,
             modifier = Modifier
                 .fillMaxWidth()
@@ -109,7 +110,7 @@ internal fun ModelPickerDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(ShapeTokens.small)
                                 .background(
                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                     else Color.Transparent

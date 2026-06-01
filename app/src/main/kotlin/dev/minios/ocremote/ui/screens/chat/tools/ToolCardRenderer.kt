@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.tools
+﻿package dev.minios.ocremote.ui.screens.chat.tools
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -39,6 +38,7 @@ import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun ToolCallCard(
@@ -181,7 +181,7 @@ internal fun ToolCallCard(
                             }
                         if (inputText.isNotBlank()) {
                             Surface(
-                                shape = RoundedCornerShape(4.dp),
+                                shape = ShapeTokens.extraSmall,
                                 color = toolOutputContainerColor(isAmoled),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -200,7 +200,7 @@ internal fun ToolCallCard(
                     }
                     if (output.isNotBlank()) {
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
+                            shape = ShapeTokens.extraSmall,
                             color = toolOutputContainerColor(isAmoled),
                             border = if (isAmoled) BorderStroke(1.dp, stateColor.copy(alpha = 0.6f)) else null,
                             modifier = Modifier.fillMaxWidth()

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.dialog
+﻿package dev.minios.ocremote.ui.screens.chat.dialog
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
@@ -38,6 +37,7 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.theme.CodeTypography
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun PermissionCard(
@@ -61,7 +61,7 @@ internal fun PermissionCard(
             containerColor = containerColor
         ),
         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.7f)) else null,
-        shape = RoundedCornerShape(12.dp),
+        shape = ShapeTokens.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(

@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.markdown
+﻿package dev.minios.ocremote.ui.screens.chat.markdown
 
 import android.widget.Toast
 import androidx.compose.foundation.horizontalScroll
@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
@@ -26,6 +25,7 @@ import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import dev.snipme.highlights.Highlights
 import org.intellij.markdown.ast.ASTNode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Custom code block component replacing mikepenz's built-in showHeader.
@@ -54,7 +54,7 @@ internal fun OcCodeBlock(
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(ShapeTokens.extraSmall)
             .fillMaxWidth()
     ) {
         // Syntax-highlighted code (mikepenz engine, no built-in header)

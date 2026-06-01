@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,6 +40,7 @@ import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Edit tool card — shows file path + diff with red/green colored lines.
@@ -114,7 +114,7 @@ internal fun EditToolCard(
                 if (isError) {
                     val errorText = (tool.state as ToolState.Error).error
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
+                        shape = ShapeTokens.extraSmall,
                         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer,
                         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.7f)) else null,
                         modifier = Modifier.fillMaxWidth()

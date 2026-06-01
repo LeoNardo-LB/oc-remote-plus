@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.markdown
+﻿package dev.minios.ocremote.ui.screens.chat.markdown
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +32,7 @@ import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes.HEADER as GFMHeader
 import org.intellij.markdown.flavours.gfm.GFMElementTypes.ROW as GFMRow
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes.CELL as GFMCell
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /** Data class representing a parsed table row from the AST. */
 private data class TableRow(
@@ -58,7 +58,7 @@ internal fun SimpleMarkdownTable(
     val rowBgOdd = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
     val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
     val pad = 10.dp
-    val shape = RoundedCornerShape(6.dp)
+    val shape = ShapeTokens.smallMedium
     val border = BorderStroke(1.dp, dividerColor)
     val annotator = annotatorSettings()
 

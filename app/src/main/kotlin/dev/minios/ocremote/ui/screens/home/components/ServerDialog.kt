@@ -1,9 +1,8 @@
-package dev.minios.ocremote.ui.screens.home.components
+﻿package dev.minios.ocremote.ui.screens.home.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -21,6 +20,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 /**
  * Parse and validate a server URL string.
@@ -111,7 +111,7 @@ internal fun ServerDialog(
 
     BasicAlertDialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = ShapeTokens.largeMedium,
             color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
             border = if (isAmoled) AmoledDefaultBorder else null,
             tonalElevation = if (isAmoled) 0.dp else 6.dp,
@@ -184,7 +184,7 @@ internal fun ServerDialog(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = ShapeTokens.medium,
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()

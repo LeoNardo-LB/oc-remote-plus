@@ -1,6 +1,5 @@
 package dev.minios.ocremote.ui.screens.sessions.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,14 +11,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.minios.ocremote.ui.components.AmoledDefaultBorder
 import dev.minios.ocremote.ui.screens.sessions.ProjectGroup
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -31,51 +34,62 @@ internal fun ProjectGroupRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val isAmoled = isAmoledTheme()
+
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = CardDefaults.shape,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant
+        ),
+        border = if (isAmoled) AmoledDefaultBorder else null,
     ) {
-        Icon(
-            imageVector = Icons.Default.Folder,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = group.displayName,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.primary,
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "${group.sessionCount} 个会话",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = group.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (group.lastUpdated != null) {
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Text(
-                        text = "·",
+                        text = "${group.sessionCount} 个会话",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        text = formatRelativeTime(group.lastUpdated),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (group.lastUpdated != null) {
+                        Text(
+                            text = "·",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = formatRelativeTime(group.lastUpdated),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

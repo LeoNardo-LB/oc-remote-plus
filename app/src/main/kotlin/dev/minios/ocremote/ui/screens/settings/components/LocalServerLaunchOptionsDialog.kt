@@ -1,10 +1,9 @@
-package dev.minios.ocremote.ui.screens.settings.components
+﻿package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +100,7 @@ internal fun LocalServerLaunchOptionsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = amoledDialogModifier(),
-        shape = RoundedCornerShape(28.dp),
+        shape = ShapeTokens.extraLarge,
         title = {
             Text(
                 text = stringResource(R.string.home_local_launch_options),

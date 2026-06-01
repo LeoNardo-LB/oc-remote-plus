@@ -1,4 +1,4 @@
-appId: dev.minios.ocremote
+appId: dev.minios.ocremote.dev
 name: "连接并进入聊天测试滚动"
 tags:
   - scroll-test

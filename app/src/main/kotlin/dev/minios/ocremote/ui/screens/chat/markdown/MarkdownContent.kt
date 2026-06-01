@@ -115,7 +115,7 @@ internal fun MarkdownContent(
     }
     // Code blocks: distinct background
     val codeBlockBg = when {
-        isAmoled -> MaterialTheme.colorScheme.surfaceContainerLow
+        isAmoled -> Color(0xFF2A2A36)  // Matches AMOLED surfaceContainerHighest
         isUser -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.surfaceContainer
     }
@@ -152,7 +152,7 @@ internal fun MarkdownContent(
     }
 
     val inlineCodeBg = when {
-        isAmoled -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f)
+        isAmoled -> Color(0xFF353540)
         isUser -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)
         else -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
     }

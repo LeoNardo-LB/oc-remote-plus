@@ -1,4 +1,4 @@
-package dev.minios.ocremote.ui.screens.chat.components
+﻿package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.ui.components.AmoledDefaultBorder
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.filterRenderableParts
@@ -56,6 +57,7 @@ import dev.minios.ocremote.ui.screens.chat.util.resolveUserCommandLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import dev.minios.ocremote.ui.theme.ShapeTokens
 
 enum class MessageCardRole { USER, ASSISTANT }
 
@@ -241,7 +243,7 @@ private fun MessageCardUser(
                         // QUEUED badge
                         if (isQueued) {
                             Surface(
-                                shape = RoundedCornerShape(4.dp),
+                                shape = ShapeTokens.extraSmall,
                                 color = QueuedBadgeColor,
                                 modifier = Modifier.padding(end = 4.dp)
                             ) {
@@ -358,8 +360,9 @@ private fun MessageCardAssistant(
         horizontalAlignment = Alignment.Start
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = ShapeTokens.medium,
+            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant,
+            border = if (isAmoled) AmoledDefaultBorder else null,
             tonalElevation = 0.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -530,7 +533,7 @@ private fun MessageCardAssistant(
                 if (errorText != null) {
                     Surface(
                         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = ShapeTokens.mediumSmall,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = if (isAmoled) 0.75f else 0.35f)),
                         tonalElevation = 0.dp,
                     ) {
