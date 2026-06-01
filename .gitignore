@@ -57,6 +57,7 @@ lint/
 
 # AI tool artifacts
 .superpowers/
+.worktrees/
 .post-dev-verification/
 
 # Temp files
