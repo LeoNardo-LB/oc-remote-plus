@@ -4,7 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +33,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +59,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Read tool card — shows "读取" title, file name subtitle, expandable for details.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ReadToolCard(
     tool: Part.Tool,
@@ -78,6 +86,8 @@ internal fun ReadToolCard(
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     val expanded = isExpanded
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     val isCompleted = tool.state is ToolState.Completed
 
     Surface(
@@ -91,7 +101,14 @@ internal fun ReadToolCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                    .combinedClickable(
+                        onClick = { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                        onLongClick = {
+                            val copyText = if (filePath.isNotBlank()) "Read: $filePath" else "Read"
+                            clipboardManager.setText(AnnotatedString(copyText))
+                            Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
+                        }
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -144,10 +161,11 @@ internal fun ReadToolCard(
                         .heightIn(max = halfScreenHeight)
                         .verticalScroll(scrollState)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(top = 2.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
+                    SelectionContainer {
+                        Column(
+                            modifier = Modifier.padding(top = 2.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                         if (filePath.isNotBlank()) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
@@ -184,6 +202,7 @@ internal fun ReadToolCard(
                                 )
                             }
                         }
+                    }
                     }
                 }
             }

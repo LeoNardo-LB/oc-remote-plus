@@ -1,10 +1,12 @@
 package dev.minios.ocremote.ui.screens.chat.tools.cards
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,8 +30,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +58,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * Task (sub-agent) tool card — shows description + child info.
  * Like WebUI: trigger = "Agent (task)" + description, content = child tool list.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun TaskToolCard(
     tool: Part.Tool,
@@ -84,6 +90,12 @@ internal fun TaskToolCard(
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     val expanded = isExpanded
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val longPressCopyText = description
+        ?: agentType?.let { "$it Agent" }
+        ?: serverTitle?.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.tool_sub_agent)
     val isRunning = tool.state is ToolState.Running
     val hasOutput = output.isNotBlank()
     val subSessionId = when (val state = tool.state) {
@@ -107,9 +119,21 @@ internal fun TaskToolCard(
                     .let { mod ->
                         when {
                             subSessionId != null && onViewSubSession != null ->
-                                mod.clickable { performHaptic(hapticView, hapticOn); onViewSubSession(subSessionId) }
+                                mod.combinedClickable(
+                                    onClick = { performHaptic(hapticView, hapticOn); onViewSubSession(subSessionId) },
+                                    onLongClick = {
+                                        clipboardManager.setText(AnnotatedString(longPressCopyText))
+                                        Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
+                                    }
+                                )
                             else ->
-                                mod.clickable { performHaptic(hapticView, hapticOn); onToggleExpand() }
+                                mod.combinedClickable(
+                                    onClick = { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                                    onLongClick = {
+                                        clipboardManager.setText(AnnotatedString(longPressCopyText))
+                                        Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
+                                    }
+                                )
                         }
                     },
                 horizontalArrangement = Arrangement.SpaceBetween,

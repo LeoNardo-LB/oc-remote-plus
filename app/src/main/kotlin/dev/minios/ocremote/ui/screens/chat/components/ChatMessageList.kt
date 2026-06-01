@@ -82,7 +82,6 @@ fun ChatMessageList(
     keyboardController: SoftwareKeyboardController?,
     viewModel: ChatViewModel,
     navigateToChildSession: (String) -> Unit,
-    onMarkdownPreviewText: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val turnGroups = computeTurnGroups(rawMessages)
@@ -188,7 +187,14 @@ fun ChatMessageList(
                                             val text = messages.flatMap { m ->
                                                 m.parts.filterIsInstance<Part.Text>().map { it.text }
                                             }.joinToString("\n\n")
-                                            if (text.isNotBlank()) { onMarkdownPreviewText(text) }
+                                            if (text.isNotBlank()) {
+                                                clipboardManager.setText(AnnotatedString(text))
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        context.getString(R.string.chat_copied_clipboard)
+                                                    )
+                                                }
+                                            }
                                         }
                                     } else null
                                 )

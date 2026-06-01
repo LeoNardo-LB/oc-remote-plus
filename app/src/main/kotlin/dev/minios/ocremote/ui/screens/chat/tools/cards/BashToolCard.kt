@@ -4,7 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -56,6 +61,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * Bash tool card — shows $ command + output.
  * Like WebUI: trigger = "Shell" + description, content = code block with command+output.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun BashToolCard(
     tool: Part.Tool,
@@ -89,6 +95,7 @@ internal fun BashToolCard(
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     val expanded = isExpanded
+    val context = LocalContext.current
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
     val hasContent = command.isNotBlank() || output.isNotBlank()
@@ -104,7 +111,15 @@ internal fun BashToolCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                    .combinedClickable(
+                        onClick = { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                        onLongClick = {
+                            if (command.isNotBlank()) {
+                                clipboardManager.setText(AnnotatedString("$ $command"))
+                                Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -138,6 +153,7 @@ internal fun BashToolCard(
                             IconButton(
                                 onClick = {
                                     clipboardManager.setText(AnnotatedString(displayText))
+                                    Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.size(22.dp)
                             ) {

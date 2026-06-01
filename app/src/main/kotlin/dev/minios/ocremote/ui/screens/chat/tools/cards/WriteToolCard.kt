@@ -4,7 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,8 +32,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +59,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * Write tool card — shows file path + code content.
  * Like WebUI: trigger = "Write" + filename, content = code view.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun WriteToolCard(
     tool: Part.Tool,
@@ -68,6 +76,8 @@ internal fun WriteToolCard(
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     val expanded = isExpanded
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
     val hasContent = content.isNotBlank()
@@ -83,7 +93,14 @@ internal fun WriteToolCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                    .combinedClickable(
+                        onClick = { performHaptic(hapticView, hapticOn); onToggleExpand() },
+                        onLongClick = {
+                            val copyText = if (filePath.isNotBlank()) "Write: $filePath" else "Write"
+                            clipboardManager.setText(AnnotatedString(copyText))
+                            Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
+                        }
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -140,13 +157,15 @@ internal fun WriteToolCard(
                         .heightIn(max = halfScreenHeight)
                         .verticalScroll(scrollState)
                 ) {
-                    Text(
-                        text = content.take(5000),
-                        style = CodeTypography.copy(fontSize = 12.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .codeHorizontalScroll()
-                    )
+                    SelectionContainer {
+                        Text(
+                            text = content.take(5000),
+                            style = CodeTypography.copy(fontSize = 12.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .codeHorizontalScroll()
+                        )
+                    }
                 }
             }
         }

@@ -213,7 +213,6 @@ import dev.minios.ocremote.ui.screens.chat.tools.cards.TaskToolCard
 import dev.minios.ocremote.ui.screens.chat.tools.cards.TodoListCard
 import dev.minios.ocremote.ui.screens.chat.tools.cards.WriteToolCard
 import dev.minios.ocremote.ui.screens.chat.dialog.ModelPickerDialog
-import dev.minios.ocremote.ui.screens.chat.dialog.MarkdownPreviewDialog
 import dev.minios.ocremote.ui.screens.chat.dialog.ImageThumbnailRow
 import dev.minios.ocremote.ui.screens.chat.dialog.ImagePreviewDialog
 import dev.minios.ocremote.ui.screens.chat.dialog.QuestionCard
@@ -379,7 +378,6 @@ fun ChatScreen(
     }
 
     var showModelPicker by remember { mutableStateOf(false) }
-    var markdownPreviewText by remember { mutableStateOf<String?>(null) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var isTerminalMode by rememberSaveable { mutableStateOf(startInTerminalMode) }
@@ -1041,7 +1039,6 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
-                                onMarkdownPreviewText = { markdownPreviewText = it },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -1061,7 +1058,6 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
-                                onMarkdownPreviewText = { markdownPreviewText = it },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -1082,20 +1078,6 @@ fun ChatScreen(
                 showModelPicker = false
             },
             onDismiss = { showModelPicker = false }
-        )
-    }
-
-    // Markdown preview dialog (copy/view assistant message)
-    markdownPreviewText?.let { previewText ->
-        MarkdownPreviewDialog(
-            markdown = previewText,
-            onDismiss = { markdownPreviewText = null },
-            onCopyAll = {
-                clipboardManager.setText(AnnotatedString(previewText))
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar(context.getString(R.string.chat_copied_clipboard))
-                }
-            }
         )
     }
 
