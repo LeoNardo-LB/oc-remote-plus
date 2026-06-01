@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,9 +20,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -47,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -57,7 +58,6 @@ import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.ui.components.AmoledSurface
-import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.sessions.SessionItem
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.DiffAdded
@@ -72,6 +72,7 @@ import java.util.Locale
 internal fun SessionRow(
     item: SessionItem,
     depth: Int = 0,
+    isLastChild: Boolean = false,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -97,50 +98,32 @@ internal fun SessionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .treeLines(
+                depth = depth,
+                isLastChild = isLastChild,
+                lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED),
+            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(start = minOf(depth * 16, 160).dp, end = 8.dp)
-            .padding(vertical = 8.dp),
+            .padding(start = minOf(depth * 24, 360).dp, end = 8.dp)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Selection checkbox
-        AnimatedVisibility(
-            visible = isSelectionMode,
-            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut()
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onClick() },
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
+        // Status icon
+        val statusIconColor = when (item.status) {
+            is SessionStatus.Busy -> MaterialTheme.colorScheme.tertiary
+            is SessionStatus.Retry -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
         }
-
-        // Status dot
-        when (item.status) {
-            is SessionStatus.Busy -> {
-                PulsingDotsIndicator(
-                    dotSize = 6.dp,
-                    dotSpacing = 2.dp,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            is SessionStatus.Retry -> {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.error)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            else -> { /* Idle — no dot */ }
-        }
+        Icon(
+            imageVector = Icons.Outlined.ChatBubbleOutline,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = statusIconColor,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
 
         // Content column
         Column(modifier = Modifier.weight(1f)) {
@@ -151,7 +134,7 @@ internal fun SessionRow(
                 style = MaterialTheme.typography.bodyLarge,
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(1.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -159,7 +142,7 @@ internal fun SessionRow(
             ) {
                 Text(
                     text = dateFormat.format(Date(item.session.time.updated)),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
                 )
 
@@ -272,6 +255,18 @@ internal fun SessionRow(
                     )
                 }
             }
+        }
+
+        // Selection checkbox on right side
+        AnimatedVisibility(
+            visible = isSelectionMode,
+            enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
+            exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut()
+        ) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onClick() },
+            )
         }
     }
 

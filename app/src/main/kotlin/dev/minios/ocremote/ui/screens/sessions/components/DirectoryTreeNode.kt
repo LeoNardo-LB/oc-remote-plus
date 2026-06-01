@@ -39,7 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -50,12 +52,38 @@ import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
 
+internal fun Modifier.treeLines(
+    depth: Int,
+    isLastChild: Boolean,
+    lineColor: Color,
+): Modifier = this.drawBehind {
+    if (depth <= 0) return@drawBehind
+
+    val indentWidth = 24.dp.toPx()
+    val strokeWidth = 1.dp.toPx()
+
+    for (level in 0 until depth) {
+        val x = indentWidth * level + indentWidth / 2
+        if (level == depth - 1) {
+            val horizontalY = size.height / 2
+            drawLine(lineColor, Offset(x, 0f), Offset(x, horizontalY), strokeWidth)
+            drawLine(lineColor, Offset(x, horizontalY), Offset(x + indentWidth / 2, horizontalY), strokeWidth)
+            if (!isLastChild) {
+                drawLine(lineColor, Offset(x, horizontalY), Offset(x, size.height.toFloat()), strokeWidth)
+            }
+        } else {
+            drawLine(lineColor, Offset(x, 0f), Offset(x, size.height.toFloat()), strokeWidth)
+        }
+    }
+}
+
 @Composable
 internal fun DirectoryTreeNode(
     node: TreeNode.Directory,
     onClick: () -> Unit,
     onCopyPath: (String) -> Unit,
     modifier: Modifier = Modifier,
+    isLastChild: Boolean = false,
 ) {
     val isAmoled = isAmoledTheme()
     var menuExpanded by remember { mutableStateOf(false) }
@@ -70,9 +98,14 @@ internal fun DirectoryTreeNode(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .treeLines(
+                depth = node.depth,
+                isLastChild = isLastChild,
+                lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED),
+            )
             .clickable(onClick = onClick)
-            .padding(start = minOf(node.depth * 16, 160).dp, end = 8.dp)
-            .padding(vertical = 10.dp),
+            .padding(start = minOf(node.depth * 24, 360).dp, end = 8.dp)
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(

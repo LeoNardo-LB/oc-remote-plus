@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -233,7 +234,16 @@ fun SessionListScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
-                        items(uiState.treeNodes, key = { it.id }) { node ->
+                        itemsIndexed(uiState.treeNodes, key = { _, node -> node.id }) { index, node ->
+                            val nextNode = if (index < uiState.treeNodes.lastIndex) uiState.treeNodes[index + 1] else null
+                            val nodeDepth = when (node) {
+                                is TreeNode.Directory -> node.depth
+                                is TreeNode.Session -> node.depth
+                            }
+                            val isLast = nextNode == null || when (nextNode) {
+                                is TreeNode.Directory -> nextNode.depth <= nodeDepth
+                                is TreeNode.Session -> nextNode.depth <= nodeDepth
+                            }
                             when (node) {
                                 is TreeNode.Directory -> {
                                     DirectoryTreeNode(
@@ -243,6 +253,7 @@ fun SessionListScreen(
                                             viewModel.copyToClipboard(path, context)
                                             scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.menu_copied_to_clipboard)) }
                                         },
+                                        isLastChild = isLast,
                                     )
                                     HorizontalDivider(
                                         color = MaterialTheme.colorScheme.outlineVariant.copy(
@@ -254,6 +265,7 @@ fun SessionListScreen(
                                     SessionRow(
                                         item = node.session,
                                         depth = node.depth,
+                                        isLastChild = isLast,
                                         isSelectionMode = uiState.isSelectionMode,
                                         isSelected = node.id in uiState.selectedIds,
                                         onClick = {
