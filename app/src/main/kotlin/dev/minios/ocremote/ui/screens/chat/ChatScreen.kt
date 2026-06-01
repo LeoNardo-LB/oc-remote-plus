@@ -510,6 +510,51 @@ fun ChatScreen(
             }
     }
 
+    // SSE scroll pinning: when user has scrolled up (!isAtBottom),
+    // reverseLayout auto-anchoring would push the viewport as content grows.
+    // We use requestScrollToItem ONLY when user is NOT actively scrolling
+    // (isScrollInProgress == false) to avoid fighting user gestures.
+    // This prevents the "stuck at bottom" bug from the previous approach.
+    LaunchedEffect(listState) {
+        var anchorIndex = listState.firstVisibleItemIndex
+        var anchorOffset = listState.firstVisibleItemScrollOffset
+        // Track whether the last scroll change was from user or programmatic
+        var userScrolling = false
+
+        snapshotFlow {
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                isAtBottom
+            )
+        }.collect { (index, offset, atBottom) ->
+            val isUserTouching = listState.isScrollInProgress
+            if (atBottom) {
+                anchorIndex = index
+                anchorOffset = offset
+                userScrolling = false
+            } else if (isUserTouching) {
+                // User is actively dragging → update anchor, don't fight it
+                anchorIndex = index
+                anchorOffset = offset
+                userScrolling = true
+            } else if (userScrolling) {
+                // User just released after scrolling → update anchor to new position
+                anchorIndex = index
+                anchorOffset = offset
+                userScrolling = false
+            } else if (index == anchorIndex && offset != anchorOffset) {
+                // Not touching, not at bottom, same item but offset changed
+                // → reverseLayout auto-shift from content growth. Pin it.
+                listState.requestScrollToItem(anchorIndex, anchorOffset)
+            } else if (index != anchorIndex) {
+                // Item index changed without user scroll (e.g., fling animation settling)
+                anchorIndex = index
+                anchorOffset = offset
+            }
+        }
+    }
+
 
     CompositionLocalProvider(
         LocalChatFontSize provides chatFontSize,
