@@ -54,7 +54,7 @@ fun buildTreeNodes(
     // 0. Normalize paths: Windows backslashes → forward slashes
     val normalizePath: (String) -> String = { it.replace('\\', '/') }
     val normalizedHomeDir = homeDir?.let { normalizePath(it) }
-    val normalizedExpandedPaths = expandedPaths.map { normalizePath(it) }.toSet()
+    val normalizedExpandedPaths = expandedPaths.map { normalizePath(it) }.toMutableSet()
 
     // 1. Collect all unique directory paths
     val allPaths = sessions.map { normalizePath(it.directory) }.filter { it.isNotBlank() }.toSet()
@@ -122,15 +122,27 @@ fun buildTreeNodes(
     val result = mutableListOf<TreeNode>()
     val rootPaths = allSegments.filter { path ->
         val parent = path.substringBeforeLast('/')
-        parent !in allSegments
+        // A path is root if its parent is not in allSegments,
+        // OR if its parent equals itself (e.g., drive root "D:" on Windows)
+        parent !in allSegments || parent == path
     }.sortedBy { it }
 
-    for (rootPath in rootPaths) {
+    // 7.5 Collapse chains of single-child, zero-session directories
+    collapseSingleChildChains(allSegments, dirInfo, childDirs, exactCount, normalizedHomeDir, normalizedExpandedPaths)
+
+    // Recompute root paths after collapsing (some nodes may have become roots)
+    val collapsedRootPaths = allSegments.filter { path ->
+        val parent = path.substringBeforeLast('/')
+        parent !in allSegments || parent == path
+    }.sortedBy { it }
+
+    for (rootPath in collapsedRootPaths) {
         flattenSubtree(rootPath, allSegments, sessions, normalizedExpandedPaths, exactCount, totalSessionCount, childDirs, dirInfo, normalizedHomeDir, statuses, result)
     }
 
     // Handle sessions with empty/blank/root directory (no tree node)
     val noDirSessions = sessions.filter { normalizePath(it.directory).isBlank() || normalizePath(it.directory) == "/" }
+
     for (session in noDirSessions) {
         result.add(TreeNode.Session(
             id = session.id,
@@ -201,4 +213,91 @@ private fun flattenSubtree(
             ))
         }
     }
+}
+
+/**
+ * Collapse chains of directories that have exactly 1 child directory and 0 sessions.
+ * Iteratively merges parent into child until no more collapsing is possible.
+ * Updates depths, display names, and expanded paths in-place.
+ */
+private fun collapseSingleChildChains(
+    allSegments: MutableSet<String>,
+    dirInfo: MutableMap<String, DirInfo>,
+    childDirs: MutableMap<String, Int>,
+    exactCount: Map<String, Int>,
+    normalizedHomeDir: String?,
+    normalizedExpandedPaths: MutableSet<String>,
+) {
+    val originalDepths = allSegments.associateWith { dirInfo[it]?.depth ?: 0 }
+
+    var changed = true
+    while (changed) {
+        changed = false
+        val toRemove = mutableListOf<String>()
+
+        for (path in allSegments.toList().sortedBy { dirInfo[it]?.depth ?: 0 }) {
+            if ((exactCount[path] ?: 0) != 0) continue
+
+            val children = allSegments.filter { child ->
+                child.substringBeforeLast('/') == path && child.startsWith("$path/")
+            }
+            if (children.size == 1) {
+                val child = children[0]
+
+                // Promote child to parent's depth
+                dirInfo[child] = dirInfo[child]!!.copy(
+                    depth = dirInfo[path]!!.depth,
+                )
+
+                // Propagate expanded state
+                if (path in normalizedExpandedPaths) {
+                    normalizedExpandedPaths.remove(path)
+                    normalizedExpandedPaths.add(child)
+                }
+
+                toRemove.add(path)
+                changed = true
+            } else if (children.isEmpty()) {
+                // Remove empty leaf directories (no children, no sessions)
+                toRemove.add(path)
+                changed = true
+            }
+        }
+
+        for (path in toRemove) {
+            allSegments.remove(path)
+            childDirs.remove(path)
+        }
+    }
+
+    // Update display names for nodes whose depth changed (i.e., were collapsed)
+    for (path in allSegments) {
+        val originalDepth = originalDepths[path] ?: continue
+        val currentDepth = dirInfo[path]?.depth ?: continue
+        if (currentDepth != originalDepth) {
+            dirInfo[path] = dirInfo[path]!!.copy(
+                displayName = buildCollapsedDisplayName(path, normalizedHomeDir),
+            )
+        }
+    }
+}
+
+/**
+ * Build display name for a collapsed directory node.
+ * Drops the first path segment (drive letter on Windows, empty segment on Unix root).
+ * Applies homeDir substitution if applicable.
+ */
+private fun buildCollapsedDisplayName(path: String, homeDir: String?): String {
+    val trimmedHome = homeDir?.trimEnd('/')
+    return when {
+        trimmedHome != null && path.startsWith("$trimmedHome/") ->
+            "~/${path.removePrefix("$trimmedHome/")}"
+        trimmedHome != null && path == trimmedHome -> "~"
+        path.startsWith('/') -> path.substring(1)
+        path.length >= 2 && path[1] == ':' -> {
+            val slashIdx = path.indexOf('/')
+            if (slashIdx >= 0) path.substring(slashIdx + 1) else path
+        }
+        else -> path
+    }.ifBlank { "/" }
 }

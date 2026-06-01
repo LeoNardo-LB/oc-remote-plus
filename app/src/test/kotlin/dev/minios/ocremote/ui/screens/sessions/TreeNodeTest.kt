@@ -67,11 +67,14 @@ class TreeNodeTest {
         val expanded = setOf("/a", "/a/b", "/a/b/c")
         val result = buildTreeNodes(sessions, expanded, null)
 
+        // Single-child chains are collapsed: /a → /a/b → /a/b/c → single node
         val dirs = result.filterIsInstance<TreeNode.Directory>()
-        val pathToDepth = dirs.associate { it.path to it.depth }
-        assertEquals(0, pathToDepth["/a"])
-        assertEquals(1, pathToDepth["/a/b"])
-        assertEquals(2, pathToDepth["/a/b/c"])
+        assertEquals(1, dirs.size)
+
+        val dir = dirs.first()
+        assertEquals("/a/b/c", dir.path)
+        assertEquals(0, dir.depth) // collapsed to root depth
+        assertEquals("a/b/c", dir.displayName)
     }
 
     @Test
@@ -84,7 +87,7 @@ class TreeNodeTest {
         val result = buildTreeNodes(sessions, expanded, null)
 
         val sessNode = result.filterIsInstance<TreeNode.Session>().first()
-        assertEquals(2, sessNode.depth) // parent "/a/b" is depth 1, session is depth 2
+        assertEquals(1, sessNode.depth) // collapsed parent "/a/b" is depth 0, session is depth 1
     }
 
     @Test
