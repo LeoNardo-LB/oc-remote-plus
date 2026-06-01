@@ -22,7 +22,7 @@ class ManageSessionUseCase @Inject constructor(
         api.listMessages(conn, sessionId, limit)
 
     suspend fun createSession(conn: ServerConnection, directory: String?): Session =
-        api.createSession(conn, directory)
+        api.createSession(conn, directory = directory)
 
     suspend fun forkSession(conn: ServerConnection, sessionId: String): Session =
         api.forkSession(conn, sessionId)

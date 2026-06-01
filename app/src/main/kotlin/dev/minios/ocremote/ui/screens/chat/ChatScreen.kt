@@ -510,38 +510,6 @@ fun ChatScreen(
             }
     }
 
-    // SSE scroll pinning: when user has scrolled up, reverseLayout's auto-anchoring
-    // would push the viewport as content grows. We use requestScrollToItem (non-suspend,
-    // applies in same measure pass) to restore the viewport anchor — no flicker.
-    // Key insight: requestScrollToItem sets the target for the NEXT measure pass,
-    // so reverseLayout's scrollBack in the current pass gets overridden immediately.
-    LaunchedEffect(listState) {
-        var anchorIndex = listState.firstVisibleItemIndex
-        var anchorOffset = listState.firstVisibleItemScrollOffset
-        snapshotFlow {
-            // Emit on any layout change
-            Triple(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-                isAtBottom
-            )
-        }.collect { (index, offset, atBottom) ->
-            if (atBottom) {
-                // At bottom: update anchor for when user scrolls up later
-                anchorIndex = index
-                anchorOffset = offset
-            } else if (index == anchorIndex && offset != anchorOffset) {
-                // Not at bottom, same item at top, but offset changed → reverseLayout auto-shift.
-                // Restore anchor in next measure pass (non-suspend, no flicker).
-                listState.requestScrollToItem(anchorIndex, anchorOffset)
-            } else {
-                // Different item at top → user scrolled. Update anchor.
-                anchorIndex = index
-                anchorOffset = offset
-            }
-        }
-    }
-
 
     CompositionLocalProvider(
         LocalChatFontSize provides chatFontSize,
