@@ -29,7 +29,6 @@ import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import dev.minios.ocremote.ui.theme.CodeTypography
-import dev.minios.ocremote.ui.theme.codeMedium
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -93,7 +92,7 @@ internal fun BashToolCard(
             SelectionContainer {
                 Text(
                     text = displayText,
-                    style = CodeTypography.codeMedium.copy(color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
+                    style = CodeTypography.copy(color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer),
                     modifier = Modifier
                         .padding(4.dp)
                         .codeHorizontalScroll()

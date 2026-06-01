@@ -20,7 +20,6 @@ import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.theme.CodeTypography
-import dev.minios.ocremote.ui.theme.codeSmall
 
 /**
  * Inline diff change counts: +N -N with colors.
@@ -33,13 +32,13 @@ internal fun DiffChangesInline(additions: Int, deletions: Int) {
         if (additions > 0) {
             Text(
                 text = "+$additions",
-                style = CodeTypography.codeSmall.copy(color = addColor)
+                style = CodeTypography.copy(color = addColor)
             )
         }
         if (deletions > 0) {
             Text(
                 text = "-$deletions",
-                style = CodeTypography.codeSmall.copy(color = delColor)
+                style = CodeTypography.copy(color = delColor)
             )
         }
     }

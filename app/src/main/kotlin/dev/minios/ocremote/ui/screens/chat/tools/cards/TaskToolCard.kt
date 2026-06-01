@@ -36,7 +36,6 @@ import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import dev.minios.ocremote.ui.theme.CodeTypography
-import dev.minios.ocremote.ui.theme.codeSmall
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -137,7 +136,7 @@ internal fun TaskToolCard(
                     if (description != null) {
                         Text(
                             text = description,
-                            style = CodeTypography.codeSmall,
+                            style = CodeTypography,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
