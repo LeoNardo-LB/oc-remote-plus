@@ -17,7 +17,7 @@ internal fun toolOutputContainerColor(isAmoled: Boolean): Color {
     return when {
         isAmoled -> Color.Black
         isSystemInDarkTheme() -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f)
     }
 }
 

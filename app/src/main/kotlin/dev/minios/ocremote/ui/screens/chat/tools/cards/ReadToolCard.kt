@@ -51,7 +51,7 @@ internal fun ReadToolCard(
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
         ?: input["path"]?.jsonPrimitive?.contentOrNull ?: ""
-    val shortPath = java.io.File(filePath).name
+    val shortPath = filePath.substringAfterLast('/')
     val offset = input["offset"]?.jsonPrimitive?.contentOrNull
     val limit = input["limit"]?.jsonPrimitive?.contentOrNull
 

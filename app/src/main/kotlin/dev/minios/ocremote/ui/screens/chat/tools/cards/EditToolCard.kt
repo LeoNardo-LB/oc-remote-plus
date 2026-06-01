@@ -55,8 +55,8 @@ internal fun EditToolCard(
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull ?: ""
-    val shortPath = java.io.File(filePath).name
-    val dirPath = java.io.File(filePath).parent ?: ""
+    val shortPath = filePath.substringAfterLast('/')
+    val dirPath = if (filePath.contains('/')) filePath.substringBeforeLast('/') else ""
     val oldString = input["oldString"]?.jsonPrimitive?.contentOrNull ?: ""
     val newString = input["newString"]?.jsonPrimitive?.contentOrNull ?: ""
 
