@@ -212,22 +212,10 @@ fun NavGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        enterTransition = { slideInHorizontally(
-            initialOffsetX = { it },
-            animationSpec = tween(AppMotion.MEDIUM, easing = EaseOut)
-        ) + fadeIn(animationSpec = tween(AppMotion.MEDIUM)) },
-        exitTransition = { slideOutHorizontally(
-            targetOffsetX = { -it / 3 },
-            animationSpec = tween(AppMotion.MEDIUM, easing = EaseIn)
-        ) + fadeOut(animationSpec = tween(AppMotion.MEDIUM)) },
-        popEnterTransition = { slideInHorizontally(
-            initialOffsetX = { -it / 3 },
-            animationSpec = tween(AppMotion.MEDIUM, easing = EaseOut)
-        ) + fadeIn(animationSpec = tween(AppMotion.MEDIUM)) },
-        popExitTransition = { slideOutHorizontally(
-            targetOffsetX = { it },
-            animationSpec = tween(AppMotion.MEDIUM, easing = EaseIn)
-        ) + fadeOut(animationSpec = tween(AppMotion.MEDIUM)) }
+        enterTransition = { fadeIn(animationSpec = tween(AppMotion.MEDIUM)) },
+        exitTransition = { fadeOut(animationSpec = tween(AppMotion.MEDIUM)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(AppMotion.MEDIUM)) },
+        popExitTransition = { fadeOut(animationSpec = tween(AppMotion.MEDIUM)) }
     ) {
         // ============ Home Screen ============
         composable(HomeNav.route) {

@@ -54,6 +54,13 @@ service/         Android foreground service
   AppNotificationManager.kt     Notification channels and event notifications
 
 ui/
+  theme/              Design token system
+    Alpha.kt          5-level semantic alpha tokens (FAINT/MUTED/MEDIUM/HIGH/AMOLED)
+    Color.kt          Brand color constants + semantic DiffAdded/DiffRemoved
+    Motion.kt         Duration tokens + easing constants
+    Shape.kt          AppShapes (Material) + ShapeTokens (component-level)
+    Theme.kt          4 color schemes (light/dark/dynamic/amoled), AppTheme composable
+    Type.kt           Typography configuration
   screens/chat/      ChatScreen (~1100 lines) + 7 sub-packages
     components/      Chat UI components
     dialog/          Image preview, markdown preview dialogs
@@ -108,6 +115,13 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.
+
+### Theme Token System
+- **Alpha tokens** (Alpha.kt): 5 levels only — FAINT(0.35) / MUTED(0.50) / MEDIUM(0.70) / HIGH(0.80) / AMOLED(0.92). Use these instead of hardcoded `.copy(alpha = Xf)`.
+- **Shape tokens** (Shape.kt): `AppShapes` for MaterialTheme, `ShapeTokens` object for component-level direct reference.
+- **Motion tokens** (Motion.kt): semantic duration constants (BREATH_CYCLE, PULSE_CYCLE, TERMINAL). Use instead of hardcoded `AnimationSpec` durations.
+- **Dark theme**: trust Material3 `darkColorScheme()` defaults. Only override 6 brand-differentiated tokens in Theme.kt.
+- **Colors** (Color.kt): brand constants + semantic `DiffAdded`/`DiffRemoved`. No dead code.
 
 ## Branches & Remotes
 

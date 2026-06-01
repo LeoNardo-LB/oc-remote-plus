@@ -9,4 +9,4 @@
 
 ## Rationale
 
-ChatScreen.kt is 8000+ lines and contains the entire chat UI. Earlier beta cycles (beta.62-64) showed repeated code loss when multiple changes were made simultaneously. This protocol ensures each change is validated and committed before the next begins.
+ChatScreen.kt is ~1100 lines and contains the core chat UI. Earlier beta cycles (beta.62-64, when it was 8000+ lines) showed repeated code loss when multiple changes were made simultaneously. This protocol ensures each change is validated and committed before the next begins.

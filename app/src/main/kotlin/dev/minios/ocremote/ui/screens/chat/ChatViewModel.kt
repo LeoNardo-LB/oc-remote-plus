@@ -573,7 +573,7 @@ class ChatViewModel @Inject constructor(
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "Loaded ${messages.size} messages for session $sessionId (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Failed to load messages", e)
                 if (e is OutOfMemoryError || (e.cause is OutOfMemoryError)) {
                     Log.w(TAG, "OOM loading messages, retrying with smaller limit")
@@ -583,7 +583,7 @@ class ChatViewModel @Inject constructor(
                         eventDispatcher.mergeMessages(sessionId, messages)
                         _hasOlderMessages.value = messages.size >= currentMessageLimit
                         if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
-                    } catch (retryEx: Exception) {
+                    } catch (retryEx: Throwable) {
                         Log.e(TAG, "Retry also failed", retryEx)
                         _error.value = retryEx.message ?: "Failed to load messages"
                     }
