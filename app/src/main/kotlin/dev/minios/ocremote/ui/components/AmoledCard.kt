@@ -3,7 +3,6 @@ package dev.minios.ocremote.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -68,7 +67,7 @@ fun AmoledElevatedCard(
     isAmoledDark: Boolean,
     modifier: Modifier = Modifier,
     normalContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
-    shape: Shape = RoundedCornerShape(12.dp),
+    shape: Shape = MaterialTheme.shapes.medium,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ElevatedCard(
@@ -100,7 +99,7 @@ fun AmoledSurface(
     modifier: Modifier = Modifier,
     normalColor: Color = MaterialTheme.colorScheme.surface,
     normalTonalElevation: Dp = 0.dp,
-    shape: Shape = RoundedCornerShape(0.dp),
+    shape: Shape = MaterialTheme.shapes.extraSmall,
     content: @Composable () -> Unit,
 ) {
     Surface(
