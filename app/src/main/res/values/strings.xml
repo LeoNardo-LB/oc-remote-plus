@@ -130,7 +130,20 @@
     <string name="session_changes_deletions">-%1$d</string>
     <string name="session_untitled">Untitled session</string>
     <string name="session_unknown_error">Unknown error</string>
-    
+    <!-- Directory / Session context menu -->
+    <string name="menu_copy_path">Copy path</string>
+    <string name="menu_copy_session_id">Copy session ID</string>
+    <string name="menu_view_details">View details</string>
+    <string name="menu_copied_to_clipboard">Copied to clipboard</string>
+    <string name="directory_session_count">%1$d sessions</string>
+    <string name="directory_details_path">Path</string>
+    <string name="directory_details_sessions">Sessions</string>
+    <string name="directory_details_subdirectories">Subdirectories</string>
+    <string name="session_details_id">Session ID</string>
+    <string name="session_details_status">Status</string>
+    <string name="session_details_created">Created</string>
+    <string name="session_details_updated">Updated</string>
+
     <!-- Chat Screen -->
     <string name="chat_input_hint">Message OpenCode…</string>
     <string name="chat_send">Send</string>
