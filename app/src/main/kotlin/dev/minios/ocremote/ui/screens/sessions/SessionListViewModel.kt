@@ -103,88 +103,77 @@ class SessionListViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(true)
     private val _projects = MutableStateFlow<List<Project>>(emptyList())
     private val _homeDir = MutableStateFlow<String?>(null)
+    private val _mode = MutableStateFlow(ListMode.PROJECTS)
+    private val _currentProject = MutableStateFlow<ProjectGroup?>(null)
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _navigateToSession = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val navigateToSession: SharedFlow<String> = _navigateToSession.asSharedFlow()
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
-        listOf(
-            eventDispatcher.sessions,
-            eventDispatcher.sessionStatuses,
-            eventDispatcher.serverSessions,
-            _isLoading,
-            _error,
-            _projects,
-            _homeDir,
-            _selectedIds,
-        )
+        _mode,
+        _currentProject,
+        eventDispatcher.sessions,
+        eventDispatcher.sessionStatuses,
+        eventDispatcher.serverSessions,
+        _isLoading,
+        _error,
+        _projects,
+        _homeDir,
+        _selectedIds
     ) { values ->
-        val allSessions = values[0] as List<Session>
-        val statuses = values[1] as Map<String, SessionStatus>
-        val serverSessions = values[2] as Map<String, Set<String>>
-        val loading = values[3] as Boolean
-        val error = values[4] as String?
-        val projects = values[5] as List<Project>
-        val homeDir = values[6] as String?
-        val selectedIds = values[7] as Set<String>
+        val mode = values[0] as ListMode
+        val currentProject = values[1] as ProjectGroup?
+        val allSessions = values[2] as List<Session>
+        val statuses = values[3] as Map<String, SessionStatus>
+        val serverSessionMap = values[4] as Map<String, Set<String>>
+        val isLoading = values[5] as Boolean
+        val error = values[6] as String?
+        val projects = values[7] as List<Project>
+        val homeDir = values[8] as String?
+        val selectedIds = values[9] as Set<String>
 
-        // Filter sessions belonging to this server
-        val serverSessionIds = serverSessions[serverId] ?: emptySet()
-        val sessions = allSessions
+        val serverSessionIds = serverSessionMap[serverId].orEmpty()
+
+        val filteredSessions = allSessions
             .filter { it.id in serverSessionIds && !it.isArchived && it.parentId == null }
             .sortedByDescending { it.time.updated }
-            .map { session ->
-                SessionItem(
-                    session = session,
-                    status = statuses[session.id] ?: SessionStatus.Idle
+
+        val projectGroups = filteredSessions
+            .groupBy { it.directory }
+            .map { (dir, sessions) ->
+                ProjectGroup(
+                    directory = dir,
+                    displayName = dir.replaceHomePrefix(homeDir ?: ""),
+                    sessionCount = sessions.size,
+                    lastUpdated = sessions.maxOfOrNull { it.time.updated }
                 )
             }
+            .sortedByDescending { it.lastUpdated ?: 0L }
 
-        // Build a flat list sorted by time — each session carries its own
-        // tilde-path label derived from session.directory
-        val allItems = sessions.map { item ->
-            val dir = item.session.directory.trimEnd('/').ifEmpty { "/" }
-            val tildePath = if (homeDir != null && dir.startsWith(homeDir)) {
-                "~" + dir.removePrefix(homeDir)
-            } else {
-                dir
-            }
-            val dirName = dir.substringAfterLast('/').ifEmpty { "/" }
-            item to SessionDirInfo(dirName, tildePath)
-        }
-
-        // Single group containing all sessions (flat, sorted by time)
-        val groups = listOf(
-            ProjectSessionGroup(
-                projectId = "",
-                projectName = "",
-                directory = "",
-                sessions = allItems.map { it.first },
-                sessionDirLabels = allItems.associate { it.first.session.id to it.second.tildePath }
+        val displaySessions = if (mode == ListMode.SESSIONS && currentProject != null) {
+            filteredSessions.filter { it.directory == currentProject.directory }
+        } else {
+            emptyList()
+        }.map { session ->
+            SessionItem(
+                session = session,
+                status = statuses[session.id] ?: SessionStatus.Idle
             )
-        )
-
-        val visibleSessionIds = allItems.map { it.first.session.id }.toSet()
-        val validSelectedIds = selectedIds.intersect(visibleSessionIds)
-        if (validSelectedIds != selectedIds) {
-            _selectedIds.value = validSelectedIds
         }
 
         SessionListUiState(
-            sessionGroups = groups,
-            projects = projects,
+            mode = mode,
+            projectGroups = projectGroups,
+            currentProject = currentProject,
+            sessions = displaySessions,
             serverName = serverName,
-            isLoading = loading,
+            isLoading = isLoading,
             error = error,
-            selectedIds = validSelectedIds,
-            isSelectionMode = validSelectedIds.isNotEmpty(),
+            selectedIds = selectedIds,
+            isSelectionMode = selectedIds.isNotEmpty()
         )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        SessionListUiState(serverName = serverName)
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
     init {
         loadHomeDir()
@@ -291,10 +280,10 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun selectAll() {
-        val allIds = uiState.value.sessionGroups
-            .flatMap { group -> group.sessions.map { it.session.id } }
-            .toSet()
-        _selectedIds.value = allIds
+        val currentState = uiState.value
+        if (currentState.mode == ListMode.SESSIONS) {
+            _selectedIds.value = currentState.sessions.map { it.session.id }.toSet()
+        }
     }
 
     fun deleteSelected() {
@@ -336,6 +325,33 @@ class SessionListViewModel @Inject constructor(
     }
 
     // ============ Directory browsing for Open Project ============
+
+    private fun String.replaceHomePrefix(homeDir: String): String {
+        return if (homeDir.isNotBlank() && this.startsWith(homeDir)) {
+            "~" + this.removePrefix(homeDir)
+        } else this
+    }
+
+    // ============ Two-level navigation ============
+
+    fun selectProject(group: ProjectGroup) {
+        _currentProject.value = group
+        _mode.value = ListMode.SESSIONS
+        _selectedIds.value = emptySet()
+    }
+
+    fun navigateBack() {
+        _mode.value = ListMode.PROJECTS
+        _currentProject.value = null
+        _selectedIds.value = emptySet()
+    }
+
+    fun createSessionInCurrentProject() {
+        val dir = _currentProject.value?.directory ?: return
+        viewModelScope.launch {
+            createNewSession(dir)
+        }
+    }
 
     /** Get the server's home directory (cached). */
     suspend fun getHomeDirectory(): String {
