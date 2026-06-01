@@ -34,7 +34,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +53,6 @@ import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
-import kotlinx.coroutines.delay
 
 /**
  * Interactive card for answering agent questions.
@@ -72,15 +70,8 @@ internal fun QuestionCard(
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
 
-    // Prevent multiple submissions — auto-reset after 5s if card still visible (API failure)
+    // Prevent multiple submissions — state is scoped per question via remember(key)
     var submitted by remember(question.id) { mutableStateOf(false) }
-
-    LaunchedEffect(submitted) {
-        if (submitted) {
-            delay(5000)
-            submitted = false
-        }
-    }
 
     // Track answers per question
     val answersPerQuestion = remember {
