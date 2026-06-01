@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -24,11 +26,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -119,6 +123,19 @@ fun ChatMessageList(
                     // Declaration order is bottom-up: pending (bottom) → messages (top).
 
                     // Pending questions (declared first = bottom-most visually)
+                    // 批量问题操作栏 - 当有2个及以上问题时显示
+                    if (uiState.pendingQuestions.size > 1) {
+                        item(key = "question_batch_actions") {
+                            QuestionBatchActionBar(
+                                count = uiState.pendingQuestions.size,
+                                onSkipAll = {
+                                    uiState.pendingQuestions.forEach { question ->
+                                        viewModel.rejectQuestion(question.id)
+                                    }
+                                }
+                            )
+                        }
+                    }
                     items(
                         uiState.pendingQuestions.reversed(),
                         key = { "question_${it.id}" }
@@ -134,6 +151,24 @@ fun ChatMessageList(
                         )
                     }
 
+                    // 批量权限操作栏 - 当有2个及以上权限时显示
+                    if (uiState.pendingPermissions.size > 1) {
+                        item(key = "perm_batch_actions") {
+                            PermissionBatchActionBar(
+                                count = uiState.pendingPermissions.size,
+                                onAllowAll = {
+                                    uiState.pendingPermissions.forEach { perm ->
+                                        viewModel.replyToPermission(perm.id, "once")
+                                    }
+                                },
+                                onRejectAll = {
+                                    uiState.pendingPermissions.forEach { perm ->
+                                        viewModel.replyToPermission(perm.id, "reject")
+                                    }
+                                }
+                            )
+                        }
+                    }
                     // Pending permissions
                     items(
                         uiState.pendingPermissions.reversed(),
@@ -340,5 +375,77 @@ private suspend fun LazyListState.snapToBottom() {
         delay(16)
         if (!canScrollBackward) return
         scroll { scrollBy(-10_000f) }
+    }
+}
+
+/**
+ * 批量权限操作栏：全部允许 / 全部拒绝
+ */
+@Composable
+private fun PermissionBatchActionBar(
+    count: Int,
+    onAllowAll: () -> Unit,
+    onRejectAll: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$count 项权限请求",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onRejectAll) {
+                    Text("全部拒绝")
+                }
+                FilledTonalButton(onClick = onAllowAll) {
+                    Text("全部允许")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 批量问题操作栏：全部跳过（question 的 reply 需要 answers 参数，批量回答不实际）
+ */
+@Composable
+private fun QuestionBatchActionBar(
+    count: Int,
+    onSkipAll: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$count 项问题请求",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            TextButton(onClick = onSkipAll) {
+                Text("全部跳过")
+            }
+        }
     }
 }

@@ -698,8 +698,16 @@ class ChatViewModel @Inject constructor(
                     )
                 }
             if (sessionQuestions.isNotEmpty()) {
-                eventDispatcher.setQuestions(sessionId, sessionQuestions)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessionQuestions.size} pending questions for session $sessionId")
+                // 合并 SSE 已有的问题 + REST 恢复的问题（去重），防止覆盖 SSE 新推送的问题
+                val existingSseQs = eventDispatcher.questions.value[sessionId] ?: emptyList()
+                val existingIds = existingSseQs.map { it.id }.toSet()
+                val newQs = sessionQuestions.filter { it.id !in existingIds }
+                if (newQs.isNotEmpty()) {
+                    eventDispatcher.setQuestions(sessionId, existingSseQs + newQs)
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Merged ${newQs.size} new + ${existingSseQs.size} existing questions for session $sessionId")
+                } else {
+                    if (BuildConfig.DEBUG) Log.d(TAG, "All ${sessionQuestions.size} REST questions already present via SSE for session $sessionId")
+                }
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "No pending questions for session $sessionId")
             }
@@ -744,8 +752,16 @@ class ChatViewModel @Inject constructor(
                     )
                 }
             if (sessionPermissions.isNotEmpty()) {
-                eventDispatcher.setPermissions(sessionId, sessionPermissions)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessionPermissions.size} pending permissions for session $sessionId")
+                // 合并 SSE 已有的权限 + REST 恢复的权限（去重），防止覆盖 SSE 新推送的权限
+                val existingSsePerms = eventDispatcher.permissions.value[sessionId] ?: emptyList()
+                val existingIds = existingSsePerms.map { it.id }.toSet()
+                val newPerms = sessionPermissions.filter { it.id !in existingIds }
+                if (newPerms.isNotEmpty()) {
+                    eventDispatcher.setPermissions(sessionId, existingSsePerms + newPerms)
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Merged ${newPerms.size} new + ${existingSsePerms.size} existing permissions for session $sessionId")
+                } else {
+                    if (BuildConfig.DEBUG) Log.d(TAG, "All ${sessionPermissions.size} REST permissions already present via SSE for session $sessionId")
+                }
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "No pending permissions for session $sessionId")
             }

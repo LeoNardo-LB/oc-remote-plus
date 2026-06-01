@@ -476,16 +476,13 @@ fun ChatScreen(
     }
 
     // Refresh session when returning from background (lock screen / app switch)
-    var hasResumedOnce by remember { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                if (hasResumedOnce) {
-                    viewModel.refreshSession()
-                    viewModel.syncSessionStatus()
-                } else {
-                    hasResumedOnce = true
-                }
+                // 始终调用 refreshSession 确保权限/问题/消息恢复
+                // init 块先执行，ON_RESUME 作为兜底补充
+                viewModel.refreshSession()
+                viewModel.syncSessionStatus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
