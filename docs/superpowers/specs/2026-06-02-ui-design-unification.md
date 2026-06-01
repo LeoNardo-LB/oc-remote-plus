@@ -70,9 +70,9 @@ object AppMotion {
     const val MEDIUM = 300      // 过渡、展开
     const val LONG = 500        // 页面级动画
 
-    val StandardEasing = EaseInOut
-    val EmphasizedEasing = EmphasizedDecelerate
-    val ExitEasing = EmphasizedAccelerate
+    val StandardEasing = EaseInOut      // 通用缓动
+    val EmphasizedEasing = EaseOut       // 进入动画
+    val ExitEasing = EaseIn              // 退出动画
 }
 ```
 
@@ -82,15 +82,17 @@ object AppMotion {
 
 | 路由跳转 | 过渡类型 |
 |----------|----------|
-| 层级前进（Home→Sessions, Sessions→Chat） | `MaterialSharedAxisX` (前进方向) |
-| 层级后退（Chat→Sessions, Sessions→Home） | `MaterialSharedAxisX` (后退方向) |
-| 同级切换 | `MaterialFadeThrough` |
+| 层级前进（Home→Sessions, Sessions→Chat） | `slideInHorizontally + fadeIn`（从右滑入） |
+| 层级后退（Chat→Sessions, Sessions→Home） | `slideOutHorizontally + fadeOut`（向右滑出） |
+| 同级切换 | `fadeIn + fadeOut`（淡入淡出） |
+
+> Material Shared Axis 风格，通过 Compose 基础动画 API 手动实现
 
 ### 2.3 组件动画统一
 
 | 文件 | 当前 | 替换为 |
 |------|------|--------|
-| ChatScreen 思考呼吸 | `tween(800ms, FastOutSlowInEasing)` | `tween(AppMotion.LONG, EmphasizedDecelerate)` |
+| ChatScreen 思考呼吸 | `tween(800ms, FastOutSlowInEasing)` | `tween(AppMotion.LONG, EaseOut)` |
 | SessionListScreen 展开 | `AnimatedVisibility` 默认参数 | 统一 `AppMotion.MEDIUM` 时长 |
 
 ### 2.4 不变的部分
@@ -108,7 +110,7 @@ object AppMotion {
 在 `ui/theme/Theme.kt` 中新增：
 
 ```kotlin
-val LocalAmoledMode = compositionLocalOf { false }
+val LocalAmoledMode = staticCompositionLocalOf { false } // 值极少变化，使用 staticCompositionLocalOf
 ```
 
 在 `OpenCodeTheme` 内部提供：
@@ -117,7 +119,7 @@ val LocalAmoledMode = compositionLocalOf { false }
 CompositionLocalProvider(LocalAmoledMode provides amoledDark) {
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = AppTypography,
+        typography = Typography,
         shapes = if (amoledDark) AmoledShapes else AppShapes,
         content = content
     )
@@ -136,15 +138,17 @@ val isAmoled = LocalAmoledMode.current
 - `MaterialTheme.colorScheme.background == Color.Black && MaterialTheme.colorScheme.surface == Color.Black`
 - `ChatColors.kt` 的 `isAmoledTheme()` 函数
 
+> 保留 `isAmoledTheme()` 函数签名不变，内部实现委托到 `LocalAmoledMode.current`，~22 个现有调用方无需修改
+
 ### 3.3 关联文件变更
 
 | 文件 | 变更 |
 |------|------|
 | `ui/theme/Theme.kt` | 新增 `LocalAmoledMode` + Shape 切换逻辑 |
 | `ui/components/AmoledCard.kt` | 简化，视觉常量来自主题 |
-| `ui/screens/chat/util/ChatColors.kt` | 删除 `isAmoledTheme()` 函数 |
+| `ui/screens/chat/util/ChatColors.kt` | 重构 `isAmoledTheme()` 委托到 `LocalAmoledMode.current` |
+| `ui/screens/chat/util/SessionUiHelpers.kt` | 重构 `isAmoledTheme()` 委托到 `LocalAmoledMode.current` |
 | `HomeScreen` | 硬编码检测 → `LocalAmoledMode.current` |
-| `ChatScreen` 相关文件 | 同上 |
 | 其他 `== Color.Black` 判断处 | 同上 |
 
 ### 3.4 统一后的数据流
