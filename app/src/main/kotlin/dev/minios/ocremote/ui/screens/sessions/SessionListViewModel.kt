@@ -1,6 +1,9 @@
 ﻿package dev.minios.ocremote.ui.screens.sessions
 
 import android.util.Log
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.BuildConfig
 import androidx.lifecycle.ViewModel
@@ -14,6 +17,8 @@ import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
+import dev.minios.ocremote.ui.screens.sessions.components.TreeNode
+import dev.minios.ocremote.ui.screens.sessions.components.buildTreeNodes
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -34,20 +39,8 @@ import javax.inject.Inject
 
 private const val TAG = "SessionListViewModel"
 
-enum class ListMode { PROJECTS, SESSIONS }
-
-data class ProjectGroup(
-    val directory: String,
-    val displayName: String,
-    val sessionCount: Int,
-    val lastUpdated: Long?,
-)
-
 data class SessionListUiState(
-    val mode: ListMode = ListMode.PROJECTS,
-    val projectGroups: List<ProjectGroup> = emptyList(),
-    val currentProject: ProjectGroup? = null,
-    val sessions: List<SessionItem> = emptyList(),
+    val treeNodes: List<TreeNode> = emptyList(),
     val serverName: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -90,16 +83,13 @@ class SessionListViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(true)
     private val _projects = MutableStateFlow<List<Project>>(emptyList())
     private val _homeDir = MutableStateFlow<String?>(null)
-    private val _mode = MutableStateFlow(ListMode.PROJECTS)
-    private val _currentProject = MutableStateFlow<ProjectGroup?>(null)
+    private val _expandedPaths = MutableStateFlow<Set<String>>(emptySet())
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _navigateToSession = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val navigateToSession: SharedFlow<String> = _navigateToSession.asSharedFlow()
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
-        _mode,
-        _currentProject,
         eventDispatcher.sessions,
         eventDispatcher.sessionStatuses,
         eventDispatcher.serverSessions,
@@ -107,58 +97,37 @@ class SessionListViewModel @Inject constructor(
         _error,
         _projects,
         _homeDir,
+        _expandedPaths,
         _selectedIds
     ) { values ->
-        val mode = values[0] as ListMode
-        val currentProject = values[1] as ProjectGroup?
-        val allSessions = values[2] as List<Session>
-        val statuses = values[3] as Map<String, SessionStatus>
-        val serverSessionMap = values[4] as Map<String, Set<String>>
-        val isLoading = values[5] as Boolean
-        val error = values[6] as String?
-        val projects = values[7] as List<Project>
-        val homeDir = values[8] as String?
-        val selectedIds = values[9] as Set<String>
+        val allSessions = values[0] as List<Session>
+        val statuses = values[1] as Map<String, SessionStatus>
+        val serverSessionMap = values[2] as Map<String, Set<String>>
+        val isLoading = values[3] as Boolean
+        val error = values[4] as String?
+        val projects = values[5] as List<Project>
+        val homeDir = values[6] as String?
+        val expandedPaths = values[7] as Set<String>
+        val selectedIds = values[8] as Set<String>
 
+        // Performance: buildTreeNodes is O(N) where N = unique path segments.
+        // For typical loads (<500 sessions) this is negligible.
+        // If profiling shows issues, extract sessions with distinctUntilChanged.
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
         val filteredSessions = allSessions
             .filter { it.id in serverSessionIds && !it.isArchived && it.parentId == null }
             .sortedByDescending { it.time.updated }
 
-        val projectGroups = filteredSessions
-            .groupBy { it.directory }
-            .map { (dir, sessions) ->
-                ProjectGroup(
-                    directory = dir,
-                    displayName = dir.replaceHomePrefix(homeDir ?: ""),
-                    sessionCount = sessions.size,
-                    lastUpdated = sessions.maxOfOrNull { it.time.updated }
-                )
-            }
-            .sortedByDescending { it.lastUpdated ?: 0L }
-
-        val displaySessions = if (mode == ListMode.SESSIONS && currentProject != null) {
-            filteredSessions.filter { it.directory == currentProject.directory }
-        } else {
-            emptyList()
-        }.map { session ->
-            SessionItem(
-                session = session,
-                status = statuses[session.id] ?: SessionStatus.Idle
-            )
-        }
+        val treeNodes = buildTreeNodes(filteredSessions, expandedPaths, homeDir, statuses)
 
         SessionListUiState(
-            mode = mode,
-            projectGroups = projectGroups,
-            currentProject = currentProject,
-            sessions = displaySessions,
+            treeNodes = treeNodes,
             serverName = serverName,
             isLoading = isLoading,
             error = error,
             selectedIds = selectedIds,
-            isSelectionMode = selectedIds.isNotEmpty()
+            isSelectionMode = selectedIds.isNotEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
@@ -167,23 +136,26 @@ class SessionListViewModel @Inject constructor(
         loadSessions()
     }
 
+    private fun loadHomeDir() {
+        viewModelScope.launch {
+            getHomeDirectory()
+        }
+    }
+
     fun loadSessions() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             try {
-                // Load all projects first
                 val projects = api.listProjects(conn)
                 _projects.value = projects
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${projects.size} projects for multi-project session fetch")
 
                 if (projects.isEmpty()) {
-                    // Fallback: load sessions without directory header (server CWD only)
                     val sessions = api.listSessions(conn)
                     eventDispatcher.setSessions(serverId, sessions)
                     if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions (no projects)")
                 } else {
-                    // Load sessions for each project using its worktree as directory
                     var totalSessions = 0
                     for (project in projects) {
                         try {
@@ -201,26 +173,17 @@ class SessionListViewModel @Inject constructor(
                 Log.e(TAG, "Failed to load sessions", e)
                 _error.value = e.message ?: "Failed to load sessions"
             } finally {
+                // Auto-expand root directories on first load
+                if (_expandedPaths.value.isEmpty()) {
+                    val currentSessions = eventDispatcher.sessions.value
+                    val topDirs = currentSessions
+                        .mapNotNull { s -> s.directory.takeIf { it.isNotBlank() }?.trimEnd('/')?.substringBeforeLast('/') }
+                        .filter { it.isNotEmpty() && !it.substring(1).contains('/') }
+                        .toSet()
+                    _expandedPaths.value = topDirs
+                }
                 _isLoading.value = false
             }
-        }
-    }
-
-    private fun loadProjects() {
-        viewModelScope.launch {
-            try {
-                val projects = api.listProjects(conn)
-                _projects.value = projects
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${projects.size} projects")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load projects", e)
-            }
-        }
-    }
-
-    private fun loadHomeDir() {
-        viewModelScope.launch {
-            getHomeDirectory()
         }
     }
 
@@ -228,7 +191,6 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val session = manageSessionUseCase.createSession(conn, directory = directory)
-                // The SSE stream should pick up the new session, but also add directly
                 eventDispatcher.setSessions(serverId, listOf(session))
                 if (BuildConfig.DEBUG) Log.d(TAG, "Created new session: ${session.id}")
                 _navigateToSession.tryEmit(session.id)
@@ -268,9 +230,11 @@ class SessionListViewModel @Inject constructor(
 
     fun selectAll() {
         val currentState = uiState.value
-        if (currentState.mode == ListMode.SESSIONS) {
-            _selectedIds.value = currentState.sessions.map { it.session.id }.toSet()
-        }
+        val sessionIds = currentState.treeNodes
+            .filterIsInstance<TreeNode.Session>()
+            .map { it.id }
+            .toSet()
+        _selectedIds.value = sessionIds
     }
 
     fun deleteSelected() {
@@ -280,9 +244,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 val results = coroutineScope {
                     ids.map { id ->
-                        async {
-                            id to api.deleteSession(conn, id)
-                        }
+                        async { id to api.deleteSession(conn, id) }
                     }.awaitAll()
                 }
                 val failed = results.filterNot { it.second }
@@ -311,34 +273,20 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
-    // ============ Directory browsing for Open Project ============
+    // ============ Tree expand/collapse ============
 
-    private fun String.replaceHomePrefix(homeDir: String): String {
-        return if (homeDir.isNotBlank() && this.startsWith(homeDir)) {
-            "~" + this.removePrefix(homeDir)
-        } else this
-    }
-
-    // ============ Two-level navigation ============
-
-    fun selectProject(group: ProjectGroup) {
-        _currentProject.value = group
-        _mode.value = ListMode.SESSIONS
-        _selectedIds.value = emptySet()
-    }
-
-    fun navigateBack() {
-        _mode.value = ListMode.PROJECTS
-        _currentProject.value = null
-        _selectedIds.value = emptySet()
-    }
-
-    fun createSessionInCurrentProject() {
-        val dir = _currentProject.value?.directory ?: return
-        viewModelScope.launch {
-            createNewSession(dir)
+    fun toggleDirectory(path: String) {
+        _expandedPaths.update { paths ->
+            if (path in paths) paths - path else paths + path
         }
     }
+
+    fun copyToClipboard(text: String, context: Context) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("label", text))
+    }
+
+    // ============ Directory browsing for Open Project ============
 
     /** Get the server's home directory (cached). */
     suspend fun getHomeDirectory(): String {
