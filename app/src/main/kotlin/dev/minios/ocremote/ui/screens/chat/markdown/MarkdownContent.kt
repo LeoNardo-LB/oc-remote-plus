@@ -20,8 +20,6 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import dev.snipme.highlights.Highlights
 import com.mikepenz.markdown.model.markdownDimens
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
@@ -224,54 +222,26 @@ internal fun MarkdownContent(
 
     val highlightsBuilder = remember { Highlights.Builder() }
 
-    val components = if (wordWrap) {
+    val components = remember(wordWrap) {
         markdownComponents(
             codeBlock = { model ->
-                MarkdownHighlightedCodeBlock(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    true
+                OcCodeBlock(
+                    content = model.content,
+                    node = model.node,
+                    style = typography.code,
+                    highlightsBuilder = highlightsBuilder,
+                    wordWrap = wordWrap,
+                    isFence = false
                 )
             },
             codeFence = { model ->
-                MarkdownHighlightedCodeFence(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    true
-                )
-            },
-            table = { model ->
-                // Fallback table for 0.41.0: use simplified rendering since
-                // the default MarkdownTableBasicText inline pipeline is broken.
-                SimpleMarkdownTable(model.content, model.node, model.typography.table)
-            }
-        )
-    } else {
-        markdownComponents(
-            codeBlock = { model ->
-                MarkdownHighlightedCodeBlock(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    false
-                )
-            },
-            codeFence = { model ->
-                MarkdownHighlightedCodeFence(
-                    model.content,
-                    model.node,
-                    typography.code,
-                    highlightsBuilder,
-                    true,
-                    false
+                OcCodeBlock(
+                    content = model.content,
+                    node = model.node,
+                    style = typography.code,
+                    highlightsBuilder = highlightsBuilder,
+                    wordWrap = wordWrap,
+                    isFence = true
                 )
             },
             table = { model ->

@@ -75,7 +75,8 @@ internal fun SearchToolCard(
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand
     ) {
-        // 入参信息块
+        Column {
+            // 入参信息块
         if (pattern != null || !dirPath.isNullOrBlank()) {
             Surface(
                 shape = RoundedCornerShape(4.dp),
@@ -129,5 +130,6 @@ internal fun SearchToolCard(
                 )
             }
         }
+        } // close Column
     }
 }

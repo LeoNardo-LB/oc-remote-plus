@@ -57,6 +57,7 @@ import dev.minios.ocremote.ui.screens.chat.util.performHaptic
  * @param rightSideExtras Extra composables on the right side of the title row (e.g. DiffChangesInline)
  * @param titleContent Optional custom title content. If null, a simple icon + text row is used.
  * @param expandedContent Content shown when expanded
+ * @param showExpandIcon Whether to show the expand/collapse chevron icon. Default true.
  */
 @Composable
 internal fun ToolCardScaffold(
@@ -73,7 +74,8 @@ internal fun ToolCardScaffold(
     onClick: (() -> Unit)? = null,
     rightSideExtras: @Composable (RowScope.() -> Unit)? = null,
     titleContent: (@Composable RowScope.() -> Unit)? = null,
-    expandedContent: @Composable () -> Unit
+    showExpandIcon: Boolean = true,
+    expandedContent: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -158,12 +160,14 @@ internal fun ToolCardScaffold(
                                 )
                             }
                         }
-                        Icon(
-                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        )
+                        if (showExpandIcon) {
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            )
+                        }
                     }
                 }
             }

@@ -102,6 +102,7 @@ internal fun TaskToolCard(
         hasContent = if (showNavArrow) true else hasOutput,
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
+        showExpandIcon = !showNavArrow,
         onClick = clickAction,
         rightSideExtras = if (showNavArrow) {
             { Icon(
