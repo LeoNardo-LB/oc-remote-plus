@@ -47,8 +47,8 @@ internal fun DiffChangesInline(additions: Int, deletions: Int) {
 
 private data class DiffLineStyle(val prefix: String, val text: String, val bgColor: Color, val fgColor: Color)
 
-private enum class DiffLineType { REMOVED, ADDED, UNCHANGED }
-private data class DiffLine(val type: DiffLineType, val text: String)
+internal enum class DiffLineType { REMOVED, ADDED, UNCHANGED }
+internal data class DiffLine(val type: DiffLineType, val text: String)
 
 /**
  * Unified diff view — shows old lines in red, new lines in green.
@@ -113,7 +113,7 @@ internal fun DiffView(before: String, after: String) {
  * Simple diff algorithm: find common prefix/suffix lines, show removed and added lines in between.
  * Not a full LCS but good enough for typical edit tool changes.
  */
-private fun computeSimpleDiff(before: List<String>, after: List<String>): List<DiffLine> {
+internal fun computeSimpleDiff(before: List<String>, after: List<String>): List<DiffLine> {
     if (before.isEmpty() && after.isEmpty()) return emptyList()
     if (before.isEmpty()) return after.map { DiffLine(DiffLineType.ADDED, it) }
     if (after.isEmpty()) return before.map { DiffLine(DiffLineType.REMOVED, it) }

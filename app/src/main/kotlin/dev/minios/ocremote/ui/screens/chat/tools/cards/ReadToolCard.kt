@@ -1,14 +1,6 @@
 ﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
-import android.widget.Toast
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,12 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,25 +23,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
-import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
-import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
 import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
-import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.toolOutputContainerColor
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.serialization.json.contentOrNull
@@ -59,7 +41,6 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Read tool card — shows "读取" title, file name subtitle, expandable for details.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ReadToolCard(
     tool: Part.Tool,
@@ -83,126 +64,74 @@ internal fun ReadToolCard(
         limit?.let { add("limit=$it") }
     }.takeIf { it.isNotEmpty() }?.joinToString(", ", "[", "]")
 
-    val hapticView = LocalView.current
-    val hapticOn = LocalHapticFeedbackEnabled.current
-    val expanded = isExpanded
-    val clipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
-    val isCompleted = tool.state is ToolState.Completed
+    val title = if (shortPath.isNotBlank()) {
+        "${stringResource(R.string.tool_read)} · $shortPath"
+    } else {
+        stringResource(R.string.tool_read)
+    }
+    val copyText = if (filePath.isNotBlank()) "Read: $filePath" else "Read"
+    // ReadToolCard shows copy button even without output (always has info to show)
+    val hasContent = true
 
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
-        tonalElevation = if (isAmoled) 0.dp else 1.dp,
-        modifier = Modifier.fillMaxWidth()
+    ToolCardScaffold(
+        icon = if (isError) Icons.Default.Error else Icons.Default.Description,
+        iconTint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        title = title,
+        copyText = copyText,
+        isExpanded = isExpanded,
+        isRunning = isRunning,
+        hasContent = hasContent,
+        isAmoled = isAmoled,
+        onToggleExpand = onToggleExpand
     ) {
-        Column(modifier = Modifier.padding(4.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .combinedClickable(
-                        onClick = { performHaptic(hapticView, hapticOn); onToggleExpand() },
-                        onLongClick = {
-                            val copyText = if (filePath.isNotBlank()) "Read: $filePath" else "Read"
-                            clipboardManager.setText(AnnotatedString(copyText))
-                            Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
-                        }
-                    ),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+        val halfScreenHeight = halfScreenHeight()
+        val scrollState = rememberScrollState()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = halfScreenHeight)
+                .verticalScroll(scrollState)
+        ) {
+            SelectionContainer {
+                Column(
+                    modifier = Modifier.padding(top = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isError) Icons.Default.Error else Icons.Default.Description,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
-                    val displayText = if (shortPath.isNotBlank()) {
-                        "${stringResource(R.string.tool_read)} · $shortPath"
-                    } else {
-                        stringResource(R.string.tool_read)
-                    }
-                    Text(
-                        text = displayText,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (isRunning) {
-                    PulsingDotsIndicator(dotSize = 5.dp, dotSpacing = 3.dp, color = MaterialTheme.colorScheme.tertiary)
-                } else {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                val halfScreenHeight = halfScreenHeight()
-                val scrollState = rememberScrollState()
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = halfScreenHeight)
-                        .verticalScroll(scrollState)
-                ) {
-                    SelectionContainer {
-                        Column(
-                            modifier = Modifier.padding(top = 2.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                    if (filePath.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = toolOutputContainerColor(isAmoled),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                        if (filePath.isNotBlank()) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = toolOutputContainerColor(isAmoled),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = filePath,
-                                    style = CodeTypography.copy(
-                                        fontSize = 11.sp,
-                                        color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                                    ),
-                                    modifier = Modifier
-                                        .padding(4.dp)
-                                        .codeHorizontalScroll()
-                                )
-                            }
-                        }
-                        if (args != null) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = toolOutputContainerColor(isAmoled),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = args,
-                                    style = CodeTypography.copy(
-                                        fontSize = 11.sp,
-                                        color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                                    ),
-                                    modifier = Modifier
-                                        .padding(4.dp)
-                                        .codeHorizontalScroll()
-                                )
-                            }
+                            Text(
+                                text = filePath,
+                                style = CodeTypography.copy(
+                                    fontSize = 11.sp,
+                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                ),
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .codeHorizontalScroll()
+                            )
                         }
                     }
+                    if (args != null) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = toolOutputContainerColor(isAmoled),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = args,
+                                style = CodeTypography.copy(
+                                    fontSize = 11.sp,
+                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                ),
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .codeHorizontalScroll()
+                            )
+                        }
                     }
                 }
             }

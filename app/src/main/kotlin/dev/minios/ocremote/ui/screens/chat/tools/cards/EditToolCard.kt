@@ -1,60 +1,42 @@
 ﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import android.widget.Toast
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.screens.chat.components.ErrorPayloadContent
-import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.chat.tools.DiffChangesInline
+import dev.minios.ocremote.ui.screens.chat.tools.DiffLineType
 import dev.minios.ocremote.ui.screens.chat.tools.DiffView
+import dev.minios.ocremote.ui.screens.chat.tools.computeSimpleDiff
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
-import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
-import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -64,7 +46,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * Edit tool card — shows file path + diff with red/green colored lines.
  * Like WebUI: trigger = "Edit" + filename + DiffChanges, content = diff view.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun EditToolCard(
     tool: Part.Tool,
@@ -91,125 +72,66 @@ internal fun EditToolCard(
     val diffBefore = filediffBefore ?: oldString
     val diffAfter = filediffAfter ?: newString
 
-    // Compute additions/deletions
-    val addCount = diffAfter.lines().size - diffBefore.lines().let { if (diffBefore.isBlank()) 0 else it.size }
-    val additions = if (addCount > 0) addCount else 0
-    val deletions = if (addCount < 0) -addCount else 0
+    // Compute additions/deletions using proper diff
+    val diffLines = remember(diffBefore, diffAfter) {
+        val beforeLines = if (diffBefore.isBlank()) emptyList() else diffBefore.lines()
+        val afterLines = if (diffAfter.isBlank()) emptyList() else diffAfter.lines()
+        computeSimpleDiff(beforeLines, afterLines)
+    }
+    val additions = diffLines.count { it.type == DiffLineType.ADDED }
+    val deletions = diffLines.count { it.type == DiffLineType.REMOVED }
 
-    val hapticView = LocalView.current
-    val hapticOn = LocalHapticFeedbackEnabled.current
-    val expanded = isExpanded
-    val clipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
     val isRunning = tool.state is ToolState.Running
     val isError = tool.state is ToolState.Error
     val hasContent = oldString.isNotBlank() || newString.isNotBlank()
+    val copyText = if (filePath.isNotBlank()) "Edit: $filePath" else "Edit"
 
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)) else null,
-        tonalElevation = if (isAmoled) 0.dp else 1.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(4.dp)) {
-            // Header row — always clickable
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .combinedClickable(
-                        onClick = { performHaptic(hapticView, hapticOn); onToggleExpand() },
-                        onLongClick = {
-                            val copyText = if (filePath.isNotBlank()) "Edit: $filePath" else "Edit"
-                            clipboardManager.setText(AnnotatedString(copyText))
-                            Toast.makeText(context, context.getString(R.string.chat_copied_clipboard), Toast.LENGTH_SHORT).show()
-                        }
-                    ),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = if (isError) Icons.Default.Error else Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.chat_edit_label),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                // Diff stats + expand indicator
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (additions > 0 || deletions > 0) {
-                        DiffChangesInline(additions = additions, deletions = deletions)
-                    }
-                    if (isRunning) {
-                        PulsingDotsIndicator(
-                            dotSize = 5.dp,
-                            dotSpacing = 3.dp,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                    } else if (hasContent) {
-                        Icon(
-                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        )
-                    }
-                }
+    ToolCardScaffold(
+        icon = if (isError) Icons.Default.Error else Icons.Default.Edit,
+        iconTint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        title = stringResource(R.string.chat_edit_label),
+        copyText = copyText,
+        isExpanded = isExpanded,
+        isRunning = isRunning,
+        hasContent = hasContent,
+        isAmoled = isAmoled,
+        onToggleExpand = onToggleExpand,
+        rightSideExtras = {
+            if (additions > 0 || deletions > 0) {
+                DiffChangesInline(additions = additions, deletions = deletions)
             }
-
-            // Expanded diff view
-            AnimatedVisibility(
-                visible = expanded && hasContent,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                val halfScreenHeight = halfScreenHeight()
-                val scrollState = rememberScrollState()
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = halfScreenHeight)
-                        .verticalScroll(scrollState)
-                ) {
-                    Column(modifier = Modifier.padding(top = 3.dp)) {
-                        if (isError) {
-                            val errorText = (tool.state as ToolState.Error).error
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer,
-                                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.7f)) else null,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                ErrorPayloadContent(
-                                    text = errorText,
-                                    textStyle = CodeTypography.copy(
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onErrorContainer,
-                                    ),
-                                    textColor = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.padding(4.dp),
-                                )
-                            }
-                        } else {
-                            SelectionContainer {
-                                DiffView(before = diffBefore, after = diffAfter)
-                            }
-                        }
+        }
+    ) {
+        val halfScreenHeight = halfScreenHeight()
+        val scrollState = rememberScrollState()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = halfScreenHeight)
+                .verticalScroll(scrollState)
+        ) {
+            Column(modifier = Modifier.padding(top = 3.dp)) {
+                if (isError) {
+                    val errorText = (tool.state as ToolState.Error).error
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer,
+                        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.7f)) else null,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ErrorPayloadContent(
+                            text = errorText,
+                            textStyle = CodeTypography.copy(
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            ),
+                            textColor = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(4.dp),
+                        )
+                    }
+                } else {
+                    SelectionContainer {
+                        DiffView(before = diffBefore, after = diffAfter)
                     }
                 }
             }
