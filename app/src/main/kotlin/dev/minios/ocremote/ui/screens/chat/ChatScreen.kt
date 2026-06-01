@@ -510,29 +510,6 @@ fun ChatScreen(
             }
     }
 
-    // SSE scroll compensation: reverseLayout auto-anchors to bottom edge.
-    // When the last item grows during streaming and user has scrolled up,
-    // reverseLayout shifts the viewport to keep bottom anchored.
-    // We detect this non-user scroll and cancel it to pin the viewport.
-    LaunchedEffect(listState) {
-        var prevIndex = listState.firstVisibleItemIndex
-        var prevOffset = listState.firstVisibleItemScrollOffset
-        snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            if (!isAtBottom && index == prevIndex) {
-                // Same item still at top but offset changed = content size changed
-                val delta = offset - prevOffset
-                if (delta > 0 && delta < 500) {
-                    // reverseLayout pushed viewport down; compensate upward
-                    listState.scroll { scrollBy(delta.toFloat()) }
-                }
-            }
-            prevIndex = index
-            prevOffset = listState.firstVisibleItemScrollOffset
-        }
-    }
-
 
     CompositionLocalProvider(
         LocalChatFontSize provides chatFontSize,
