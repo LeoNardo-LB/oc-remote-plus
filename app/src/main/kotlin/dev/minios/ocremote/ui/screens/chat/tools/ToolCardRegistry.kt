@@ -33,6 +33,20 @@ internal data class ToolDisplayInfo(
 )
 
 /**
+ * Extract the file name from a potentially path-like server title.
+ * If the title contains path separators, returns only the last segment.
+ * e.g. "Read /path/to/File.kt" → "File.kt", "Edit file" → "Edit file" (unchanged)
+ */
+private fun extractFileNameFromTitle(title: String): String {
+    val lastSegment = title.substringAfterLast('/')
+    return if (lastSegment.length < title.length && lastSegment.contains('.')) {
+        lastSegment
+    } else {
+        title
+    }
+}
+
+/**
  * Resolve display info for a tool call based on its type and input arguments.
  * Matches WebUI tool registry behavior with human-readable titles.
  */
@@ -44,8 +58,8 @@ internal fun resolveToolDisplay(
 ): ToolDisplayInfo {
     // Use server-provided title if available
     val serverTitle = when (state) {
-        is ToolState.Running -> state.title
-        is ToolState.Completed -> state.title
+        is ToolState.Running -> state.title?.let { extractFileNameFromTitle(it) }
+        is ToolState.Completed -> state.title?.let { extractFileNameFromTitle(it) }
         else -> null
     }
 
@@ -144,7 +158,7 @@ internal fun resolveToolDisplay(
                 .replaceFirstChar { it.uppercase() }
             ToolDisplayInfo(
                 title = serverTitle?.takeIf { it.isNotBlank() } ?: fallbackName,
-                subtitle = null,
+                subtitle = shortPath,
                 icon = Icons.Default.Build
             )
         }
