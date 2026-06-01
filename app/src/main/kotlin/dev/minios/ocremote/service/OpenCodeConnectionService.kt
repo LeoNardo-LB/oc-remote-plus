@@ -11,6 +11,7 @@ import android.util.Log
 import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
+import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.data.repository.ServerRepository
 import dev.minios.ocremote.data.repository.SettingsRepository
@@ -60,6 +61,9 @@ class OpenCodeConnectionService : Service() {
 
     @Inject
     lateinit var appNotificationManager: AppNotificationManager
+
+    @Inject
+    lateinit var eventDispatcher: EventDispatcher
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
@@ -301,26 +305,44 @@ class OpenCodeConnectionService : Service() {
                 }
             }
             is SseEvent.PermissionAsked -> {
-                if (appNotificationManager.isChildSession(event.sessionId)) return
-                Log.i(TAG, "[${server.displayName}] Permission asked: ${event.permission}")
+                val targetSessionId = if (appNotificationManager.isChildSession(event.sessionId)) {
+                    // 子 session 权限冒泡到父 session 通知
+                    val session = eventDispatcher.sessions.value.find { it.id == event.sessionId }
+                    session?.parentId ?: event.sessionId
+                } else {
+                    event.sessionId
+                }
+                Log.i(TAG, "[${server.displayName}] Permission asked: ${event.permission} (session=${event.sessionId}, target=$targetSessionId)")
                 appNotificationManager.showPermissionNotification(
-                    this, systemNotificationManager, server, event.sessionId, event.permission
+                    this, systemNotificationManager, server, targetSessionId, event.permission
                 )
             }
             is SseEvent.QuestionAsked -> {
-                if (appNotificationManager.isChildSession(event.sessionId)) return
-                Log.i(TAG, "[${server.displayName}] Question asked for session ${event.sessionId}")
+                val targetSessionId = if (appNotificationManager.isChildSession(event.sessionId)) {
+                    // 子 session 问题冒泡到父 session 通知
+                    val session = eventDispatcher.sessions.value.find { it.id == event.sessionId }
+                    session?.parentId ?: event.sessionId
+                } else {
+                    event.sessionId
+                }
+                Log.i(TAG, "[${server.displayName}] Question asked for session ${event.sessionId} (target=$targetSessionId)")
                 val questionText = event.questions.firstOrNull()?.question
                     ?: getString(R.string.notification_has_question, getString(R.string.notification_new_session))
                 appNotificationManager.showQuestionNotification(
-                    this, systemNotificationManager, server, event.sessionId, questionText
+                    this, systemNotificationManager, server, targetSessionId, questionText
                 )
             }
             is SseEvent.SessionError -> {
-                if (event.sessionId != null && appNotificationManager.isChildSession(event.sessionId)) return
-                Log.i(TAG, "[${server.displayName}] Session error: ${event.error}")
+                val targetSessionId = if (event.sessionId != null && appNotificationManager.isChildSession(event.sessionId)) {
+                    // 子 session 错误冒泡到父 session 通知
+                    val session = eventDispatcher.sessions.value.find { it.id == event.sessionId }
+                    session?.parentId ?: event.sessionId
+                } else {
+                    event.sessionId
+                }
+                Log.i(TAG, "[${server.displayName}] Session error: ${event.error} (session=${event.sessionId}, target=$targetSessionId)")
                 appNotificationManager.showErrorNotification(
-                    this, systemNotificationManager, server, event.sessionId, event.error
+                    this, systemNotificationManager, server, targetSessionId, event.error
                 )
             }
             else -> { }

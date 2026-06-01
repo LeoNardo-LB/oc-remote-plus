@@ -98,6 +98,16 @@ class EventDispatcher @Inject constructor(
     fun setQuestions(sessionId: String, questions: List<SseEvent.QuestionAsked>) =
         questionHandler.setQuestions(sessionId, questions)
 
+    // ============ Child-session Aggregation ============
+
+    /** Aggregate permissions for a session including its child sessions. */
+    fun getPermissionsWithChildren(sessionId: String, sessions: List<Session>) =
+        permissionHandler.getPermissionsWithChildren(sessionId, sessions)
+
+    /** Aggregate questions for a session including its child sessions. */
+    fun getQuestionsWithChildren(sessionId: String, sessions: List<Session>) =
+        questionHandler.getQuestionsWithChildren(sessionId, sessions)
+
     fun clearAll() {
         sessionHandler.clearAll()
         messageHandler.clearAll()

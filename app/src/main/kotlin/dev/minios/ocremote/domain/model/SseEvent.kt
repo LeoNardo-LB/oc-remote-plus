@@ -91,7 +91,10 @@ sealed class SseEvent {
         val patterns: List<String> = emptyList(),
         val metadata: Map<String, String>? = null,
         val always: Boolean = false,
-        val tool: ToolRef? = null
+        val tool: ToolRef? = null,
+        /** Transient: sub-agent source label (e.g. "scout subagent"), not serialized. */
+        @kotlinx.serialization.Transient
+        val sourceSessionTitle: String? = null
     ) : SseEvent()
 
     @Serializable
@@ -106,7 +109,10 @@ sealed class SseEvent {
         val id: String,
         val sessionId: String,
         val questions: List<Question>,
-        val tool: ToolRef? = null
+        val tool: ToolRef? = null,
+        /** Transient: sub-agent source label, not serialized. */
+        @kotlinx.serialization.Transient
+        val sourceSessionTitle: String? = null
     ) : SseEvent() {
         @Serializable
         data class Question(

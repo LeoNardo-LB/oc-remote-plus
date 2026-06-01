@@ -112,6 +112,14 @@ internal fun QuestionCard(
                     color = contentColor
                 )
             }
+            // Sub-agent source label (shown when question comes from a child session)
+            if (question.sourceSessionTitle != null) {
+                Text(
+                    text = question.sourceSessionTitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor.copy(alpha = 0.6f)
+                )
+            }
 
             // Question sections
             question.questions.forEachIndexed { index, q ->

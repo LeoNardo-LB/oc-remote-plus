@@ -454,8 +454,8 @@ class ChatViewModel @Inject constructor(
             messageCount = messageCount,
             revert = revertState,
             sessionStatus = statuses[sessionId] ?: SessionStatus.Idle,
-            pendingPermissions = permissions[sessionId] ?: emptyList(),
-            pendingQuestions = questions[sessionId] ?: emptyList(),
+            pendingPermissions = eventDispatcher.getPermissionsWithChildren(sessionId, allSessions),
+            pendingQuestions = eventDispatcher.getQuestionsWithChildren(sessionId, allSessions),
             isLoading = loading,
             error = error,
             isSending = sending,
@@ -663,9 +663,17 @@ class ChatViewModel @Inject constructor(
         try {
             val allQuestions = managePermissionUseCase.listPendingQuestions(conn, directory = sessionDirectory)
             if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingQuestions: ${allQuestions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
+
+            // Include questions from child sessions
+            val childSessionIds = eventDispatcher.sessions.value
+                .filter { it.parentId == sessionId }
+                .map { it.id }
+                .toSet()
+
             val sessionQuestions = allQuestions
-                .filter { it.sessionId == sessionId }
+                .filter { it.sessionId == sessionId || it.sessionId in childSessionIds }
                 .map { req ->
+                    val isChild = req.sessionId != sessionId
                     SseEvent.QuestionAsked(
                         id = req.id,
                         sessionId = req.sessionId,
@@ -683,7 +691,10 @@ class ChatViewModel @Inject constructor(
                                 }
                             )
                         },
-                        tool = req.tool
+                        tool = req.tool,
+                        sourceSessionTitle = if (isChild) {
+                            eventDispatcher.sessions.value.find { it.id == req.sessionId }?.title
+                        } else null
                     )
                 }
             if (sessionQuestions.isNotEmpty()) {
@@ -702,9 +713,17 @@ class ChatViewModel @Inject constructor(
         try {
             val allPermissions = managePermissionUseCase.listPendingPermissions(conn, directory = sessionDirectory)
             if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingPermissions: ${allPermissions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
+
+            // Include permissions from child sessions
+            val childSessionIds = eventDispatcher.sessions.value
+                .filter { it.parentId == sessionId }
+                .map { it.id }
+                .toSet()
+
             val sessionPermissions = allPermissions
-                .filter { it.sessionId == sessionId }
+                .filter { it.sessionId == sessionId || it.sessionId in childSessionIds }
                 .map { req ->
+                    val isChild = req.sessionId != sessionId
                     SseEvent.PermissionAsked(
                         id = req.id,
                         sessionId = req.sessionId,
@@ -718,7 +737,10 @@ class ChatViewModel @Inject constructor(
                             }
                         },
                         always = req.always.isNotEmpty(), // List<String> → Boolean: non-empty means "always"
-                        tool = req.tool
+                        tool = req.tool,
+                        sourceSessionTitle = if (isChild) {
+                            eventDispatcher.sessions.value.find { it.id == req.sessionId }?.title
+                        } else null
                     )
                 }
             if (sessionPermissions.isNotEmpty()) {

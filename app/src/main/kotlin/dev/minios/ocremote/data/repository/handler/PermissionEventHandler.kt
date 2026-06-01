@@ -1,5 +1,6 @@
 package dev.minios.ocremote.data.repository.handler
 
+import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,5 +64,33 @@ class PermissionEventHandler @Inject constructor() : SseEventHandler {
 
     fun clearAll() {
         _permissions.value = emptyMap()
+    }
+
+    /**
+     * Get all pending permissions for a session, including permissions from child sessions.
+     * This enables the parent session UI to display sub-agent permission requests.
+     * Child session permissions are annotated with [SseEvent.PermissionAsked.sourceSessionTitle].
+     */
+    fun getPermissionsWithChildren(sessionId: String, sessions: List<Session>): List<SseEvent.PermissionAsked> {
+        val currentPerms = _permissions.value[sessionId] ?: emptyList()
+
+        // Find child sessions (sessions whose parentId == sessionId)
+        val childSessionIds = sessions
+            .filter { it.parentId == sessionId }
+            .map { it.id }
+            .toSet()
+
+        // Aggregate permissions from all child sessions, annotating with source title
+        val childPerms = _permissions.value
+            .filterKeys { it in childSessionIds }
+            .entries
+            .flatMap { (childId, perms) ->
+                val childTitle = sessions.find { it.id == childId }?.title
+                perms.map { perm ->
+                    perm.copy(sourceSessionTitle = childTitle)
+                }
+            }
+
+        return currentPerms + childPerms
     }
 }

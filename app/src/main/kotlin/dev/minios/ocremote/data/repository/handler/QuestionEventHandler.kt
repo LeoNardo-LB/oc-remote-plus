@@ -1,5 +1,6 @@
 package dev.minios.ocremote.data.repository.handler
 
+import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,5 +72,33 @@ class QuestionEventHandler @Inject constructor() : SseEventHandler {
 
     fun clearAll() {
         _questions.value = emptyMap()
+    }
+
+    /**
+     * Get all pending questions for a session, including questions from child sessions.
+     * This enables the parent session UI to display sub-agent question requests.
+     * Child session questions are annotated with [SseEvent.QuestionAsked.sourceSessionTitle].
+     */
+    fun getQuestionsWithChildren(sessionId: String, sessions: List<Session>): List<SseEvent.QuestionAsked> {
+        val currentQuestions = _questions.value[sessionId] ?: emptyList()
+
+        // Find child sessions (sessions whose parentId == sessionId)
+        val childSessionIds = sessions
+            .filter { it.parentId == sessionId }
+            .map { it.id }
+            .toSet()
+
+        // Aggregate questions from all child sessions, annotating with source title
+        val childQuestions = _questions.value
+            .filterKeys { it in childSessionIds }
+            .entries
+            .flatMap { (childId, qs) ->
+                val childTitle = sessions.find { it.id == childId }?.title
+                qs.map { q ->
+                    q.copy(sourceSessionTitle = childTitle)
+                }
+            }
+
+        return currentQuestions + childQuestions
     }
 }

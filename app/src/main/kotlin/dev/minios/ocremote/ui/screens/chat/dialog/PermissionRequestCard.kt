@@ -94,6 +94,14 @@ internal fun PermissionCard(
                     )
                 }
             }
+            // Sub-agent source label (shown when permission comes from a child session)
+            if (permission.sourceSessionTitle != null) {
+                Text(
+                    text = permission.sourceSessionTitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor.copy(alpha = 0.6f)
+                )
+            }
             // Permission description
             Text(
                 text = permission.permission,
