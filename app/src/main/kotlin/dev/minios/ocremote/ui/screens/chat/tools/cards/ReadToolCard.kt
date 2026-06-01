@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
+package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -108,7 +108,7 @@ internal fun ReadToolCard(
                                 text = shortPath,
                                 style = CodeTypography.copy(
                                     fontSize = 11.sp,
-                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.STRONG)
+                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.HIGH)
                                 ),
                                 modifier = Modifier
                                     .padding(4.dp)
@@ -126,7 +126,7 @@ internal fun ReadToolCard(
                                 text = args,
                                 style = CodeTypography.copy(
                                     fontSize = 11.sp,
-                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.STRONG)
+                                    color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.HIGH)
                                 ),
                                 modifier = Modifier
                                     .padding(4.dp)

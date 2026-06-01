@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.input
+package dev.minios.ocremote.ui.screens.chat.input
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -419,7 +419,7 @@ internal fun ChatInputBar(
                             Text(
                                 text = cmd.description,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
@@ -472,7 +472,7 @@ internal fun ChatInputBar(
                             tint = if (isDir)
                                 MaterialTheme.colorScheme.tertiary
                             else
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
                         )
                         Text(
                             text = buildAnnotatedString {
@@ -552,7 +552,7 @@ internal fun ChatInputBar(
                         Text(
                             text = statusText,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -564,8 +564,8 @@ internal fun ChatInputBar(
                 if (showContext) {
                     val percentage = Math.round(lastContextTokens.toDouble() / contextWindow * 100).toInt()
                     val contextColor = when {
-                        percentage >= 90 -> MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.STRONG)
-                        percentage >= 70 -> MaterialTheme.colorScheme.tertiary.copy(alpha = AlphaTokens.NORMAL)
+                        percentage >= 90 -> MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.HIGH)
+                        percentage >= 70 -> MaterialTheme.colorScheme.tertiary.copy(alpha = AlphaTokens.MEDIUM)
                         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                     }
                     Text(
@@ -646,13 +646,13 @@ internal fun ChatInputBar(
                                     ProviderIcon(
                                         providerId = selectedProviderId,
                                         size = 13.dp,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL)
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
                                     )
                                 }
                                 Text(
                                     text = modelLabel,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
                                 )
                                 Icon(
                                     Icons.Default.UnfoldMore,
@@ -695,7 +695,7 @@ internal fun ChatInputBar(
                                 Icons.Default.AttachFile,
                                 contentDescription = stringResource(R.string.chat_attach),
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
                             )
                         }
                     }
@@ -788,7 +788,7 @@ internal fun ChatInputBar(
                             if (isAmoled) {
                                 Modifier.border(
                                     width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
                                     shape = ShapeTokens.mediumSmall,
                                 )
                             } else {
@@ -853,7 +853,7 @@ internal fun ChatInputBar(
                                 )
                                 isAmoled -> Modifier.border(
                                     width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.NORMAL),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM),
                                     shape = ShapeTokens.largeMedium
                                 )
                                 else -> Modifier

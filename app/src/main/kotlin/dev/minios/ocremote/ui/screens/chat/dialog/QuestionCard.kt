@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.dialog
+package dev.minios.ocremote.ui.screens.chat.dialog
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -135,7 +135,7 @@ internal fun QuestionCard(
                 Text(
                     text = q.question,
                     style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = AlphaTokens.STRONG)
+                    color = contentColor.copy(alpha = AlphaTokens.HIGH)
                 )
 
                 Spacer(Modifier.height(2.dp))
@@ -226,7 +226,7 @@ internal fun QuestionCard(
                                     if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = if (isSelected) accentColor else accentColor.copy(alpha = AlphaTokens.NORMAL)
+                                    tint = if (isSelected) accentColor else accentColor.copy(alpha = AlphaTokens.MEDIUM)
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
@@ -289,7 +289,7 @@ internal fun QuestionCard(
                                         Icons.Default.Close,
                                         contentDescription = stringResource(R.string.chat_clear),
                                         modifier = Modifier.size(16.dp),
-                                        tint = accentColor.copy(alpha = AlphaTokens.NORMAL)
+                                        tint = accentColor.copy(alpha = AlphaTokens.MEDIUM)
                                     )
                                 }
                             }
@@ -317,12 +317,12 @@ internal fun QuestionCard(
                                         Icons.Default.Edit,
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp),
-                                        tint = accentColor.copy(alpha = AlphaTokens.NORMAL)
+                                        tint = accentColor.copy(alpha = AlphaTokens.MEDIUM)
                                     )
                                     Text(
                                         text = stringResource(R.string.question_custom_answer),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = accentColor.copy(alpha = AlphaTokens.NORMAL)
+                                        color = accentColor.copy(alpha = AlphaTokens.MEDIUM)
                                     )
                                 }
                             }

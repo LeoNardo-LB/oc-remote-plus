@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
+package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -161,7 +161,7 @@ internal fun TaskToolCard(
             SelectionContainer {
                 MarkdownContent(
                     markdown = output,
-                    textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer,
+                    textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer,
                     isUser = false
                 )
             }

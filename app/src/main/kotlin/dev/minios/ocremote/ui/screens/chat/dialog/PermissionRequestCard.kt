@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.dialog
+package dev.minios.ocremote.ui.screens.chat.dialog
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -61,7 +61,7 @@ internal fun PermissionCard(
         colors = CardDefaults.cardColors(
             containerColor = containerColor
         ),
-        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.NORMAL)) else null,
+        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.MEDIUM)) else null,
         shape = ShapeTokens.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -115,7 +115,7 @@ internal fun PermissionCard(
                     text = permission.patterns.joinToString(", "),
                     style = CodeTypography.copy(
                         fontSize = 11.sp,
-                        color = contentColor.copy(alpha = AlphaTokens.NORMAL)
+                        color = contentColor.copy(alpha = AlphaTokens.MEDIUM)
                     ),
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis

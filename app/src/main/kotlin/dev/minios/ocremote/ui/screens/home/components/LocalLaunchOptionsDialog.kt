@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.home.components
+package dev.minios.ocremote.ui.screens.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -82,10 +82,10 @@ internal fun LocalLaunchOptionsDialog(
         SwitchDefaults.colors(
             checkedThumbColor = MaterialTheme.colorScheme.primary,
             checkedTrackColor = Color.Black,
-            checkedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.STRONG),
+            checkedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH),
             uncheckedThumbColor = MaterialTheme.colorScheme.outline,
             uncheckedTrackColor = Color.Black,
-            uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.STRONG),
+            uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH),
         )
     } else SwitchDefaults.colors()
 
@@ -349,7 +349,7 @@ internal fun LocalLaunchOptionsDialog(
                                         if (selected && isAmoled) {
                                             Modifier.border(
                                                 width = 1.dp,
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
                                                 shape = ShapeTokens.medium,
                                             )
                                         } else Modifier

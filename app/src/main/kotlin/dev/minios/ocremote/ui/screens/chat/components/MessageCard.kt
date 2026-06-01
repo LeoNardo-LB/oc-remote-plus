@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.components
+package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -203,12 +203,12 @@ private fun MessageCardUser(
                                 imageVector = Icons.Default.RateReview,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = textColor.copy(alpha = AlphaTokens.NORMAL)
+                                tint = textColor.copy(alpha = AlphaTokens.MEDIUM)
                             )
                             Text(
                                 text = userCommandLabel,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = textColor.copy(alpha = AlphaTokens.AMOLED_CODE)
+                                color = textColor.copy(alpha = AlphaTokens.AMOLED)
                             )
                         }
                     }

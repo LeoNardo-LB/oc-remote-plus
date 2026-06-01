@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
+package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -84,7 +84,7 @@ internal fun WriteToolCard(
             SelectionContainer {
                 Text(
                     text = content.take(5000),
-                    style = CodeTypography.copy(color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer),
+                    style = CodeTypography.copy(color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer),
                     modifier = Modifier
                         .padding(4.dp)
                         .codeHorizontalScroll()

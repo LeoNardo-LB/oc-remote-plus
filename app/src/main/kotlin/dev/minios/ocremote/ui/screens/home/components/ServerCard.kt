@@ -66,7 +66,7 @@ internal fun ServerCard(
                     Text(
                         text = server.url,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = cardContentColor.copy(alpha = AlphaTokens.NORMAL)
+                        color = cardContentColor.copy(alpha = AlphaTokens.MEDIUM)
                     )
                     if (isConnected) {
                         Text(
@@ -200,7 +200,7 @@ internal fun ServerCard(
                             containerColor = Color.Black,
                             contentColor = MaterialTheme.colorScheme.primary,
                             disabledContainerColor = Color.Black,
-                            disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL),
+                            disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
                         )
                     } else {
                         ButtonDefaults.buttonColors()

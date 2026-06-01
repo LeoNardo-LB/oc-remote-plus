@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.server
+package dev.minios.ocremote.ui.screens.server
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -180,10 +180,10 @@ fun ServerModelFilterScreen(
                                                     SwitchDefaults.colors(
                                                         checkedThumbColor = MaterialTheme.colorScheme.primary,
                                                         checkedTrackColor = Color.Black,
-                                                        checkedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.STRONG),
+                                                        checkedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH),
                                                         uncheckedThumbColor = MaterialTheme.colorScheme.outline,
                                                         uncheckedTrackColor = Color.Black,
-                                                        uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.STRONG)
+                                                        uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH)
                                                     )
                                                 } else {
                                                     SwitchDefaults.colors()

@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
+package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -94,7 +94,7 @@ internal fun SearchToolCard(
                             text = "pattern: $pattern",
                             style = CodeTypography.copy(
                                 fontSize = 11.sp,
-                                color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.STRONG)
+                                color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.HIGH)
                             )
                         )
                     }
@@ -103,7 +103,7 @@ internal fun SearchToolCard(
                             text = "path: $dirPath",
                             style = CodeTypography.copy(
                                 fontSize = 11.sp,
-                                color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.STRONG)
+                                color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.HIGH)
                             )
                         )
                     }
@@ -126,7 +126,7 @@ internal fun SearchToolCard(
             SelectionContainer {
                 MarkdownContent(
                     markdown = output,
-                    textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer,
+                    textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer,
                     isUser = false
                 )
             }

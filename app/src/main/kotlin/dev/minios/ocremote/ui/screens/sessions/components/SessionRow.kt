@@ -153,7 +153,7 @@ internal fun SessionRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                     }

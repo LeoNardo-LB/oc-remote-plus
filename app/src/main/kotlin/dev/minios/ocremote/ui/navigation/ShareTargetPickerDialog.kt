@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.navigation
+package dev.minios.ocremote.ui.navigation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -167,7 +167,7 @@ internal fun ShareTargetPickerDialog(
                                     Icons.AutoMirrored.Filled.Chat,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL)
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     // Session title

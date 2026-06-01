@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.sessions.components
+package dev.minios.ocremote.ui.screens.sessions.components
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -321,7 +321,7 @@ internal fun OpenProjectDialog(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.back),
                                 modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL)
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
                             )
                         }
                         Text(

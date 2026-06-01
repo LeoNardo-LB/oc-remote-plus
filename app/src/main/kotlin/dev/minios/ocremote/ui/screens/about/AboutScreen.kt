@@ -85,7 +85,7 @@ fun AboutScreen(
             Text(
                 text = stringResource(R.string.about_unofficial),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.NORMAL),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM),
                 textAlign = TextAlign.Center
             )
 

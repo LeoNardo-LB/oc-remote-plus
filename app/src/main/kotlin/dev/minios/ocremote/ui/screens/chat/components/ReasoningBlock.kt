@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.components
+package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -60,7 +60,7 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
     val accentColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
     val containerColor = when {
         isAmoled -> Color.Black
-        else -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = AlphaTokens.NORMAL)
+        else -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = AlphaTokens.MEDIUM)
     }
     val textColor = MaterialTheme.colorScheme.onSurface
 

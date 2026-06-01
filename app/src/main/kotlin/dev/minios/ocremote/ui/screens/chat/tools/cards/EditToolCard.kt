@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools.cards
+package dev.minios.ocremote.ui.screens.chat.tools.cards
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
@@ -117,7 +117,7 @@ internal fun EditToolCard(
                     Surface(
                         shape = ShapeTokens.extraSmall,
                         color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer,
-                        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.NORMAL)) else null,
+                        border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.MEDIUM)) else null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         ErrorPayloadContent(

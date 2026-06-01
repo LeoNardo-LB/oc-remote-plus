@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.components
+package dev.minios.ocremote.ui.screens.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -68,7 +68,7 @@ internal fun RevertBanner(onRedo: () -> Unit) {
                 Text(
                     text = stringResource(R.string.chat_tap_restore),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = AlphaTokens.NORMAL)
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = AlphaTokens.MEDIUM)
                 )
             }
             Icon(

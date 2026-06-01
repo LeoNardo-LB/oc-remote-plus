@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.settings.components
+package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -82,7 +82,7 @@ internal fun amoledDialogModifier(): Modifier {
     return if (isAmoledTheme) {
         Modifier.border(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.STRONG),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH),
             shape = ShapeTokens.extraLarge,
         )
     } else {

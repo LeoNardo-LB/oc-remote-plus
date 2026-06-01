@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.tools
+package dev.minios.ocremote.ui.screens.chat.tools
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -188,7 +188,7 @@ internal fun ToolCallCard(
                             ) {
                                 Text(
                                     text = inputText.take(2000),
-                                    style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.STRONG)),
+                                    style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = AlphaTokens.HIGH)),
                                     modifier = Modifier.padding(4.dp).codeHorizontalScroll()
                                 )
                             }
@@ -208,7 +208,7 @@ internal fun ToolCallCard(
                         ) {
                             Text(
                                 text = output.take(3000),
-                                style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED_CODE) else MaterialTheme.colorScheme.onSecondaryContainer),
+                                style = CodeTypography.copy(fontSize = 11.sp, color = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer),
                                 modifier = Modifier.padding(4.dp).codeHorizontalScroll()
                             )
                         }

@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.sessions
+package dev.minios.ocremote.ui.screens.sessions
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -186,7 +186,7 @@ fun SessionListScreen(
                     modifier = if (isAmoled) {
                         Modifier.border(
                             width = 1.dp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
                             shape = FloatingActionButtonDefaults.shape
                         )
                     } else {

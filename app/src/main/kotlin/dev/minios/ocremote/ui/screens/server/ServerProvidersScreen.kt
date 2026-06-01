@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.server
+package dev.minios.ocremote.ui.screens.server
 
 import android.util.Log
 import android.widget.Toast
@@ -150,7 +150,7 @@ fun ServerProvidersScreen(
             Surface(
                 shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.NORMAL)) else null,
+                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)) else null,
                 tonalElevation = if (isAmoled) 0.dp else 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -205,7 +205,7 @@ fun ServerProvidersScreen(
             Surface(
                 shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.NORMAL)) else null,
+                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)) else null,
                 tonalElevation = if (isAmoled) 0.dp else 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -258,7 +258,7 @@ fun ServerProvidersScreen(
             Surface(
                 shape = ShapeTokens.largeMedium,
                 color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.NORMAL)) else null,
+                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)) else null,
                 tonalElevation = if (isAmoled) 0.dp else 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -275,7 +275,7 @@ fun ServerProvidersScreen(
                         Text(
                             text = stringResource(R.string.server_settings_oauth_device_code_hint),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.NORMAL),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM),
                         )
                         Surface(
                             shape = ShapeTokens.medium,
@@ -341,7 +341,7 @@ fun ServerProvidersScreen(
                         Text(
                             text = stringResource(R.string.server_settings_oauth_headless_fallback),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.NORMAL),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM),
                         )
                     }
                     if (pending.authorization.url.isNotBlank()) {
@@ -426,7 +426,7 @@ fun ServerProvidersScreen(
                     Text(
                         text = stringResource(R.string.server_settings_providers_connected),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.NORMAL)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
                     )
                 }
                 items(connected, key = { it.providerId }) { provider ->
@@ -449,7 +449,7 @@ fun ServerProvidersScreen(
                     Text(
                         text = stringResource(R.string.server_settings_providers_available),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.NORMAL)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
                     )
                 }
                 items(available, key = { it.providerId }) { provider ->

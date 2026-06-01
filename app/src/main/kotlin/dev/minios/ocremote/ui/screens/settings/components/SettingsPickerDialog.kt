@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.settings.components
+package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -126,7 +126,7 @@ internal fun <K> SettingsPickerDialog(
                                     if (isSelected && isAmoled) {
                                         Modifier.border(
                                             width = 1.dp,
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL),
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
                                             shape = ShapeTokens.medium,
                                         )
                                     } else {

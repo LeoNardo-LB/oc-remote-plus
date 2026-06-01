@@ -96,7 +96,7 @@ internal fun LocalRuntimeCard(
                 Text(
                     text = stringResource(R.string.home_local_server_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = cardContentColor.copy(alpha = AlphaTokens.AMOLED_CODE),
+                    color = cardContentColor.copy(alpha = AlphaTokens.AMOLED),
                 )
             }
 
@@ -194,7 +194,7 @@ internal fun LocalRuntimeCard(
                     Text(
                         text = stringResource(R.string.home_local_setup_desc),
                         style = MaterialTheme.typography.bodySmall,
-                        color = cardContentColor.copy(alpha = AlphaTokens.AMOLED_CODE),
+                        color = cardContentColor.copy(alpha = AlphaTokens.AMOLED),
                     )
                     Button(
                         onClick = onSetup,

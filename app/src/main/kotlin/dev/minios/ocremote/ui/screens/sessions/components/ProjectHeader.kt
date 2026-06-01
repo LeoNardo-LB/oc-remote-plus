@@ -33,12 +33,12 @@ internal fun ProjectHeader(
             Icons.Default.Folder,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.NORMAL)
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
         )
         Text(
             text = name,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.STRONG),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH),
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

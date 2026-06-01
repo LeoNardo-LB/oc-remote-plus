@@ -191,7 +191,7 @@ internal fun MarkdownContent(
             fontWeight = FontWeight.SemiBold
         ),
         h6 = MaterialTheme.typography.bodyMedium.copy(
-            color = textColor.copy(alpha = AlphaTokens.STRONG),
+            color = textColor.copy(alpha = AlphaTokens.HIGH),
             fontWeight = FontWeight.Medium
         ),
         text = bodyStyle,

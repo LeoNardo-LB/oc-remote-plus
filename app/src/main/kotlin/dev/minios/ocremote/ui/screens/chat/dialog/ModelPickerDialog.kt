@@ -1,4 +1,4 @@
-﻿package dev.minios.ocremote.ui.screens.chat.dialog
+package dev.minios.ocremote.ui.screens.chat.dialog
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -133,7 +133,7 @@ internal fun ModelPickerDialog(
                                     Text(
                                         text = stringResource(R.string.chat_free_label),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = AlphaTokens.STRONG)
+                                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = AlphaTokens.HIGH)
                                     )
                                 }
                             }
