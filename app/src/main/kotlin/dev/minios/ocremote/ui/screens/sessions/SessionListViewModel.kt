@@ -55,19 +55,6 @@ data class SessionListUiState(
     val isSelectionMode: Boolean = false,
 )
 
-/** A group of sessions belonging to a project. */
-data class ProjectSessionGroup(
-    val projectId: String,
-    val projectName: String,
-    val directory: String,
-    val sessions: List<SessionItem>,
-    /** Per-session tilde-path labels (sessionId -> tildePath) for flat display. */
-    val sessionDirLabels: Map<String, String> = emptyMap()
-)
-
-/** Helper for session directory info. */
-private data class SessionDirInfo(val name: String, val tildePath: String)
-
 data class SessionItem(
     val session: Session,
     val status: SessionStatus = SessionStatus.Idle
