@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
+import androidx.compose.foundation.text.selection.SelectionContainer
 import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
 import dev.minios.ocremote.ui.screens.chat.tools.ToolCallCard
 import dev.minios.ocremote.ui.screens.chat.tools.cards.BashToolCard
@@ -52,11 +53,13 @@ internal fun PartContent(
         is Part.Text -> {
             // Hide synthetic/ignored text parts (internal system content)
             if (part.text.isNotBlank() && part.synthetic != true && part.ignored != true) {
-                MarkdownContent(
-                    markdown = part.text,
-                    textColor = textColor,
-                    isUser = isUser
-                )
+                SelectionContainer {
+                    MarkdownContent(
+                        markdown = part.text,
+                        textColor = textColor,
+                        isUser = isUser
+                    )
+                }
             }
         }
         is Part.Reasoning -> {

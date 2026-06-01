@@ -42,6 +42,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
+import androidx.compose.foundation.text.selection.SelectionContainer
 import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolInput
 import dev.minios.ocremote.ui.screens.chat.tools.extractToolOutput
@@ -205,11 +206,13 @@ internal fun TaskToolCard(
                         .heightIn(max = halfScreenHeight)
                         .verticalScroll(scrollState)
                 ) {
-                    MarkdownContent(
-                        markdown = output,
-                        textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
-                        isUser = false
-                    )
+                    SelectionContainer {
+                        MarkdownContent(
+                            markdown = output,
+                            textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSecondaryContainer,
+                            isUser = false
+                        )
+                    }
                 }
             }
         }
