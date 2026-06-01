@@ -147,18 +147,13 @@ fun SessionListScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                     },
-                    actions = {
-                        IconButton(onClick = { showOpenProject = true }) {
-                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.sessions_open_project))
-                        }
-                    }
                 )
             }
         },
         floatingActionButton = {
             if (!uiState.isSelectionMode) {
                 FloatingActionButton(
-                    onClick = { viewModel.createNewSession() },
+                    onClick = { showOpenProject = true },
                     containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.primaryContainer,
                     contentColor = if (isAmoled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
                     elevation = if (isAmoled) {
