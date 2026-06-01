@@ -18,6 +18,8 @@ Unofficial OpenCode Android client. Jetpack Compose + Kotlin + Hilt + Ktor.
 .\gradlew :app:compileDevDebugKotlin
 ```
 
+**JDK 21 required** — `build.gradle.kts` sets `jvmToolchain(21)` and `JavaVersion.VERSION_21`. Local builds also set `org.gradle.java.home` in `gradle.properties`.
+
 **Proxy warning**: `gradle.properties` hardcodes `127.0.0.1:7897` HTTP proxy. Build fails if proxy is unreachable. Comment out the 4 `systemProp.*` lines when building without proxy.
 
 ## Product Flavors
@@ -35,7 +37,7 @@ Clean Architecture, 3 layers. **Dependency direction: UI → Domain ← Data.**
 
 ```
 domain/          Pure Kotlin, no Android deps
-  model/         13 sealed classes / data classes (SseEvent, Message, Part, etc.)
+  model/         13 data classes (SseEvent, Message, Part, Session, AppSettings, etc.)
   repository/    4 interfaces (Chat, Session, Server, Settings)
   usecase/       21 UseCases — ViewModel calls these, not API directly
 
@@ -52,21 +54,36 @@ service/         Android foreground service
   AppNotificationManager.kt     Notification channels and event notifications
 
 ui/
-  screens/chat/      ChatScreen (2400 lines, extracted from 8200) + 7 sub-packages
-  screens/home/      HomeScreen + components
+  screens/chat/      ChatScreen (~1100 lines) + 7 sub-packages
+    components/      Chat UI components
+    dialog/          Image preview, markdown preview dialogs
+    input/           Message input bar
+    markdown/        Markdown rendering
+    terminal/        PTY terminal view over WebSocket
+    tools/           Tool-call expandable cards
+    util/            Chat-specific utilities
+  screens/home/      HomeScreen + server cards + local runtime
   screens/sessions/  SessionListScreen + components
-  screens/settings/  SettingsScreen + 11 picker dialogs
+  screens/settings/  SettingsScreen + 9 picker dialogs
   screens/server/    Server settings/providers/model filter
+  screens/about/     About screen
+  screens/webview/   WebView fallback (OAuth, HTML errors)
   navigation/        NavGraph.kt + 10 type-safe Route objects in routes/
   components/        Shared components (PulsingDotsIndicator, ProviderIcon)
+
+di/                Hilt modules (NetworkModule, DomainModule)
 ```
 
-**Key pattern**: ViewModels delegate to UseCases. UseCases currently shell-delegate to OpenCodeApi. Repository implementations bridge EventDispatcher (state) + API (network).
+**Key patterns**:
+- ViewModels delegate to UseCases. UseCases currently shell-delegate to OpenCodeApi.
+- Repository implementations bridge EventDispatcher (state) + API (network).
+- DI uses **KSP** (not kapt) for Hilt annotation processing.
+- Terminal uses WebSocket transport for PTY streams; SSE for events.
 
 ## Critical Constraints
 
 ### ChatScreen.kt Editing Protocol
-See `docs/chatscreen-editing-protocol.md`. Still ~2400 lines. Rules:
+See `docs/chatscreen-editing-protocol.md`. Rules:
 - Never edit in parallel across agents
 - Always Read before Edit
 - Run `compileDevDebugKotlin` after each edit
@@ -76,7 +93,7 @@ See `docs/chatscreen-editing-protocol.md`. Still ~2400 lines. Rules:
 ### Signing
 - Release keystore lives at `app/keystore/release.jks` with password in `signing.properties`
 - When `signing.properties` exists → release builds use release keystore
-- When absent → release builds fall back to debug signing (line 67 of build.gradle.kts)
+- When absent → release builds fall back to debug signing (line 67 of `build.gradle.kts`)
 - CI uses GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_ALIAS`, `KEYSTORE_PASSWORD`)
 
 ### Version Management
@@ -87,7 +104,7 @@ See `docs/chatscreen-editing-protocol.md`. Still ~2400 lines. Rules:
 ### Test Gotchas
 - `isReturnDefaultValues = true` — mocks return default values instead of throwing. This can mask bugs where mock data silently returns null/0/false
 - Test runner: JUnit 4 + MockK 1.14.9 + Turbine 1.2.1 + coroutines-test
-- No instrumented/UI tests in the project — unit tests only
+- No instrumented/UI tests in the project — unit tests only (~35 test files)
 
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.
@@ -96,12 +113,11 @@ Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to ot
 
 | Remote | URL | Role |
 |--------|-----|------|
-| `origin` | `github.com/crim50n/oc-remote` | Upstream (owner: crim50n) |
-| `fork` | `github.com:LeoNardo-LB/oc-remote-v2` | Fork (push access) |
+| `origin` | `github.com:LeoNardo-LB/oc-remote-v2` | Fork (push access, current default) |
+| upstream | `github.com:crim50n/oc-remote` | Upstream (owner: crim50n) — add manually if needed |
 
 - `master` — stable, matches upstream
-- `dev` — active development, push to `fork`
-- Push: `git push fork dev` / `git push fork <tag>`
+- Push: `git push origin master` / `git push origin <tag>`
 
 ## Localization
 
@@ -113,3 +129,8 @@ Release builds use R8 minification. Rules preserve:
 - `kotlinx.serialization` annotated classes
 - Ktor coroutine internals
 - Mikepenz Markdown renderer state/models (async parsing)
+
+## Android SDK
+
+- `compileSdk` = 36, `minSdk` = 26, `targetSdk` = 35
+- Compose BOM `2026.05.01`
