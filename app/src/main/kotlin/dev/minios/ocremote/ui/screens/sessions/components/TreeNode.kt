@@ -75,11 +75,10 @@ fun buildTreeNodes(
         }
     }
 
-    // Directory groups FIRST — expand all by default when no explicit expanded state
-    val expandAll = expandedDirs.isEmpty()
+    // Directory groups FIRST — only expand when explicitly toggled
     for ((dirKey, dirSessionList) in dirSessions) {
         val fullPath = if (normalizedBase != null) "$normalizedBase/$dirKey" else dirKey
-        val isExpanded = expandAll || fullPath in expandedDirs
+        val isExpanded = fullPath in expandedDirs
         result.add(TreeNode.Directory(
             id = dirKey,
             path = fullPath,
