@@ -64,13 +64,13 @@ internal fun DirectoryTreeNode(
                 onLongClick = { menuExpanded = true },
             )
             .padding(start = 12.dp, end = 8.dp)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = if (node.isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(10.dp))

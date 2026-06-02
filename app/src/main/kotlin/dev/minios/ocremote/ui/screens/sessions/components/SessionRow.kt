@@ -94,7 +94,7 @@ internal fun SessionRow(
                 onLongClick = onLongClick,
             )
             .padding(start = 28.dp, end = 8.dp)
-            .padding(vertical = 2.dp),
+            .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Status icon
@@ -106,7 +106,7 @@ internal fun SessionRow(
         Icon(
             imageVector = Icons.Outlined.ChatBubbleOutline,
             contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(20.dp),
             tint = statusIconColor,
         )
         Spacer(modifier = Modifier.width(8.dp))
