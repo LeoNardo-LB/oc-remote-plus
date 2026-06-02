@@ -5,19 +5,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -36,6 +40,10 @@ fun AppDialog(
     onDismiss: () -> Unit,
     title: String,
     isAmoled: Boolean = isAmoledTheme(),
+    showClose: Boolean = true,
+    showDividers: Boolean = true,
+    maxBodyHeight: Dp? = null,
+    scrollable: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
     buttons: @Composable ColumnScope.() -> Unit,
 ) {
@@ -53,7 +61,7 @@ fun AppDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, end = 8.dp, top = 20.dp, bottom = 12.dp),
+                        .padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -61,33 +69,51 @@ fun AppDialog(
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = null,
-                        )
+                    if (showClose) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = null,
+                            )
+                        }
                     }
                 }
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT),
-                )
+                if (showDividers) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT),
+                    )
+                }
 
                 // Content
-                Column(
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    content = content,
-                )
+                if (scrollable) {
+                    val heightMod = if (maxBodyHeight != null) Modifier.heightIn(max = maxBodyHeight) else Modifier
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .then(heightMod)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        item { content() }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        content = content,
+                    )
+                }
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT),
-                )
+                if (showDividers) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT),
+                    )
+                }
 
                 // Buttons
                 Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     content = buttons,
                 )
             }
@@ -139,31 +165,17 @@ private fun DialogButton(
 ) {
     when (style) {
         ButtonStyle.Primary -> {
-            TextButton(
-                onClick = onClick,
-                modifier = modifier,
-            ) {
-                Text(text)
-            }
+            FilledTonalButton(onClick = onClick, modifier = modifier) { Text(text) }
         }
         ButtonStyle.Secondary -> {
-            TextButton(
-                onClick = onClick,
-                modifier = modifier,
-            ) {
-                Text(text)
-            }
+            OutlinedButton(onClick = onClick, modifier = modifier) { Text(text) }
         }
         ButtonStyle.Danger -> {
-            TextButton(
+            OutlinedButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-            ) {
-                Text(text)
-            }
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(text) }
         }
     }
 }
