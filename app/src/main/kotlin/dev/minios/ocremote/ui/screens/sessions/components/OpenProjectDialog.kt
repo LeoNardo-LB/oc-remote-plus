@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,6 +46,7 @@ import dev.minios.ocremote.ui.components.ButtonStyle
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
 import dev.minios.ocremote.ui.screens.sessions.SessionListViewModel
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -86,23 +88,27 @@ internal fun OpenProjectDialog(
         return if (path.startsWith(home)) "~" + path.removePrefix(home) else path
     }
 
-    // Load home directory and initial listing
+    // Load home directory and then list currentDir whenever it changes.
+    // Single LaunchedEffect avoids the race condition where LaunchedEffect(Unit)
+    // setting currentDir triggered a second LaunchedEffect(currentDir) causing
+    // duplicate concurrent loads that could interleave isLoading/directories state.
     LaunchedEffect(Unit) {
         val home = viewModel.getHomeDirectory()
         homeDir = home
-        val startDir = initialDirectory ?: "/"
-        currentDir = startDir
-        isLoading = true
-        directories = viewModel.listDirectories(startDir)
-        isLoading = false
+        // Set initial directory (will trigger the snapshotFlow below)
+        if (currentDir == null) {
+            currentDir = initialDirectory ?: "/"
+        }
     }
 
-    // Re-list when currentDir changes
-    LaunchedEffect(currentDir) {
-        val dir = currentDir ?: return@LaunchedEffect
-        isLoading = true
-        directories = viewModel.listDirectories(dir)
-        isLoading = false
+    // React to currentDir changes via snapshotFlow — no double-trigger on init
+    LaunchedEffect(Unit) {
+        snapshotFlow { currentDir }.collectLatest { dir ->
+            if (dir == null) return@collectLatest
+            isLoading = true
+            directories = viewModel.listDirectories(dir)
+            isLoading = false
+        }
     }
 
     AppDialog(
@@ -118,7 +124,13 @@ internal fun OpenProjectDialog(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Back arrow - always visible, disabled at root
-                val isAtRoot = currentDir == "/"
+                // Detect root for both Unix ("/") and Windows drive roots ("C:/", "D:/")
+                val dirPath = currentDir ?: "/"
+                val normalizedPath = dirPath.trimEnd('/')
+                val isAtRoot = normalizedPath.isEmpty()
+                        || normalizedPath == "/"
+                        // Windows drive root: "C:" or "C:/" after trimEnd
+                        || normalizedPath.matches(Regex("[A-Za-z]:/?"))
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.back),
@@ -126,9 +138,8 @@ internal fun OpenProjectDialog(
                         .size(16.dp)
                         .then(
                             if (!isAtRoot) Modifier.clickable {
-                                val path = currentDir?.trimEnd('/') ?: ""
-                                val parent = path.substringBeforeLast('/')
-                                currentDir = parent.ifEmpty { "/" }
+                                val parent = java.io.File(normalizedPath).parent
+                                currentDir = parent ?: "/"
                             } else Modifier
                         ),
                     tint = if (isAtRoot) {
