@@ -18,7 +18,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.ServerConfig
-import dev.minios.ocremote.ui.components.AmoledDefaultBorder
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import dev.minios.ocremote.ui.theme.ShapeTokens
@@ -97,6 +99,10 @@ internal fun ServerDialog(
     val scrollState = rememberScrollState()
 
     val isAmoled = LocalAmoledMode.current
+    val params = amoledDialogParams(
+        normalColor = MaterialTheme.colorScheme.surface,
+        shape = ShapeTokens.largeMedium,
+    )
     val switchColors = if (isAmoled) {
         SwitchDefaults.colors(
             checkedThumbColor = MaterialTheme.colorScheme.primary,
@@ -112,10 +118,10 @@ internal fun ServerDialog(
 
     BasicAlertDialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = ShapeTokens.largeMedium,
-            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-            border = if (isAmoled) AmoledDefaultBorder else null,
-            tonalElevation = if (isAmoled) 0.dp else 6.dp,
+            shape = params.shape,
+            color = params.containerColor,
+            border = params.border,
+            tonalElevation = params.tonalElevation,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = dialogMaxHeight)
@@ -219,15 +225,10 @@ internal fun ServerDialog(
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.server_cancel))
-                    }
-                    TextButton(
-                        onClick = {
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.server_cancel), DialogButtonRole.Secondary, onDismiss),
+                        Triple(stringResource(R.string.server_save), DialogButtonRole.Primary) {
                             val normalizedUrl = validateAndNormalizeUrl(url)
                             urlError = when {
                                 url.isBlank() -> urlRequiredText
@@ -247,11 +248,9 @@ internal fun ServerDialog(
                                     autoConnect
                                 )
                             }
-                        }
-                    ) {
-                        Text(stringResource(R.string.server_save))
-                    }
-                }
+                        },
+                    )
+                )
             }
         }
     }

@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.screens.chat.util.LocalImageSaveRequest
 import dev.minios.ocremote.ui.screens.chat.util.decodePartFileBytes
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
@@ -133,20 +134,17 @@ internal fun ImagePreviewDialog(
     onDismiss: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val params = amoledDialogParams(shape = ShapeTokens.largeMedium)
     val isAmoled = isAmoledTheme()
     BasicAlertDialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
-            shape = ShapeTokens.largeMedium,
-            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = if (isAmoled) {
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH))
-            } else {
-                null
-            },
-            tonalElevation = if (isAmoled) 0.dp else 6.dp,
+            shape = params.shape,
+            color = params.containerColor,
+            border = params.border,
+            tonalElevation = params.tonalElevation,
         ) {
             Box(modifier = Modifier.padding(14.dp)) {
                 Image(

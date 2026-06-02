@@ -59,6 +59,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.minios.ocremote.R
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.screens.server.components.ProviderRow
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
@@ -146,12 +149,16 @@ fun ServerProvidersScreen(
         val methods = uiState.authMethods[provider.providerId].orEmpty().ifEmpty {
             listOf(dev.minios.ocremote.data.dto.response.ProviderAuthMethod(type = "api", label = stringResource(R.string.server_settings_auth_method_api)))
         }
+        val connectParams = amoledDialogParams(
+            normalColor = MaterialTheme.colorScheme.surface,
+            shape = ShapeTokens.largeMedium,
+        )
         BasicAlertDialog(onDismissRequest = { connectProvider = null }) {
             Surface(
-                shape = ShapeTokens.largeMedium,
-                color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)) else null,
-                tonalElevation = if (isAmoled) 0.dp else 6.dp,
+                shape = connectParams.shape,
+                color = connectParams.containerColor,
+                border = connectParams.border,
+                tonalElevation = connectParams.tonalElevation,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -189,31 +196,37 @@ fun ServerProvidersScreen(
                         )
                     }
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { connectProvider = null }) { Text(stringResource(R.string.cancel)) }
-                    }
+                    DialogButtons(
+                        buttons = listOf(
+                            Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary) { connectProvider = null },
+                        )
+                    )
                 }
             }
         }
     }
 
     apiKeyProvider?.let { provider ->
+        val apiKeyParams = amoledDialogParams(
+            normalColor = MaterialTheme.colorScheme.surface,
+            shape = ShapeTokens.largeMedium,
+        )
         BasicAlertDialog(onDismissRequest = {
             apiKeyProvider = null
             apiKey = ""
         }) {
             Surface(
-                shape = ShapeTokens.largeMedium,
-                color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)) else null,
-                tonalElevation = if (isAmoled) 0.dp else 6.dp,
+                shape = apiKeyParams.shape,
+                color = apiKeyParams.containerColor,
+                border = apiKeyParams.border,
+                tonalElevation = apiKeyParams.tonalElevation,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(stringResource(R.string.server_settings_api_key_title, provider.providerName), style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.server_settings_api_key_title, provider.providerName), style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
@@ -228,20 +241,19 @@ fun ServerProvidersScreen(
                             )
                         } else androidx.compose.material3.OutlinedTextFieldDefaults.colors()
                     )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = {
-                            apiKeyProvider = null
-                            apiKey = ""
-                        }) { Text(stringResource(R.string.cancel)) }
-                        TextButton(
-                            onClick = {
+                    DialogButtons(
+                        buttons = listOf(
+                            Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary) {
+                                apiKeyProvider = null
+                                apiKey = ""
+                            },
+                            Triple(stringResource(R.string.connect), DialogButtonRole.Primary) {
                                 viewModel.connectProviderApi(provider.providerId, apiKey)
                                 apiKeyProvider = null
                                 apiKey = ""
                             },
-                            enabled = apiKey.isNotBlank() && !uiState.isSaving
-                        ) { Text(stringResource(R.string.connect)) }
-                    }
+                        )
+                    )
                 }
             }
         }
@@ -251,15 +263,19 @@ fun ServerProvidersScreen(
         val deviceCode = remember(pending.authorization.instructions) {
             extractOAuthDeviceCode(pending.authorization.instructions)
         }
+        val oauthParams = amoledDialogParams(
+            normalColor = MaterialTheme.colorScheme.surface,
+            shape = ShapeTokens.largeMedium,
+        )
         BasicAlertDialog(onDismissRequest = {
             oauthCode = ""
             viewModel.cancelProviderOauth()
         }) {
             Surface(
-                shape = ShapeTokens.largeMedium,
-                color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)) else null,
-                tonalElevation = if (isAmoled) 0.dp else 6.dp,
+                shape = oauthParams.shape,
+                color = oauthParams.containerColor,
+                border = oauthParams.border,
+                tonalElevation = oauthParams.tonalElevation,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(

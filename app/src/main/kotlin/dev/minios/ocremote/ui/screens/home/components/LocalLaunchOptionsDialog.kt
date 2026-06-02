@@ -32,6 +32,10 @@ import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
+import dev.minios.ocremote.ui.components.AppPickerList
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import dev.minios.ocremote.ui.theme.ShapeTokens
@@ -310,84 +314,43 @@ internal fun LocalLaunchOptionsDialog(
     }
 
     if (showTimeoutDialog) {
-        BasicAlertDialog(onDismissRequest = { showTimeoutDialog = false }) {
+        val timeoutParams = amoledDialogParams(
+            normalColor = MaterialTheme.colorScheme.surface,
+            shape = ShapeTokens.largeMedium,
+        )
+        BasicAlertDialog(
+            onDismissRequest = { showTimeoutDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
             Surface(
-                shape = ShapeTokens.largeMedium,
-                color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                border = if (isAmoled) AmoledDefaultBorder else null,                tonalElevation = if (isAmoled) 0.dp else 6.dp,
+                shape = timeoutParams.shape,
+                color = timeoutParams.containerColor,
+                border = timeoutParams.border,
+                tonalElevation = timeoutParams.tonalElevation,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.92f)
                     .heightIn(max = 420.dp),
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(24.dp)) {
                     Text(
                         text = stringResource(R.string.home_local_startup_timeout_label),
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp),
                     )
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f, fill = false)
-                            .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        items(timeoutOptions) { option ->
-                            val selected = option == startupTimeoutSec
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(ShapeTokens.medium)
-                                    .background(
-                                        when {
-                                            selected && isAmoled -> Color.Black
-                                            selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = AlphaTokens.MUTED)
-                                            else -> Color.Transparent
-                                        }
-                                    )
-                                    .then(
-                                        if (selected && isAmoled) {
-                                            Modifier.border(
-                                                width = 1.dp,
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
-                                                shape = ShapeTokens.medium,
-                                            )
-                                        } else Modifier
-                                    )
-                                    .clickable {
-                                        onStartupTimeoutSecChange(option)
-                                        showTimeoutDialog = false
-                                    }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.home_local_startup_timeout_value, option),
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                )
-                                if (selected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        TextButton(onClick = { showTimeoutDialog = false }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                    }
+                    Spacer(Modifier.height(16.dp))
+                    AppPickerList(
+                        options = timeoutOptions.map { it to stringResource(R.string.home_local_startup_timeout_value, it) },
+                        selectedKey = startupTimeoutSec,
+                        onSelect = { option ->
+                            onStartupTimeoutSecChange(option)
+                            showTimeoutDialog = false
+                        },
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    DialogButtons(
+                        buttons = listOf(
+                            Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary) { showTimeoutDialog = false },
+                        )
+                    )
                 }
             }
         }

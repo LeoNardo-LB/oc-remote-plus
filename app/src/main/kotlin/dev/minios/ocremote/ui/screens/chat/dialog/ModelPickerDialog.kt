@@ -34,6 +34,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.dto.response.ProviderModel
 import dev.minios.ocremote.ui.components.ProviderIcon
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
@@ -48,6 +49,7 @@ internal fun ModelPickerDialog(
     onDismiss: () -> Unit
 ) {
     val isAmoled = isAmoledTheme()
+    val params = amoledDialogParams(shape = ShapeTokens.largeMedium)
 
     fun isModelFree(providerId: String, model: ProviderModel): Boolean {
         if (providerId != "opencode") return false
@@ -67,9 +69,10 @@ internal fun ModelPickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            shape = ShapeTokens.largeMedium,
-            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp,
+            shape = params.shape,
+            color = params.containerColor,
+            border = params.border,
+            tonalElevation = params.tonalElevation,
             modifier = Modifier.fillMaxWidth()
         ) {
             LazyColumn(
