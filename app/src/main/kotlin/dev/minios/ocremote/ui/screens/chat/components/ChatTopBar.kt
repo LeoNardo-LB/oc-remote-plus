@@ -64,11 +64,6 @@ fun ChatTopBar(
     shareUrl: String?,
     contextWindow: Int = 0,
     lastContextTokens: Int = 0,
-    contextInputTokens: Int = 0,
-    contextOutputTokens: Int = 0,
-    contextReasoningTokens: Int = 0,
-    contextCacheReadTokens: Int = 0,
-    contextCacheWriteTokens: Int = 0,
     onNavigateBack: () -> Unit,
     onTerminalMode: () -> Unit,
     onOpenInWebView: () -> Unit,
@@ -190,23 +185,23 @@ fun ChatTopBar(
                                 ) {
                                     tokenRow(
                                         label = stringResource(R.string.chat_context_detail_input),
-                                        value = formatTokenCount(contextInputTokens)
+                                        value = formatTokenCount(totalInputTokens)
                                     )
                                     tokenRow(
                                         label = stringResource(R.string.chat_context_detail_output),
-                                        value = formatTokenCount(contextOutputTokens)
+                                        value = formatTokenCount(totalOutputTokens)
                                     )
                                     tokenRow(
                                         label = stringResource(R.string.chat_context_detail_reasoning),
-                                        value = formatTokenCount(contextReasoningTokens)
+                                        value = formatTokenCount(totalReasoningTokens)
                                     )
                                     tokenRow(
                                         label = stringResource(R.string.chat_context_detail_cache_read),
-                                        value = formatTokenCount(contextCacheReadTokens)
+                                        value = formatTokenCount(totalCacheReadTokens)
                                     )
                                     tokenRow(
                                         label = stringResource(R.string.chat_context_detail_cache_write),
-                                        value = formatTokenCount(contextCacheWriteTokens)
+                                        value = formatTokenCount(totalCacheWriteTokens)
                                     )
                                 }
                                 if (totalCost > 0) {
