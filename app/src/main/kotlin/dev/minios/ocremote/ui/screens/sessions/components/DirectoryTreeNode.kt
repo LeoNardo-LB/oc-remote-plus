@@ -98,12 +98,12 @@ internal fun DirectoryTreeNode(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .treeLines(
                 depth = node.depth,
                 isLastChild = isLastChild,
                 lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED),
             )
-            .clickable(onClick = onClick)
             .padding(start = minOf(node.depth * 24, 360).dp, end = 8.dp)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

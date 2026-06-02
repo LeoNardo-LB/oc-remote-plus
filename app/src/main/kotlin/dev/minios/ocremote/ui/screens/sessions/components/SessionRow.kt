@@ -111,6 +111,8 @@ internal fun SessionRow(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Spacer to align with directory's folder icon position (arrow 20dp + gap 8dp = 28dp)
+        Spacer(modifier = Modifier.width(28.dp))
         // Status icon
         val statusIconColor = when (item.status) {
             is SessionStatus.Busy -> MaterialTheme.colorScheme.tertiary
@@ -194,9 +196,9 @@ internal fun SessionRow(
             }
         }
 
-        // Three-dot menu (hidden during selection mode)
+        // Three-dot menu (hidden during selection mode) — fixed size to match checkbox area
         if (!isSelectionMode) {
-            Box {
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                 IconButton(
                     onClick = { menuExpanded = true },
                     modifier = Modifier.size(32.dp),
@@ -257,16 +259,20 @@ internal fun SessionRow(
             }
         }
 
-        // Selection checkbox on right side
+        // Selection checkbox — fixed size to match menu area
         AnimatedVisibility(
             visible = isSelectionMode,
             enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
-            exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut()
+            exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut(),
+            modifier = Modifier.size(width = 48.dp, height = 48.dp),
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onClick() },
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onClick() },
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 
