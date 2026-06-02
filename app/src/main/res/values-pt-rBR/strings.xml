@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OC Remote</string>
     <!-- Home Screen -->
@@ -462,4 +462,8 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="home_local_run_background_label">Executar servidor em segundo plano</string>
     <string name="home_local_run_background_desc">Usar o modo de tarefa em segundo plano do Termux para iniciar o runtime local</string>
     <string name="home_local_auto_start_requires_background">A inicialização automática requer o modo em segundo plano</string>
+    <string name="session_path">Caminho</string>
+    <string name="session_count">Sessoes</string>
+    <string name="session_copy_path">Copiar caminho</string>
+    <string name="sessions_create_session">Criar sessao</string>
 </resources>

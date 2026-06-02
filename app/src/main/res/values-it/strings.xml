@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OC Remote</string>
     <!-- Home Screen -->
@@ -462,4 +462,8 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="home_local_run_background_label">Esegui server in background</string>
     <string name="home_local_run_background_desc">Usa la modalità attività in background di Termux per avviare il runtime locale</string>
     <string name="home_local_auto_start_requires_background">L\'avvio automatico richiede la modalità background</string>
+    <string name="session_path">Percorso</string>
+    <string name="session_count">Sessioni</string>
+    <string name="session_copy_path">Copia percorso</string>
+    <string name="sessions_create_session">Crea sessione</string>
 </resources>

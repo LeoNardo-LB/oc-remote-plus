@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OC Remote</string>
     <!-- Home Screen -->
@@ -462,4 +462,8 @@ Tokeny: ~%4$d -&gt; ~%5$d</string>
     <string name="home_local_run_background_label">Uruchom serwer w tle</string>
     <string name="home_local_run_background_desc">Użyj trybu zadania w tle Termux, aby uruchomić lokalne środowisko</string>
     <string name="home_local_auto_start_requires_background">Automatyczne uruchamianie wymaga trybu pracy w tle</string>
+    <string name="session_path">Ścieżka</string>
+    <string name="session_count">Sesje</string>
+    <string name="session_copy_path">Kopiuj ścieżkę</string>
+    <string name="sessions_create_session">Utwórz sesję</string>
 </resources>

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OC Remote</string>
     <!-- Home Screen -->
@@ -462,4 +462,8 @@
     <string name="home_local_run_background_label">Запустити сервер у фоновому режимі</string>
     <string name="home_local_run_background_desc">Використовуйте фоновий режим Termux для запуску локального середовища</string>
     <string name="home_local_auto_start_requires_background">Автоматичний запуск потребує фоновий режим</string>
+    <string name="session_path">Шлях</string>
+    <string name="session_count">Сесії</string>
+    <string name="session_copy_path">Копіювати шлях</string>
+    <string name="sessions_create_session">Створити сесію</string>
 </resources>
