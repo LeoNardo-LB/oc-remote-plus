@@ -529,6 +529,13 @@ fun ChatScreen(
                     totalCost = uiState.totalCost,
                     sessionParentId = uiState.sessionParentId,
                     shareUrl = uiState.shareUrl,
+                    contextWindow = uiState.contextWindow,
+                    lastContextTokens = uiState.lastContextTokens,
+                    contextInputTokens = uiState.contextInputTokens,
+                    contextOutputTokens = uiState.contextOutputTokens,
+                    contextReasoningTokens = uiState.contextReasoningTokens,
+                    contextCacheReadTokens = uiState.contextCacheReadTokens,
+                    contextCacheWriteTokens = uiState.contextCacheWriteTokens,
                     onNavigateBack = onNavigateBack,
                     onTerminalMode = { isTerminalMode = true },
                     onOpenInWebView = onOpenInWebView,
@@ -918,8 +925,6 @@ fun ChatScreen(
 
 
                         },
-                        contextWindow = uiState.contextWindow,
-                        lastContextTokens = uiState.lastContextTokens,
                         onStop = { viewModel.abortSession() }
                     )
                 }

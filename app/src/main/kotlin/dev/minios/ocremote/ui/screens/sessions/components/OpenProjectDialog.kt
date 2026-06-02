@@ -140,6 +140,7 @@ internal fun OpenProjectDialog(
         homeDir = home
         val startDir = initialDirectory ?: home
         currentDir = startDir
+        searchQuery = if (home != null && startDir.startsWith(home)) "~${startDir.removePrefix(home)}" else startDir
         isLoading = true
         directories = viewModel.listDirectories(startDir)
         isLoading = false
@@ -299,43 +300,6 @@ internal fun OpenProjectDialog(
                         }
                 }
 
-                // Breadcrumb / current path (when not searching)
-                if (!isSearching && currentDir != null) {
-                    val canGoUp = currentDir != "/" && currentDir != homeDir
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 4.dp)
-                            .then(
-                                if (canGoUp) Modifier
-                                    .clip(ShapeTokens.extraSmall)
-                                    .clickable {
-                                        // Navigate up
-                                        val parent = currentDir!!.trimEnd('/').substringBeforeLast('/')
-                                        currentDir = parent.ifEmpty { "/" }
-                                    } else Modifier
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (canGoUp) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
-                            )
-                        }
-                        Text(
-                            text = tildeReplace(currentDir ?: "/"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM),
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 4.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT)
@@ -379,8 +343,8 @@ internal fun OpenProjectDialog(
                                             displayPath = tildeReplace(absPath) + "/",
                                             onClick = { onSelect(absPath) },
                                             onNavigate = {
-                                                searchQuery = ""
                                                 currentDir = absPath
+                                                searchQuery = tildeReplace(absPath)
                                             }
                                         )
                                     }
@@ -393,8 +357,8 @@ internal fun OpenProjectDialog(
                                             displayPath = tildeReplace(absolutePath) + "/",
                                             onClick = { onSelect(absolutePath) },
                                             onNavigate = {
-                                                searchQuery = ""
                                                 currentDir = absolutePath
+                                                searchQuery = tildeReplace(absolutePath)
                                             }
                                         )
                                     }
@@ -428,6 +392,7 @@ internal fun OpenProjectDialog(
                                             onNavigate = {
                                                 // Navigate into this directory
                                                 currentDir = absPath
+                                                searchQuery = tildeReplace(absPath)
                                             },
                                             onClick = { onSelect(absPath) }
                                         )
@@ -532,7 +497,7 @@ internal fun OpenProjectDialog(
                                 showCreateFolderDialog = false
                                 newFolderName = ""
                                 createFolderError = null
-                                searchQuery = ""
+                                searchQuery = tildeReplace(parent)
                                 currentDir = parent
                                 directories = viewModel.listDirectories(parent)
                                 Toast

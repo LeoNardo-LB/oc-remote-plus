@@ -77,6 +77,12 @@ data class ChatUiState(
     val contextWindow: Int = 0,
     /** Total tokens from the last assistant message with output > 0 (current context usage). */
     val lastContextTokens: Int = 0,
+    /** Token breakdown from the last assistant message with output > 0. */
+    val contextInputTokens: Int = 0,
+    val contextOutputTokens: Int = 0,
+    val contextReasoningTokens: Int = 0,
+    val contextCacheReadTokens: Int = 0,
+    val contextCacheWriteTokens: Int = 0,
     /** IDs of user messages that are queued (sent while assistant is still generating). */
     val queuedMessageIds: Set<String> = emptySet(),
     /** Parent session ID — non-null when this session is a child/sub-agent session. */
@@ -402,9 +408,15 @@ class ChatViewModel @Inject constructor(
             ?: assistantMessages.sumOf { it.tokens?.output ?: 0 }
         // Context usage: total tokens from the last assistant message with output > 0
         val lastWithOutput = assistantMessages.firstOrNull { (it.tokens?.output ?: 0) > 0 }
-        val lastContextTokens = lastWithOutput?.tokens?.let { t ->
+        val lastTokens = lastWithOutput?.tokens
+        val lastContextTokens = lastTokens?.let { t ->
             t.input + t.output + t.reasoning + t.cache.read + t.cache.write
         } ?: 0
+        val contextInputTokens = lastTokens?.input ?: 0
+        val contextOutputTokens = lastTokens?.output ?: 0
+        val contextReasoningTokens = lastTokens?.reasoning ?: 0
+        val contextCacheReadTokens = lastTokens?.cache?.read ?: 0
+        val contextCacheWriteTokens = lastTokens?.cache?.write ?: 0
 
         // Resolve available variants for the currently selected model.
         // If selected model is no longer visible (filtered out), fall back to first visible model.
@@ -477,6 +489,11 @@ class ChatViewModel @Inject constructor(
             shareUrl = session?.share?.url,
             contextWindow = currentModel?.limit?.context ?: 0,
             lastContextTokens = lastContextTokens,
+            contextInputTokens = contextInputTokens,
+            contextOutputTokens = contextOutputTokens,
+            contextReasoningTokens = contextReasoningTokens,
+            contextCacheReadTokens = contextCacheReadTokens,
+            contextCacheWriteTokens = contextCacheWriteTokens,
             queuedMessageIds = queuedMessageIds,
             sessionParentId = session?.parentId,
             sessionAgent = session?.agent,

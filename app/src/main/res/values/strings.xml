@@ -504,6 +504,15 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="chat_child_session">子会话</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">查看详情</string>
+    <string name="chat_context_detail_title">上下文使用详情</string>
+    <string name="chat_context_detail_window">上下文窗口: %1$s</string>
+    <string name="chat_context_detail_usage">已使用: %1$d%% (%2$s)</string>
+    <string name="chat_context_detail_input">Input tokens</string>
+    <string name="chat_context_detail_output">Output tokens</string>
+    <string name="chat_context_detail_reasoning">Reasoning tokens</string>
+    <string name="chat_context_detail_cache_read">Cache read</string>
+    <string name="chat_context_detail_cache_write">Cache write</string>
+    <string name="chat_context_detail_cost">总费用: $%1$s</string>
 
     <!-- About Screen -->
     <string name="about_title">About</string>

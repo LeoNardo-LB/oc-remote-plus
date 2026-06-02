@@ -85,11 +85,10 @@ import dev.minios.ocremote.data.dto.response.AgentInfo
 import dev.minios.ocremote.data.dto.response.CommandInfo
 import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.ToolState
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.components.BreathingCircleIndicator
-import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import dev.minios.ocremote.ui.screens.chat.dialog.ImagePreviewDialog
 import dev.minios.ocremote.ui.screens.chat.util.ImageAttachment
 import dev.minios.ocremote.ui.screens.chat.util.agentColor
@@ -100,6 +99,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import dev.minios.ocremote.ui.theme.AppMotion
 
 /**
  * Slash command definition for the suggestion popup.
@@ -314,8 +314,6 @@ internal fun ChatInputBar(
     onSlashCommand: (SlashCommand) -> Unit = {},
     inputMode: ChatInputMode = ChatInputMode.NORMAL,
     onInputModeChange: (ChatInputMode) -> Unit = {},
-    contextWindow: Int = 0,
-    lastContextTokens: Int = 0,
     onStop: () -> Unit = {}
 ) {
     val isAmoled = isAmoledTheme()
@@ -500,84 +498,13 @@ internal fun ChatInputBar(
             }
         }
 
-        // Status row: working status (left) + context usage (right)
-        val showContext = contextWindow > 0 && lastContextTokens > 0
-        if (isBusy || showContext) {
-            val lastRunningTool = if (isBusy) {
-                messages.firstOrNull()?.parts
-                    ?.filterIsInstance<Part.Tool>()
-                    ?.lastOrNull { it.state is ToolState.Running }
-            } else null
-
-            val statusText = if (isBusy) {
-                if (lastRunningTool != null) {
-                    val title = (lastRunningTool.state as ToolState.Running).title
-                    when (lastRunningTool.tool) {
-                        "read" -> title ?: stringResource(R.string.chat_tool_reading_file)
-                        "write" -> title ?: stringResource(R.string.chat_tool_writing_file)
-                        "edit" -> title ?: stringResource(R.string.chat_tool_editing_file)
-                        "bash" -> title ?: stringResource(R.string.chat_tool_running_command)
-                        "glob", "list" -> title ?: stringResource(R.string.chat_tool_searching_files)
-                        "grep" -> title ?: stringResource(R.string.chat_tool_searching_code)
-                        "webfetch" -> title ?: stringResource(R.string.chat_tool_fetching_url)
-                        "task" -> title ?: stringResource(R.string.chat_tool_running_subagent)
-                        "todowrite" -> title ?: stringResource(R.string.chat_tool_updating_tasks)
-                        else -> title ?: stringResource(R.string.chat_tool_running_tool, lastRunningTool.tool)
-                    }
-                } else {
-                    stringResource(R.string.chat_tool_thinking)
-                }
-            } else null
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 2.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: working status
-                if (isBusy && statusText != null) {
-                    Row(
-                        modifier = Modifier.weight(1f, fill = false),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        PulsingDotsIndicator(
-                            dotSize = 4.dp,
-                            dotSpacing = 3.dp,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(0.dp))
-                }
-                // Right: context usage (percentage)
-                if (showContext) {
-                    val percentage = Math.round(lastContextTokens.toDouble() / contextWindow * 100).toInt()
-                    val contextColor = when {
-                        percentage >= 90 -> MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.HIGH)
-                        percentage >= 70 -> MaterialTheme.colorScheme.tertiary.copy(alpha = AlphaTokens.MEDIUM)
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                    }
-                    Text(
-                        text = stringResource(
-                            R.string.chat_context_format,
-                            percentage
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contextColor
-                    )
-                }
-            }
+        // Status: indeterminate progress bar when busy
+        AnimatedVisibility(
+            visible = isBusy,
+            enter = fadeIn(animationSpec = tween(AppMotion.SHORT)),
+            exit = fadeOut(animationSpec = tween(AppMotion.SHORT))
+        ) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
         Column(

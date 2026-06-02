@@ -116,6 +116,12 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.
 
+### Material 3 First
+- **优先使用 Material 3 原生组件和原生样式**。能用 `LinearProgressIndicator`、`CircularProgressIndicator`、`IconButton` 等原生组件解决的，不要自定义 Canvas 绘制。
+- **优先使用 Material 3 原生配色和动效**。颜色用 `MaterialTheme.colorScheme` 中的语义色，间距用 `dp` 常量或 Material token，不要硬编码。
+- **仅在原生组件无法满足需求时才自定义**（如特殊动画效果），自定义组件也应尽量复用 Material token 系统。
+- **禁止引入额外 UI 依赖库**（如 Accompanist），除非有充分的理由并经过讨论。
+
 ### Theme Token System
 - **Alpha tokens** (Alpha.kt): 5 levels only — FAINT(0.35) / MUTED(0.50) / MEDIUM(0.70) / HIGH(0.80) / AMOLED(0.92). Use these instead of hardcoded `.copy(alpha = Xf)`.
 - **Shape tokens** (Shape.kt): `AppShapes` for MaterialTheme, `ShapeTokens` object for component-level direct reference.
