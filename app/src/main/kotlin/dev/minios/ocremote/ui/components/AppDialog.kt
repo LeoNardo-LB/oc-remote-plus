@@ -6,8 +6,9 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
@@ -88,14 +89,14 @@ fun AppDialog(
                 // Content
                 if (scrollable) {
                     val heightMod = if (maxBodyHeight != null) Modifier.heightIn(max = maxBodyHeight) else Modifier
-                    LazyColumn(
+                    Column(
                         modifier = Modifier
                             .weight(1f, fill = false)
                             .then(heightMod)
+                            .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        item { content() }
-                    }
+                        content = content,
+                    )
                 } else {
                     Column(
                         modifier = Modifier
