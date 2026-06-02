@@ -119,7 +119,11 @@ fun refreshSessions() {
 }
 ```
 
-Note: This duplicates `loadSessions()` logic but without `_isLoading = true` and without the first-load auto-expand logic. This is intentional — refresh should not show the full-screen loading spinner or reset expand state.
+Note: This duplicates `loadSessions()` logic but without `_isLoading = true` and without the first-load auto-expand logic. This is intentional — refresh should not show the full-screen loading spinner or reset expand state. Key differences from `loadSessions()`:
+- Uses `_isRefreshing` instead of `_isLoading`
+- No `finally` block auto-expand logic
+- `finally` block only sets `_isRefreshing.value = false`
+- Concurrent safety: if `loadSessions()` is already running (`_isLoading == true`), `refreshSessions()` should skip (check at start and return early)
 
 - [ ] **Step 4: Commit**
 
@@ -182,7 +186,15 @@ Key: Remove the outer `Box(modifier = Modifier.fillMaxSize().padding(padding))` 
 
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Verify PullToRefreshBox structure**
+
+Verify in code review (compile check only confirms syntax):
+- PullToRefreshBox wraps the entire `when` block (replacing the outer `Box(modifier=fillMaxSize().padding(padding))`)
+- `isRefreshing` bound to `uiState.isRefreshing` (not `uiState.isLoading`)
+- `onRefresh` calls `viewModel.refreshSessions()` (not `viewModel.loadSessions()`)
+- Empty list state: PullToRefreshBox wraps the empty-state Text — no pull gesture expected
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListScreen.kt
@@ -220,7 +232,7 @@ fun toggleDirectory(path: String) {
 
 - [ ] **Step 3: Compute `prefillDirectory` in `combine`**
 
-Add `_lastToggledDirectory` to the `combine` call — now 11 flows total. Append after `_isRefreshing`:
+Add `_lastToggledDirectory` to the `combine` call — now 11 flows total (10 after Task 1, +1 here). Append after `_isRefreshing`:
 
 ```kotlin
 val uiState: StateFlow<SessionListUiState> = combine(
@@ -418,6 +430,16 @@ Expected: BUILD SUCCESSFUL
 ```
 
 Expected: All tests pass. If any pre-existing test fails (unrelated to our changes), report to user.
+
+- [ ] **Step 3: Manual verification checklist**
+
+Build and run the dev debug APK, then verify:
+1. **Pull-to-refresh**: Session list with data → swipe down → refresh indicator appears → data updates → indicator disappears
+2. **Refresh preserves state**: Expand directory → pull-to-refresh → directory remains expanded
+3. **Directory prefill (expanded)**: Expand directory A → tap FAB "+" → OpenProjectDialog opens at directory A
+4. **Directory prefill (collapsed)**: Collapse directory A → tap FAB "+" → OpenProjectDialog opens at baseDirectory (or home if no base)
+5. **Directory prefill (never expanded)**: Fresh load, no directory toggled → tap FAB "+" → OpenProjectDialog opens at baseDirectory (or home)
+6. **Error during refresh**: Disconnect network → pull-to-refresh → error message shown → refresh indicator disappears
 
 - [ ] **Step 3: Verify commit history**
 

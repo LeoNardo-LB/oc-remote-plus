@@ -20,7 +20,7 @@ Two UX improvements to the session list page (`SessionListScreen`):
 ### Behavior
 
 - User swipes down on the session list → `PullToRefreshBox` indicator appears.
-- Triggers full `loadSessions()` (same logic as initial load).
+- Triggers the same session-fetching logic as `loadSessions()`, but via a dedicated `refreshSessions()` method that uses `_isRefreshing` (not `_isLoading`) and preserves current `expandedPaths` state.
 - Indicator dismisses when loading completes.
 - No incremental/delta logic — full reload replaces current data.
 
@@ -38,9 +38,10 @@ Two UX improvements to the session list page (`SessionListScreen`):
 
 #### `SessionListScreen.kt`
 
-- Wrap existing `LazyColumn` with Material3 `PullToRefreshBox`.
+- Wrap the entire `when { ... }` content block (currently inside `Box`) with Material3 `PullToRefreshBox`. This replaces the outer `Box`.
 - Bind `isRefreshing` to `uiState.isRefreshing`.
 - `onRefresh` callback calls `viewModel.refreshSessions()`.
+- Refresh preserves current directory expansion state — `expandedPaths` is not modified during refresh.
 
 #### Dependency
 
@@ -72,7 +73,7 @@ Two UX improvements to the session list page (`SessionListScreen`):
 #### `SessionListViewModel.kt`
 
 - Add `private val _lastToggledDirectory = MutableStateFlow<String?>(null)`.
-- In `toggleDirectory(path)`: always set `_lastToggledDirectory.value = path` before toggling in/out of `expandedPaths`.
+- In `toggleDirectory(path)`: always set `_lastToggledDirectory.value = path` regardless of whether expanding or collapsing. The prefill logic checks `expandedPaths` at query time, not at recording time.
 - In the `combine` that builds `SessionListUiState`, compute `prefillDirectory`:
   ```
   prefillDirectory = if (lastToggledDirectory != null && lastToggledDirectory in expandedPaths)
@@ -92,7 +93,7 @@ Two UX improvements to the session list page (`SessionListScreen`):
 #### `OpenProjectDialog.kt`
 
 - Add parameter: `initialDirectory: String? = null`.
-- In `LaunchedEffect(Unit)`: if `initialDirectory` is not null, call `viewModel.listDirectories(initialDirectory)` and set `currentPath = initialDirectory`.
+- In `LaunchedEffect(Unit)`: if `initialDirectory` is not null, call `viewModel.listDirectories(initialDirectory)` and set `currentDir = initialDirectory`. Note: the variable in OpenProjectDialog is `currentDir`, not `currentPath`.
 - If null, current behavior unchanged (start from home).
 
 ---
