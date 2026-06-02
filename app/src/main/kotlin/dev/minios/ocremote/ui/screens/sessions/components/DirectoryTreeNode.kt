@@ -3,9 +3,9 @@ package dev.minios.ocremote.ui.screens.sessions.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,14 +18,12 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +44,7 @@ import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DirectoryTreeNode(
     node: TreeNode.Directory,
@@ -60,72 +59,55 @@ internal fun DirectoryTreeNode(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { menuExpanded = true },
+            )
             .padding(start = 12.dp, end = 8.dp)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = if (node.isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
             contentDescription = null,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.primary,
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = node.displayName,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        if (node.sessionCount > 0) {
-            Text(
-                text = stringResource(R.string.directory_session_count, node.sessionCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
-            )
-        }
-        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            IconButton(
-                onClick = { menuExpanded = true },
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-                containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.menu_copy_path)) },
-                    onClick = {
-                        menuExpanded = false
-                        onCopyPath(node.path)
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.menu_view_details)) },
-                    onClick = {
-                        menuExpanded = false
-                        showDetailsDialog = true
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
-                )
-            }
-        }
+    }
+
+    DropdownMenu(
+        expanded = menuExpanded,
+        onDismissRequest = { menuExpanded = false },
+        containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.menu_copy_path)) },
+            onClick = {
+                menuExpanded = false
+                onCopyPath(node.path)
+            },
+            leadingIcon = {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.menu_view_details)) },
+            onClick = {
+                menuExpanded = false
+                showDetailsDialog = true
+            },
+            leadingIcon = {
+                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+        )
     }
 
     if (showDetailsDialog) {
