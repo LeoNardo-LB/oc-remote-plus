@@ -35,9 +35,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.SessionStatus
-import dev.minios.ocremote.ui.components.AppDialog
-import dev.minios.ocremote.ui.components.AppDialogButtons
-import dev.minios.ocremote.ui.components.ButtonStyle
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.window.DialogProperties
+import dev.minios.ocremote.ui.components.amoledDialogParams
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DetailRow
 import dev.minios.ocremote.ui.screens.sessions.SessionItem
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.DiffAdded
@@ -177,6 +185,7 @@ internal fun SessionRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionDetailsDialog(
     item: SessionItem,
@@ -184,79 +193,69 @@ private fun SessionDetailsDialog(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onCopyId: () -> Unit,
-    isAmoled: Boolean,
+    @Suppress("UNUSED_PARAMETER") isAmoled: Boolean,
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    val params = amoledDialogParams()
 
-    AppDialog(
-        onDismiss = onDismiss,
-        title = stringResource(R.string.session_session_details),
-        isAmoled = isAmoled,
-        content = {
-            SelectionContainer {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    DetailRow(
-                        stringResource(R.string.session_details_name),
-                        item.session.title ?: stringResource(R.string.session_untitled)
-                    )
-                    DetailRow(stringResource(R.string.session_details_id), item.session.id)
-                    DetailRow(
-                        stringResource(R.string.session_details_status),
-                        when (item.status) {
-                            is SessionStatus.Busy -> stringResource(R.string.session_status_busy)
-                            is SessionStatus.Retry -> stringResource(R.string.session_status_retry)
-                            else -> stringResource(R.string.session_status_idle)
-                        }
-                    )
-                    DetailRow(
-                        stringResource(R.string.session_details_created),
-                        dateFormat.format(Date(item.session.time.created))
-                    )
-                    DetailRow(
-                        stringResource(R.string.session_details_updated),
-                        dateFormat.format(Date(item.session.time.updated))
-                    )
-                    val summary = item.session.summary
-                    if (summary != null) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            color = params.containerColor,
+            tonalElevation = params.tonalElevation,
+            border = params.border,
+            shape = params.shape,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.session_session_details),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(16.dp))
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         DetailRow(
-                            "Diff",
-                            "+${summary.additions} -${summary.deletions} (${summary.files} files)"
+                            stringResource(R.string.session_details_name),
+                            item.session.title ?: stringResource(R.string.session_untitled)
                         )
+                        DetailRow(stringResource(R.string.session_details_id), item.session.id)
+                        DetailRow(
+                            stringResource(R.string.session_details_status),
+                            when (item.status) {
+                                is SessionStatus.Busy -> stringResource(R.string.session_status_busy)
+                                is SessionStatus.Retry -> stringResource(R.string.session_status_retry)
+                                else -> stringResource(R.string.session_status_idle)
+                            }
+                        )
+                        DetailRow(
+                            stringResource(R.string.session_details_created),
+                            dateFormat.format(Date(item.session.time.created))
+                        )
+                        DetailRow(
+                            stringResource(R.string.session_details_updated),
+                            dateFormat.format(Date(item.session.time.updated))
+                        )
+                        val summary = item.session.summary
+                        if (summary != null) {
+                            DetailRow(
+                                "Diff",
+                                "+${summary.additions} -${summary.deletions} (${summary.files} files)"
+                            )
+                        }
                     }
                 }
-            }
-        },
-        buttons = {
-            AppDialogButtons(
-                buttons = listOf(
-                    Triple(stringResource(R.string.menu_copy_session_id), ButtonStyle.Secondary, onCopyId),
-                    Triple(stringResource(R.string.session_rename), ButtonStyle.Secondary) { onDismiss(); onRename() },
-                    Triple(stringResource(R.string.session_delete), ButtonStyle.Danger) { onDismiss(); onDelete() },
+                Spacer(Modifier.height(16.dp))
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.menu_copy_session_id), DialogButtonRole.Secondary, onCopyId),
+                        Triple(stringResource(R.string.session_rename), DialogButtonRole.Secondary) { onDismiss(); onRename() },
+                        Triple(stringResource(R.string.session_delete), DialogButtonRole.Danger) { onDismiss(); onDelete() },
+                    )
                 )
-            )
+            }
         }
-    )
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(0.3f),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(0.7f),
-        )
     }
 }

@@ -36,9 +36,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.AppDialog
-import dev.minios.ocremote.ui.components.AppDialogButtons
-import dev.minios.ocremote.ui.components.ButtonStyle
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.window.DialogProperties
+import dev.minios.ocremote.ui.components.amoledDialogParams
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DetailRow
 import dev.minios.ocremote.ui.theme.AlphaTokens
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -125,54 +133,46 @@ internal fun DirectoryTreeNode(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DirectoryDetailsDialog(
     node: TreeNode.Directory,
     onDismiss: () -> Unit,
     onCopyPath: () -> Unit,
-    isAmoled: Boolean,
+    @Suppress("UNUSED_PARAMETER") isAmoled: Boolean,
 ) {
-    AppDialog(
-        onDismiss = onDismiss,
-        title = stringResource(R.string.session_directory_details),
-        isAmoled = isAmoled,
-        content = {
-            SelectionContainer {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    DetailRow(label = stringResource(R.string.session_path), value = node.path)
-                    DetailRow(label = stringResource(R.string.session_count), value = node.sessionCount.toString())
-                }
-            }
-        },
-        buttons = {
-            AppDialogButtons(
-                buttons = listOf(
-                    Triple(stringResource(R.string.session_copy_path), ButtonStyle.Secondary, onCopyPath),
-                )
-            )
-        }
-    )
-}
+    val params = amoledDialogParams()
 
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(0.3f),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(0.7f),
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            color = params.containerColor,
+            tonalElevation = params.tonalElevation,
+            border = params.border,
+            shape = params.shape,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.session_directory_details),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(16.dp))
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        DetailRow(label = stringResource(R.string.session_path), value = node.path)
+                        DetailRow(label = stringResource(R.string.session_count), value = node.sessionCount.toString())
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.session_copy_path), DialogButtonRole.Secondary, onCopyPath),
+                    )
+                )
+            }
+        }
     }
 }
