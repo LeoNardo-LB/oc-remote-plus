@@ -76,6 +76,7 @@ import dev.minios.ocremote.ui.theme.ShapeTokens
 internal fun OpenProjectDialog(
     viewModel: SessionListViewModel,
     projects: List<Project>,
+    initialDirectory: String? = null,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -137,9 +138,10 @@ internal fun OpenProjectDialog(
     LaunchedEffect(Unit) {
         val home = viewModel.getHomeDirectory()
         homeDir = home
-        currentDir = home
+        val startDir = initialDirectory ?: home
+        currentDir = startDir
         isLoading = true
-        directories = viewModel.listDirectories(home)
+        directories = viewModel.listDirectories(startDir)
         isLoading = false
     }
 
