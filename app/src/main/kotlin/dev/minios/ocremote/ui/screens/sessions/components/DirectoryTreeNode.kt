@@ -1,8 +1,5 @@
 package dev.minios.ocremote.ui.screens.sessions.components
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,16 +14,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,14 +26,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.AmoledSurface
+import dev.minios.ocremote.ui.components.AppDialog
+import dev.minios.ocremote.ui.components.AppDialogButtons
+import dev.minios.ocremote.ui.components.ButtonStyle
 import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -104,7 +97,6 @@ internal fun DirectoryTreeNode(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DirectoryDetailsDialog(
     node: TreeNode.Directory,
@@ -112,48 +104,22 @@ private fun DirectoryDetailsDialog(
     onCopyPath: () -> Unit,
     isAmoled: Boolean,
 ) {
-    val context = LocalContext.current
-
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        AmoledSurface(
-            isAmoledDark = isAmoled,
-            shape = ShapeTokens.largeMedium,
-            normalTonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(text = node.displayName, style = MaterialTheme.typography.headlineSmall)
-                HorizontalDivider()
-                DetailRow(stringResource(R.string.directory_details_path), node.path)
-                DetailRow(
-                    stringResource(R.string.directory_details_sessions),
-                    "${node.sessionCount}"
+    AppDialog(
+        onDismiss = onDismiss,
+        title = node.displayName,
+        isAmoled = isAmoled,
+        content = {
+            DetailRow(label = stringResource(R.string.session_path), value = node.path)
+            DetailRow(label = stringResource(R.string.session_count), value = node.sessionCount.toString())
+        },
+        buttons = {
+            AppDialogButtons(
+                buttons = listOf(
+                    Triple(stringResource(R.string.session_copy_path), ButtonStyle.Secondary, onCopyPath),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = {
-                        onCopyPath()
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("path", node.path))
-                    }) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.menu_copy_path))
-                    }
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-                }
-            }
+            )
         }
-    }
+    )
 }
 
 @Composable

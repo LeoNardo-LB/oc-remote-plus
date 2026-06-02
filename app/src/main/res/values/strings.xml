@@ -139,6 +139,9 @@
     <string name="directory_details_path">Path</string>
     <string name="directory_details_sessions">Sessions</string>
     <string name="directory_details_subdirectories">Subdirectories</string>
+    <string name="session_path">Path</string>
+    <string name="session_count">Sessions</string>
+    <string name="session_copy_path">Copy path</string>
     <string name="session_details_id">Session ID</string>
     <string name="session_details_status">Status</string>
     <string name="session_details_created">Created</string>
