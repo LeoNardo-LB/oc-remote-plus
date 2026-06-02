@@ -1,8 +1,5 @@
 package dev.minios.ocremote.ui.screens.sessions.components
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,17 +15,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,24 +26,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.SessionStatus
-import dev.minios.ocremote.ui.components.AmoledSurface
+import dev.minios.ocremote.ui.components.AppDialog
+import dev.minios.ocremote.ui.components.AppDialogButtons
+import dev.minios.ocremote.ui.components.ButtonStyle
 import dev.minios.ocremote.ui.screens.sessions.SessionItem
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.DiffAdded
 import dev.minios.ocremote.ui.theme.DiffRemoved
-import dev.minios.ocremote.ui.theme.ShapeTokens
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SessionRow(
     item: SessionItem,
@@ -184,7 +174,6 @@ internal fun SessionRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionDetailsDialog(
     item: SessionItem,
@@ -195,82 +184,47 @@ private fun SessionDetailsDialog(
     isAmoled: Boolean,
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
-    val context = LocalContext.current
 
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        AmoledSurface(
-            isAmoledDark = isAmoled,
-            shape = ShapeTokens.largeMedium,
-            normalTonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = item.session.title ?: stringResource(R.string.session_untitled),
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                HorizontalDivider()
-                DetailRow(stringResource(R.string.session_details_id), item.session.id)
-                DetailRow(
-                    stringResource(R.string.session_details_status),
-                    when (item.status) {
-                        is SessionStatus.Busy -> stringResource(R.string.session_status_busy)
-                        is SessionStatus.Retry -> stringResource(R.string.session_status_retry)
-                        else -> stringResource(R.string.session_status_idle)
-                    }
-                )
-                DetailRow(
-                    stringResource(R.string.session_details_created),
-                    dateFormat.format(Date(item.session.time.created))
-                )
-                DetailRow(
-                    stringResource(R.string.session_details_updated),
-                    dateFormat.format(Date(item.session.time.updated))
-                )
-                val summary = item.session.summary
-                if (summary != null) {
-                    DetailRow(
-                        "Diff",
-                        "+${summary.additions} -${summary.deletions} (${summary.files} files)"
-                    )
+    AppDialog(
+        onDismiss = onDismiss,
+        title = item.session.title ?: stringResource(R.string.session_untitled),
+        isAmoled = isAmoled,
+        content = {
+            DetailRow(stringResource(R.string.session_details_id), item.session.id)
+            DetailRow(
+                stringResource(R.string.session_details_status),
+                when (item.status) {
+                    is SessionStatus.Busy -> stringResource(R.string.session_status_busy)
+                    is SessionStatus.Retry -> stringResource(R.string.session_status_retry)
+                    else -> stringResource(R.string.session_status_idle)
                 }
-                HorizontalDivider()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TextButton(onClick = {
-                        onCopyId()
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("session_id", item.session.id))
-                    }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.menu_copy_session_id))
-                    }
-                    TextButton(onClick = onRename) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.session_rename))
-                    }
-                    TextButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.delete))
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-                }
+            )
+            DetailRow(
+                stringResource(R.string.session_details_created),
+                dateFormat.format(Date(item.session.time.created))
+            )
+            DetailRow(
+                stringResource(R.string.session_details_updated),
+                dateFormat.format(Date(item.session.time.updated))
+            )
+            val summary = item.session.summary
+            if (summary != null) {
+                DetailRow(
+                    "Diff",
+                    "+${summary.additions} -${summary.deletions} (${summary.files} files)"
+                )
             }
+        },
+        buttons = {
+            AppDialogButtons(
+                buttons = listOf(
+                    Triple(stringResource(R.string.menu_copy_session_id), ButtonStyle.Secondary, onCopyId),
+                    Triple(stringResource(R.string.session_rename), ButtonStyle.Secondary) { onDismiss(); onRename() },
+                    Triple(stringResource(R.string.session_delete), ButtonStyle.Danger) { onDismiss(); onDelete() },
+                )
+            )
         }
-    }
+    )
 }
 
 @Composable
