@@ -60,8 +60,12 @@ data class ChatUiState(
     val selectedProviderId: String? = null,
     val selectedModelId: String? = null,
     val totalCost: Double = 0.0,
+    /** Session totals computed from all loaded assistant messages (not session.tokens which may be per-call). */
     val totalInputTokens: Int = 0,
     val totalOutputTokens: Int = 0,
+    val totalReasoningTokens: Int = 0,
+    val totalCacheReadTokens: Int = 0,
+    val totalCacheWriteTokens: Int = 0,
     val agents: List<AgentInfo> = emptyList(),
     val selectedAgent: String = "build",
     val variantNames: List<String> = emptyList(),
@@ -396,16 +400,15 @@ class ChatViewModel @Inject constructor(
             _selectedModelId.value = effectiveModelId
         }
 
-        // Compute cost/token totals — prefer session-level aggregates (covers all messages,
-        // not just loaded ones). Fall back to summing loaded assistant messages.
+        // Compute cost/token totals — always sum from loaded assistant messages.
+        // session.tokens is NOT cumulative in the OpenCode backend (overwrite, not +=).
         val assistantMessages = sessionMessages.filterIsInstance<Message.Assistant>()
-        val sessionTokens = session?.tokens
-        val totalCost = session?.cost
-            ?: assistantMessages.sumOf { it.cost ?: 0.0 }
-        val totalInputTokens = sessionTokens?.input
-            ?: assistantMessages.sumOf { it.tokens?.input ?: 0 }
-        val totalOutputTokens = sessionTokens?.output
-            ?: assistantMessages.sumOf { it.tokens?.output ?: 0 }
+        val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
+        val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
+        val totalOutputTokens = assistantMessages.sumOf { it.tokens?.output ?: 0 }
+        val totalReasoningTokens = assistantMessages.sumOf { it.tokens?.reasoning ?: 0 }
+        val totalCacheReadTokens = assistantMessages.sumOf { it.tokens?.cache?.read ?: 0 }
+        val totalCacheWriteTokens = assistantMessages.sumOf { it.tokens?.cache?.write ?: 0 }
         // Context usage: total tokens from the last assistant message with output > 0
         val lastWithOutput = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
         val lastTokens = lastWithOutput?.tokens
@@ -479,6 +482,9 @@ class ChatViewModel @Inject constructor(
             totalCost = totalCost,
             totalInputTokens = totalInputTokens,
             totalOutputTokens = totalOutputTokens,
+            totalReasoningTokens = totalReasoningTokens,
+            totalCacheReadTokens = totalCacheReadTokens,
+            totalCacheWriteTokens = totalCacheWriteTokens,
             agents = agents.filter { it.mode != "subagent" && !it.hidden },
             selectedAgent = effectiveAgent,
             variantNames = availableVariants,

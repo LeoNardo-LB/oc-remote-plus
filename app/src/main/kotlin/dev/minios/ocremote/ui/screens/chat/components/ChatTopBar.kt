@@ -56,6 +56,9 @@ fun ChatTopBar(
     messageCount: Int,
     totalInputTokens: Int,
     totalOutputTokens: Int,
+    totalReasoningTokens: Int = 0,
+    totalCacheReadTokens: Int = 0,
+    totalCacheWriteTokens: Int = 0,
     totalCost: Double,
     sessionParentId: String?,
     shareUrl: String?,
@@ -90,8 +93,8 @@ fun ChatTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                // Subtitle: chat items count, total tokens and cost for the session
-                val totalTokens = totalInputTokens + totalOutputTokens
+                // Subtitle: message count, total tokens (all types), and cost
+                val totalTokens = totalInputTokens + totalOutputTokens + totalReasoningTokens + totalCacheReadTokens + totalCacheWriteTokens
                 val hasStats = messageCount > 0 || totalTokens > 0 || totalCost > 0
                 if (hasStats) {
                     val parts = mutableListOf<String>()
