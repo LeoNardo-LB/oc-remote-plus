@@ -1,19 +1,9 @@
 package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.border
-import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import java.util.Locale
-import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @Composable
 internal fun getThemeDisplayName(theme: String): String {
@@ -74,24 +64,4 @@ internal fun getImageMaxSideDisplayName(px: Int): String {
         return stringResource(R.string.settings_compress_images_max_side_keep_original)
     }
     return stringResource(R.string.settings_compress_images_max_side_value, px)
-}
-
-@Composable
-internal fun amoledDialogModifier(): Modifier {
-    val isAmoledTheme = LocalAmoledMode.current
-    return if (isAmoledTheme) {
-        Modifier.border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH),
-            shape = ShapeTokens.extraLarge,
-        )
-    } else {
-        Modifier
-    }
-}
-
-@Composable
-internal fun amoledDialogContainerColor(): Color {
-    val isAmoledTheme = LocalAmoledMode.current
-    return if (isAmoledTheme) Color.Black else AlertDialogDefaults.containerColor
 }
