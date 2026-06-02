@@ -49,6 +49,7 @@ data class SessionListUiState(
     val baseDirectory: String? = null,
     val baseDirectories: Set<String> = emptySet(),
     val isRefreshing: Boolean = false,
+    val prefillDirectory: String? = null,
 )
 
 data class SessionItem(
@@ -89,6 +90,7 @@ class SessionListViewModel @Inject constructor(
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _baseDirectory = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
+    private val _lastToggledDirectory = MutableStateFlow<String?>(null)
     private val _navigateToSession = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val navigateToSession: SharedFlow<String> = _navigateToSession.asSharedFlow()
 
@@ -103,7 +105,8 @@ class SessionListViewModel @Inject constructor(
         _expandedPaths,
         _selectedIds,
         _baseDirectory,
-        _isRefreshing
+        _isRefreshing,
+        _lastToggledDirectory
     ) { values ->
         val allSessions = values[0] as List<Session>
         val statuses = values[1] as Map<String, SessionStatus>
@@ -115,6 +118,7 @@ class SessionListViewModel @Inject constructor(
         val selectedIds = values[7] as Set<String>
         val baseDirectory = values[8] as String?
         val isRefreshing = values[9] as Boolean
+        val lastToggledDirectory = values[10] as String?
 
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
@@ -133,6 +137,11 @@ class SessionListViewModel @Inject constructor(
 
         val treeNodes = buildTreeNodes(baseFilteredSessions, expandedPaths, baseDirectory, statuses)
 
+        val prefillDirectory = if (lastToggledDirectory != null && lastToggledDirectory in expandedPaths)
+            lastToggledDirectory
+        else
+            baseDirectory
+
         SessionListUiState(
             treeNodes = treeNodes,
             serverName = serverName,
@@ -143,6 +152,7 @@ class SessionListViewModel @Inject constructor(
             baseDirectory = baseDirectory,
             baseDirectories = emptySet(),
             isRefreshing = isRefreshing,
+            prefillDirectory = prefillDirectory,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
@@ -322,6 +332,7 @@ class SessionListViewModel @Inject constructor(
 
     fun toggleDirectory(path: String) {
         val normalized = path.replace('\\', '/')
+        _lastToggledDirectory.value = normalized
         _expandedPaths.update { paths ->
             if (normalized in paths) paths - normalized else paths + normalized
         }
