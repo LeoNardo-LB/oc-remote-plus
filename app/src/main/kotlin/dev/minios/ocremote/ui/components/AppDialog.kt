@@ -101,6 +101,7 @@ fun AppDialog(
                     Column(
                         modifier = Modifier
                             .weight(1f, fill = false)
+                            .then(if (maxBodyHeight != null) Modifier.heightIn(max = maxBodyHeight) else Modifier)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         content = content,
                     )

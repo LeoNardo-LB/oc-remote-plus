@@ -21,7 +21,7 @@ internal fun ImageCompressionMaxSideDialog(
         title = stringResource(R.string.settings_compress_images_max_side),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 480.dp,
         content = {
             AppPickerList(
@@ -52,7 +52,7 @@ internal fun ImageCompressionQualityDialog(
         title = stringResource(R.string.settings_compress_images_quality),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 480.dp,
         content = {
             AppPickerList(

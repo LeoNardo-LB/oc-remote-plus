@@ -20,7 +20,7 @@ internal fun FontSizePickerDialog(
         title = stringResource(R.string.settings_font_size),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 480.dp,
         content = {
             AppPickerList(

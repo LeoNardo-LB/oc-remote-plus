@@ -22,7 +22,7 @@ internal fun LanguagePickerDialog(
         title = stringResource(R.string.dialog_select_language),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 520.dp,
         content = {
             AppPickerList(

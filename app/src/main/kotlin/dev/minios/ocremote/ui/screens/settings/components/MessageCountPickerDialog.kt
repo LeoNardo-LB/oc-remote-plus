@@ -20,7 +20,7 @@ internal fun MessageCountPickerDialog(
         title = stringResource(R.string.settings_initial_messages),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 480.dp,
         content = {
             AppPickerList(

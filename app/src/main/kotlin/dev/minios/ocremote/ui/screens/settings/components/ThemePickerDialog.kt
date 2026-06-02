@@ -20,7 +20,7 @@ internal fun ThemePickerDialog(
         title = stringResource(R.string.dialog_select_theme),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 480.dp,
         content = {
             AppPickerList(

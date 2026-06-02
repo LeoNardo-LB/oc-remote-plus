@@ -20,7 +20,7 @@ internal fun ReconnectModePickerDialog(
         title = stringResource(R.string.dialog_select_reconnect_mode),
         showClose = false,
         showDividers = false,
-        scrollable = true,
+        scrollable = false,
         maxBodyHeight = 480.dp,
         content = {
             AppPickerList(
