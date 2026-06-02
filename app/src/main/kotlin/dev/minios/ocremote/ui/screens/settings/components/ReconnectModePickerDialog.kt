@@ -1,44 +1,68 @@
 package dev.minios.ocremote.ui.screens.settings.components
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.AppDialog
-import dev.minios.ocremote.ui.components.AppDialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.components.AppPickerList
-import dev.minios.ocremote.ui.components.ButtonStyle
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.DialogButtonRole
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReconnectModePickerDialog(
     currentMode: String,
     onModeSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AppDialog(
-        onDismiss = onDismiss,
-        title = stringResource(R.string.dialog_select_reconnect_mode),
-        showClose = false,
-        showDividers = false,
-        scrollable = false,
-        maxBodyHeight = 480.dp,
-        content = {
-            AppPickerList(
-                options = listOf(
-                    "aggressive" to stringResource(R.string.settings_reconnect_aggressive),
-                    "normal" to stringResource(R.string.settings_reconnect_normal),
-                    "conservative" to stringResource(R.string.settings_reconnect_conservative)
-                ),
-                selectedKey = currentMode,
-                onSelect = onModeSelected,
-            )
-        },
-        buttons = {
-            AppDialogButtons(
-                listOf(
-                    Triple(stringResource(R.string.cancel), ButtonStyle.Secondary, onDismiss),
+    val params = amoledDialogParams()
+
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            color = params.containerColor,
+            tonalElevation = params.tonalElevation,
+            border = params.border,
+            shape = params.shape,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.dialog_select_reconnect_mode),
+                    style = MaterialTheme.typography.titleMedium,
                 )
-            )
+                Spacer(Modifier.height(16.dp))
+                AppPickerList(
+                    options = listOf(
+                        "aggressive" to stringResource(R.string.settings_reconnect_aggressive),
+                        "normal" to stringResource(R.string.settings_reconnect_normal),
+                        "conservative" to stringResource(R.string.settings_reconnect_conservative)
+                    ),
+                    selectedKey = currentMode,
+                    onSelect = onModeSelected,
+                )
+                Spacer(Modifier.height(16.dp))
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary, onDismiss),
+                    )
+                )
+            }
         }
-    )
+    }
 }

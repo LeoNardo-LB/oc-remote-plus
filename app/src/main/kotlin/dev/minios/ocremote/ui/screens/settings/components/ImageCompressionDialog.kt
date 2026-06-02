@@ -1,14 +1,27 @@
 package dev.minios.ocremote.ui.screens.settings.components
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.AppDialog
-import dev.minios.ocremote.ui.components.AppDialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.components.AppPickerList
-import dev.minios.ocremote.ui.components.ButtonStyle
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.DialogButtonRole
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ImageCompressionMaxSideDialog(
     currentMaxSide: Int,
@@ -16,30 +29,42 @@ internal fun ImageCompressionMaxSideDialog(
     onDismiss: () -> Unit
 ) {
     val options = listOf(0, 720, 960, 1080, 1440, 1920, 2560)
-    AppDialog(
-        onDismiss = onDismiss,
-        title = stringResource(R.string.settings_compress_images_max_side),
-        showClose = false,
-        showDividers = false,
-        scrollable = false,
-        maxBodyHeight = 480.dp,
-        content = {
-            AppPickerList(
-                options = options.map { it to getImageMaxSideDisplayName(it) },
-                selectedKey = currentMaxSide,
-                onSelect = onSelected,
-            )
-        },
-        buttons = {
-            AppDialogButtons(
-                listOf(
-                    Triple(stringResource(R.string.cancel), ButtonStyle.Secondary, onDismiss),
+    val params = amoledDialogParams()
+
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            color = params.containerColor,
+            tonalElevation = params.tonalElevation,
+            border = params.border,
+            shape = params.shape,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_compress_images_max_side),
+                    style = MaterialTheme.typography.titleMedium,
                 )
-            )
+                Spacer(Modifier.height(16.dp))
+                AppPickerList(
+                    options = options.map { it to getImageMaxSideDisplayName(it) },
+                    selectedKey = currentMaxSide,
+                    onSelect = onSelected,
+                )
+                Spacer(Modifier.height(16.dp))
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary, onDismiss),
+                    )
+                )
+            }
         }
-    )
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ImageCompressionQualityDialog(
     currentQuality: Int,
@@ -47,28 +72,39 @@ internal fun ImageCompressionQualityDialog(
     onDismiss: () -> Unit
 ) {
     val options = listOf(40, 50, 60, 70, 80)
-    AppDialog(
-        onDismiss = onDismiss,
-        title = stringResource(R.string.settings_compress_images_quality),
-        showClose = false,
-        showDividers = false,
-        scrollable = false,
-        maxBodyHeight = 480.dp,
-        content = {
-            AppPickerList(
-                options = options.map {
-                    it to stringResource(R.string.settings_compress_images_quality_value, it)
-                },
-                selectedKey = currentQuality,
-                onSelect = onSelected,
-            )
-        },
-        buttons = {
-            AppDialogButtons(
-                listOf(
-                    Triple(stringResource(R.string.cancel), ButtonStyle.Secondary, onDismiss),
+    val params = amoledDialogParams()
+
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            color = params.containerColor,
+            tonalElevation = params.tonalElevation,
+            border = params.border,
+            shape = params.shape,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_compress_images_quality),
+                    style = MaterialTheme.typography.titleMedium,
                 )
-            )
+                Spacer(Modifier.height(16.dp))
+                AppPickerList(
+                    options = options.map {
+                        it to stringResource(R.string.settings_compress_images_quality_value, it)
+                    },
+                    selectedKey = currentQuality,
+                    onSelect = onSelected,
+                )
+                Spacer(Modifier.height(16.dp))
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary, onDismiss),
+                    )
+                )
+            }
         }
-    )
+    }
 }
