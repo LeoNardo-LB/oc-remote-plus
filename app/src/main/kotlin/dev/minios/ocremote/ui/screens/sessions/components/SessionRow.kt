@@ -32,8 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.SessionStatus
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
+import dev.minios.ocremote.ui.components.AppDialog
+import dev.minios.ocremote.ui.components.AppDialogButtons
+import dev.minios.ocremote.ui.components.ButtonStyle
 import dev.minios.ocremote.ui.screens.sessions.SessionItem
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.DiffAdded
@@ -153,6 +154,7 @@ internal fun SessionRow(
 
     // Details dialog with actions
     if (showDetailsDialog) {
+        val isAmoled = isAmoledTheme()
         SessionDetailsDialog(
             item = item,
             onDismiss = { showDetailsDialog = false },
@@ -167,6 +169,7 @@ internal fun SessionRow(
             onCopyId = {
                 onCopyId(item.session.id)
             },
+            isAmoled = isAmoled,
         )
     }
 }
@@ -178,15 +181,15 @@ private fun SessionDetailsDialog(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onCopyId: () -> Unit,
+    isAmoled: Boolean,
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(text = item.session.title ?: stringResource(R.string.session_untitled))
-        },
-        text = {
+    AppDialog(
+        onDismiss = onDismiss,
+        title = item.session.title ?: stringResource(R.string.session_untitled),
+        isAmoled = isAmoled,
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 DetailRow(stringResource(R.string.session_details_id), item.session.id)
                 DetailRow(
@@ -214,18 +217,14 @@ private fun SessionDetailsDialog(
                 }
             }
         },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onCopyId) {
-                    Text(stringResource(R.string.menu_copy_session_id))
-                }
-                TextButton(onClick = { onDismiss(); onRename() }) {
-                    Text(stringResource(R.string.session_rename))
-                }
-                TextButton(onClick = { onDismiss(); onDelete() }) {
-                    Text(stringResource(R.string.session_delete), color = MaterialTheme.colorScheme.error)
-                }
-            }
+        buttons = {
+            AppDialogButtons(
+                buttons = listOf(
+                    Triple(stringResource(R.string.menu_copy_session_id), ButtonStyle.Secondary, onCopyId),
+                    Triple(stringResource(R.string.session_rename), ButtonStyle.Secondary) { onDismiss(); onRename() },
+                    Triple(stringResource(R.string.session_delete), ButtonStyle.Danger) { onDismiss(); onDelete() },
+                )
+            )
         }
     )
 }
