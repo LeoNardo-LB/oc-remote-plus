@@ -70,6 +70,7 @@ import dev.minios.ocremote.ui.screens.settings.components.getLanguageDisplayName
 import dev.minios.ocremote.ui.screens.settings.components.getReconnectModeDisplayName
 import dev.minios.ocremote.ui.screens.settings.components.getThemeDisplayName
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import dev.minios.ocremote.ui.theme.ListItemTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import kotlin.math.roundToInt
 
@@ -176,7 +177,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.Language, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showLanguageDialog = true }
+                modifier = Modifier.clickable { showLanguageDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Reconnect mode
@@ -186,7 +187,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.Sync, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showReconnectModeDialog = true }
+                modifier = Modifier.clickable { showReconnectModeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -201,7 +202,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.Palette, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showThemeDialog = true }
+                modifier = Modifier.clickable { showThemeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Dynamic colors (only on Android 12+)
@@ -219,7 +220,7 @@ fun SettingsScreen(
                             colors = switchColors
                         )
                     },
-                    modifier = Modifier.clickable { viewModel.setDynamicColor(!dynamicColor) }
+                    modifier = Modifier.clickable { viewModel.setDynamicColor(!dynamicColor) }.padding(ListItemTokens.ContentPaddingMedium)
                 )
             }
 
@@ -237,7 +238,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setAmoledDark(!amoledDark) }
+                modifier = Modifier.clickable { viewModel.setAmoledDark(!amoledDark) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -252,7 +253,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.FormatSize, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showFontSizeDialog = true }
+                modifier = Modifier.clickable { showFontSizeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Compact messages
@@ -269,7 +270,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setCompactMessages(!compactMessages) }
+                modifier = Modifier.clickable { viewModel.setCompactMessages(!compactMessages) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Code word wrap
@@ -286,7 +287,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setCodeWordWrap(!codeWordWrap) }
+                modifier = Modifier.clickable { viewModel.setCodeWordWrap(!codeWordWrap) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Auto-expand tool results
@@ -303,7 +304,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setCollapseTools(!collapseTools) }
+                modifier = Modifier.clickable { viewModel.setCollapseTools(!collapseTools) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Expand reasoning by default
@@ -320,7 +321,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setExpandReasoning(!expandReasoning) }
+                modifier = Modifier.clickable { viewModel.setExpandReasoning(!expandReasoning) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -335,7 +336,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.Storage, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showMessageCountDialog = true }
+                modifier = Modifier.clickable { showMessageCountDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Confirm before send
@@ -352,7 +353,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setConfirmBeforeSend(!confirmBeforeSend) }
+                modifier = Modifier.clickable { viewModel.setConfirmBeforeSend(!confirmBeforeSend) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Haptic feedback
@@ -369,7 +370,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setHapticFeedback(!hapticFeedback) }
+                modifier = Modifier.clickable { viewModel.setHapticFeedback(!hapticFeedback) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Keep screen on
@@ -386,7 +387,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setKeepScreenOn(!keepScreenOn) }
+                modifier = Modifier.clickable { viewModel.setKeepScreenOn(!keepScreenOn) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Optimize image attachments
@@ -405,7 +406,7 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.clickable {
                     viewModel.setCompressImageAttachments(!compressImageAttachments)
-                }
+                }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             ListItem(
@@ -414,7 +415,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = null)
                 },
-                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageMaxSideDialog = true }
+                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageMaxSideDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             ListItem(
@@ -425,7 +426,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = null)
                 },
-                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageQualityDialog = true }
+                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageQualityDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             ListItem(
@@ -436,7 +437,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.Terminal, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showTerminalFontSizeDialog = true }
+                modifier = Modifier.clickable { showTerminalFontSizeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -457,7 +458,7 @@ fun SettingsScreen(
                         colors = switchColors,
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setShowLocalRuntime(!showLocalRuntime) },
+                modifier = Modifier.clickable { viewModel.setShowLocalRuntime(!showLocalRuntime) }.padding(ListItemTokens.ContentPaddingMedium),
             )
 
             ListItem(
@@ -466,7 +467,7 @@ fun SettingsScreen(
                 leadingContent = {
                     Icon(Icons.Default.Settings, contentDescription = null)
                 },
-                modifier = Modifier.clickable { showLocalLaunchOptionsDialog = true },
+                modifier = Modifier.clickable { showLocalLaunchOptionsDialog = true }.padding(ListItemTokens.ContentPaddingMedium),
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -488,7 +489,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setNotificationsEnabled(!notificationsEnabled) }
+                modifier = Modifier.clickable { viewModel.setNotificationsEnabled(!notificationsEnabled) }.padding(ListItemTokens.ContentPaddingMedium)
             )
 
             // Silent notifications
@@ -505,7 +506,7 @@ fun SettingsScreen(
                         colors = switchColors
                     )
                 },
-                modifier = Modifier.clickable { viewModel.setSilentNotifications(!silentNotifications) }
+                modifier = Modifier.clickable { viewModel.setSilentNotifications(!silentNotifications) }.padding(ListItemTokens.ContentPaddingMedium)
             )
         }
 
