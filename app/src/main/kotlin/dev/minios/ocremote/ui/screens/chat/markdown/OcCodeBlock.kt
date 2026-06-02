@@ -1,12 +1,11 @@
 ﻿package dev.minios.ocremote.ui.screens.chat.markdown
 
 import android.widget.Toast
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
@@ -17,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -52,44 +52,30 @@ internal fun OcCodeBlock(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val maxWidth = LocalConfiguration.current.screenWidthDp.dp
 
     Box(
         modifier = Modifier
             .clip(ShapeTokens.extraSmall)
             .fillMaxWidth()
+            .widthIn(max = maxWidth)
     ) {
         // Syntax-highlighted code (mikepenz engine, no built-in header)
-        if (wordWrap) {
-            if (isFence) {
-                MarkdownHighlightedCodeFence(
-                    content, node, style, highlightsBuilder,
-                    false,  // showHeader
-                    true    // wordWrap
-                )
-            } else {
-                MarkdownHighlightedCodeBlock(
-                    content, node, style, highlightsBuilder,
-                    false,
-                    true
-                )
-            }
+        // immediate=true: synchronous highlight avoids Highlights.Builder race condition
+        // widthIn ensures finite constraints reach mikepenz's internal Row + horizontalScroll
+        val immediate = true
+        if (isFence) {
+            MarkdownHighlightedCodeFence(
+                content, node, style, highlightsBuilder,
+                false,  // showHeader
+                immediate
+            )
         } else {
-            val scrollState = rememberScrollState()
-            Box(modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)) {
-                if (isFence) {
-                    MarkdownHighlightedCodeFence(
-                        content, node, style, highlightsBuilder,
-                        false,
-                        false
-                    )
-                } else {
-                    MarkdownHighlightedCodeBlock(
-                        content, node, style, highlightsBuilder,
-                        false,
-                        false
-                    )
-                }
-            }
+            MarkdownHighlightedCodeBlock(
+                content, node, style, highlightsBuilder,
+                false,  // showHeader
+                immediate
+            )
         }
 
         // Floating copy button (top-right, always visible, fixed position)
