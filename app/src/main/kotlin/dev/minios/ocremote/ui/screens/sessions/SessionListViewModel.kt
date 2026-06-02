@@ -84,7 +84,6 @@ class SessionListViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(true)
     private val _projects = MutableStateFlow<List<Project>>(emptyList())
-    private val _homeDir = MutableStateFlow<String?>(null)
     private val _expandedPaths = MutableStateFlow<Set<String>>(emptySet())
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _baseDirectory = MutableStateFlow<String?>(null)
@@ -99,7 +98,6 @@ class SessionListViewModel @Inject constructor(
         _isLoading,
         _error,
         _projects,
-        _homeDir,
         _expandedPaths,
         _selectedIds,
         _baseDirectory
@@ -110,34 +108,15 @@ class SessionListViewModel @Inject constructor(
         val isLoading = values[3] as Boolean
         val error = values[4] as String?
         val projects = values[5] as List<Project>
-        val homeDir = values[6] as String?
-        val expandedPaths = values[7] as Set<String>
-        val selectedIds = values[8] as Set<String>
-        val baseDirectory = values[9] as String?
+        val expandedPaths = values[6] as Set<String>
+        val selectedIds = values[7] as Set<String>
+        val baseDirectory = values[8] as String?
 
-        // Performance: buildTreeNodes is O(N) where N = unique path segments.
-        // For typical loads (<500 sessions) this is negligible.
-        // If profiling shows issues, extract sessions with distinctUntilChanged.
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
         val filteredSessions = allSessions
             .filter { it.id in serverSessionIds && !it.isArchived && it.parentId == null }
             .sortedByDescending { it.time.updated }
-
-        val baseDirectories = filteredSessions
-            .map { session ->
-                val dir = session.directory.replace('\\', '/').trimEnd('/')
-                when {
-                    dir.length >= 2 && dir[1] == ':' -> dir.substringBefore('/')
-                    dir.startsWith('/') -> {
-                        val secondSlash = dir.indexOf('/', 1)
-                        if (secondSlash > 0) dir.substring(0, secondSlash) else dir
-                    }
-                    else -> dir.substringBefore('/')
-                }
-            }
-            .filter { it.isNotBlank() }
-            .toSet()
 
         val baseFilteredSessions = if (baseDirectory != null) {
             filteredSessions.filter { session ->
@@ -148,7 +127,7 @@ class SessionListViewModel @Inject constructor(
             filteredSessions
         }
 
-        val treeNodes = buildTreeNodes(baseFilteredSessions, expandedPaths, homeDir, statuses)
+        val treeNodes = buildTreeNodes(baseFilteredSessions, expandedPaths, baseDirectory, statuses)
 
         SessionListUiState(
             treeNodes = treeNodes,
@@ -158,19 +137,12 @@ class SessionListViewModel @Inject constructor(
             selectedIds = selectedIds,
             isSelectionMode = selectedIds.isNotEmpty(),
             baseDirectory = baseDirectory,
-            baseDirectories = baseDirectories,
+            baseDirectories = emptySet(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
     init {
-        loadHomeDir()
         loadSessions()
-    }
-
-    private fun loadHomeDir() {
-        viewModelScope.launch {
-            getHomeDirectory()
-        }
     }
 
     fun loadSessions() {
@@ -204,14 +176,21 @@ class SessionListViewModel @Inject constructor(
                 Log.e(TAG, "Failed to load sessions", e)
                 _error.value = e.message ?: "Failed to load sessions"
             }             finally {
-                // Auto-expand root directories on first load
                 if (_expandedPaths.value.isEmpty()) {
+                    // Expand all directories by default on first load
                     val currentSessions = eventDispatcher.sessions.value
-                    val topDirs = currentSessions
-                        .mapNotNull { s -> s.directory.takeIf { it.isNotBlank() }?.replace('\\', '/')?.trimEnd('/') }
-                        .filter { it.isNotEmpty() && !it.substring(1).contains('/') }
-                        .toSet()
-                    _expandedPaths.value = topDirs
+                    val base = _baseDirectory.value?.replace('\\', '/')?.trimEnd('/')
+                    val dirs = mutableSetOf<String>()
+                    for (s in currentSessions) {
+                        val dir = s.directory.replace('\\', '/').trimEnd('/')
+                        if (base != null && dir.startsWith(base)) {
+                            val relative = dir.removePrefix(base).removePrefix("/")
+                            if (relative.isNotEmpty()) {
+                                dirs.add("$base/${relative.substringBefore('/')}")
+                            }
+                        }
+                    }
+                    _expandedPaths.value = dirs
                 }
                 _isLoading.value = false
             }
@@ -315,6 +294,8 @@ class SessionListViewModel @Inject constructor(
 
     fun setBaseDirectory(directory: String?) {
         _baseDirectory.value = directory?.replace('\\', '/')?.trimEnd('/')
+        // Reset expanded paths so auto-expand recalculates for the new base
+        _expandedPaths.value = emptySet()
     }
 
     val currentBaseDirectory: String? get() = _baseDirectory.value
@@ -326,13 +307,11 @@ class SessionListViewModel @Inject constructor(
 
     // ============ Directory browsing for Open Project ============
 
-    /** Get the server's home directory (cached). */
+    /** Get the server's home directory. */
     suspend fun getHomeDirectory(): String {
-        _homeDir.value?.let { return it }
         return try {
             val paths = api.getServerPaths(conn)
             val home = paths.home
-            _homeDir.value = home
             if (BuildConfig.DEBUG) Log.d(TAG, "Server home directory: $home")
             home
         } catch (e: Exception) {

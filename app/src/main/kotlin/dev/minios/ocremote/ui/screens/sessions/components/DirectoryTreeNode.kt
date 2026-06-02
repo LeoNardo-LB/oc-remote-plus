@@ -61,7 +61,7 @@ internal fun DirectoryTreeNode(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = minOf(node.depth * 24, 360).dp, end = 8.dp)
+            .padding(start = 12.dp, end = 8.dp)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -80,9 +80,9 @@ internal fun DirectoryTreeNode(
             modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.width(8.dp))
-        if (node.totalSessionCount > 0) {
+        if (node.sessionCount > 0) {
             Text(
-                text = stringResource(R.string.directory_session_count, node.totalSessionCount),
+                text = stringResource(R.string.directory_session_count, node.sessionCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
             )
@@ -160,11 +160,7 @@ private fun DirectoryDetailsDialog(
                 DetailRow(stringResource(R.string.directory_details_path), node.path)
                 DetailRow(
                     stringResource(R.string.directory_details_sessions),
-                    "${node.sessionCount} direct, ${node.totalSessionCount} total"
-                )
-                DetailRow(
-                    stringResource(R.string.directory_details_subdirectories),
-                    "${node.childDirectoryCount}"
+                    "${node.sessionCount}"
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -64,7 +64,6 @@ import java.util.Locale
 @Composable
 internal fun SessionRow(
     item: SessionItem,
-    depth: Int = 0,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -94,7 +93,7 @@ internal fun SessionRow(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(start = minOf(depth * 24, 360).dp, end = 8.dp)
+            .padding(start = 12.dp, end = 8.dp)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

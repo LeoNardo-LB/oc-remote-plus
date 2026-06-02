@@ -277,7 +277,6 @@ fun SessionListScreen(
                                 is TreeNode.Session -> {
                                     SessionRow(
                                         item = node.session,
-                                        depth = node.depth,
                                         isSelectionMode = uiState.isSelectionMode,
                                         isSelected = node.id in uiState.selectedIds,
                                         onClick = {
