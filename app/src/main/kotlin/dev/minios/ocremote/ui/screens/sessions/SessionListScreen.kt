@@ -1,5 +1,6 @@
 package dev.minios.ocremote.ui.screens.sessions
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -108,22 +109,15 @@ fun SessionListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column(
-                        modifier = Modifier
-                            .clip(ShapeTokens.small)
-                            .clickable { showBaseDirDialog = true }
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
+                    Column(modifier = Modifier.clickable { showBaseDirDialog = true }) {
                         Text(
                             text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
                             style = MaterialTheme.typography.titleMedium,
                         )
-                        if (uiState.baseDirectory != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
+                        AnimatedVisibility(visible = uiState.baseDirectory != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = uiState.baseDirectory!!.replace('\\', '/').trimEnd('/'),
+                                    text = (uiState.baseDirectory ?: "").replace('\\', '/').trimEnd('/'),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -135,14 +129,6 @@ fun SessionListScreen(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        } else {
-                            // No base directory selected, still show arrow for consistency
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 },

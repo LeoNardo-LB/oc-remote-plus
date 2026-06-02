@@ -1,13 +1,16 @@
 package dev.minios.ocremote.ui.screens.sessions.components
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -114,23 +117,27 @@ internal fun OpenProjectDialog(
                     .padding(bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (currentDir != "/" && currentDir != null) {
-                    IconButton(
-                        onClick = {
-                            val path = currentDir?.trimEnd('/') ?: ""
-                            val parent = path.substringBeforeLast('/')
-                            currentDir = parent.ifEmpty { "/" }
-                        },
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                // Back arrow - always visible, disabled at root
+                val isAtRoot = currentDir == "/"
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.back),
+                    modifier = Modifier
+                        .size(16.dp)
+                        .then(
+                            if (!isAtRoot) Modifier.clickable {
+                                val path = currentDir?.trimEnd('/') ?: ""
+                                val parent = path.substringBeforeLast('/')
+                                currentDir = parent.ifEmpty { "/" }
+                            } else Modifier
+                        ),
+                    tint = if (isAtRoot) {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = tildeReplace(currentDir ?: "/"),
                     modifier = Modifier
