@@ -46,7 +46,7 @@ internal fun WriteToolCard(
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
         ?: input["path"]?.jsonPrimitive?.contentOrNull ?: ""
-    val shortPath = filePath.substringAfterLast('/')
+    val shortPath = java.io.File(filePath).name
     val content = input["content"]?.jsonPrimitive?.contentOrNull ?: ""
 
     val isRunning = tool.state is ToolState.Running
