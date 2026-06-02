@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -71,6 +72,7 @@ internal fun SessionRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 64.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { showDetailsDialog = true },
@@ -93,17 +95,14 @@ internal fun SessionRow(
         )
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Content column
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.session.title ?: stringResource(R.string.session_untitled),
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
             )
-
             Spacer(modifier = Modifier.height(1.dp))
-
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,6 +56,7 @@ internal fun DirectoryTreeNode(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 64.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { showDetailsDialog = true },
@@ -78,11 +80,16 @@ internal fun DirectoryTreeNode(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(1.dp))
-            Text(
-                text = stringResource(R.string.directory_session_count, node.sessionCount),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.directory_session_count, node.sessionCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
+                )
+            }
         }
     }
 
