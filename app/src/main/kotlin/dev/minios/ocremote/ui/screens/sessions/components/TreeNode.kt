@@ -16,6 +16,7 @@ sealed interface TreeNode {
         val path: String,
         val displayName: String,
         val sessionCount: Int,
+        val activeSessionCount: Int,
         val isExpanded: Boolean,
     ) : TreeNode
 
@@ -79,11 +80,16 @@ fun buildTreeNodes(
     for ((dirKey, dirSessionList) in dirSessions) {
         val fullPath = if (normalizedBase != null) "$normalizedBase/$dirKey" else dirKey
         val isExpanded = fullPath in expandedDirs
+        val activeCount = dirSessionList.count { session ->
+            val status = statuses[session.id]
+            status is SessionStatus.Busy
+        }
         result.add(TreeNode.Directory(
             id = dirKey,
             path = fullPath,
             displayName = fullPath,
             sessionCount = dirSessionList.size,
+            activeSessionCount = activeCount,
             isExpanded = isExpanded,
         ))
         if (isExpanded) {

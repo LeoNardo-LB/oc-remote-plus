@@ -137,6 +137,7 @@
     <string name="menu_view_details">View details</string>
     <string name="menu_copied_to_clipboard">Copied to clipboard</string>
     <string name="directory_session_count">%1$d sessions</string>
+    <string name="directory_session_count_active">%1$d/%2$d sessions active</string>
     <string name="directory_details_path">Path</string>
     <string name="directory_details_sessions">Sessions</string>
     <string name="directory_details_subdirectories">Subdirectories</string>

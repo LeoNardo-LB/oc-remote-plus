@@ -76,14 +76,26 @@ internal fun DirectoryTreeNode(
             )
             Spacer(modifier = Modifier.height(1.dp))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = stringResource(R.string.directory_session_count, node.sessionCount),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
-                )
+                if (node.activeSessionCount > 0) {
+                    Text(
+                        text = stringResource(
+                            R.string.directory_session_count_active,
+                            node.activeSessionCount,
+                            node.sessionCount
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.directory_session_count, node.sessionCount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
+                    )
+                }
             }
         }
     }
