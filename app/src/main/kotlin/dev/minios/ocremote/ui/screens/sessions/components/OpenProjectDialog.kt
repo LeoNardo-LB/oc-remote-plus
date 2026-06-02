@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -136,7 +135,7 @@ internal fun OpenProjectDialog(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 450.dp),
+                    .weight(0.7f, fill = false),
             ) {
                 when {
                     isLoading -> {
@@ -168,7 +167,7 @@ internal fun OpenProjectDialog(
                                     ?: "${currentDir?.trimEnd('/')}/${node.name}"
                                 DirectoryRow(
                                     displayPath = node.name,
-                                    onClick = { onSelect(absPath) },
+                                    onClick = { currentDir = absPath },
                                     onNavigate = { currentDir = absPath },
                                 )
                             }

@@ -9,13 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,19 +70,19 @@ fun AppDialog(
                 }
 
                 HorizontalDivider(
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT),
                 )
 
                 // Content
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
                     content = content,
                 )
 
                 HorizontalDivider(
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT),
                 )
 
                 // Buttons
@@ -140,7 +139,7 @@ private fun DialogButton(
 ) {
     when (style) {
         ButtonStyle.Primary -> {
-            FilledTonalButton(
+            TextButton(
                 onClick = onClick,
                 modifier = modifier,
             ) {
@@ -148,7 +147,7 @@ private fun DialogButton(
             }
         }
         ButtonStyle.Secondary -> {
-            OutlinedButton(
+            TextButton(
                 onClick = onClick,
                 modifier = modifier,
             ) {
@@ -156,10 +155,10 @@ private fun DialogButton(
             }
         }
         ButtonStyle.Danger -> {
-            OutlinedButton(
+            TextButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonDefaults.outlinedButtonColors(
+                colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.error,
                 ),
             ) {
