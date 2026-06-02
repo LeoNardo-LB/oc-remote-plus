@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
@@ -27,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.res.stringResource
@@ -81,13 +85,24 @@ internal fun DirectoryTreeNode(
             ) {
                 if (node.activeSessionCount > 0) {
                     Text(
-                        text = stringResource(
-                            R.string.directory_session_count_active,
-                            node.activeSessionCount,
-                            node.sessionCount
-                        ),
+                        text = buildAnnotatedString {
+                            withStyle(
+                                SpanStyle(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                append("${node.activeSessionCount}")
+                            }
+                            withStyle(
+                                SpanStyle(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED)
+                                )
+                            ) {
+                                append("/${node.sessionCount} sessions active")
+                            }
+                        },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
                     )
                 } else {
                     Text(
