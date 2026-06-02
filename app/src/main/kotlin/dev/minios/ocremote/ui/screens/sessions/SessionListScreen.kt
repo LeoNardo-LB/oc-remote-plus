@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -54,6 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -104,6 +103,7 @@ fun SessionListScreen(
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
 
     var showOpenProject by remember { mutableStateOf(false) }
+    var showBaseDirDialog by remember { mutableStateOf(false) }
 
     BackHandler(enabled = uiState.isSelectionMode) {
         viewModel.clearSelection()
@@ -142,47 +142,28 @@ fun SessionListScreen(
                     )
                 )
             } else {
-                var baseDirMenuExpanded by remember { mutableStateOf(false) }
                 TopAppBar(
                     title = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { baseDirMenuExpanded = true }
+                            modifier = Modifier
+                                .clip(ShapeTokens.small)
+                                .clickable { showBaseDirDialog = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
+                                text = uiState.baseDirectory?.let { dir ->
+                                    dir.replace('\\', '/').trimEnd('/')
+                                } ?: uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            if (uiState.baseDirectories.size > 1) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                DropdownMenu(
-                                    expanded = baseDirMenuExpanded,
-                                    onDismissRequest = { baseDirMenuExpanded = false },
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("全部") },
-                                        onClick = {
-                                            baseDirMenuExpanded = false
-                                            viewModel.setBaseDirectory(null)
-                                        }
-                                    )
-                                    uiState.baseDirectories.sorted().forEach { dir ->
-                                        DropdownMenuItem(
-                                            text = { Text(dir) },
-                                            onClick = {
-                                                baseDirMenuExpanded = false
-                                                viewModel.setBaseDirectory(dir)
-                                            }
-                                        )
-                                    }
-                                }
-                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     },
                     navigationIcon = {
@@ -277,15 +258,6 @@ fun SessionListScreen(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         itemsIndexed(uiState.treeNodes, key = { _, node -> node.id }) { index, node ->
-                            val nextNode = if (index < uiState.treeNodes.lastIndex) uiState.treeNodes[index + 1] else null
-                            val nodeDepth = when (node) {
-                                is TreeNode.Directory -> node.depth
-                                is TreeNode.Session -> node.depth
-                            }
-                            val isLast = nextNode == null || when (nextNode) {
-                                is TreeNode.Directory -> nextNode.depth <= nodeDepth
-                                is TreeNode.Session -> nextNode.depth <= nodeDepth
-                            }
                             when (node) {
                                 is TreeNode.Directory -> {
                                     DirectoryTreeNode(
@@ -295,7 +267,6 @@ fun SessionListScreen(
                                             viewModel.copyToClipboard(path, context)
                                             scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.menu_copied_to_clipboard)) }
                                         },
-                                        isLastChild = isLast,
                                     )
                                     HorizontalDivider(
                                         color = MaterialTheme.colorScheme.outlineVariant.copy(
@@ -307,7 +278,6 @@ fun SessionListScreen(
                                     SessionRow(
                                         item = node.session,
                                         depth = node.depth,
-                                        isLastChild = isLast,
                                         isSelectionMode = uiState.isSelectionMode,
                                         isSelected = node.id in uiState.selectedIds,
                                         onClick = {
@@ -357,6 +327,19 @@ fun SessionListScreen(
                 viewModel.createNewSession(directory = directory)
             },
             onDismiss = { showOpenProject = false }
+        )
+    }
+
+    // Base directory selector dialog
+    if (showBaseDirDialog) {
+        OpenProjectDialog(
+            viewModel = viewModel,
+            projects = emptyList(),
+            onSelect = { directory ->
+                showBaseDirDialog = false
+                viewModel.setBaseDirectory(directory)
+            },
+            onDismiss = { showBaseDirDialog = false }
         )
     }
 

@@ -41,8 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -67,7 +65,6 @@ import java.util.Locale
 internal fun SessionRow(
     item: SessionItem,
     depth: Int = 0,
-    isLastChild: Boolean = false,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -93,11 +90,6 @@ internal fun SessionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .treeLines(
-                depth = depth,
-                isLastChild = isLastChild,
-                lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED),
-            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,

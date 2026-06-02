@@ -314,7 +314,7 @@ class SessionListViewModel @Inject constructor(
     }
 
     fun setBaseDirectory(directory: String?) {
-        _baseDirectory.value = directory
+        _baseDirectory.value = directory?.replace('\\', '/')?.trimEnd('/')
     }
 
     val currentBaseDirectory: String? get() = _baseDirectory.value
