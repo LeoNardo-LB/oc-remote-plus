@@ -46,6 +46,8 @@ data class SessionListUiState(
     val error: String? = null,
     val selectedIds: Set<String> = emptySet(),
     val isSelectionMode: Boolean = false,
+    val baseDirectory: String? = null,
+    val baseDirectories: Set<String> = emptySet(),
 )
 
 data class SessionItem(
@@ -85,6 +87,7 @@ class SessionListViewModel @Inject constructor(
     private val _homeDir = MutableStateFlow<String?>(null)
     private val _expandedPaths = MutableStateFlow<Set<String>>(emptySet())
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _baseDirectory = MutableStateFlow<String?>(null)
     private val _navigateToSession = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val navigateToSession: SharedFlow<String> = _navigateToSession.asSharedFlow()
 
@@ -98,7 +101,8 @@ class SessionListViewModel @Inject constructor(
         _projects,
         _homeDir,
         _expandedPaths,
-        _selectedIds
+        _selectedIds,
+        _baseDirectory
     ) { values ->
         val allSessions = values[0] as List<Session>
         val statuses = values[1] as Map<String, SessionStatus>
@@ -109,6 +113,7 @@ class SessionListViewModel @Inject constructor(
         val homeDir = values[6] as String?
         val expandedPaths = values[7] as Set<String>
         val selectedIds = values[8] as Set<String>
+        val baseDirectory = values[9] as String?
 
         // Performance: buildTreeNodes is O(N) where N = unique path segments.
         // For typical loads (<500 sessions) this is negligible.
@@ -119,7 +124,31 @@ class SessionListViewModel @Inject constructor(
             .filter { it.id in serverSessionIds && !it.isArchived && it.parentId == null }
             .sortedByDescending { it.time.updated }
 
-        val treeNodes = buildTreeNodes(filteredSessions, expandedPaths, homeDir, statuses)
+        val baseDirectories = filteredSessions
+            .map { session ->
+                val dir = session.directory.replace('\\', '/').trimEnd('/')
+                when {
+                    dir.length >= 2 && dir[1] == ':' -> dir.substringBefore('/')
+                    dir.startsWith('/') -> {
+                        val secondSlash = dir.indexOf('/', 1)
+                        if (secondSlash > 0) dir.substring(0, secondSlash) else dir
+                    }
+                    else -> dir.substringBefore('/')
+                }
+            }
+            .filter { it.isNotBlank() }
+            .toSet()
+
+        val baseFilteredSessions = if (baseDirectory != null) {
+            filteredSessions.filter { session ->
+                val dir = session.directory.replace('\\', '/').trimEnd('/')
+                dir.startsWith(baseDirectory)
+            }
+        } else {
+            filteredSessions
+        }
+
+        val treeNodes = buildTreeNodes(baseFilteredSessions, expandedPaths, homeDir, statuses)
 
         SessionListUiState(
             treeNodes = treeNodes,
@@ -128,6 +157,8 @@ class SessionListViewModel @Inject constructor(
             error = error,
             selectedIds = selectedIds,
             isSelectionMode = selectedIds.isNotEmpty(),
+            baseDirectory = baseDirectory,
+            baseDirectories = baseDirectories,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
@@ -281,6 +312,12 @@ class SessionListViewModel @Inject constructor(
             if (normalized in paths) paths - normalized else paths + normalized
         }
     }
+
+    fun setBaseDirectory(directory: String?) {
+        _baseDirectory.value = directory
+    }
+
+    val currentBaseDirectory: String? get() = _baseDirectory.value
 
     fun copyToClipboard(text: String, context: Context) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

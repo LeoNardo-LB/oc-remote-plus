@@ -3,11 +3,6 @@ package dev.minios.ocremote.ui.screens.sessions.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -120,10 +115,10 @@ internal fun SessionRow(
         Icon(
             imageVector = Icons.Outlined.ChatBubbleOutline,
             contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(22.dp),
             tint = statusIconColor,
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         // Content column
         Column(modifier = Modifier.weight(1f)) {
@@ -194,9 +189,15 @@ internal fun SessionRow(
             }
         }
 
-        // Three-dot menu (hidden during selection mode) — fixed size to match checkbox area
-        if (!isSelectionMode) {
-            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        // Right-side action area: menu or checkbox, same 48dp slot
+        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onClick() },
+                    modifier = Modifier.size(24.dp),
+                )
+            } else {
                 IconButton(
                     onClick = { menuExpanded = true },
                     modifier = Modifier.size(32.dp),
@@ -254,22 +255,6 @@ internal fun SessionRow(
                         },
                     )
                 }
-            }
-        }
-
-        // Selection checkbox — fixed size to match menu area
-        AnimatedVisibility(
-            visible = isSelectionMode,
-            enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
-            exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut(),
-            modifier = Modifier.size(width = 48.dp, height = 48.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onClick() },
-                    modifier = Modifier.size(24.dp),
-                )
             }
         }
     }

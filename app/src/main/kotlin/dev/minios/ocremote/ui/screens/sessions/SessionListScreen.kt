@@ -1,6 +1,7 @@
 package dev.minios.ocremote.ui.screens.sessions
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,17 +11,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -136,12 +142,48 @@ fun SessionListScreen(
                     )
                 )
             } else {
+                var baseDirMenuExpanded by remember { mutableStateOf(false) }
                 TopAppBar(
                     title = {
-                        Text(
-                            text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { baseDirMenuExpanded = true }
+                        ) {
+                            Text(
+                                text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            if (uiState.baseDirectories.size > 1) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                DropdownMenu(
+                                    expanded = baseDirMenuExpanded,
+                                    onDismissRequest = { baseDirMenuExpanded = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("全部") },
+                                        onClick = {
+                                            baseDirMenuExpanded = false
+                                            viewModel.setBaseDirectory(null)
+                                        }
+                                    )
+                                    uiState.baseDirectories.sorted().forEach { dir ->
+                                        DropdownMenuItem(
+                                            text = { Text(dir) },
+                                            onClick = {
+                                                baseDirMenuExpanded = false
+                                                viewModel.setBaseDirectory(dir)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {

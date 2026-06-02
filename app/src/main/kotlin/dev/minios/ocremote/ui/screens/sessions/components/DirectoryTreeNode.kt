@@ -121,7 +121,7 @@ internal fun DirectoryTreeNode(
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
             )
         }
-        Box {
+        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             IconButton(
                 onClick = { menuExpanded = true },
                 modifier = Modifier.size(32.dp),
