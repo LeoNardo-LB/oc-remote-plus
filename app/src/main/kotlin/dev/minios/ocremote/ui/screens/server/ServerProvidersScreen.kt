@@ -24,6 +24,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
@@ -62,7 +64,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.DialogButtonRole
 import dev.minios.ocremote.ui.components.DialogButtons
 import dev.minios.ocremote.ui.components.amoledDialogParams
-import dev.minios.ocremote.ui.screens.server.components.ProviderRow
+import dev.minios.ocremote.ui.screens.settings.components.SectionHeader
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import dev.minios.ocremote.ui.theme.ShapeTokens
@@ -423,9 +425,8 @@ fun ServerProvidersScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(padding),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             if (!uiState.error.isNullOrBlank()) {
                 item {
@@ -433,52 +434,75 @@ fun ServerProvidersScreen(
                         text = uiState.error!!,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
 
             if (connected.isNotEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.server_settings_providers_connected),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
-                    )
-                }
+                item { SectionHeader(title = stringResource(R.string.server_settings_providers_connected)) }
                 items(connected, key = { it.providerId }) { provider ->
-                    ProviderRow(
-                        provider = provider,
-                        onConnect = { viewModel.clearError(); connectProvider = provider },
-                        onDisconnect = { viewModel.disconnectProvider(provider.providerId) },
-                        showConnect = false,
-                        canDisconnect = provider.source != "env",
-                        isSaving = uiState.isSaving,
-                        isAmoled = isAmoled,
-                        showSource = true
+                    ListItem(
+                        headlineContent = { Text(provider.providerName) },
+                        supportingContent = {
+                            Column {
+                                Text(
+                                    text = provider.providerId,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
+                                )
+                                provider.source?.let { src ->
+                                    Text(
+                                        text = when (src) {
+                                            "env" -> stringResource(R.string.server_settings_provider_source_env)
+                                            "api" -> stringResource(R.string.server_settings_provider_source_api)
+                                            "config" -> stringResource(R.string.server_settings_provider_source_config)
+                                            "custom" -> stringResource(R.string.server_settings_provider_source_custom)
+                                            else -> stringResource(R.string.server_settings_provider_source_other)
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED)
+                                    )
+                                }
+                            }
+                        },
+                        trailingContent = {
+                            if (provider.source != "env") {
+                                TextButton(onClick = { viewModel.disconnectProvider(provider.providerId) }, enabled = !uiState.isSaving) {
+                                    Text(stringResource(R.string.disconnect))
+                                }
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.server_settings_provider_env_connected),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED)
+                                )
+                            }
+                        }
                     )
+                    HorizontalDivider()
                 }
             }
 
             if (available.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.padding(top = 4.dp))
-                    Text(
-                        text = stringResource(R.string.server_settings_providers_available),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
-                    )
-                }
+                item { SectionHeader(title = stringResource(R.string.server_settings_providers_available)) }
                 items(available, key = { it.providerId }) { provider ->
-                    ProviderRow(
-                        provider = provider,
-                        onConnect = { viewModel.clearError(); connectProvider = provider },
-                        onDisconnect = { viewModel.disconnectProvider(provider.providerId) },
-                        showConnect = true,
-                        canDisconnect = false,
-                        isSaving = uiState.isSaving,
-                        isAmoled = isAmoled,
-                        showSource = false
+                    ListItem(
+                        headlineContent = { Text(provider.providerName) },
+                        supportingContent = {
+                            Text(
+                                text = provider.providerId,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
+                            )
+                        },
+                        trailingContent = {
+                            TextButton(onClick = { viewModel.clearError(); connectProvider = provider }, enabled = !uiState.isSaving) {
+                                Text(stringResource(R.string.connect))
+                            }
+                        }
                     )
+                    HorizontalDivider()
                 }
             }
         }

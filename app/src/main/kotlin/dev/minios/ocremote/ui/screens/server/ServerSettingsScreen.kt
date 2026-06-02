@@ -1,36 +1,28 @@
 ﻿package dev.minios.ocremote.ui.screens.server
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.AmoledCard
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.LocalAmoledMode
-import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +31,6 @@ fun ServerSettingsScreen(
     onOpenProviders: () -> Unit,
     onOpenModels: () -> Unit
 ) {
-    val isAmoled = LocalAmoledMode.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -56,76 +47,24 @@ fun ServerSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AmoledCard(
-                isAmoledDark = isAmoled,
-                shape = ShapeTokens.medium,
-                normalContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.server_settings_providers)) },
+                supportingContent = { Text(stringResource(R.string.server_settings_providers_desc)) },
+                leadingContent = { Icon(Icons.Default.Hub, contentDescription = null) },
+                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .padding(top = 8.dp)
                     .clickable(onClick = onOpenProviders)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Hub, contentDescription = null)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.server_settings_providers),
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = stringResource(R.string.server_settings_providers_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
-                        )
-                    }
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                }
-            }
-
-            AmoledCard(
-                isAmoledDark = isAmoled,
-                shape = ShapeTokens.medium,
-                normalContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenModels)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Tune, contentDescription = null)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.server_settings_models),
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = stringResource(R.string.server_settings_models_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
-                        )
-                    }
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                }
-            }
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.server_settings_models)) },
+                supportingContent = { Text(stringResource(R.string.server_settings_models_desc)) },
+                leadingContent = { Icon(Icons.Default.Tune, contentDescription = null) },
+                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                modifier = Modifier.clickable(onClick = onOpenModels)
+            )
         }
     }
 }

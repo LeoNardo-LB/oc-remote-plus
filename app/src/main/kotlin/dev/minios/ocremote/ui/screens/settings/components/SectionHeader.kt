@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun SectionHeader(title: String) {
+fun SectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelMedium,

@@ -49,7 +49,7 @@ internal fun ServerCard(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Header row: name, URL, status, menu
             Row(
@@ -136,7 +136,7 @@ internal fun ServerCard(
             // Action buttons row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (isConnected) {
                     Button(
@@ -165,7 +165,7 @@ internal fun ServerCard(
             if (isConnected) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     OutlinedButton(
                         onClick = onDisconnect,

@@ -3,8 +3,6 @@ package dev.minios.ocremote.ui.screens.server
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,11 +13,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -42,10 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.AmoledCard
+import dev.minios.ocremote.ui.screens.settings.components.SectionHeader
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
-import dev.minios.ocremote.ui.theme.ShapeTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,7 +102,7 @@ fun ServerModelFilterScreen(
                     androidx.compose.material3.OutlinedTextFieldDefaults.colors()
                 }
             )
-            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
 
             when {
                 uiState.isLoading -> {
@@ -118,9 +115,9 @@ fun ServerModelFilterScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.height(8.dp))
+                            androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                             Text(uiState.error ?: stringResource(R.string.server_settings_load_error))
-                            Spacer(Modifier.height(8.dp))
+                            androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                             TextButton(onClick = { viewModel.loadProviders() }) {
                                 Text(stringResource(R.string.retry))
                             }
@@ -137,61 +134,42 @@ fun ServerModelFilterScreen(
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         items(filteredGroups, key = { it.providerId }) { group ->
-                            AmoledCard(
-                                isAmoledDark = isAmoled,
-                                shape = ShapeTokens.medium,
-                                normalContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                            ) {
-                                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                                    Text(
-                                        text = group.providerName,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                    )
-                                    group.models.forEach { model ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = model.modelName,
-                                                    style = MaterialTheme.typography.bodyMedium
+                            SectionHeader(title = group.providerName)
+                            group.models.forEach { model ->
+                                ListItem(
+                                    headlineContent = { Text(model.modelName) },
+                                    supportingContent = {
+                                        Text(
+                                            text = model.modelId,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Switch(
+                                            checked = model.visible,
+                                            onCheckedChange = { checked ->
+                                                viewModel.setModelVisible(group.providerId, model.modelId, checked)
+                                            },
+                                            colors = if (isAmoled) {
+                                                SwitchDefaults.colors(
+                                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                                    checkedTrackColor = Color.Black,
+                                                    checkedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH),
+                                                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                                    uncheckedTrackColor = Color.Black,
+                                                    uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH)
                                                 )
-                                                Text(
-                                                    text = model.modelId,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM)
-                                                )
+                                            } else {
+                                                SwitchDefaults.colors()
                                             }
-                                            Switch(
-                                                checked = model.visible,
-                                                onCheckedChange = { checked ->
-                                                    viewModel.setModelVisible(group.providerId, model.modelId, checked)
-                                                },
-                                                colors = if (isAmoled) {
-                                                    SwitchDefaults.colors(
-                                                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                                        checkedTrackColor = Color.Black,
-                                                        checkedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH),
-                                                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                                                        uncheckedTrackColor = Color.Black,
-                                                        uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH)
-                                                    )
-                                                } else {
-                                                    SwitchDefaults.colors()
-                                                }
-                                            )
-                                        }
+                                        )
                                     }
-                                }
+                                )
+                                HorizontalDivider()
                             }
                         }
                     }
