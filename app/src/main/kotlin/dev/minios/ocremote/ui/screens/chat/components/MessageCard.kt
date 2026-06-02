@@ -15,12 +15,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.RateReview
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -40,6 +38,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
+import dev.minios.ocremote.ui.components.ConfirmDialog
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.filterRenderableParts
@@ -298,23 +297,15 @@ private fun MessageCardUser(
 
         // 撤回确认对话框
         if (showRevertConfirmation && onRevert != null) {
-            AlertDialog(
-                onDismissRequest = { showRevertConfirmation = false },
-                title = { Text(stringResource(R.string.chat_revert)) },
-                text = { Text(stringResource(R.string.chat_revert_message)) },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showRevertConfirmation = false
-                        onRevert()
-                    }) {
-                        Text(stringResource(R.string.chat_revert))
-                    }
+            ConfirmDialog(
+                title = stringResource(R.string.chat_revert),
+                message = stringResource(R.string.chat_revert_message),
+                confirmLabel = stringResource(R.string.chat_revert),
+                onDismiss = { showRevertConfirmation = false },
+                onConfirm = {
+                    showRevertConfirmation = false
+                    onRevert()
                 },
-                dismissButton = {
-                    TextButton(onClick = { showRevertConfirmation = false }) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                }
             )
         }
     }

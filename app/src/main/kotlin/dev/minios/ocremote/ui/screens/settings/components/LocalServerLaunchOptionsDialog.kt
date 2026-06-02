@@ -2,14 +2,17 @@ package dev.minios.ocremote.ui.screens.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -19,10 +22,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,8 +38,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.repository.LocalServerManager
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import dev.minios.ocremote.ui.theme.ShapeTokens
@@ -98,217 +105,222 @@ internal fun LocalServerLaunchOptionsDialog(
         SwitchDefaults.colors()
     }
 
-    AlertDialog(
+    val mainParams = amoledDialogParams()
+    BasicAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = amoledDialogModifier(),
-        shape = ShapeTokens.extraLarge,
-        title = {
-            Text(
-                text = stringResource(R.string.home_local_launch_options),
-                style = MaterialTheme.typography.headlineSmall,
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.home_local_network_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_local_allow_lan_access)) },
-                    supportingContent = { Text(stringResource(R.string.home_local_allow_lan_access_desc)) },
-                    trailingContent = {
-                        Switch(
-                            checked = localAllowLanAccess,
-                            onCheckedChange = { localAllowLanAccess = it },
-                            colors = switchColors,
-                        )
-                    },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            color = mainParams.containerColor,
+            tonalElevation = mainParams.tonalElevation,
+            border = mainParams.border,
+            shape = mainParams.shape,
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = stringResource(R.string.home_local_launch_options),
+                    style = MaterialTheme.typography.titleMedium,
                 )
+                Spacer(Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(stringResource(R.string.home_local_network_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                Text(stringResource(R.string.home_local_security_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                OutlinedTextField(
-                    value = localServerUsername,
-                    onValueChange = { localServerUsername = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.home_local_server_username_label)) },
-                    placeholder = { Text(stringResource(R.string.home_local_server_username_placeholder)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                )
-
-                OutlinedTextField(
-                    value = localServerPassword,
-                    onValueChange = { localServerPassword = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.home_local_server_password_label)) },
-                    placeholder = { Text(stringResource(R.string.home_local_server_password_placeholder)) },
-                    trailingIcon = {
-                        IconButton(onClick = { maskServerPassword = !maskServerPassword }) {
-                            Icon(
-                                imageVector = if (maskServerPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = null,
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.home_local_allow_lan_access)) },
+                        supportingContent = { Text(stringResource(R.string.home_local_allow_lan_access_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = localAllowLanAccess,
+                                onCheckedChange = { localAllowLanAccess = it },
+                                colors = switchColors,
                             )
-                        }
-                    },
-                    visualTransformation = if (maskServerPassword) FullStringMaskTransformation else VisualTransformation.None,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                )
-
-                if (localAllowLanAccess && trimmedServerPassword.isBlank()) {
-                    Text(
-                        text = stringResource(R.string.home_local_lan_password_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        },
                     )
-                }
 
-                Text(stringResource(R.string.home_local_proxy_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.home_local_security_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_local_proxy_enable)) },
-                    supportingContent = { Text(stringResource(R.string.home_local_proxy_url_label)) },
-                    trailingContent = {
-                        Switch(
-                            checked = localEnabled,
-                            onCheckedChange = { localEnabled = it },
-                            colors = switchColors,
-                        )
-                    },
-                )
-
-                if (localEnabled) {
                     OutlinedTextField(
-                        value = localProxyUrl,
-                        onValueChange = { localProxyUrl = it },
+                        value = localServerUsername,
+                        onValueChange = { localServerUsername = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text(stringResource(R.string.home_local_proxy_url_label)) },
-                        placeholder = { Text("http://127.0.0.1:8080") },
+                        label = { Text(stringResource(R.string.home_local_server_username_label)) },
+                        placeholder = { Text(stringResource(R.string.home_local_server_username_placeholder)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    )
+
+                    OutlinedTextField(
+                        value = localServerPassword,
+                        onValueChange = { localServerPassword = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.home_local_server_password_label)) },
+                        placeholder = { Text(stringResource(R.string.home_local_server_password_placeholder)) },
                         trailingIcon = {
-                            IconButton(onClick = { maskProxyUrl = !maskProxyUrl }) {
+                            IconButton(onClick = { maskServerPassword = !maskServerPassword }) {
                                 Icon(
-                                    imageVector = if (maskProxyUrl) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    imageVector = if (maskServerPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                     contentDescription = null,
                                 )
                             }
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        isError = trimmedProxyUrl.isBlank(),
-                        visualTransformation = if (maskProxyUrl) FullStringMaskTransformation else VisualTransformation.None,
+                        visualTransformation = if (maskServerPassword) FullStringMaskTransformation else VisualTransformation.None,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     )
 
-                    OutlinedTextField(
-                        value = localNoProxyList,
-                        onValueChange = { localNoProxyList = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 4,
-                        label = { Text(stringResource(R.string.home_local_proxy_no_proxy_label)) },
-                        placeholder = { Text(LocalServerManager.DEFAULT_NO_PROXY_LIST) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    if (localAllowLanAccess && trimmedServerPassword.isBlank()) {
+                        Text(
+                            text = stringResource(R.string.home_local_lan_password_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
+                    Text(stringResource(R.string.home_local_proxy_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.home_local_proxy_enable)) },
+                        supportingContent = { Text(stringResource(R.string.home_local_proxy_url_label)) },
+                        trailingContent = {
+                            Switch(
+                                checked = localEnabled,
+                                onCheckedChange = { localEnabled = it },
+                                colors = switchColors,
+                            )
+                        },
                     )
-                }
 
-                Text(
-                    text = stringResource(R.string.home_local_proxy_no_proxy_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Text(stringResource(R.string.home_local_autostart_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_local_run_background_label)) },
-                    supportingContent = { Text(stringResource(R.string.home_local_run_background_desc)) },
-                    trailingContent = {
-                        Switch(
-                            checked = localRunInBackground,
-                            onCheckedChange = {
-                                localRunInBackground = it
-                                if (!it) {
-                                    localAutoStart = false
+                    if (localEnabled) {
+                        OutlinedTextField(
+                            value = localProxyUrl,
+                            onValueChange = { localProxyUrl = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text(stringResource(R.string.home_local_proxy_url_label)) },
+                            placeholder = { Text("http://127.0.0.1:8080") },
+                            trailingIcon = {
+                                IconButton(onClick = { maskProxyUrl = !maskProxyUrl }) {
+                                    Icon(
+                                        imageVector = if (maskProxyUrl) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = null,
+                                    )
                                 }
                             },
-                            colors = switchColors,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            isError = trimmedProxyUrl.isBlank(),
+                            visualTransformation = if (maskProxyUrl) FullStringMaskTransformation else VisualTransformation.None,
                         )
-                    },
-                )
 
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_local_auto_start_label)) },
-                    supportingContent = {
-                        Text(
-                            if (localRunInBackground) {
-                                stringResource(R.string.home_local_auto_start_desc)
-                            } else {
-                                stringResource(R.string.home_local_auto_start_requires_background)
-                            }
+                        OutlinedTextField(
+                            value = localNoProxyList,
+                            onValueChange = { localNoProxyList = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                            maxLines = 4,
+                            label = { Text(stringResource(R.string.home_local_proxy_no_proxy_label)) },
+                            placeholder = { Text(LocalServerManager.DEFAULT_NO_PROXY_LIST) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         )
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = localAutoStart,
-                            onCheckedChange = { localAutoStart = it },
-                            enabled = localRunInBackground,
-                            colors = switchColors,
-                        )
-                    },
-                )
+                    }
 
-                ExposedDropdownMenuBox(
-                    expanded = timeoutExpanded,
-                    onExpandedChange = { timeoutExpanded = !timeoutExpanded },
-                ) {
-                    OutlinedTextField(
-                        value = stringResource(R.string.home_local_startup_timeout_value, localStartupTimeoutSec),
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        label = { Text(stringResource(R.string.home_local_startup_timeout_label)) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = timeoutExpanded) },
+                    Text(
+                        text = stringResource(R.string.home_local_proxy_no_proxy_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    ExposedDropdownMenu(expanded = timeoutExpanded, onDismissRequest = { timeoutExpanded = false }) {
-                        timeoutOptions.forEach { value ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.home_local_startup_timeout_value, value)) },
-                                onClick = {
-                                    localStartupTimeoutSec = value
-                                    timeoutExpanded = false
+
+                    Text(stringResource(R.string.home_local_autostart_section), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.home_local_run_background_label)) },
+                        supportingContent = { Text(stringResource(R.string.home_local_run_background_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = localRunInBackground,
+                                onCheckedChange = {
+                                    localRunInBackground = it
+                                    if (!it) {
+                                        localAutoStart = false
+                                    }
                                 },
+                                colors = switchColors,
                             )
+                        },
+                    )
+
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.home_local_auto_start_label)) },
+                        supportingContent = {
+                            Text(
+                                if (localRunInBackground) {
+                                    stringResource(R.string.home_local_auto_start_desc)
+                                } else {
+                                    stringResource(R.string.home_local_auto_start_requires_background)
+                                }
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = localAutoStart,
+                                onCheckedChange = { localAutoStart = it },
+                                enabled = localRunInBackground,
+                                colors = switchColors,
+                            )
+                        },
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = timeoutExpanded,
+                        onExpandedChange = { timeoutExpanded = !timeoutExpanded },
+                    ) {
+                        OutlinedTextField(
+                            value = stringResource(R.string.home_local_startup_timeout_value, localStartupTimeoutSec),
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            label = { Text(stringResource(R.string.home_local_startup_timeout_label)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = timeoutExpanded) },
+                        )
+                        ExposedDropdownMenu(expanded = timeoutExpanded, onDismissRequest = { timeoutExpanded = false }) {
+                            timeoutOptions.forEach { value ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_local_startup_timeout_value, value)) },
+                                    onClick = {
+                                        localStartupTimeoutSec = value
+                                        timeoutExpanded = false
+                                    },
+                                )
+                            }
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        localEnabled,
-                        trimmedProxyUrl,
-                        trimmedNoProxy,
-                        localAllowLanAccess,
-                        localServerUsername.trim(),
-                        trimmedServerPassword,
-                        localRunInBackground,
-                        localAutoStart && localRunInBackground,
-                        localStartupTimeoutSec,
+                Spacer(Modifier.height(16.dp))
+                DialogButtons(
+                    buttons = listOf(
+                        Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary, onDismiss),
+                        Triple(stringResource(R.string.server_save), DialogButtonRole.Primary) {
+                            if (!canSave) return@Triple
+                            onSave(
+                                localEnabled,
+                                trimmedProxyUrl,
+                                trimmedNoProxy,
+                                localAllowLanAccess,
+                                localServerUsername.trim(),
+                                trimmedServerPassword,
+                                localRunInBackground,
+                                localAutoStart && localRunInBackground,
+                                localStartupTimeoutSec,
+                            )
+                        },
                     )
-                },
-                enabled = canSave,
-            ) {
-                Text(stringResource(R.string.server_save))
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-        containerColor = amoledDialogContainerColor(),
-    )
+        }
+    }
 }
 
 private object FullStringMaskTransformation : VisualTransformation {

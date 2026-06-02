@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -53,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.ui.components.ConfirmDialog
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.ChatUiState
 import dev.minios.ocremote.ui.screens.chat.ChatViewModel
@@ -247,31 +247,21 @@ fun ChatMessageList(
                                     var showRevertDialog by remember { mutableStateOf(false) }
 
                                     if (showRevertDialog) {
-                                        AlertDialog(
-                                            onDismissRequest = { showRevertDialog = false },
-                                            title = { Text(stringResource(R.string.chat_revert_title)) },
-                                            text = { Text(stringResource(R.string.chat_revert_message)) },
-                                            confirmButton = {
-                                                TextButton(
-                                                    onClick = {
-                                                        showRevertDialog = false
-                                                        viewModel.revertMessage(chatMessage.message.id) { ok ->
-                                                            coroutineScope.launch {
-                                                                snackbarHostState.showSnackbar(
-                                                                    if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
-                                                                )
-                                                            }
-                                                        }
+                                        ConfirmDialog(
+                                            title = stringResource(R.string.chat_revert_title),
+                                            message = stringResource(R.string.chat_revert_message),
+                                            confirmLabel = stringResource(R.string.chat_revert),
+                                            onDismiss = { showRevertDialog = false },
+                                            onConfirm = {
+                                                showRevertDialog = false
+                                                viewModel.revertMessage(chatMessage.message.id) { ok ->
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                                        )
                                                     }
-                                                ) {
-                                                    Text(stringResource(R.string.chat_revert), color = MaterialTheme.colorScheme.error)
                                                 }
                                             },
-                                            dismissButton = {
-                                                TextButton(onClick = { showRevertDialog = false }) {
-                                                    Text(stringResource(R.string.cancel))
-                                                }
-                                            }
                                         )
                                     }
 

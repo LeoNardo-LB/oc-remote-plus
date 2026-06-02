@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -21,7 +23,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -29,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -43,8 +46,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
+import dev.minios.ocremote.ui.components.DialogButtonRole
+import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.screens.chat.util.formatTokenCount
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.theme.AlphaTokens
@@ -154,74 +161,88 @@ fun ChatTopBar(
                 if (showContextDialog) {
                     val pct = Math.round(lastContextTokens.toDouble() / contextWindow * 100).toInt()
                         .coerceIn(0, 100)
-                    AlertDialog(
+                    val contextParams = amoledDialogParams()
+                    BasicAlertDialog(
                         onDismissRequest = { showContextDialog = false },
-                        title = {
-                            Text(stringResource(R.string.chat_context_detail_title))
-                        },
-                        text = {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                        properties = DialogProperties(usePlatformDefaultWidth = false),
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(0.92f),
+                            color = contextParams.containerColor,
+                            tonalElevation = contextParams.tonalElevation,
+                            border = contextParams.border,
+                            shape = contextParams.shape,
+                        ) {
+                            Column(modifier = Modifier.padding(24.dp)) {
                                 Text(
-                                    text = stringResource(
-                                        R.string.chat_context_detail_window,
-                                        formatTokenCount(contextWindow)
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium
+                                    text = stringResource(R.string.chat_context_detail_title),
+                                    style = MaterialTheme.typography.titleMedium,
                                 )
-                                Text(
-                                    text = stringResource(
-                                        R.string.chat_context_detail_usage,
-                                        pct,
-                                        formatTokenCount(lastContextTokens)
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                                Spacer(Modifier.height(16.dp))
                                 Column(
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    tokenRow(
-                                        label = stringResource(R.string.chat_context_detail_input),
-                                        value = formatTokenCount(totalInputTokens)
-                                    )
-                                    tokenRow(
-                                        label = stringResource(R.string.chat_context_detail_output),
-                                        value = formatTokenCount(totalOutputTokens)
-                                    )
-                                    tokenRow(
-                                        label = stringResource(R.string.chat_context_detail_reasoning),
-                                        value = formatTokenCount(totalReasoningTokens)
-                                    )
-                                    tokenRow(
-                                        label = stringResource(R.string.chat_context_detail_cache_read),
-                                        value = formatTokenCount(totalCacheReadTokens)
-                                    )
-                                    tokenRow(
-                                        label = stringResource(R.string.chat_context_detail_cache_write),
-                                        value = formatTokenCount(totalCacheWriteTokens)
-                                    )
-                                }
-                                if (totalCost > 0) {
                                     Text(
                                         text = stringResource(
-                                            R.string.chat_context_detail_cost,
-                                            String.format("%.4f", totalCost)
+                                            R.string.chat_context_detail_window,
+                                            formatTokenCount(contextWindow)
                                         ),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary
+                                        style = MaterialTheme.typography.bodyMedium
                                     )
+                                    Text(
+                                        text = stringResource(
+                                            R.string.chat_context_detail_usage,
+                                            pct,
+                                            formatTokenCount(lastContextTokens)
+                                        ),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Column(
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        tokenRow(
+                                            label = stringResource(R.string.chat_context_detail_input),
+                                            value = formatTokenCount(totalInputTokens)
+                                        )
+                                        tokenRow(
+                                            label = stringResource(R.string.chat_context_detail_output),
+                                            value = formatTokenCount(totalOutputTokens)
+                                        )
+                                        tokenRow(
+                                            label = stringResource(R.string.chat_context_detail_reasoning),
+                                            value = formatTokenCount(totalReasoningTokens)
+                                        )
+                                        tokenRow(
+                                            label = stringResource(R.string.chat_context_detail_cache_read),
+                                            value = formatTokenCount(totalCacheReadTokens)
+                                        )
+                                        tokenRow(
+                                            label = stringResource(R.string.chat_context_detail_cache_write),
+                                            value = formatTokenCount(totalCacheWriteTokens)
+                                        )
+                                    }
+                                    if (totalCost > 0) {
+                                        Text(
+                                            text = stringResource(
+                                                R.string.chat_context_detail_cost,
+                                                String.format("%.4f", totalCost)
+                                            ),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showContextDialog = false }) {
-                                Text(stringResource(R.string.close))
+                                Spacer(Modifier.height(16.dp))
+                                DialogButtons(
+                                    buttons = listOf(
+                                        Triple(stringResource(R.string.close), DialogButtonRole.Primary) { showContextDialog = false },
+                                    )
+                                )
                             }
                         }
-                    )
+                    }
                 }
 
                 Box {
