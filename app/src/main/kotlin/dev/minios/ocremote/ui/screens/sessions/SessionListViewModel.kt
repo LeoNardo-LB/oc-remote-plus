@@ -172,12 +172,12 @@ class SessionListViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load sessions", e)
                 _error.value = e.message ?: "Failed to load sessions"
-            } finally {
+            }             finally {
                 // Auto-expand root directories on first load
                 if (_expandedPaths.value.isEmpty()) {
                     val currentSessions = eventDispatcher.sessions.value
                     val topDirs = currentSessions
-                        .mapNotNull { s -> s.directory.takeIf { it.isNotBlank() }?.trimEnd('/')?.substringBeforeLast('/') }
+                        .mapNotNull { s -> s.directory.takeIf { it.isNotBlank() }?.replace('\\', '/')?.trimEnd('/') }
                         .filter { it.isNotEmpty() && !it.substring(1).contains('/') }
                         .toSet()
                     _expandedPaths.value = topDirs
@@ -276,8 +276,9 @@ class SessionListViewModel @Inject constructor(
     // ============ Tree expand/collapse ============
 
     fun toggleDirectory(path: String) {
+        val normalized = path.replace('\\', '/')
         _expandedPaths.update { paths ->
-            if (path in paths) paths - path else paths + path
+            if (normalized in paths) paths - normalized else paths + normalized
         }
     }
 
