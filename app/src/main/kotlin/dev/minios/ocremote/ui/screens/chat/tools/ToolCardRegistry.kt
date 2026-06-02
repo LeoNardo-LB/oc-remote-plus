@@ -38,7 +38,7 @@ internal data class ToolDisplayInfo(
  * e.g. "Read /path/to/File.kt" → "File.kt", "Edit file" → "Edit file" (unchanged)
  */
 private fun extractFileNameFromTitle(title: String): String {
-    val lastSegment = title.substringAfterLast('/')
+    val lastSegment = title.substringAfterLast('/').substringAfterLast('\\')
     return if (lastSegment.length < title.length && lastSegment.contains('.')) {
         lastSegment
     } else {
@@ -66,7 +66,7 @@ internal fun resolveToolDisplay(
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
         ?: input["path"]?.jsonPrimitive?.contentOrNull
         ?: input["file"]?.jsonPrimitive?.contentOrNull
-    val shortPath = filePath?.substringAfterLast('/')
+    val shortPath = filePath?.let { java.io.File(it).name }
 
     return when (toolName) {
         "read" -> {
@@ -120,7 +120,7 @@ internal fun resolveToolDisplay(
         "list", "listDirectory" -> {
             ToolDisplayInfo(
                 title = serverTitle ?: stringResource(R.string.tool_list_directory),
-                subtitle = filePath,
+                subtitle = shortPath ?: filePath,
                 icon = Icons.Default.Folder
             )
         }
