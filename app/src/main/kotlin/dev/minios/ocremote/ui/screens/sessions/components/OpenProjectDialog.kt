@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,15 @@ internal fun OpenProjectDialog(
     onDismiss: () -> Unit
 ) {
     val isAmoled = isAmoledTheme()
+    val fieldColors = if (isAmoled) {
+        OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.Black,
+            unfocusedContainerColor = Color.Black,
+            disabledContainerColor = Color.Black,
+        )
+    } else {
+        OutlinedTextFieldDefaults.colors()
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var currentDir by remember { mutableStateOf<String?>(null) }
@@ -220,6 +231,7 @@ internal fun OpenProjectDialog(
                         Text(stringResource(R.string.sessions_create_folder_name_placeholder))
                     },
                     isError = createFolderError != null,
+                    colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (createFolderError != null) {

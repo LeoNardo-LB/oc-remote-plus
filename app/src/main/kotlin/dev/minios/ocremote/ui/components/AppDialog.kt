@@ -53,7 +53,7 @@ fun AppDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 4.dp, top = 16.dp, bottom = 12.dp),
+                        .padding(start = 24.dp, end = 8.dp, top = 20.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -77,7 +77,7 @@ fun AppDialog(
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
                     content = content,
                 )
 
@@ -87,7 +87,7 @@ fun AppDialog(
 
                 // Buttons
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                     content = buttons,
                 )
             }
@@ -102,7 +102,7 @@ fun ColumnScope.AppDialogButtons(
     if (buttons.size <= 2) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             buttons.forEach { (text, style, onClick) ->
                 DialogButton(
@@ -116,7 +116,7 @@ fun ColumnScope.AppDialogButtons(
     } else {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             buttons.forEach { (text, style, onClick) ->
                 DialogButton(
