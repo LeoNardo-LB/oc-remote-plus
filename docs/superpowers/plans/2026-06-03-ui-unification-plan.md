@@ -166,6 +166,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -368,7 +369,7 @@ fun ConfirmDialog(
     title: String,
     message: String,
     confirmLabel: String,
-    @Suppress("UNUSED_PARAMETER") confirmRole: DialogButtonRole = DialogButtonRole.Danger,
+    confirmRole: DialogButtonRole = DialogButtonRole.Danger,
     dismissLabel: String = stringResource(android.R.string.cancel),
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
@@ -400,7 +401,7 @@ fun ConfirmDialog(
                 DialogButtons(
                     buttons = listOf(
                         Triple(dismissLabel, DialogButtonRole.Secondary, onDismiss),
-                        Triple(confirmLabel, DialogButtonRole.Danger, onConfirm),
+                        Triple(confirmLabel, confirmRole, onConfirm),
                     )
                 )
             }
@@ -2510,6 +2511,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -2541,7 +2543,9 @@ internal fun ThemePickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.92f),
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .heightIn(max = 480.dp),
             color = params.containerColor,
             tonalElevation = params.tonalElevation,
             border = params.border,
@@ -2593,6 +2597,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -2625,7 +2630,9 @@ internal fun LanguagePickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.92f),
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .heightIn(max = 520.dp),
             color = params.containerColor,
             tonalElevation = params.tonalElevation,
             border = params.border,
