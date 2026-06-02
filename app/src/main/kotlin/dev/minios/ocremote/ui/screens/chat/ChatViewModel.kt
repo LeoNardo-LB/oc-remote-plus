@@ -858,9 +858,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectModel(providerId: String, modelId: String) {
+        // MUST set flag BEFORE modifying StateFlows — on Main.immediate dispatcher,
+        // setting a StateFlow value synchronously triggers combine recomputation,
+        // which would overwrite our values if the flag isn't set yet.
+        isModelExplicitlySelected = true
         _selectedProviderId.value = providerId
         _selectedModelId.value = modelId
-        isModelExplicitlySelected = true
         // Remember selection for this session (in-memory, cleared on app restart)
         sessionModelCache[sessionId] = providerId to modelId
     }

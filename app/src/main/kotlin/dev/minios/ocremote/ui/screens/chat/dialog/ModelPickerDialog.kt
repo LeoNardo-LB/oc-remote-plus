@@ -6,18 +6,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -29,10 +29,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.dto.response.ProviderModel
-import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.theme.AlphaTokens
@@ -48,6 +48,7 @@ internal fun ModelPickerDialog(
     onDismiss: () -> Unit
 ) {
     val isAmoled = isAmoledTheme()
+
     fun isModelFree(providerId: String, model: ProviderModel): Boolean {
         if (providerId != "opencode") return false
         val cost = model.cost ?: return true
@@ -61,19 +62,21 @@ internal fun ModelPickerDialog(
             .sortedWith(compareBy<ProviderInfo> { it.id != "opencode" }.thenBy { it.name.lowercase() })
     }
 
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        AmoledSurface(
-            isAmoledDark = isAmoled,
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
             shape = ShapeTokens.largeMedium,
-            normalTonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 560.dp)
+            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth()
         ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 for ((index, provider) in sortedProviders.withIndex()) {
                     val topPad = if (index == 0) 0.dp else 12.dp
@@ -116,7 +119,10 @@ internal fun ModelPickerDialog(
                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = AlphaTokens.MUTED)
                                     else Color.Transparent
                                 )
-                                .clickable { onSelect(provider.id, model.id) }
+                                .clickable {
+                                    onSelect(provider.id, model.id)
+                                    onDismiss()
+                                }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

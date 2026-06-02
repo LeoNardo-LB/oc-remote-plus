@@ -1075,7 +1075,6 @@ fun ChatScreen(
             selectedModelId = uiState.selectedModelId,
             onSelect = { providerId, modelId ->
                 viewModel.selectModel(providerId, modelId)
-                showModelPicker = false
             },
             onDismiss = { showModelPicker = false }
         )
