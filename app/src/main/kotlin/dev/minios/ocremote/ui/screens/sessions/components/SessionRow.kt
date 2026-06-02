@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -73,13 +75,13 @@ internal fun SessionRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Status icon
-        val statusIconColor = when (item.status) {
-            is SessionStatus.Busy -> MaterialTheme.colorScheme.tertiary
-            is SessionStatus.Retry -> MaterialTheme.colorScheme.error
-            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
+        val (statusIcon, statusIconColor) = when (item.status) {
+            is SessionStatus.Busy -> Icons.Filled.ChatBubble to MaterialTheme.colorScheme.tertiary
+            is SessionStatus.Retry -> Icons.Outlined.ErrorOutline to MaterialTheme.colorScheme.error
+            else -> Icons.Outlined.ChatBubbleOutline to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.FAINT)
         }
         Icon(
-            imageVector = Icons.Outlined.ChatBubbleOutline,
+            imageVector = statusIcon,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
             tint = statusIconColor,
