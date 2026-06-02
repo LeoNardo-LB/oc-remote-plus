@@ -100,83 +100,45 @@ fun SessionListScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteSessionId by remember { mutableStateOf("") }
     var deleteSessionTitle by remember { mutableStateOf("") }
-    var showDeleteSelectedDialog by remember { mutableStateOf(false) }
-
     var showOpenProject by remember { mutableStateOf(false) }
     var showBaseDirDialog by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = uiState.isSelectionMode) {
-        viewModel.clearSelection()
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            if (uiState.isSelectionMode) {
-                TopAppBar(
-                    title = {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(ShapeTokens.small)
+                            .clickable { showBaseDirDialog = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
                         Text(
-                            text = stringResource(R.string.sessions_selected_count, uiState.selectedIds.size),
+                            text = uiState.baseDirectory?.let { dir ->
+                                dir.replace('\\', '/').trimEnd('/')
+                            } ?: uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
                             style = MaterialTheme.typography.titleMedium
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { viewModel.clearSelection() }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                        }
-                    },
-                    actions = {
-                        TextButton(onClick = { viewModel.selectAll() }) {
-                            Text(stringResource(R.string.sessions_select_all))
-                        }
-                        IconButton(onClick = { showDeleteSelectedDialog = true }) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.sessions_delete_selected),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-            } else {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(ShapeTokens.small)
-                                .clickable { showBaseDirDialog = true }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = uiState.baseDirectory?.let { dir ->
-                                    dir.replace('\\', '/').trimEnd('/')
-                                } ?: uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                        }
-                    },
-                )
-            }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
         },
         floatingActionButton = {
-            if (!uiState.isSelectionMode) {
-                FloatingActionButton(
+            FloatingActionButton(
                     onClick = { showOpenProject = true },
                     containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.primaryContainer,
                     contentColor = if (isAmoled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
@@ -202,7 +164,6 @@ fun SessionListScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = stringResource(R.string.sessions_new))
                 }
-            }
         }
     ) { padding ->
         Box(
@@ -277,16 +238,9 @@ fun SessionListScreen(
                                 is TreeNode.Session -> {
                                     SessionRow(
                                         item = node.session,
-                                        isSelectionMode = uiState.isSelectionMode,
-                                        isSelected = node.id in uiState.selectedIds,
                                         onClick = {
-                                            if (uiState.isSelectionMode) {
-                                                viewModel.toggleSelection(node.id)
-                                            } else {
-                                                onNavigateToChat(node.id, false)
-                                            }
+                                            onNavigateToChat(node.id, false)
                                         },
-                                        onLongClick = { viewModel.toggleSelection(node.id) },
                                         onRename = {
                                             renameSessionId = node.id
                                             renameText = node.session.session.title ?: ""
@@ -340,46 +294,6 @@ fun SessionListScreen(
             },
             onDismiss = { showBaseDirDialog = false }
         )
-    }
-
-    // Delete selected dialog
-    if (showDeleteSelectedDialog) {
-        BasicAlertDialog(onDismissRequest = { showDeleteSelectedDialog = false }) {
-            AmoledSurface(
-                isAmoledDark = isAmoled,
-                shape = ShapeTokens.largeMedium,
-                normalTonalElevation = 6.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.sessions_delete_selected),
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Text(stringResource(R.string.sessions_delete_selected_confirm, uiState.selectedIds.size))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showDeleteSelectedDialog = false }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        TextButton(
-                            onClick = {
-                                viewModel.deleteSelected()
-                                showDeleteSelectedDialog = false
-                            },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Text(stringResource(R.string.delete))
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // Rename dialog
