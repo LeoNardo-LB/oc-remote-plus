@@ -47,7 +47,7 @@ internal fun BatteryOptimizationBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = AlphaTokens.HIGH)
                 )
             }
-            FilledTonalButton(onClick = onDisable) {
+            Button(onClick = onDisable) {
                 Text(stringResource(R.string.home_fix))
             }
         }

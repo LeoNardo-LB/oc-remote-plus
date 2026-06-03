@@ -24,7 +24,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -66,6 +66,7 @@ import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.components.DialogButtons
 import dev.minios.ocremote.ui.components.DialogButtonRole
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
+import dev.minios.ocremote.ui.theme.ButtonTokens
 import dev.minios.ocremote.ui.screens.sessions.components.DirectoryTreeNode
 import dev.minios.ocremote.ui.screens.sessions.components.SessionRow
 import dev.minios.ocremote.ui.screens.sessions.components.TreeNode
@@ -207,7 +208,7 @@ fun SessionListScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error
                         )
-                        FilledTonalButton(onClick = { viewModel.loadSessions() }) {
+                        Button(onClick = { viewModel.loadSessions() }) {
                             Text(stringResource(R.string.retry))
                         }
                     }
