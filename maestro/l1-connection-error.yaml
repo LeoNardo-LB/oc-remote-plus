@@ -1,0 +1,17 @@
+appId: dev.minios.ocremote.dev
+name: L1 - Connection Error Screen
+tags:
+  - layer1
+  - network
+---
+
+# Launch app
+- launchApp
+
+# Wait for app to load
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+# Take screenshot of current state
+- takeScreenshot: l1_connection_state

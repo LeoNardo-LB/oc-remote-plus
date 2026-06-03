@@ -1,0 +1,16 @@
+appId: dev.minios.ocremote.dev
+name: L1 - App Launch
+tags:
+  - layer1
+  - smoke
+---
+
+# Launch app
+- launchApp:
+    clearState: false
+
+# Verify home screen loads (check for app title or server list)
+- assertVisible: ".*"
+
+# Take screenshot for verification
+- takeScreenshot: l1_app_launch

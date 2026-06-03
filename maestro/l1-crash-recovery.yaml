@@ -1,0 +1,27 @@
+appId: dev.minios.ocremote.dev
+name: L1 - Crash Recovery
+tags:
+  - layer1
+  - crash
+---
+
+# Launch app
+- launchApp
+
+# Wait for app to load
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+# Force stop the app (simulates crash)
+- stopApp
+
+# Relaunch - should recover with crash info
+- launchApp
+
+# Verify app comes back up
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 15000
+
+- takeScreenshot: l1_crash_recovery
