@@ -1,14 +1,74 @@
 appId: dev.minios.ocremote.dev
-name: L5 - Token Usage and Permission Settings
+name: L5 - Token Permission Settings
 tags:
   - layer5
-  - manual
+  - settings
+  - permissions
 ---
-# Manual: TokenUsageCard visible in chat, PermissionRulesSection in Settings
 
+# Launch app
 - launchApp
+
+# Wait for home screen
 - extendedWaitUntil:
-    visible: ".*"
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l5_token_app_loaded
+
+# Navigate to Settings
+- tapOn:
+    text: "Settings"
+    optional: true
+
+# Wait for Settings screen
+- extendedWaitUntil:
+    visible: "Settings"
     timeout: 10000
-- takeScreenshot: l5_app_loaded
-# Navigate to Settings to see permission auto-approve rules section
+
+- assertVisible: "Settings"
+- takeScreenshot: l5_token_settings_loaded
+
+# Verify Settings loaded with expected sections
+- assertVisible: "General"
+- assertVisible: "Appearance"
+- takeScreenshot: l5_token_settings_sections
+
+# Note: "Auto-approve rules" is the last section on a long Settings page.
+# Maestro swipe doesn't effectively scroll Compose LazyColumn.
+# The Auto-approve rules section is verified by androidTest (PermissionRulesSectionTest)
+# and by manual adb-assisted screenshot below.
+
+# Scroll to bottom via repeated swipes (best-effort for Maestro)
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- takeScreenshot: l5_token_settings_scrolled

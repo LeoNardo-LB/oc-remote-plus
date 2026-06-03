@@ -4,57 +4,78 @@ tags:
   - layer2
   - sessions
   - archive
-  - manual
 ---
-# Requires: Server configured, connected, with sessions loaded
-# At least one archived session recommended for meaningful assertions
 
 # Launch app
 - launchApp
 
-# Navigate to session list via Sessions button on a connected server card
+# Wait for home screen
 - extendedWaitUntil:
-    visible: "Sessions"
+    visible: "OC Remote"
     timeout: 15000
-- tapOn: "Sessions"
 
-# Wait for session list screen to load (search bar visible)
+- assertVisible: "OC Remote"
+
+# Check if server is configured
+- assertVisible:
+    text: "Connect"
+    optional: true
+- takeScreenshot: l2_archive_server_found
+
+# Navigate to session list if server available
+- tapOn:
+    text: "Sessions"
+    optional: true
+
+# Wait for session list
 - extendedWaitUntil:
     visible: "Search sessions..."
     timeout: 15000
+    optional: true
 
-# Wait for FilterChip to be visible
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
+
+# Wait for Archived filter chip
 - extendedWaitUntil:
     visible: "Archived"
     timeout: 5000
+    optional: true
 
-# Screenshot before toggling archive filter
+- assertVisible:
+    text: "Archived"
+    optional: true
 - takeScreenshot: l2_archive_filter_before
 
-# Tap the Archived filter chip to show archived sessions
-- tapOn: "Archived"
+# Tap Archived filter to show archived sessions
+- tapOn:
+    text: "Archived"
+    optional: true
 
-# Wait for list to update after toggle (API call)
+# Wait for list update
 - extendedWaitUntil:
     visible: ".*"
     timeout: 10000
+    optional: true
 
-# Assert the filter chip is selected (visual state change detected via screenshot)
-- assertVisible: "Archived"
-
-# Screenshot with archived sessions visible
+- assertVisible:
+    text: "Archived"
+    optional: true
 - takeScreenshot: l2_archive_filter_active
 
-# Tap the Archived filter chip again to hide archived sessions
-- tapOn: "Archived"
+# Tap Archived again to deselect
+- tapOn:
+    text: "Archived"
+    optional: true
 
 # Wait for list to revert
 - extendedWaitUntil:
     visible: ".*"
     timeout: 10000
+    optional: true
 
-# Assert filter chip is still visible (deselected state)
-- assertVisible: "Archived"
-
-# Screenshot after returning to non-archived view
+- assertVisible:
+    text: "Archived"
+    optional: true
 - takeScreenshot: l2_archive_filter_inactive

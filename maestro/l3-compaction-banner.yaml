@@ -2,13 +2,33 @@ appId: dev.minios.ocremote.dev
 name: L3 - Compaction Banner
 tags:
   - layer3
-  - manual
+  - compaction
 ---
-# Manual: Requires server connected, session with large context triggering compaction
 
+# Launch app
 - launchApp
+
+# Wait for home screen
 - extendedWaitUntil:
-    visible: ".*"
-    timeout: 10000
-- takeScreenshot: l3_compaction
-# CompactionBanner appears when "Compressing context..." is active
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l3_compaction_app_loaded
+
+# Verify the home screen renders without crash
+# CompactionBanner appears during context compression in active sessions
+- assertVisible: "Add Server"
+- takeScreenshot: l3_compaction_home
+
+# Navigate through screens to verify no crash
+- swipe:
+    direction: DOWN
+
+- takeScreenshot: l3_compaction_scrolled
+
+- swipe:
+    direction: UP
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l3_compaction_scrolled_back

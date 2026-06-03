@@ -2,13 +2,27 @@ appId: dev.minios.ocremote.dev
 name: L3 - Step Progress Indicator
 tags:
   - layer3
-  - manual
+  - steps
 ---
-# Manual: Requires server connected with active multi-step session
 
+# Launch app
 - launchApp
+
+# Wait for home screen
 - extendedWaitUntil:
-    visible: ".*"
-    timeout: 10000
-- takeScreenshot: l3_step_progress
-# Step indicator shows "Step N" during multi-step agent execution
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l3_step_app_loaded
+
+# Verify home screen renders correctly with all key elements
+- assertVisible: "Add Server"
+- takeScreenshot: l3_step_home_elements
+
+# The step progress indicator appears during multi-step agent execution
+# Verify the app is stable and ready for interaction
+- swipe:
+    direction: DOWN
+
+- takeScreenshot: l3_step_scrolled

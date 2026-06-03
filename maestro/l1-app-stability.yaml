@@ -1,0 +1,30 @@
+appId: dev.minios.ocremote.dev
+name: L1 - App Stability
+tags:
+  - layer1
+  - stability
+---
+
+# Launch app
+- launchApp
+
+# Wait for content to render
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l1_stability_loaded
+
+# Swipe down on home screen to test rendering stability
+- swipe:
+    direction: DOWN
+
+- takeScreenshot: l1_stability_scrolled_down
+
+# Swipe back up
+- swipe:
+    direction: UP
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l1_stability_scrolled_up

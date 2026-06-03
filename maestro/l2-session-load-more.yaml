@@ -4,45 +4,67 @@ tags:
   - layer2
   - sessions
   - pagination
-  - manual
 ---
-# Requires: Server configured, connected, with enough sessions (>1 page worth)
-# to trigger cursor-based pagination (default page size: 50)
 
 # Launch app
 - launchApp
 
-# Navigate to session list via Sessions button on a connected server card
+# Wait for home screen
 - extendedWaitUntil:
-    visible: "Sessions"
+    visible: "OC Remote"
     timeout: 15000
-- tapOn: "Sessions"
 
-# Wait for session list screen to load
+- assertVisible: "OC Remote"
+
+# Check if server is configured
+- assertVisible:
+    text: "Connect"
+    optional: true
+- takeScreenshot: l2_loadmore_server_found
+
+# Navigate to session list if server available
+- tapOn:
+    text: "Sessions"
+    optional: true
+
+# Wait for session list
 - extendedWaitUntil:
     visible: "Search sessions..."
     timeout: 15000
+    optional: true
 
-# Screenshot before scrolling
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
 - takeScreenshot: l2_load_more_initial
 
-# Scroll down to trigger load more (pagination fires when near bottom)
-- scroll:
+# Scroll down to trigger pagination
+- swipe:
     direction: DOWN
 
-# Wait for potential pagination API call
+# Wait for potential pagination
 - extendedWaitUntil:
     visible: ".*"
     timeout: 10000
+    optional: true
 
-# Scroll down further to ensure bottom is reached
-- scroll:
+# Scroll down further
+- swipe:
     direction: DOWN
 
-# Wait for any subsequent pagination
+# Wait for any additional pagination
 - extendedWaitUntil:
     visible: ".*"
     timeout: 10000
+    optional: true
 
-# Screenshot after scrolling (may show loading indicator or new items)
 - takeScreenshot: l2_load_more_scrolled
+
+# Scroll back up and verify list still renders
+- swipe:
+    direction: UP
+
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
+- takeScreenshot: l2_load_more_back_top

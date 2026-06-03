@@ -5,12 +5,19 @@ tags:
   - smoke
 ---
 
-# Launch app
+# Launch app with fresh state
 - launchApp:
-    clearState: false
+    clearState: true
 
-# Verify home screen loads (check for app title or server list)
-- assertVisible: ".*"
+# Wait for home screen - app title or empty state message
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
 
-# Take screenshot for verification
-- takeScreenshot: l1_app_launch
+# Assert the home screen loaded successfully
+- assertVisible: "OC Remote"
+- takeScreenshot: l1_app_launch_home
+
+# If empty state visible, assert that too (no crash, just no servers)
+- assertVisible: "Add Server"
+- takeScreenshot: l1_app_launch_empty_state

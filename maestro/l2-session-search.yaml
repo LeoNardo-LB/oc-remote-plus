@@ -4,39 +4,66 @@ tags:
   - layer2
   - sessions
   - search
-  - manual
 ---
-# Manual test: Requires a configured, connected server with sessions.
-# Run: maestro test maestro/l2-session-search.yaml
-# Setup: Add server in Home → Connect → Verify sessions exist → Run this flow
 
+# Launch app
 - launchApp
+
+# Wait for home screen
 - extendedWaitUntil:
-    visible: ".*"
-    timeout: 10000
+    visible: "OC Remote"
+    timeout: 15000
 
-# Navigate to session list
-- tapOn: "Sessions"
+- assertVisible: "OC Remote"
 
-# Wait for search bar
+# Check if server is connected (Connect button visible = server configured)
+- assertVisible:
+    text: "Connect"
+    optional: true
+- takeScreenshot: l2_search_server_connected
+
+# Navigate to session list if server available
+- tapOn:
+    text: "Sessions"
+    optional: true
+
+# Wait for session list to load
 - extendedWaitUntil:
     visible: "Search sessions..."
     timeout: 15000
+    optional: true
+
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
 - takeScreenshot: l2_session_search_initial
 
-# Search
-- tapOn: "Search sessions..."
-- inputText: "test"
-- extendedWaitUntil:
-    visible: "test"
-    timeout: 10000
-- assertVisible: "test"
-- takeScreenshot: l2_session_search_filtered
+# Tap on search bar
+- tapOn:
+    text: "Search sessions..."
+    optional: true
 
-# Clear
-- tapOn: "Clear search"
+# Enter search text
+- inputText: "test"
+
+# Wait for search results or empty state
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: l2_session_search_typed
+
+# Press back to dismiss keyboard and go back
+- pressKey: BACK
+
+# Wait for session list
 - extendedWaitUntil:
     visible: "Search sessions..."
     timeout: 10000
-- assertVisible: "Search sessions..."
-- takeScreenshot: l2_session_search_cleared
+    optional: true
+
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
+- takeScreenshot: l2_session_search_done

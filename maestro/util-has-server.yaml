@@ -1,0 +1,14 @@
+appId: dev.minios.ocremote.dev
+name: Util - Check Has Server
+tags:
+  - util
+---
+
+# This is a reusable sub-flow. Not meant to be run directly.
+# L2+ flows use this pattern to detect if a server is configured.
+# Usage: copy the conditional pattern into your flow.
+
+# Check if "Connect" button is visible (means server is configured)
+- assertVisible:
+    text: "Connect"
+    timeout: 5000

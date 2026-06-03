@@ -8,10 +8,15 @@ tags:
 # Launch app
 - launchApp
 
-# Wait for app to load
+# Wait for home screen to render
 - extendedWaitUntil:
-    visible: ".*"
-    timeout: 10000
+    visible: "OC Remote"
+    timeout: 15000
 
-# Take screenshot of current state
+# Assert app loaded without crash
+- assertVisible: "OC Remote"
 - takeScreenshot: l1_connection_state
+
+# Verify empty state text (app renders properly even without server)
+- assertVisible: "Add Server"
+- takeScreenshot: l1_connection_empty_state

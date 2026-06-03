@@ -58,7 +58,7 @@ maestro/
 - 每个 Layer 中涉及 UI 变更的 Task，必须编写对应的 Maestro flow
 - Flow 中必须包含 `takeScreenshot` 步骤
 - Flow 必须包含 `assertVisible` 断言（不是仅截图）
-- 标注 `manual: true` 的 flow（如需要手动操作网络开关）记录在 README 中
+- **禁止使用 `manual` tag** — 所有 flow 必须可通过 `maestro test` 全自动运行，不允许任何手动步骤
 
 **运行（需模拟器）：**
 ```bash
@@ -89,7 +89,7 @@ maestro test maestro/l{n}-{feature}.yaml
 
 **Maestro flow 实机运行要求：**
 - 每个 Layer 中涉及 UI 的功能，其 Maestro flow **必须在模拟器上实际运行并全部通过**
-- `manual: true` 标记的 flow（需要外部依赖如服务器连接）记录在 `maestro/README.md` 中，标注为 "需手动环境验证"
+- **禁止使用 `manual: true` 标记** — 如果 flow 依赖外部条件（如服务器连接），必须在 flow 中通过条件检测（`extendedWaitUntil`）优雅处理，而非要求手动操作
 - Flow 中的 `takeScreenshot` 步骤必须全部 COMPLETED（截图成功生成）
 - Flow 中的 `assertVisible` 断言必须全部通过
 
@@ -106,7 +106,7 @@ maestro test maestro/l{n}-{feature}.yaml
 
 **特殊情况处理：**
 - 无模拟器可用时：在 Layer 完成报告中明确标注 "⚠️ 未进行实机验证"，列出需要补测的 items
-- Maestro flow 需要外部依赖（如服务器）：标注 `manual` 并记录在 README 中
+- Maestro flow 需要外部依赖（如服务器）：通过 `extendedWaitUntil` 超时或条件分支优雅降级，**禁止使用 `manual` 标记**
 - androidTest 因环境问题失败：记录失败原因，作为 known issue 跟踪
 
 ### 维度 3: 代码分支日志输出验证 (Log Branch Verification)

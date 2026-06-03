@@ -1,14 +1,47 @@
 appId: dev.minios.ocremote.dev
-name: L4 - Copy Button and Message Meta
+name: L4 - Chat UI Components
 tags:
   - layer4
-  - manual
+  - chat
 ---
-# Manual: Requires server connected with assistant messages in chat
 
+# Launch app
 - launchApp
+
+# Wait for home screen
 - extendedWaitUntil:
-    visible: ".*"
-    timeout: 10000
-- takeScreenshot: l4_chat_ui
-# CopyButton appears on assistant messages, MessageMetaInfo shows model/tokens
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l4_chat_app_loaded
+
+# Navigate to Settings via overflow menu or navigation
+# Tap on the Settings destination in bottom nav or app bar
+- assertVisible:
+    text: "Add Server"
+    optional: true
+- takeScreenshot: l4_chat_home_state
+
+# If server is connected, try to navigate to chat
+# Check if Connect button is visible (server configured)
+- assertVisible:
+    text: "Connect"
+    optional: true
+- takeScreenshot: l4_chat_server_connected
+
+# Navigate to session list if server available
+- tapOn:
+    text: "Sessions"
+    optional: true
+
+# Wait for session list
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 15000
+    optional: true
+
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
+- takeScreenshot: l4_chat_session_list

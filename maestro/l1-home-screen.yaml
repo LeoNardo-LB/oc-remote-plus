@@ -1,0 +1,23 @@
+appId: dev.minios.ocremote.dev
+name: L1 - Home Screen
+tags:
+  - layer1
+  - home
+---
+
+# Launch app
+- launchApp
+
+# Wait for home screen title
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+
+# Assert all key home screen elements
+- assertVisible: "OC Remote"
+- assertVisible: "Add Server"
+- takeScreenshot: l1_home_screen
+
+# If "No servers configured" is visible, assert it
+- assertVisible: "No servers configured"
+- takeScreenshot: l1_home_screen_empty

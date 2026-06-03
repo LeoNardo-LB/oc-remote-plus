@@ -5,23 +5,27 @@ tags:
   - crash
 ---
 
-# Launch app
+# First launch
 - launchApp
 
-# Wait for app to load
+# Wait for home screen
 - extendedWaitUntil:
-    visible: ".*"
-    timeout: 10000
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: l1_crash_before_stop
 
 # Force stop the app (simulates crash)
 - stopApp
 
-# Relaunch - should recover with crash info
+# Relaunch - should recover gracefully
 - launchApp
 
 # Verify app comes back up
 - extendedWaitUntil:
-    visible: ".*"
+    visible: "OC Remote"
     timeout: 15000
 
+- assertVisible: "OC Remote"
 - takeScreenshot: l1_crash_recovery
