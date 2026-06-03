@@ -34,4 +34,19 @@ class ManageSessionUseCase @Inject constructor(
     suspend fun abortSession(conn: ServerConnection, sessionId: String, directory: String?) {
         api.abortSession(conn, sessionId, directory)
     }
+
+    suspend fun deleteMessage(conn: ServerConnection, sessionId: String, messageId: String): Boolean =
+        api.deleteMessage(conn, sessionId, messageId)
+
+    suspend fun deleteMessagePart(conn: ServerConnection, sessionId: String, messageId: String, partIndex: Int): Boolean =
+        api.deleteMessagePart(conn, sessionId, messageId, partIndex)
+
+    suspend fun archiveSession(conn: ServerConnection, sessionId: String): Session =
+        api.updateSessionFields(conn, sessionId, mapOf("archived" to true))
+
+    suspend fun unarchiveSession(conn: ServerConnection, sessionId: String): Session =
+        api.updateSessionFields(conn, sessionId, mapOf("archived" to false))
+
+    suspend fun importSession(conn: ServerConnection, shareUrl: String): Session =
+        api.importSession(conn, shareUrl)
 }
