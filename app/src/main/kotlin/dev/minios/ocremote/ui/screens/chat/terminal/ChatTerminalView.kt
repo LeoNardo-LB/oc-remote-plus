@@ -45,7 +45,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.DrawerValue
@@ -483,7 +483,7 @@ fun ChatTerminalView(
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            FilledTonalButton(
+                            Button(
                                 onClick = {
                                     viewModel.createTerminalTab { ok ->
                                         if (!ok) {
@@ -496,13 +496,14 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                colors = ButtonTokens.tonalColors()
+                                colors = ButtonTokens.filledColors(),
+                                border = ButtonTokens.amoledBorder(),
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
                                 Text("New")
                             }
-                            FilledTonalButton(
+                            Button(
                                 onClick = {
                                     keyboardController?.show()
                                     coroutineScope.launch { terminalDrawerState.close() }
@@ -510,7 +511,8 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                colors = ButtonTokens.tonalColors()
+                                colors = ButtonTokens.filledColors(),
+                                border = ButtonTokens.amoledBorder(),
                             ) {
                                 Icon(Icons.Default.Keyboard, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))

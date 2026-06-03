@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,9 +18,9 @@ import dev.minios.ocremote.ui.theme.ButtonTokens
 /**
  * Role of a button inside a dialog.
  *
- * - [Primary]:   Main action (confirm, save, create). FilledTonalButton with primary color.
- * - [Secondary]: Cancel / dismiss. FilledTonalButton with surface variant color.
- * - [Danger]:    Destructive action (delete, revert). FilledTonalButton with error color.
+ * - [Primary]:   Main action (confirm, save, create). Filled Button with primary color.
+ * - [Secondary]: Cancel / dismiss. FilledTonalButton with Material 3 default colors.
+ * - [Danger]:    Destructive action (delete, revert). FilledTonalButton with errorContainer color.
  */
 enum class DialogButtonRole {
     Primary,
@@ -82,11 +84,11 @@ private fun DialogActionButton(
     val contentPadding = if (compact) ButtonTokens.CompactPadding else ButtonDefaults.ContentPadding
     when (role) {
         DialogButtonRole.Primary -> {
-            FilledTonalButton(
+            Button(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonTokens.tonalColors(),
-                border = ButtonTokens.tonalBorder(),
+                colors = ButtonTokens.filledColors(),
+                border = ButtonTokens.amoledBorder(),
                 contentPadding = contentPadding,
             ) {
                 Text(text)
@@ -96,8 +98,6 @@ private fun DialogActionButton(
             FilledTonalButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonTokens.secondaryColors(),
-                border = ButtonTokens.tonalBorder(),
                 contentPadding = contentPadding,
             ) {
                 Text(text)
@@ -108,7 +108,7 @@ private fun DialogActionButton(
                 onClick = onClick,
                 modifier = modifier,
                 colors = ButtonTokens.dangerColors(),
-                border = ButtonTokens.tonalBorder(),
+                border = ButtonTokens.amoledBorder(),
                 contentPadding = contentPadding,
             ) {
                 Text(text)

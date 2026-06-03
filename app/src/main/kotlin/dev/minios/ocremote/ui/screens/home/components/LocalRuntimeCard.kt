@@ -114,11 +114,11 @@ internal fun LocalRuntimeCard(
 
             // Fix command copy button (for errors with a known fix)
             if (runtimeStatus == LocalRuntimeStatus.Error && !fixCommand.isNullOrBlank()) {
-                FilledTonalButton(
+                Button(
                     onClick = { onCopyFixCommand(fixCommand) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonTokens.tonalColors(),
-                    border = ButtonTokens.tonalBorder(),
+                    colors = ButtonTokens.filledColors(),
+                    border = ButtonTokens.amoledBorder(),
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -127,11 +127,11 @@ internal fun LocalRuntimeCard(
             }
 
             if (runtimeStatus == LocalRuntimeStatus.Error && needsOverlaySettings) {
-                FilledTonalButton(
+                Button(
                     onClick = onOpenTermuxOverlaySettings,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonTokens.tonalColors(),
-                    border = ButtonTokens.tonalBorder(),
+                    colors = ButtonTokens.filledColors(),
+                    border = ButtonTokens.amoledBorder(),
                 ) {
                     Icon(Icons.Default.OpenInNew, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -143,11 +143,11 @@ internal fun LocalRuntimeCard(
             when {
                 // Termux not installed — show install button
                 !termuxInstalled -> {
-                    FilledTonalButton(
+                    Button(
                         onClick = onInstallTermux,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonTokens.tonalColors(),
-                        border = ButtonTokens.tonalBorder(),
+                        colors = ButtonTokens.filledColors(),
+                        border = ButtonTokens.amoledBorder(),
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -162,22 +162,22 @@ internal fun LocalRuntimeCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = cardContentColor.copy(alpha = AlphaTokens.AMOLED),
                     )
-                    FilledTonalButton(
+                    Button(
                         onClick = onSetup,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonTokens.tonalColors(),
-                        border = ButtonTokens.tonalBorder(),
+                        colors = ButtonTokens.filledColors(),
+                        border = ButtonTokens.amoledBorder(),
                     ) {
                         Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.home_local_setup))
                     }
 
-                    FilledTonalButton(
+                    Button(
                         onClick = onStart,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonTokens.tonalColors(),
-                        border = ButtonTokens.tonalBorder(),
+                        colors = ButtonTokens.filledColors(),
+                        border = ButtonTokens.amoledBorder(),
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -199,11 +199,11 @@ internal fun LocalRuntimeCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (localServerConnected) {
-                            FilledTonalButton(
+                            Button(
                                 onClick = onOpenLocalSessions,
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonTokens.tonalColors(),
-                                border = ButtonTokens.tonalBorder(),
+                                colors = ButtonTokens.filledColors(),
+                                border = ButtonTokens.amoledBorder(),
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
@@ -211,12 +211,12 @@ internal fun LocalRuntimeCard(
                             }
                         }
 
-                        FilledTonalButton(
+                        Button(
                             onClick = onStop,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = runtimeStatus == LocalRuntimeStatus.Running,
-                            colors = ButtonTokens.tonalColors(),
-                            border = ButtonTokens.tonalBorder(),
+                            colors = ButtonTokens.filledColors(),
+                            border = ButtonTokens.amoledBorder(),
                         ) {
                             if (runtimeStatus == LocalRuntimeStatus.Starting || runtimeStatus == LocalRuntimeStatus.Stopping) {
                                 CircularProgressIndicator(
@@ -237,22 +237,22 @@ internal fun LocalRuntimeCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        FilledTonalButton(
+                        Button(
                             onClick = onStart,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonTokens.tonalColors(),
-                            border = ButtonTokens.tonalBorder(),
+                            colors = ButtonTokens.filledColors(),
+                            border = ButtonTokens.amoledBorder(),
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.home_local_start))
                         }
 
-                        FilledTonalButton(
+                        Button(
                             onClick = onSetup,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonTokens.tonalColors(),
-                            border = ButtonTokens.tonalBorder(),
+                            colors = ButtonTokens.filledColors(),
+                            border = ButtonTokens.amoledBorder(),
                         ) {
                             Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
@@ -280,11 +280,11 @@ internal fun LocalRuntimeCard(
                     )
                 }
 
-                FilledTonalButton(
+                Button(
                     onClick = onOpenLocalSessions,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonTokens.tonalColors(),
-                    border = ButtonTokens.tonalBorder(),
+                    colors = ButtonTokens.filledColors(),
+                    border = ButtonTokens.amoledBorder(),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
                     Spacer(Modifier.width(8.dp))

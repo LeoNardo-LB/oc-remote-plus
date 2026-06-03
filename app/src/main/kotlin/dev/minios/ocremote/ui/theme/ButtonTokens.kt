@@ -12,16 +12,16 @@ import androidx.compose.ui.unit.dp
 /**
  * Centralized button style tokens.
  *
- * All FilledTonalButton colors, borders, and content padding values are defined here.
- * Change once, apply everywhere.
- *
  * Usage:
  * ```kotlin
- * FilledTonalButton(
- *     colors = ButtonTokens.tonalColors(),
- *     border = ButtonTokens.tonalBorder(),
- *     contentPadding = ButtonTokens.CompactPadding,
- * )
+ * // Primary (Filled Button)
+ * Button(colors = ButtonTokens.filledColors(), border = ButtonTokens.amoledBorder())
+ *
+ * // Secondary (FilledTonalButton — no custom colors needed)
+ * FilledTonalButton() // use Material 3 defaults
+ *
+ * // Danger (FilledTonalButton with error tonal)
+ * FilledTonalButton(colors = ButtonTokens.dangerColors(), border = ButtonTokens.amoledBorder())
  * ```
  */
 object ButtonTokens {
@@ -37,51 +37,24 @@ object ButtonTokens {
     /** Spacing between inline buttons in a Row. */
     const val RowSpacing = 8
 
-    // ── FilledTonalButton Colors ──────────────────────────────────────
+    // ── Filled Button Colors (Primary) ────────────────────────────────
 
     /**
-     * Colors for [FilledTonalButton] adapted to the current theme.
+     * Colors for [Button] (Filled) for Primary actions.
      *
-     * - **Light / Dark**: primary / onPrimary — deep saturated container with white text.
+     * - **Light / Dark**: Material 3 default (`primary`/`onPrimary`).
      * - **AMOLED**: Black container + primary content.
      */
     @Composable
-    fun tonalColors(): ButtonColors {
+    fun filledColors(): ButtonColors {
         val isAmoled = LocalAmoledMode.current
         return if (isAmoled) {
-            ButtonDefaults.filledTonalButtonColors(
+            ButtonDefaults.buttonColors(
                 containerColor = Color.Black,
                 contentColor = MaterialTheme.colorScheme.primary,
             )
         } else {
-            ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
-    }
-
-    // ── Secondary FilledTonalButton Colors ────────────────────────────
-
-    /**
-     * Colors for secondary [FilledTonalButton] (cancel / dismiss).
-     *
-     * - **Light**: surfaceContainerHighest / onSurfaceVariant — neutral grey fill.
-     * - **AMOLED**: Black container + onSurfaceVariant content + primary border.
-     */
-    @Composable
-    fun secondaryColors(): ButtonColors {
-        val isAmoled = LocalAmoledMode.current
-        return if (isAmoled) {
-            ButtonDefaults.filledTonalButtonColors(
-                containerColor = Color.Black,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ButtonDefaults.buttonColors()
         }
     }
 
@@ -90,8 +63,8 @@ object ButtonTokens {
     /**
      * Colors for danger [FilledTonalButton] (delete / destructive).
      *
-     * - **Light / Dark**: error / onError — saturated red fill with white text.
-     * - **AMOLED**: Black container + error content + primary border.
+     * - **Light / Dark**: `errorContainer` / `onErrorContainer` (Material 3 tonal error).
+     * - **AMOLED**: Black container + error content.
      */
     @Composable
     fun dangerColors(): ButtonColors {
@@ -103,22 +76,22 @@ object ButtonTokens {
             )
         } else {
             ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
             )
         }
     }
 
-    // ── FilledTonalButton Border ──────────────────────────────────────
+    // ── AMOLED Border ────────────────────────────────────────────────
 
     /**
-     * Border for [FilledTonalButton] adapted to the current theme.
+     * Border for buttons adapted to the current theme.
      *
      * - **AMOLED**: 1dp primary border with [AlphaTokens.HIGH] alpha.
      * - **Light / Dark**: `null` (no border).
      */
     @Composable
-    fun tonalBorder(): BorderStroke? {
+    fun amoledBorder(): BorderStroke? {
         val isAmoled = LocalAmoledMode.current
         return if (isAmoled) {
             BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))

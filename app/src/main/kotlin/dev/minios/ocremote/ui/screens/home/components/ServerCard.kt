@@ -139,11 +139,11 @@ internal fun ServerCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (isConnected) {
-                    FilledTonalButton(
+                    Button(
                         onClick = onOpenSessions,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonTokens.tonalColors(),
-                        border = ButtonTokens.tonalBorder()
+                        colors = ButtonTokens.filledColors(),
+                        border = ButtonTokens.amoledBorder()
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -156,11 +156,11 @@ internal fun ServerCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    FilledTonalButton(
+                    Button(
                         onClick = onDisconnect,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonTokens.tonalColors(),
-                        border = ButtonTokens.tonalBorder()
+                        colors = ButtonTokens.filledColors(),
+                        border = ButtonTokens.amoledBorder()
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -169,12 +169,12 @@ internal fun ServerCard(
                 }
             }
             if (!isConnected) {
-                FilledTonalButton(
+                Button(
                     onClick = onConnect,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isConnecting,
-                    colors = ButtonTokens.tonalColors(),
-                    border = ButtonTokens.tonalBorder()
+                    colors = ButtonTokens.filledColors(),
+                    border = ButtonTokens.amoledBorder()
                 ) {
                     if (isConnecting) {
                         CircularProgressIndicator(
