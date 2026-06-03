@@ -11,12 +11,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun SessionListRoute(
     onNavigateToChat: (sessionId: String, openTerminal: Boolean) -> Unit,
+    onNavigateToNewChat: (directory: String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val viewModel: SessionListViewModel = hiltViewModel()
     SessionListScreen(
         viewModel = viewModel,
         onNavigateToChat = onNavigateToChat,
+        onNavigateToNewChat = onNavigateToNewChat,
         onNavigateBack = onNavigateBack
     )
 }

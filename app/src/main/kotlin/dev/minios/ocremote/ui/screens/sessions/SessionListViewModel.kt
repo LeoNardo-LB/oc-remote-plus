@@ -91,8 +91,6 @@ class SessionListViewModel @Inject constructor(
     private val _baseDirectory = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
     private val _lastToggledDirectory = MutableStateFlow<String?>(null)
-    private val _navigateToSession = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val navigateToSession: SharedFlow<String> = _navigateToSession.asSharedFlow()
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
@@ -270,18 +268,6 @@ class SessionListViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to sync session statuses: ${e.message}")
-        }
-    }
-
-    fun createNewSession(directory: String? = null) {
-        viewModelScope.launch {
-            try {
-                val session = manageSessionUseCase.createSession(conn, directory = directory)
-                eventDispatcher.setSessions(serverId, listOf(session))
-                _navigateToSession.tryEmit(session.id)
-            } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to create session"
-            }
         }
     }
 
