@@ -235,6 +235,7 @@
     <string name="chat_messages_reverted">Messages reverted</string>
     <string name="chat_tap_restore">Tap to restore, or use /redo</string>
     <string name="chat_thinking">Thinking</string>
+    <string name="chat_reasoning">Reasoning</string>
     <string name="chat_edit_label">Edit</string>
     <string name="chat_write_label">Write</string>
     <string name="chat_tasks_label">Tasks</string>
@@ -337,15 +338,6 @@
     <string name="settings_auto_approve_rules">Auto-approve rules</string>
     <string name="settings_no_auto_approve_rules">No saved auto-approve rules</string>
     <string name="settings_delete_rule">Delete rule</string>
-    
-    <!-- Token Usage -->
-    <string name="chat_token_usage_total">%,d tokens</string>
-    <string name="chat_token_context_usage">%,d / %,d context</string>
-    <string name="chat_token_input">Input</string>
-    <string name="chat_token_output">Output</string>
-    <string name="chat_token_reasoning">Reasoning</string>
-    <string name="chat_token_cache_read">Cache read</string>
-    <string name="chat_token_cache_write">Cache write</string>
     
     <!-- Questions -->
     <string name="question_submit">Submit</string>

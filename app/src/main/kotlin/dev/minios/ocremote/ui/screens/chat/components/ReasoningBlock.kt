@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,7 +49,7 @@ import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
 
 @Composable
-internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleExpand: () -> Unit = {}, durationMs: Long? = null) {
+internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleExpand: () -> Unit = {}, durationMs: Long? = null, isStreaming: Boolean = false) {
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     val expanded = isExpanded
@@ -69,14 +70,12 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
         label = "pulseAlpha"
     )
 
-    val isComplete = durationMs != null
-    val headerText = if (isComplete && durationMs != null) {
-        val dur = if (durationMs < 1000) "${durationMs}ms"
-            else if (durationMs < 60000) "${"%.1f".format(durationMs / 1000.0)}s"
-            else "${"%.1f".format(durationMs / 60000.0)}m"
-        stringResource(R.string.chat_thinking_complete, dur)
-    } else {
-        stringResource(R.string.chat_status_thinking)
+    val isComplete = durationMs != null && !isStreaming
+    val headerText = when {
+        isStreaming && text.isBlank() -> stringResource(R.string.chat_thinking)
+        isStreaming -> stringResource(R.string.chat_thinking)
+        isComplete && durationMs != null -> stringResource(R.string.chat_thinking_complete, formatReasoningDuration(durationMs))
+        else -> stringResource(R.string.chat_status_thinking)
     }
 
     Surface(
@@ -136,6 +135,16 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
                     )
                 }
 
+                // Streaming placeholder when text is empty
+                if (isStreaming && text.isBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = accentColor.copy(alpha = AlphaTokens.MUTED)
+                    )
+                }
+
                 // Expandable content
                 AnimatedVisibility(
                     visible = expanded,
@@ -164,4 +173,10 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
             }
         }
     }
+}
+
+private fun formatReasoningDuration(ms: Long): String = when {
+    ms < 1000 -> "${ms}ms"
+    ms < 60_000 -> "${"%.1f".format(ms / 1000.0)}s"
+    else -> "${"%.1f".format(ms / 60_000.0)}m"
 }
