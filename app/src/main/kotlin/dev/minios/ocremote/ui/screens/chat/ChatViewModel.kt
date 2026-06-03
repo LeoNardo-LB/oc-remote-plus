@@ -95,6 +95,10 @@ data class ChatUiState(
     val toolExpandedStates: Map<String, Boolean> = emptyMap(),
     val currentAgentName: String? = null,
     val currentModelId: String? = null,
+    /** User messages optimistically inserted before API confirmation, keyed by messageId. */
+    val pendingMessageIds: Set<String> = emptySet(),
+    /** Draft restored after a failed send. Non-null only once until consumed. */
+    val restoredDraft: RevertedDraftPayload? = null,
 )
 
 data class RevertedDraftPayload(
@@ -230,6 +234,13 @@ class ChatViewModel @Inject constructor(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
 
+    // ============ Optimistic Send ============
+    /** Locally-generated IDs for optimistic messages. Used to distinguish from server-confirmed. */
+    private val _pendingMessageIds = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Draft restored after a failed send. UI consumes once and sets back to null. */
+    private val _restoredDraft = MutableStateFlow<RevertedDraftPayload?>(null)
+
     // ============ Tool Expand State ============
     private val _toolExpandedStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val toolExpandedStates: StateFlow<Map<String, Boolean>> = _toolExpandedStates
@@ -313,7 +324,9 @@ class ChatViewModel @Inject constructor(
         _isLoadingOlder,
         _toolExpandedStates,
         eventDispatcher.currentAgent,
-        eventDispatcher.currentModel
+        eventDispatcher.currentModel,
+        _pendingMessageIds,
+        _restoredDraft
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val allSessions = args[0] as List<Session>
@@ -345,6 +358,9 @@ class ChatViewModel @Inject constructor(
         val currentAgentMap = args[21] as Map<String, String>
         @Suppress("UNCHECKED_CAST")
         val currentModelMap = args[22] as Map<String, Pair<String, String>>
+        @Suppress("UNCHECKED_CAST")
+        val pendingMessageIds = args[23] as Set<String>
+        val restoredDraft = args[24] as RevertedDraftPayload?
 
         val session = allSessions.find { it.id == sessionId }
         val sessionMessages = allMessages[sessionId] ?: emptyList()
@@ -513,7 +529,9 @@ class ChatViewModel @Inject constructor(
             sessionAgent = session?.agent,
             currentAgentName = currentAgentMap[sessionId],
             currentModelId = currentModelMap[sessionId]?.second,
-            toolExpandedStates = toolExpandedStates
+            toolExpandedStates = toolExpandedStates,
+            pendingMessageIds = pendingMessageIds,
+            restoredDraft = restoredDraft
         )
     }.stateIn(
         viewModelScope,
@@ -1036,6 +1054,11 @@ class ChatViewModel @Inject constructor(
         draftUseCase.clearDraft(sessionId)
     }
 
+    /** Consume the restored draft after UI has read it. */
+    fun consumeRestoredDraft() {
+        _restoredDraft.value = null
+    }
+
     /** Persist current draft to disk. */
     private fun saveDraft() {
         val agentPair = _selectedAgent.value
@@ -1098,6 +1121,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun sendParts(parts: List<PromptPart>) {
+        val pendingId = "pending-${java.util.UUID.randomUUID()}"
+        _pendingMessageIds.update { it + pendingId }
         viewModelScope.launch {
             _isSending.value = true
             try {
@@ -1121,6 +1146,12 @@ class ChatViewModel @Inject constructor(
                 if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
+                _pendingMessageIds.update { it - pendingId }
+                // Restore draft from the failed send
+                val failedText = parts.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("\n")
+                if (failedText.isNotBlank()) {
+                    _restoredDraft.value = RevertedDraftPayload(text = failedText)
+                }
                 _error.value = e.message ?: "Failed to send message"
             } finally {
                 _isSending.value = false
