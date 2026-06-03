@@ -83,6 +83,7 @@ import kotlinx.coroutines.launch
 fun SessionListScreen(
     viewModel: SessionListViewModel,
     onNavigateToChat: (sessionId: String, openTerminal: Boolean) -> Unit,
+    onNavigateToNewChat: (directory: String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -90,14 +91,6 @@ fun SessionListScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(viewModel) {
-        viewModel.navigateToSession
-            .onEach { sessionId ->
-                onNavigateToChat(sessionId, false)
-            }
-            .launchIn(this)
-    }
 
     // Dialog states
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -288,7 +281,7 @@ fun SessionListScreen(
             initialDirectory = uiState.prefillDirectory,
             onSelect = { directory ->
                 showOpenProject = false
-                viewModel.createNewSession(directory = directory)
+                onNavigateToNewChat(directory)
             },
             onDismiss = { showOpenProject = false }
         )

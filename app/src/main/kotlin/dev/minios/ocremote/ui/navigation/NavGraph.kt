@@ -353,6 +353,19 @@ fun NavGraph(
                         )
                     )
                 },
+                onNavigateToNewChat = { directory ->
+                    navController.navigate(
+                        ChatNav.createRoute(
+                            serverUrl = params.server.serverUrl,
+                            username = params.server.username,
+                            password = params.server.password,
+                            serverName = params.server.serverName,
+                            serverId = params.server.serverId,
+                            sessionId = "",
+                            directory = directory
+                        )
+                    )
+                },
                 onNavigateBack = {
                     navController.popBackStack()
                 }
