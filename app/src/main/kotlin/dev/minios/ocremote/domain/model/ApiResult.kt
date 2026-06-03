@@ -24,7 +24,7 @@ sealed class ApiResult<T> {
 /**
  * Typed API errors with HTTP status code classification.
  */
-sealed class ApiError {
+sealed class ApiError : Exception() {
     /** Authentication failure (401). */
     data object AuthError : ApiError()
 
