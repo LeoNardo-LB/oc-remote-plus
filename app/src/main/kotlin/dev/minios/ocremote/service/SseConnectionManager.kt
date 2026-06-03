@@ -7,6 +7,7 @@ import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.ServerConfig
+import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.data.repository.SettingsRepository
 import kotlinx.coroutines.*
@@ -215,6 +216,8 @@ class SseConnectionManager @Inject constructor(
                 }
                 Log.i(TAG, "[${server.displayName}] Pre-loaded $totalSessions sessions across ${projects.size} projects")
             }
+            // Initialize session statuses from server
+            syncSessionStatuses(conn)
         } catch (e: Exception) {
             Log.w(TAG, "[${server.displayName}] Failed to pre-load sessions: ${e.message}")
         }
@@ -222,26 +225,63 @@ class SseConnectionManager @Inject constructor(
 
     /**
      * Recover messages for all active sessions of a server after SSE reconnection.
-     * Uses mergeMessages to fill gaps from missed SSE events without overwriting
-     * existing local state. Also marks sessions idle to fix stuck streaming states.
+     * Phase 1: Replace messages with REST data (source of truth).
+     * Phase 2: Sync session statuses from server — only mark idle sessions as idle.
      */
     private suspend fun recoverMessages(server: ServerConfig, conn: ServerConnection) {
         val sessionIds = eventDispatcher.serverSessions.value[server.id] ?: return
         if (sessionIds.isEmpty()) return
 
+        // Phase 1: Recover messages (REST as source of truth)
         Log.i(TAG, "[${server.displayName}] Recovering messages for ${sessionIds.size} sessions")
         var recoveredCount = 0
         for (sessionId in sessionIds) {
             try {
                 val messages = api.listMessages(conn, sessionId)
-                eventDispatcher.mergeMessages(sessionId, messages)
-                eventDispatcher.markSessionIdle(sessionId)
+                eventDispatcher.replaceMessages(sessionId, messages)
                 recoveredCount++
             } catch (e: Exception) {
                 Log.w(TAG, "[${server.displayName}] Failed to recover messages for session $sessionId: ${e.message}")
             }
         }
         Log.i(TAG, "[${server.displayName}] Recovered messages for $recoveredCount/${sessionIds.size} sessions")
+
+        // Phase 2: Sync real session statuses from server
+        syncSessionStatuses(conn)
+    }
+
+    /**
+     * Fetch real session statuses from REST API and update the dispatcher.
+     * Only marks sessions as idle when the server confirms they are idle.
+     */
+    private suspend fun syncSessionStatuses(conn: ServerConnection) {
+        try {
+            val result = api.fetchSessionStatus(conn)
+            result.onSuccess { statuses ->
+                val statusMap = statuses.mapValues { (_, info) ->
+                    when (info.type) {
+                        "busy" -> SessionStatus.Busy
+                        "retry" -> SessionStatus.Retry(
+                            attempt = info.attempt ?: 0,
+                            message = info.message ?: "",
+                            next = info.next ?: 0L
+                        )
+                        else -> SessionStatus.Idle
+                    }
+                }
+                eventDispatcher.syncAllSessionStatuses(statusMap)
+
+                // Only mark truly idle sessions with message completion fix
+                for ((sessionId, status) in statusMap) {
+                    if (status is SessionStatus.Idle) {
+                        eventDispatcher.markSessionIdle(sessionId)
+                    }
+                }
+                Log.i(TAG, "Synced statuses for ${statusMap.size} sessions from REST")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to sync session statuses: ${e.message}")
+        }
     }
 
     private fun updateServerConnected(serverId: String, connected: Boolean) {
