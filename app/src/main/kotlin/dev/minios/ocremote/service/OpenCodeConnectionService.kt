@@ -11,6 +11,8 @@ import android.util.Log
 import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
+import dev.minios.ocremote.data.api.NetworkMonitor
+import dev.minios.ocremote.data.api.NetworkState
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.data.repository.ServerRepository
@@ -20,6 +22,9 @@ import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.domain.repository.SettingsRepository as DomainSettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import java.util.Locale
 import javax.inject.Inject
@@ -71,10 +76,14 @@ class OpenCodeConnectionService : Service() {
     @Inject
     lateinit var serverRepository: ServerRepository
 
+    @Inject
+    lateinit var networkMonitor: NetworkMonitor
+
     private val binder = LocalBinder()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var notificationWatchdogJob: Job? = null
+    private var networkRecoveryJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     private lateinit var systemNotificationManager: NotificationManager
@@ -90,12 +99,27 @@ class OpenCodeConnectionService : Service() {
         fun getService(): OpenCodeConnectionService = this@OpenCodeConnectionService
     }
 
+    @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) Log.d(TAG, "Service created")
 
         systemNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         appNotificationManager.createNotificationChannels(systemNotificationManager, this)
+
+        // Start network monitoring and observe recovery events
+        networkMonitor.startMonitoring()
+        networkRecoveryJob = serviceScope.launch {
+            networkMonitor.networkState
+                .debounce(2_000L)
+                .distinctUntilChanged()
+                .collect { state ->
+                    if (state == NetworkState.Available && connectionManager.connections.isNotEmpty()) {
+                        Log.i(TAG, "Network recovered, reconnecting ${connectionManager.connections.size} server(s)")
+                        connectionManager.reconnectAll()
+                    }
+                }
+        }
 
         serviceScope.launch {
             autoConnectConfiguredServers()
@@ -153,6 +177,9 @@ class OpenCodeConnectionService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         if (BuildConfig.DEBUG) Log.d(TAG, "Service destroyed")
+        networkRecoveryJob?.cancel()
+        networkRecoveryJob = null
+        networkMonitor.stopMonitoring()
         connectionManager.stopAllConnections()
         serviceScope.cancel()
     }

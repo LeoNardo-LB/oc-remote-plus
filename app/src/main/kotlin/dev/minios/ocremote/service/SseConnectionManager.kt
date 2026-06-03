@@ -2,6 +2,7 @@ package dev.minios.ocremote.service
 
 import android.util.Log
 import dev.minios.ocremote.BuildConfig
+import dev.minios.ocremote.data.api.NetworkMonitor
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.api.SseClient
@@ -32,7 +33,8 @@ data class ServerConnectionState(
     val config: ServerConfig,
     val conn: ServerConnection,
     val sseJob: Job,
-    val isConnected: Boolean = false
+    val isConnected: Boolean = false,
+    val onEvent: (ServerConfig, SseEvent) -> Unit = { _, _ -> }
 )
 
 /**
@@ -47,7 +49,8 @@ class SseConnectionManager @Inject constructor(
     private val api: OpenCodeApi,
     private val sseClient: SseClient,
     private val eventDispatcher: EventDispatcher,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val networkMonitor: NetworkMonitor
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -79,7 +82,7 @@ class SseConnectionManager @Inject constructor(
         val job = startSseConnection(server, conn, onEvent)
 
         connections[server.id] = ServerConnectionState(
-            config = server, conn = conn, sseJob = job, isConnected = false
+            config = server, conn = conn, sseJob = job, isConnected = false, onEvent = onEvent
         )
         _connectingServerIds.update { it + server.id }
 
@@ -111,6 +114,29 @@ class SseConnectionManager @Inject constructor(
         for (serverId in serverIds) {
             eventDispatcher.clearForServer(serverId)
         }
+    }
+
+    /**
+     * Reconnect all active connections. Used when network recovers from a loss.
+     * Restarts the SSE connection for each server so the auto-reconnect loop
+     * resets its attempt counter and reconnects immediately.
+     */
+    fun reconnectAll() {
+        for ((serverId, state) in connections.toMap()) {
+            reconnectServer(serverId)
+        }
+    }
+
+    /**
+     * Reconnect a single server connection. Restarts the SSE connection so
+     * the auto-reconnect loop resets its attempt counter and reconnects immediately.
+     */
+    private fun reconnectServer(serverId: String) {
+        val state = connections[serverId] ?: return
+        Log.i(TAG, "Reconnecting server $serverId after network recovery")
+        state.sseJob.cancel()
+        val newJob = startSseConnection(state.config, state.conn, state.onEvent)
+        connections[serverId] = state.copy(sseJob = newJob)
     }
 
     /**
