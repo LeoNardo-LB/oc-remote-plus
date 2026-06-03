@@ -478,6 +478,13 @@
     <string name="retry">Retry</string>
     <string name="delete">Delete</string>
     <string name="close">Close</string>
+    <!-- Message meta info -->
+    <string name="chat_meta_tokens">%d tokens</string>
+    <string name="chat_glob_match_count">%d matches</string>
+    <string name="tool_web_fetch">WebFetch</string>
+    <string name="chat_webfetch_prompt">Prompt: %s</string>
+    <string name="tool_web_search">WebSearch</string>
+
     <string name="chat_context_usage">Context: %1$d%%</string>
     <string name="chat_system_prompt_title">System Prompt</string>
     <string name="chat_system_prompt_empty">No system prompt configured for this session.</string>
