@@ -538,15 +538,7 @@ fun ChatScreen(
                     onTerminalMode = { isTerminalMode = true },
                     onOpenInWebView = onOpenInWebView,
                     onNewSession = {
-                        viewModel.createNewSession { session ->
-                            if (session != null) {
-                                onNavigateToSession(session.id)
-                            } else {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_session_create_failed))
-                                }
-                            }
-                        }
+                        onNavigateToSession("")  // Empty sessionId = lazy creation
                     },
                     onForkSession = {
                         viewModel.forkSession { session ->
@@ -826,15 +818,7 @@ fun ChatScreen(
                         onSlashCommand = { cmd ->
                             when (cmd.name) {
                                 "new" -> {
-                                    viewModel.createNewSession { session ->
-                                        if (session != null) {
-                                            onNavigateToSession(session.id)
-                                        } else {
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_session_create_failed))
-                                            }
-                                        }
-                                    }
+                                    onNavigateToSession("")  // Empty sessionId = lazy creation
                                 }
                                 "compact" -> {
                                     viewModel.compactSession { ok ->

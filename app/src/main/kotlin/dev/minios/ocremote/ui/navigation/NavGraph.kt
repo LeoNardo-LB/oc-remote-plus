@@ -384,7 +384,8 @@ fun NavGraph(
                         password = params.server.password,
                         serverName = params.server.serverName,
                         serverId = params.server.serverId,
-                        sessionId = newSessionId
+                        sessionId = newSessionId,
+                        directory = if (newSessionId.isEmpty()) params.directory else ""
                     )
                     navController.navigate(route) {
                         // Pop current chat so back goes to session list, not old session
