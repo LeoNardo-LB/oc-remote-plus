@@ -118,7 +118,7 @@ internal fun EditToolCard(
                     val errorText = (tool.state as ToolState.Error).error
                     Surface(
                         shape = ShapeTokens.extraSmall,
-                        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer,
+                        color = MaterialTheme.colorScheme.errorContainer,
                         border = if (isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.MEDIUM)) else null,
                         modifier = Modifier.fillMaxWidth()
                     ) {

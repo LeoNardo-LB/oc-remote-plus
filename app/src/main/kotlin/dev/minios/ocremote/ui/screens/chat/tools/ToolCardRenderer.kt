@@ -183,7 +183,7 @@ internal fun ToolCallCard(
                         if (inputText.isNotBlank()) {
                             Surface(
                                 shape = ShapeTokens.extraSmall,
-                                color = toolOutputContainerColor(isAmoled),
+                                color = toolOutputContainerColor(),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
@@ -202,7 +202,7 @@ internal fun ToolCallCard(
                     if (output.isNotBlank()) {
                         Surface(
                             shape = ShapeTokens.extraSmall,
-                            color = toolOutputContainerColor(isAmoled),
+                            color = toolOutputContainerColor(),
                             border = if (isAmoled) BorderStroke(1.dp, stateColor.copy(alpha = AlphaTokens.MEDIUM)) else null,
                             modifier = Modifier.fillMaxWidth()
                         ) {

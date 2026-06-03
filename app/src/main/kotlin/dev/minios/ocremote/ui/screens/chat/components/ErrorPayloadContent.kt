@@ -30,7 +30,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.markdown.looksLikeHtmlPayload
 import dev.minios.ocremote.ui.screens.chat.markdown.normalizeHtmlForEmbeddedPreview
-import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
 
@@ -76,8 +75,7 @@ internal fun ErrorPayloadContent(
         }
 
         if (mode == HtmlErrorViewMode.Page) {
-            val isAmoled = isAmoledTheme()
-            val bgColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface
+            val bgColor = MaterialTheme.colorScheme.surface
             AndroidView(
                 factory = { context ->
                     WebView(context).apply {

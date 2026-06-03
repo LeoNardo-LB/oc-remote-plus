@@ -378,7 +378,7 @@ internal fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = maxHeight)
-                    .background(if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(vertical = 4.dp)
             ) {
                 items(filteredCommands, key = { it.name }) { cmd ->
@@ -441,7 +441,7 @@ internal fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = maxHeight)
-                    .background(if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(vertical = 4.dp)
             ) {
                 items(
@@ -704,13 +704,7 @@ internal fun ChatInputBar(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                         .clip(ShapeTokens.mediumSmall)
-                        .background(
-                            if (isAmoled) {
-                                Color.Black
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerHigh
-                            }
-                        )
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .then(
                             if (isAmoled) {
                                 Modifier.border(
@@ -760,13 +754,7 @@ internal fun ChatInputBar(
                     modifier = Modifier
                         .weight(1f)
                         .clip(ShapeTokens.largeMedium)
-                        .background(
-                            if (isAmoled) {
-                                Color.Black
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                            }
-                        )
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.MUTED))
                         .then(
                             when {
                                 isShellMode -> Modifier.border(
@@ -825,13 +813,7 @@ internal fun ChatInputBar(
                             if (showStop) {
                                 MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.SELECTED)
                             } else if (isShellMode && !isSending) {
-                                if (isAmoled) {
-                                    Color.Black
-                                } else {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.FAINT)
-                                }
-                            } else if (isAmoled) {
-                                Color.Black
+                                MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.FAINT)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.FAINT)
                             }

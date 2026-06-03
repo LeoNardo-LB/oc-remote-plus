@@ -47,11 +47,7 @@ internal fun AssistantTurnBubble(
     onCopyText: (() -> Unit)? = null
 ) {
     val isAmoled = isAmoledTheme()
-    val backgroundColor = if (isAmoled) {
-        Color.Black
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
-    }
+    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val textColor = if (isAmoled) {
         MaterialTheme.colorScheme.onSurface
     } else {
@@ -189,7 +185,7 @@ internal fun AssistantTurnBubble(
                     // Error display
                     if (errorText != null) {
                         Surface(
-                            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer.copy(alpha = AlphaTokens.FAINT),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = AlphaTokens.FAINT),
                             shape = ShapeTokens.mediumSmall,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = if (isAmoled) AlphaTokens.HIGH else AlphaTokens.FAINT)),
                             tonalElevation = 0.dp,

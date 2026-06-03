@@ -83,7 +83,7 @@ internal fun BashToolCard(
         val scrollState = rememberScrollState()
         Surface(
             shape = ShapeTokens.extraSmall,
-            color = toolOutputContainerColor(isAmoled),
+            color = toolOutputContainerColor(),
             border = if (isAmoled) AmoledDefaultBorder else null,            modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 3.dp)

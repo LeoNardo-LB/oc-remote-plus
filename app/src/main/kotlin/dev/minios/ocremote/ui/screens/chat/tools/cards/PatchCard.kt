@@ -48,7 +48,7 @@ internal fun PatchCard(
 
     Surface(
         shape = ShapeTokens.small,
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surface,
         border = if (isAmoled) AmoledDefaultBorder else null,        tonalElevation = if (isAmoled) 0.dp else 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {

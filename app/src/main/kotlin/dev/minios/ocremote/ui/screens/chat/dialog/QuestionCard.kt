@@ -82,7 +82,7 @@ internal fun QuestionCard(
         }
     }
 
-    val containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val contentColor = if (isAmoled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
     val accentColor = MaterialTheme.colorScheme.primary
 
@@ -213,7 +213,7 @@ internal fun QuestionCard(
                             },
                                 enabled = !submitted,
                                 shape = ShapeTokens.small,
-                                color = if (isSelected) accentColor.copy(alpha = AlphaTokens.SELECTED) else if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface.copy(alpha = AlphaTokens.MEDIUM),
+                                color = if (isSelected) accentColor.copy(alpha = AlphaTokens.SELECTED) else MaterialTheme.colorScheme.surface.copy(alpha = AlphaTokens.MEDIUM),
                                 border = if (!isSelected && isAmoled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED)) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {

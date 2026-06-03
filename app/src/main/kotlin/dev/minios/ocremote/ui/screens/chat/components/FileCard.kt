@@ -33,11 +33,7 @@ internal fun FileCard(file: Part.File) {
 @Composable
 internal fun FileCardFallback(file: Part.File) {
     val isAmoled = isAmoledTheme()
-    val containerColor = if (isAmoled) {
-        Color.Black
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
+    val containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     val borderColor = if (isAmoled) {
         MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.HIGH)
     } else {

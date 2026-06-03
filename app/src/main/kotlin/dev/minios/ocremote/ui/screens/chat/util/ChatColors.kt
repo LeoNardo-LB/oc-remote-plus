@@ -12,11 +12,11 @@ import dev.minios.ocremote.ui.theme.LocalAmoledMode
 internal fun isAmoledTheme(): Boolean = LocalAmoledMode.current
 
 @Composable
-internal fun toolOutputContainerColor(isAmoled: Boolean): Color {
-    return when {
-        isAmoled -> Color.Black
-        isSystemInDarkTheme() -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AlphaTokens.AMOLED)
+internal fun toolOutputContainerColor(): Color {
+    return if (isSystemInDarkTheme()) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AlphaTokens.AMOLED)
     }
 }
 

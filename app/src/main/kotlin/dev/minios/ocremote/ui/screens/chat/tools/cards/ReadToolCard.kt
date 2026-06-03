@@ -102,7 +102,7 @@ internal fun ReadToolCard(
                     if (filePath.isNotBlank()) {
                         Surface(
                             shape = ShapeTokens.extraSmall,
-                            color = toolOutputContainerColor(isAmoled),
+                            color = toolOutputContainerColor(),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -120,7 +120,7 @@ internal fun ReadToolCard(
                     if (args != null) {
                         Surface(
                             shape = ShapeTokens.extraSmall,
-                            color = toolOutputContainerColor(isAmoled),
+                            color = toolOutputContainerColor(),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(

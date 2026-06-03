@@ -164,7 +164,7 @@ internal fun ImagePreviewDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val actionContainerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface.copy(alpha = AlphaTokens.AMOLED)
+                    val actionContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = AlphaTokens.AMOLED)
                     val actionBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isAmoled) AlphaTokens.AMOLED else AlphaTokens.HIGH)
                     val actionTintColor = MaterialTheme.colorScheme.onSurface
 

@@ -100,11 +100,7 @@ private fun MessageCardUser(
     onCopyText: (() -> Unit)?,
     isAmoled: Boolean,
 ) {
-    val backgroundColor = if (isAmoled) {
-        Color.Black
-    } else {
-        MaterialTheme.colorScheme.primaryContainer
-    }
+    val backgroundColor = MaterialTheme.colorScheme.primaryContainer
     val textColor = if (isAmoled) {
         MaterialTheme.colorScheme.onSurface
     } else {
@@ -353,7 +349,7 @@ private fun MessageCardAssistant(
     ) {
         Surface(
             shape = ShapeTokens.medium,
-            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             border = if (isAmoled) AmoledDefaultBorder else null,
             tonalElevation = 0.dp,
             modifier = Modifier.fillMaxWidth()
@@ -524,7 +520,7 @@ private fun MessageCardAssistant(
                 // Error display
                 if (errorText != null) {
                     Surface(
-                        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer.copy(alpha = AlphaTokens.FAINT),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = AlphaTokens.FAINT),
                         shape = ShapeTokens.mediumSmall,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = if (isAmoled) AlphaTokens.HIGH else AlphaTokens.FAINT)),
                         tonalElevation = 0.dp,

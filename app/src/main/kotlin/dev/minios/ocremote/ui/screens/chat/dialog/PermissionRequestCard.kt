@@ -51,7 +51,7 @@ internal fun PermissionCard(
     var submitted by remember(permission.id) { mutableStateOf(false) }
 
     // Use error-container colors to signal security sensitivity (distinct from Question's tertiary)
-    val containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.errorContainer
+    val containerColor = MaterialTheme.colorScheme.errorContainer
     val contentColor = if (isAmoled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onErrorContainer
     val accentTint = if (isAmoled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error
 
