@@ -52,6 +52,7 @@ data class SessionListUiState(
     val baseDirectories: Set<String> = emptySet(),
     val isRefreshing: Boolean = false,
     val prefillDirectory: String? = null,
+    val searchQuery: String? = null,
 )
 
 data class SessionItem(
@@ -94,6 +95,7 @@ class SessionListViewModel @Inject constructor(
     private val _baseDirectory = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
     private val _lastToggledDirectory = MutableStateFlow<String?>(null)
+    private val _searchQuery = MutableStateFlow<String?>(null)
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
@@ -107,7 +109,8 @@ class SessionListViewModel @Inject constructor(
         _selectedIds,
         _baseDirectory,
         _isRefreshing,
-        _lastToggledDirectory
+        _lastToggledDirectory,
+        _searchQuery
     ) { values ->
         val allSessions = values[0] as List<Session>
         val statuses = values[1] as Map<String, SessionStatus>
@@ -120,6 +123,7 @@ class SessionListViewModel @Inject constructor(
         val baseDirectory = values[8] as String?
         val isRefreshing = values[9] as Boolean
         val lastToggledDirectory = values[10] as String?
+        val searchQuery = values[11] as String?
 
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
@@ -154,6 +158,7 @@ class SessionListViewModel @Inject constructor(
             baseDirectories = emptySet(),
             isRefreshing = isRefreshing,
             prefillDirectory = prefillDirectory,
+            searchQuery = searchQuery,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
@@ -171,14 +176,14 @@ class SessionListViewModel @Inject constructor(
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${projects.size} projects for multi-project session fetch")
 
                 if (projects.isEmpty()) {
-                    val sessions = api.listSessions(conn)
+                    val sessions = api.listSessions(conn, search = _searchQuery.value)
                     eventDispatcher.setSessions(serverId, sessions)
                     if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions (no projects)")
                 } else {
                     var totalSessions = 0
                     for (project in projects) {
                         try {
-                            val sessions = api.listSessions(conn, directory = project.worktree)
+                            val sessions = api.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
                             eventDispatcher.setSessions(serverId, sessions)
                             totalSessions += sessions.size
                             if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions for project ${project.displayName}")
@@ -224,12 +229,12 @@ class SessionListViewModel @Inject constructor(
                 val projects = api.listProjects(conn)
                 _projects.value = projects
                 if (projects.isEmpty()) {
-                    val sessions = api.listSessions(conn)
+                    val sessions = api.listSessions(conn, search = _searchQuery.value)
                     eventDispatcher.setSessions(serverId, sessions)
                 } else {
                     for (project in projects) {
                         try {
-                            val sessions = api.listSessions(conn, directory = project.worktree)
+                            val sessions = api.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
                             eventDispatcher.setSessions(serverId, sessions)
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed to refresh sessions for project ${project.displayName}: ${e.message}")
@@ -389,6 +394,16 @@ class SessionListViewModel @Inject constructor(
     }
 
     val currentBaseDirectory: String? get() = _baseDirectory.value
+
+    val searchQuery: String? get() = _searchQuery.value
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query.ifBlank { null }
+    }
+
+    fun clearSearchQuery() {
+        _searchQuery.value = null
+    }
 
     fun copyToClipboard(text: String, context: Context) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
