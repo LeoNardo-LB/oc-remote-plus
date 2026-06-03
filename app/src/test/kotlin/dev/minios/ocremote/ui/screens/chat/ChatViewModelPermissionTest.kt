@@ -7,6 +7,7 @@ import dev.minios.ocremote.data.dto.response.PermissionRequest
 import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.data.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.Session
@@ -160,6 +161,7 @@ class ChatViewModelPermissionTest {
             undoRedoUseCase = undoRedoUseCase,
             settingsRepository = settingsRepository,
             api = api,
+            permissionAutoApprover = mockk<PermissionAutoApprover>(relaxed = true),
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver()
         )
     }

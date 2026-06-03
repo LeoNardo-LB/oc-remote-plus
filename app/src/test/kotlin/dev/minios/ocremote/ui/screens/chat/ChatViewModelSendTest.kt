@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.usecase.*
@@ -125,6 +126,7 @@ class ChatViewModelSendTest {
             undoRedoUseCase = undoRedoUseCase,
             settingsRepository = settingsRepository,
             api = api,
+            permissionAutoApprover = mockk<PermissionAutoApprover>(relaxed = true),
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver()
         )
     }
