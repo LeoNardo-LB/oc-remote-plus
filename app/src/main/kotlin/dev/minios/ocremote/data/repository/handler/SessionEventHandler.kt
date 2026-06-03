@@ -71,7 +71,14 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     private fun handleSessionCreated(event: SseEvent.SessionCreated, serverId: String) {
         trackSession(serverId, event.info.id)
-        _sessions.update { (it + event.info).sortedByDescending { s -> s.time.updated } }
+        _sessions.update { current ->
+            val idx = current.indexOfFirst { it.id == event.info.id }
+            if (idx >= 0) {
+                current.toMutableList().apply { set(idx, event.info) }
+            } else {
+                (current + event.info).sortedByDescending { s -> s.time.updated }
+            }
+        }
         _sessionStatuses.update { it + (event.info.id to SessionStatus.Idle) }
     }
 

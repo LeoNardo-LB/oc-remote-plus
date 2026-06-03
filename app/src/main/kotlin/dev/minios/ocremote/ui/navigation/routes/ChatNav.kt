@@ -1,5 +1,6 @@
 package dev.minios.ocremote.ui.navigation.routes
 
+import android.util.Log
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -39,15 +40,20 @@ object ChatNav {
         sessionId: String,
         openTerminal: Boolean = false
     ): String {
+        Log.d("P0-1-DEBUG", "ChatNav.createRoute: sessionId='$sessionId', serverId='$serverId', serverUrl='$serverUrl', openTerminal=$openTerminal")
         val serverQuery = ServerRouteParams.queryString(serverUrl, username, password, serverName, serverId)
         val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")
-        return "$ROUTE?$serverQuery&$PARAM_SESSION_ID=$encodedSessionId&$PARAM_OPEN_TERMINAL=$openTerminal"
+        val route = "$ROUTE?$serverQuery&$PARAM_SESSION_ID=$encodedSessionId&$PARAM_OPEN_TERMINAL=$openTerminal"
+        Log.d("P0-1-DEBUG", "ChatNav.createRoute: result=$route")
+        return route
     }
 
     fun fromEntry(entry: NavBackStackEntry): Params {
+        Log.d("P0-1-DEBUG", "ChatNav.fromEntry: raw sessionId=${entry.arguments?.getString(PARAM_SESSION_ID)}")
         val server = entry.serverRouteParams()
         val sessionId = URLDecoder.decode(entry.arguments?.getString(PARAM_SESSION_ID).orEmpty(), "UTF-8")
         val openTerminal = entry.arguments?.getBoolean(PARAM_OPEN_TERMINAL) ?: false
+        Log.d("P0-1-DEBUG", "ChatNav.fromEntry: parsed sessionId='$sessionId', openTerminal=$openTerminal, serverId='${server.serverId}'")
         return Params(server = server, sessionId = sessionId, openTerminal = openTerminal)
     }
 }

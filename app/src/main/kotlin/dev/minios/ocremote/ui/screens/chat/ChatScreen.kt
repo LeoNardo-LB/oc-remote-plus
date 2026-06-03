@@ -258,6 +258,7 @@ fun ChatScreen(
     startInTerminalMode: Boolean = false,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
+    Log.d("P0-1-DEBUG", "ChatScreen: ENTER, viewModel.sessionId='${viewModel.sessionId}', viewModel.serverName='${viewModel.serverName}', startInTerminalMode=$startInTerminalMode, sharedImages=${initialSharedImages.size}")
     val uiState by viewModel.uiState.collectAsState()
     val draftText by viewModel.draftText.collectAsState()
     val draftAttachmentUris by viewModel.draftAttachmentUris.collectAsState()

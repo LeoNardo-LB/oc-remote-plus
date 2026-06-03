@@ -146,6 +146,10 @@ class ChatViewModel @Inject constructor(
         savedStateHandle.get<String>("sessionId") ?: "", "UTF-8"
     )
 
+    init {
+        Log.d("P0-1-DEBUG", "ChatViewModel constructor: sessionId='$sessionId', serverId='$serverId', serverUrl='$serverUrl', serverName='$serverName'")
+    }
+
     private val conn = ServerConnection.from(serverUrl, username, password.ifEmpty { null })
 
     private val _isLoading = MutableStateFlow(true)
@@ -500,6 +504,7 @@ class ChatViewModel @Inject constructor(
     )
 
     init {
+        Log.d("P0-1-DEBUG", "ChatViewModel.init: ENTER sessionId=$sessionId")
         // Restore draft from disk
         val draft = draftUseCase.getDraft(sessionId)
         if (draft != null) {
@@ -515,6 +520,7 @@ class ChatViewModel @Inject constructor(
                 _selectedVariant.value = draft.selectedVariant
             }
         }
+        Log.d("P0-1-DEBUG", "ChatViewModel.init: draft restored")
 
         // Restore model selection from in-memory cache (survives session switching, cleared on app restart)
         sessionModelCache[sessionId]?.let { (providerId, modelId) ->
@@ -539,15 +545,40 @@ class ChatViewModel @Inject constructor(
         // Load initial message count from settings, then load data
         viewModelScope.launch {
             currentMessageLimit = settingsRepository.initialMessageCount.first()
-            loadSession()
-            loadMessages()
-            loadPendingQuestions()
-            loadPendingPermissions()
+            try {
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: BEFORE loadSession")
+                loadSession()
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: AFTER loadSession")
+            } catch (e: Exception) {
+                Log.e("P0-1-DEBUG", "ChatViewModel.init: loadSession EXCEPTION", e)
+            }
+            try {
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: BEFORE loadMessages")
+                loadMessages()
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: AFTER loadMessages")
+            } catch (e: Exception) {
+                Log.e("P0-1-DEBUG", "ChatViewModel.init: loadMessages EXCEPTION", e)
+            }
+            try {
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: BEFORE loadPendingQuestions")
+                loadPendingQuestions()
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: AFTER loadPendingQuestions")
+            } catch (e: Exception) {
+                Log.e("P0-1-DEBUG", "ChatViewModel.init: loadPendingQuestions EXCEPTION", e)
+            }
+            try {
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: BEFORE loadPendingPermissions")
+                loadPendingPermissions()
+                Log.d("P0-1-DEBUG", "ChatViewModel.init: AFTER loadPendingPermissions")
+            } catch (e: Exception) {
+                Log.e("P0-1-DEBUG", "ChatViewModel.init: loadPendingPermissions EXCEPTION", e)
+            }
+            Log.d("P0-1-DEBUG", "ChatViewModel.init: ALL load steps completed")
         }
         loadProviders()
         loadAgents()
         loadCommands()
-
+        Log.d("P0-1-DEBUG", "ChatViewModel.init: EXIT")
     }
 
     /** Load the session info to get its directory for correct project context. */
