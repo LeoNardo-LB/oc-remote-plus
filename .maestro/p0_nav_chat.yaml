@@ -1,0 +1,20 @@
+appId: dev.minios.ocremote.dev
+name: P0 Navigate to Chat
+---
+# Navigate to sessions by tapping "Sessions"  
+- tapOn: "Sessions"
+
+# Wait for session list to load
+- extendedWaitUntil:
+    timeout: 8000
+    visible: ".*"
+
+# Tap on a session item - try different y positions to find one
+# First try around the middle area where sessions should be listed
+- tapOn:
+    point: "540,800"
+
+# Wait for chat screen
+- extendedWaitUntil:
+    timeout: 10000
+    visible: ".*"

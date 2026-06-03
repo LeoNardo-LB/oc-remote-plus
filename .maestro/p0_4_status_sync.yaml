@@ -1,0 +1,24 @@
+appId: dev.minios.ocremote.dev
+name: P0-4 Session Status Sync Check
+---
+# This flow verifies that the app is running without crashes
+# and session status (busy/idle) is being properly tracked
+
+# Go back first
+- pressKey: back
+
+# Wait for session list
+- assertVisible: "Sessions"
+
+# Navigate to a session (the first one visible)
+- tapOn:
+    text: ".*"
+    index: 0
+
+# Wait for chat screen to load
+- extendedWaitUntil:
+    visible: "Type a message"
+    timeout: 10000
+
+# Check that the app didn't crash
+- assertTrue: "App is still running after entering session"

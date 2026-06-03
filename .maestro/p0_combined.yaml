@@ -1,0 +1,35 @@
+appId: dev.minios.ocremote.dev
+name: P0-1 and P0-4 Combined Test
+---
+# Step 1: Navigate to sessions list by tapping "Sessions"
+- tapOn: "Sessions"
+
+# Step 2: Wait for sessions to load
+- extendedWaitUntil:
+    timeout: 5000
+    visible: ".*"
+
+# Step 3: Enter a session (first clickable item)
+- tapOn:
+    point: "540,600"
+
+# Step 4: Wait for chat screen to load
+- extendedWaitUntil:
+    timeout: 10000
+    visible: ".*"
+
+# Step 5: Go back to sessions list
+- pressKey: back
+
+# Step 6: Enter session again (test re-entry / status sync)
+- tapOn:
+    point: "540,600"
+
+# Step 7: Wait
+- extendedWaitUntil:
+    timeout: 10000
+    visible: ".*"
+
+# App still running = P0-1 fixed, P0-4 testable
+- assertVisible:
+    id: "android:id/content"

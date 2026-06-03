@@ -1,0 +1,21 @@
+appId: dev.minios.ocremote.dev
+name: P0-1 New Session No Crash
+---
+# Click FAB (bottom right corner)
+- tapOn:
+    point: "950,2300"
+
+# Wait a moment for dialog
+- extendedWaitUntil:
+    timeout: 5000
+    visible: ".*"
+
+# Press back to dismiss if dialog appeared
+- pressKey: back
+
+# Press back again to return to sessions list
+- pressKey: back
+
+# Check app didn't crash - look for any content
+- assertVisible:
+    id: "android:id/content"

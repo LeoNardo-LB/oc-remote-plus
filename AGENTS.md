@@ -115,10 +115,17 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 - **完整构建**（`assembleDevRelease` 等）: 300 秒
 - **依赖解析/首次构建**: 可延长至 600 秒
 
-### Test Gotchas
+### Verification & Testing
+See `docs/verification-requirements.md` for the full 4-dimension verification framework.
+
+**Must load `verification-before-completion` skill** before any completion claim. The Iron Law: no completion claims without fresh verification evidence.
+
+Test infrastructure:
+- Unit tests: JUnit 4 + MockK 1.14.9 + Turbine 1.2.1 + kotlinx-coroutines-test
+- Instrumented tests: `HiltTestRunner` + `createComposeRule()` (in `androidTest/`)
+- E2E flows: Maestro YAML in `maestro/` directory
 - `isReturnDefaultValues = true` — mocks return default values instead of throwing. This can mask bugs where mock data silently returns null/0/false
-- Test runner: JUnit 4 + MockK 1.14.9 + Turbine 1.2.1 + coroutines-test
-- No instrumented/UI tests in the project — unit tests only (~35 test files)
+- Each Layer requires: compile ✅ + unit tests ✅ + enhanced tests ✅ + Maestro flows (UI) + androidTest (UI)
 
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.
