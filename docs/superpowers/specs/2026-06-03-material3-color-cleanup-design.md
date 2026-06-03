@@ -153,7 +153,7 @@ This works because the AMOLED theme sets:
 
 - Each file must be read before editing to verify the exact pattern
 - Some `Color.Black` uses are in `when` blocks or ternary chains — handle each case appropriately
-- **TerminalEmulator.kt** default background (`defaultBg = Color.Black` for AMOLED) should use `MaterialTheme.colorScheme.surface`
+- **TerminalEmulator.kt** default background is terminal-specific (not AMOLED-specific) — see Section 4
 - Switch track colors that set **both** tracks to `Color.Black` in AMOLED may need special handling — verify they don't break Switch visuals
 
 ---
