@@ -931,11 +931,12 @@ class OpenCodeApi @Inject constructor(
      *
      * @return Map of sessionId → RestSessionStatusInfo where type ∈ {"idle", "busy", "retry"}
      */
-    suspend fun fetchSessionStatus(conn: ServerConnection): Result<Map<String, RestSessionStatusInfo>> {
+    suspend fun fetchSessionStatus(conn: ServerConnection, directory: String? = null): Result<Map<String, RestSessionStatusInfo>> {
         return runCatching {
             val response: Map<String, kotlinx.serialization.json.JsonObject> =
                 httpClient.get("${conn.baseUrl}/session/status") {
                     conn.authHeader?.let { header("Authorization", it) }
+                    directory?.let { header("x-opencode-directory", it) }
                 }.body()
             response.mapValues { (_, obj) ->
                 RestSessionStatusInfo(

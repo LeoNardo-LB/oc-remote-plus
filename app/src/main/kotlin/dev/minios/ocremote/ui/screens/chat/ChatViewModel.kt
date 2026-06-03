@@ -673,7 +673,7 @@ class ChatViewModel @Inject constructor(
      */
     fun syncSessionStatus() {
         viewModelScope.launch {
-            val result = api.fetchSessionStatus(conn)
+            val result = api.fetchSessionStatus(conn, directory = sessionDirectory)
             result.onSuccess { statuses ->
                 // Batch-update ALL session statuses (one REST call, all sessions)
                 val statusMap = statuses.mapValues { (_, info) ->
@@ -689,9 +689,12 @@ class ChatViewModel @Inject constructor(
                 }
                 eventDispatcher.syncAllSessionStatuses(statusMap)
 
-                // Only mark current session messages as completed if truly idle (protected)
+                // Only mark current session as idle if REST explicitly confirmed it's idle.
+                // null means the server didn't report this session (possibly wrong directory),
+                // which must NOT be treated as "confirmed idle" — doing so would incorrectly
+                // overwrite a legitimate Busy status from SSE and break ongoing tasks.
                 val currentStatus = statusMap[sessionId]
-                if (currentStatus == null || currentStatus is SessionStatus.Idle) {
+                if (currentStatus is SessionStatus.Idle) {
                     eventDispatcher.markSessionIdleProtected(sessionId)
                 }
             }
