@@ -42,7 +42,7 @@ object ButtonTokens {
     /**
      * Colors for [FilledTonalButton] adapted to the current theme.
      *
-     * - **Light / Dark**: primaryContainer / onPrimaryContainer — strong contrast.
+     * - **Light / Dark**: primary / onPrimary — deep saturated container with white text.
      * - **AMOLED**: Black container + primary content.
      */
     @Composable
@@ -55,8 +55,8 @@ object ButtonTokens {
             )
         } else {
             ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         }
     }
