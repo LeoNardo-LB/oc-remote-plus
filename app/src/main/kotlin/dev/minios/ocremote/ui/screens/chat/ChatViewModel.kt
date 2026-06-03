@@ -14,6 +14,7 @@ import dev.minios.ocremote.data.dto.response.AgentInfo
 import dev.minios.ocremote.data.dto.response.CommandInfo
 import dev.minios.ocremote.data.dto.common.ModelSelection
 import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.ui.navigation.routes.ChatNav
 import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
@@ -38,6 +39,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.net.URLDecoder
 import javax.inject.Inject
 
@@ -142,9 +145,13 @@ class ChatViewModel @Inject constructor(
     private val serverId: String = URLDecoder.decode(
         savedStateHandle.get<String>("serverId") ?: "", "UTF-8"
     )
-    val sessionId: String = URLDecoder.decode(
+    private val directoryParam: String = URLDecoder.decode(
+        savedStateHandle.get<String>(ChatNav.PARAM_DIRECTORY) ?: "", "UTF-8"
+    )
+    var sessionId: String = URLDecoder.decode(
         savedStateHandle.get<String>("sessionId") ?: "", "UTF-8"
     )
+        private set
 
     init {
     }
@@ -164,6 +171,8 @@ class ChatViewModel @Inject constructor(
     private var isModelExplicitlySelected = false
     /** The directory of this session's project — sent as x-opencode-directory so the server resolves the correct project context. */
     private var sessionDirectory: String? = null
+    /** Mutex to prevent concurrent session creation */
+    private val sessionCreateMutex = Mutex()
     /** Signals when [loadSession] has finished (successfully or with error), so that terminal
      *  creation can wait for [sessionDirectory] to be populated. */
     private val sessionLoaded = CompletableDeferred<Unit>()
@@ -503,27 +512,33 @@ class ChatViewModel @Inject constructor(
     )
 
     init {
+        val isNewSession = sessionId.isEmpty()
+
         // Restore draft from disk
-        val draft = draftUseCase.getDraft(sessionId)
-        if (draft != null) {
-            _draftText.value = draft.text
-            _draftAttachmentUris.value = draft.imageUris
-            if (draft.confirmedFilePaths.isNotEmpty()) {
-                _confirmedFilePaths.value = draft.confirmedFilePaths.toSet()
-            }
-            if (!draft.selectedAgent.isNullOrBlank()) {
-                _selectedAgent.value = draft.selectedAgent to true
-            }
-            if (!draft.selectedVariant.isNullOrBlank()) {
-                _selectedVariant.value = draft.selectedVariant
+        if (!isNewSession) {
+            val draft = draftUseCase.getDraft(sessionId)
+            if (draft != null) {
+                _draftText.value = draft.text
+                _draftAttachmentUris.value = draft.imageUris
+                if (draft.confirmedFilePaths.isNotEmpty()) {
+                    _confirmedFilePaths.value = draft.confirmedFilePaths.toSet()
+                }
+                if (!draft.selectedAgent.isNullOrBlank()) {
+                    _selectedAgent.value = draft.selectedAgent to true
+                }
+                if (!draft.selectedVariant.isNullOrBlank()) {
+                    _selectedVariant.value = draft.selectedVariant
+                }
             }
         }
 
         // Restore model selection from in-memory cache (survives session switching, cleared on app restart)
-        sessionModelCache[sessionId]?.let { (providerId, modelId) ->
-            _selectedProviderId.value = providerId
-            _selectedModelId.value = modelId
-            isModelExplicitlySelected = true
+        if (!isNewSession) {
+            sessionModelCache[sessionId]?.let { (providerId, modelId) ->
+                _selectedProviderId.value = providerId
+                _selectedModelId.value = modelId
+                isModelExplicitlySelected = true
+            }
         }
 
         viewModelScope.launch {
@@ -540,23 +555,34 @@ class ChatViewModel @Inject constructor(
         }
 
         // Load initial message count from settings, then load data
-        viewModelScope.launch {
-            currentMessageLimit = settingsRepository.initialMessageCount.first()
-            try {
-                loadSession()
-            } catch (e: Exception) {
+        if (!isNewSession) {
+            viewModelScope.launch {
+                currentMessageLimit = settingsRepository.initialMessageCount.first()
+                try {
+                    loadSession()
+                } catch (e: Exception) {
+                }
+                try {
+                    loadMessages()
+                } catch (e: Exception) {
+                }
+                try {
+                    loadPendingQuestions()
+                } catch (e: Exception) {
+                }
+                try {
+                    loadPendingPermissions()
+                } catch (e: Exception) {
+                }
             }
-            try {
-                loadMessages()
-            } catch (e: Exception) {
+        } else {
+            // New session: set directory from route param, skip loading
+            if (directoryParam.isNotEmpty()) {
+                sessionDirectory = directoryParam
             }
-            try {
-                loadPendingQuestions()
-            } catch (e: Exception) {
-            }
-            try {
-                loadPendingPermissions()
-            } catch (e: Exception) {
+            _isLoading.value = false
+            if (!sessionLoaded.isCompleted) {
+                sessionLoaded.complete(Unit)
             }
         }
         loadProviders()
@@ -1036,10 +1062,33 @@ class ChatViewModel @Inject constructor(
         sendParts(parts)
     }
 
+    /**
+     * Ensures a session exists before sending messages.
+     * If sessionId is empty (new session), creates one via API.
+     * Thread-safe via Mutex to prevent duplicate creation.
+     */
+    private suspend fun ensureSession(): String {
+        if (sessionId.isNotEmpty()) return sessionId
+        return sessionCreateMutex.withLock {
+            // Double-check after acquiring lock
+            if (sessionId.isNotEmpty()) return sessionId
+            val dir = if (directoryParam.isNotEmpty()) directoryParam else sessionDirectory
+            val session = manageSessionUseCase.createSession(conn, directory = dir)
+            eventDispatcher.setSessions(serverId, listOf(session))
+            sessionId = session.id
+            sessionDirectory = session.directory.ifBlank { dir }
+            if (!sessionLoaded.isCompleted) {
+                sessionLoaded.complete(Unit)
+            }
+            sessionId
+        }
+    }
+
     private fun sendParts(parts: List<PromptPart>) {
         viewModelScope.launch {
             _isSending.value = true
             try {
+                val currentSessionId = ensureSession()
                 val model = if (_selectedProviderId.value != null && _selectedModelId.value != null) {
                     ModelSelection(
                         providerId = _selectedProviderId.value!!,
@@ -1049,14 +1098,14 @@ class ChatViewModel @Inject constructor(
 
                 sendMessageUseCase.sendPrompt(
                     conn = conn,
-                    sessionId = sessionId,
+                    sessionId = currentSessionId,
                     parts = parts,
                     model = model,
                     agent = uiState.value.selectedAgent,
                     variant = _selectedVariant.value,
                     directory = sessionDirectory
                 )
-                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $sessionId (${parts.size} parts)")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
                 _error.value = e.message ?: "Failed to send message"
@@ -1498,21 +1547,6 @@ class ChatViewModel @Inject constructor(
 
     fun closeTerminalSession() {
         // Global terminal workspaces are server-scoped and survive chat screen changes.
-    }
-
-    /** Create a new session and return it. */
-    fun createNewSession(onResult: (Session?) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val session = manageSessionUseCase.createSession(conn, directory = sessionDirectory)
-                eventDispatcher.setSessions(serverId, listOf(session))
-                if (BuildConfig.DEBUG) Log.d(TAG, "Created new session: ${session.id}")
-                onResult(session)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to create session", e)
-                onResult(null)
-            }
-        }
     }
 
     /** Connection parameters for navigation to other sessions. */
