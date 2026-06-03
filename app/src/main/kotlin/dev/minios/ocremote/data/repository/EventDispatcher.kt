@@ -64,11 +64,12 @@ class EventDispatcher @Inject constructor(
             miscHandler.clearForSession(sessionId)
         }
 
-        // Cross-handler: CommandExecuted resets session status to Idle
+        // Cross-handler: CommandExecuted — only mark messages as completed.
+        // Don't force session to Idle: the server sends session.status event
+        // if the session actually becomes idle. Forcing Idle here causes
+        // flickering when the agent continues to the next tool call.
         if (event is SseEvent.CommandExecuted) {
-            event.sessionId.let { sid ->
-                sessionHandler.updateSessionStatus(sid, SessionStatus.Idle)
-            }
+            messageHandler.markSessionIdle(event.sessionId)
         }
     }
 
@@ -141,5 +142,15 @@ class EventDispatcher @Inject constructor(
     fun markSessionIdle(sessionId: String) {
         messageHandler.markSessionIdle(sessionId)
         sessionHandler.updateSessionStatus(sessionId, SessionStatus.Idle)
+    }
+
+    /**
+     * Like [markSessionIdle] but uses SSE-freshness protection on the status update.
+     * Won't set Idle if SSE recently (within 5s) updated the status to Busy/Retry.
+     * Message completion still proceeds regardless.
+     */
+    fun markSessionIdleProtected(sessionId: String) {
+        messageHandler.markSessionIdle(sessionId)
+        sessionHandler.updateSessionStatusProtected(sessionId, SessionStatus.Idle)
     }
 }
