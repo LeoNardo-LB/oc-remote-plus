@@ -3,20 +3,27 @@ package dev.minios.ocremote.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.domain.model.AppSettings
+import dev.minios.ocremote.domain.model.AutoApproveRule
 import dev.minios.ocremote.domain.usecase.GetSettingsFlowUseCase
 import dev.minios.ocremote.domain.usecase.UpdateSettingsUseCase
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val getSettingsFlowUseCase: GetSettingsFlowUseCase,
-    private val updateSettingsUseCase: UpdateSettingsUseCase
+    private val updateSettingsUseCase: UpdateSettingsUseCase,
+    private val autoApprover: PermissionAutoApprover
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = getSettingsFlowUseCase()
@@ -54,6 +61,20 @@ class SettingsViewModel @Inject constructor(
     val localServerRunInBackground = settings.map { it.localServerRunInBackground }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val localServerAutoStart = settings.map { it.localServerAutoStart }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val localServerStartupTimeoutSec = settings.map { it.localServerStartupTimeoutSec }.stateIn(viewModelScope, SharingStarted.Eagerly, 30)
+
+    // --- Permission auto-approve rules ---
+    private val _rulesRefreshTrigger = MutableStateFlow(0)
+    val autoApproveRules: StateFlow<List<AutoApproveRule>> = _rulesRefreshTrigger
+        .map { autoApprover.loadRules() }
+        .map { it.toList().sortedByDescending { rule -> rule.createdAt } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun deletePermissionRule(rule: AutoApproveRule) {
+        viewModelScope.launch {
+            autoApprover.removeRule(rule)
+            _rulesRefreshTrigger.value += 1
+        }
+    }
 
     // --- Setters ---
 

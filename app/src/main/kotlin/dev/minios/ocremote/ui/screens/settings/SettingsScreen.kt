@@ -59,6 +59,7 @@ import dev.minios.ocremote.ui.screens.settings.components.ImageCompressionQualit
 import dev.minios.ocremote.ui.screens.settings.components.LanguagePickerDialog
 import dev.minios.ocremote.ui.screens.settings.components.LocalServerLaunchOptionsDialog
 import dev.minios.ocremote.ui.screens.settings.components.MessageCountPickerDialog
+import dev.minios.ocremote.ui.screens.settings.components.PermissionRulesSection
 import dev.minios.ocremote.ui.screens.settings.components.ReconnectModePickerDialog
 import dev.minios.ocremote.ui.screens.settings.components.SectionHeader
 import dev.minios.ocremote.ui.screens.settings.components.TerminalFontSizeDialog
@@ -112,6 +113,7 @@ fun SettingsScreen(
     val localServerRunInBackground by viewModel.localServerRunInBackground.collectAsState()
     val localServerAutoStart by viewModel.localServerAutoStart.collectAsState()
     val localServerStartupTimeoutSec by viewModel.localServerStartupTimeoutSec.collectAsState()
+    val autoApproveRules by viewModel.autoApproveRules.collectAsState()
 
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -493,6 +495,15 @@ fun SettingsScreen(
                     )
                 },
                 modifier = Modifier.clickable { viewModel.setSilentNotifications(!silentNotifications) }.padding(ListItemTokens.ContentPaddingMedium)
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // ======== Permissions ========
+            SectionHeader(stringResource(R.string.settings_auto_approve_rules))
+            PermissionRulesSection(
+                rules = autoApproveRules,
+                onDeleteRule = { rule -> viewModel.deletePermissionRule(rule) }
             )
         }
 

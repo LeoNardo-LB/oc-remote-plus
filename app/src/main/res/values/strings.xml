@@ -319,6 +319,17 @@
     <string name="permission_allow_once">Once</string>
     <string name="permission_allow_always">Always</string>
     <string name="permission_deny">Reject</string>
+    <string name="permission_always_confirm_title">Always allow?</string>
+    <string name="permission_always_confirm_message">This will automatically approve \"%1$s\" permission for directory \"%2$s\". You can manage saved rules in Settings.</string>
+    <string name="permission_always_confirm_button">Confirm always</string>
+    <string name="permission_reject_title">Reject with reason</string>
+    <string name="permission_reject_from_agent">From agent: %s</string>
+    <string name="permission_reject_reason_label">Reason (optional)</string>
+    <string name="permission_reject_reason_hint">Explain why this is denied…</string>
+    <string name="permission_reject_button">Reject</string>
+    <string name="settings_auto_approve_rules">Auto-approve rules</string>
+    <string name="settings_no_auto_approve_rules">No saved auto-approve rules</string>
+    <string name="settings_delete_rule">Delete rule</string>
     
     <!-- Questions -->
     <string name="question_submit">Submit</string>
