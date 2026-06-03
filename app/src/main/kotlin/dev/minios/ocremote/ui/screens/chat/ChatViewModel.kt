@@ -1421,6 +1421,23 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Called when a SessionUpdated SSE event is received.
+     * Refreshes the message list to pick up revert/unrevert changes.
+     */
+    fun onSessionUpdated(session: Session) {
+        if (session.id != sessionId) return
+        viewModelScope.launch {
+            try {
+                val messages = manageSessionUseCase.listMessages(conn, sessionId, 100)
+                eventDispatcher.replaceMessages(sessionId, messages)
+                if (BuildConfig.DEBUG) Log.d(TAG, "Refreshed messages after session update")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to refresh messages after session update", e)
+            }
+        }
+    }
+
     /** Fork the current session. Returns the new session or null. */
     fun forkSession(onResult: (Session?) -> Unit) {
         viewModelScope.launch {

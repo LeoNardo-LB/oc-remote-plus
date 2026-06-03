@@ -7,9 +7,11 @@ import dev.minios.ocremote.data.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.data.repository.handler.*
+import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.usecase.*
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -191,4 +193,35 @@ class ChatViewModelDeleteTest {
         directory = directory,
         time = Session.Time(created = 1000L, updated = 2000L)
     )
+
+    // --- Task 10: onSessionUpdated tests ---
+
+    @Test
+    fun `onSessionUpdated refreshes messages for matching session`() = runTest {
+        val messages = listOf(mockk<MessageWithParts>(relaxed = true))
+        coEvery { manageSessionUseCase.listMessages(any(), testSessionId, 100) } returns messages
+
+        val vm = createViewModel()
+        vm.onSessionUpdated(createTestSession())
+
+        coVerify { manageSessionUseCase.listMessages(any(), testSessionId, 100) }
+    }
+
+    @Test
+    fun `onSessionUpdated ignores non-matching session`() = runTest {
+        coEvery { manageSessionUseCase.listMessages(any(), any(), any()) } returns emptyList()
+
+        val vm = createViewModel()
+        // Should not throw for non-matching session
+        vm.onSessionUpdated(createTestSession(id = "other-session"))
+    }
+
+    @Test
+    fun `onSessionUpdated handles exception gracefully`() = runTest {
+        coEvery { manageSessionUseCase.listMessages(any(), testSessionId, 100) } throws RuntimeException("network error")
+
+        val vm = createViewModel()
+        // Should not throw
+        vm.onSessionUpdated(createTestSession())
+    }
 }
