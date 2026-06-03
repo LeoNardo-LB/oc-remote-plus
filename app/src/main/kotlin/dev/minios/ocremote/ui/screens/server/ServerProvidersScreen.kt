@@ -197,11 +197,6 @@ fun ServerProvidersScreen(
                         )
                     }
 
-                    DialogButtons(
-                        buttons = listOf(
-                            Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary) { connectProvider = null },
-                        )
-                    )
                 }
             }
         }

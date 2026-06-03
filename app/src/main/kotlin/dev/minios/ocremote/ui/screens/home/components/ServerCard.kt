@@ -1,7 +1,6 @@
 package dev.minios.ocremote.ui.screens.home.components
 
-import dev.minios.ocremote.ui.components.amoledTonalButtonBorder
-import dev.minios.ocremote.ui.components.amoledTonalButtonColors
+import dev.minios.ocremote.ui.theme.ButtonTokens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -143,8 +142,8 @@ internal fun ServerCard(
                     FilledTonalButton(
                         onClick = onOpenSessions,
                         modifier = Modifier.weight(1f),
-                        colors = amoledTonalButtonColors(),
-                        border = amoledTonalButtonBorder()
+                        colors = ButtonTokens.tonalColors(),
+                        border = ButtonTokens.tonalBorder()
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -160,8 +159,8 @@ internal fun ServerCard(
                     FilledTonalButton(
                         onClick = onDisconnect,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = amoledTonalButtonColors(),
-                        border = amoledTonalButtonBorder()
+                        colors = ButtonTokens.tonalColors(),
+                        border = ButtonTokens.tonalBorder()
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -174,8 +173,8 @@ internal fun ServerCard(
                     onClick = onConnect,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isConnecting,
-                    colors = amoledTonalButtonColors(),
-                    border = amoledTonalButtonBorder()
+                    colors = ButtonTokens.tonalColors(),
+                    border = ButtonTokens.tonalBorder()
                 ) {
                     if (isConnecting) {
                         CircularProgressIndicator(

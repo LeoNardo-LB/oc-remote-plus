@@ -1,11 +1,9 @@
 package dev.minios.ocremote.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -14,10 +12,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.LocalAmoledMode
+import dev.minios.ocremote.ui.theme.ButtonTokens
 
 /**
  * Role of a button inside a dialog.
@@ -49,7 +45,7 @@ fun DialogButtons(
     if (buttons.size <= 2) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(ButtonTokens.RowSpacing.dp, Alignment.End),
         ) {
             buttons.forEach { (text, role, onClick) ->
                 DialogActionButton(
@@ -62,7 +58,7 @@ fun DialogButtons(
     } else {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(ButtonTokens.StackSpacing.dp),
         ) {
             buttons.forEach { (text, role, onClick) ->
                 DialogActionButton(
@@ -70,6 +66,7 @@ fun DialogButtons(
                     role = role,
                     onClick = onClick,
                     modifier = Modifier.fillMaxWidth(),
+                    compact = true,
                 )
             }
         }
@@ -82,20 +79,27 @@ private fun DialogActionButton(
     role: DialogButtonRole,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
+    val contentPadding = if (compact) ButtonTokens.CompactPadding else ButtonDefaults.ContentPadding
     when (role) {
         DialogButtonRole.Primary -> {
             FilledTonalButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = amoledTonalButtonColors(),
-                border = amoledTonalButtonBorder(),
+                colors = ButtonTokens.tonalColors(),
+                border = ButtonTokens.tonalBorder(),
+                contentPadding = contentPadding,
             ) {
                 Text(text)
             }
         }
         DialogButtonRole.Secondary -> {
-            TextButton(onClick = onClick, modifier = modifier) {
+            TextButton(
+                onClick = onClick,
+                modifier = modifier,
+                contentPadding = contentPadding,
+            ) {
                 Text(text)
             }
         }
@@ -106,45 +110,10 @@ private fun DialogActionButton(
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
                 ),
+                contentPadding = contentPadding,
             ) {
                 Text(text)
             }
         }
-    }
-}
-
-/**
- * [ButtonColors] for [FilledTonalButton] that adapts to AMOLED dark mode.
- *
- * AMOLED: Black container + primary content + primary border.
- * Normal: Default tonal button colors, no border.
- *
- * Use for full-width card action buttons (Connect, Start, etc.) to eliminate
- * per-button AMOLED boilerplate.
- */
-@Composable
-fun amoledTonalButtonColors(): ButtonColors {
-    val isAmoled = LocalAmoledMode.current
-    return if (isAmoled) {
-        ButtonDefaults.filledTonalButtonColors(
-            containerColor = Color.Black,
-            contentColor = MaterialTheme.colorScheme.primary,
-        )
-    } else {
-        ButtonDefaults.filledTonalButtonColors()
-    }
-}
-
-/**
- * Border for a tonal button in AMOLED mode, or `null` in normal mode.
- * Matches [amoledTonalButtonColors] visual style.
- */
-@Composable
-fun amoledTonalButtonBorder(): BorderStroke? {
-    val isAmoled = LocalAmoledMode.current
-    return if (isAmoled) {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-    } else {
-        null
     }
 }

@@ -87,7 +87,7 @@ import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import kotlinx.coroutines.launch
-import dev.minios.ocremote.ui.components.amoledTonalButtonColors
+import dev.minios.ocremote.ui.theme.ButtonTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
 
@@ -496,7 +496,7 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                colors = amoledTonalButtonColors()
+                                colors = ButtonTokens.tonalColors()
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
@@ -510,7 +510,7 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                colors = amoledTonalButtonColors()
+                                colors = ButtonTokens.tonalColors()
                             ) {
                                 Icon(Icons.Default.Keyboard, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))

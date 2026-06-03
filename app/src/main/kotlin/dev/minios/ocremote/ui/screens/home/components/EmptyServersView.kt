@@ -4,8 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FilledTonalButton
-import dev.minios.ocremote.ui.components.amoledTonalButtonColors
-import dev.minios.ocremote.ui.components.amoledTonalButtonBorder
+import dev.minios.ocremote.ui.theme.ButtonTokens
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,8 +44,8 @@ internal fun EmptyServersView(
             )
             FilledTonalButton(
                 onClick = onAddServer,
-                colors = amoledTonalButtonColors(),
-                border = amoledTonalButtonBorder(),
+                colors = ButtonTokens.tonalColors(),
+                border = ButtonTokens.tonalBorder(),
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
