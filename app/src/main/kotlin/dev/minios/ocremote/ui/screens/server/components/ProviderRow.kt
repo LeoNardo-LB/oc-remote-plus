@@ -9,7 +9,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,11 +74,11 @@ internal fun ProviderRow(
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
                 if (showConnect) {
-                    TextButton(onClick = onConnect, enabled = !isSaving) {
+                    OutlinedButton(onClick = onConnect, enabled = !isSaving) {
                         Text(stringResource(R.string.connect))
                     }
                 } else if (canDisconnect) {
-                    TextButton(onClick = onDisconnect, enabled = !isSaving) {
+                    OutlinedButton(onClick = onDisconnect, enabled = !isSaving) {
                         Text(stringResource(R.string.disconnect))
                     }
                 } else {

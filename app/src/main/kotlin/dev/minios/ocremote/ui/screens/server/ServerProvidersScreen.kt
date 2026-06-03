@@ -32,7 +32,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -461,7 +460,12 @@ fun ServerProvidersScreen(
                         },
                         trailingContent = {
                             if (provider.source != "env") {
-                                OutlinedButton(onClick = { viewModel.disconnectProvider(provider.providerId) }, enabled = !uiState.isSaving) {
+                                Button(
+                                    onClick = { viewModel.disconnectProvider(provider.providerId) },
+                                    enabled = !uiState.isSaving,
+                                    colors = ButtonTokens.filledColors(),
+                                    border = ButtonTokens.amoledBorder(),
+                                ) {
                                     Text(stringResource(R.string.disconnect))
                                 }
                             } else {
@@ -490,7 +494,12 @@ fun ServerProvidersScreen(
                             )
                         },
                         trailingContent = {
-                            OutlinedButton(onClick = { viewModel.clearError(); connectProvider = provider }, enabled = !uiState.isSaving) {
+                            Button(
+                                onClick = { viewModel.clearError(); connectProvider = provider },
+                                enabled = !uiState.isSaving,
+                                colors = ButtonTokens.filledColors(),
+                                border = ButtonTokens.amoledBorder(),
+                            ) {
                                 Text(stringResource(R.string.connect))
                             }
                         }

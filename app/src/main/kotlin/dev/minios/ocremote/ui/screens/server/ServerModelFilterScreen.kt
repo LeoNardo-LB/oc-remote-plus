@@ -23,8 +23,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -43,6 +43,7 @@ import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.amoledOutlinedTextFieldColors
 import dev.minios.ocremote.ui.screens.settings.components.SectionHeader
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import dev.minios.ocremote.ui.theme.ButtonTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,7 +116,11 @@ fun ServerModelFilterScreen(
                             androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                             Text(uiState.error ?: stringResource(R.string.server_settings_load_error))
                             androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-                            TextButton(onClick = { viewModel.loadProviders() }) {
+                            Button(
+                                onClick = { viewModel.loadProviders() },
+                                colors = ButtonTokens.filledColors(),
+                                border = ButtonTokens.amoledBorder(),
+                            ) {
                                 Text(stringResource(R.string.retry))
                             }
                         }
