@@ -57,6 +57,8 @@ import dev.minios.ocremote.ui.screens.chat.ChatUiState
 import dev.minios.ocremote.ui.screens.chat.ChatViewModel
 import dev.minios.ocremote.ui.screens.chat.dialog.PermissionCard
 import dev.minios.ocremote.ui.screens.chat.dialog.QuestionCard
+import dev.minios.ocremote.ui.screens.chat.components.AlwaysConfirmDialog
+import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.ui.screens.chat.util.computeTurnGroups
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -97,6 +99,7 @@ fun ChatMessageList(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
+            var showAlwaysDialog by remember { mutableStateOf<SseEvent.PermissionAsked?>(null) }
             val pullToRefreshState = rememberPullToRefreshState()
             PullToRefreshBox(
                 isRefreshing = uiState.isLoadingOlder,
@@ -178,7 +181,7 @@ fun ChatMessageList(
                         PermissionCard(
                             permission = permission,
                             onOnce = { viewModel.replyToPermission(permission.id, "once") },
-                            onAlways = { viewModel.replyToPermission(permission.id, "always") },
+                            onAlways = { showAlwaysDialog = permission },
                             onReject = { viewModel.replyToPermission(permission.id, "reject") }
                         )
                     }
@@ -353,6 +356,19 @@ fun ChatMessageList(
                         modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+            // Always-allow confirmation dialog
+            showAlwaysDialog?.let { perm ->
+                AlwaysConfirmDialog(
+                    toolName = perm.permission,
+                    directoryPattern = viewModel.getSessionDirectory() ?: "*",
+                    onConfirm = {
+                        viewModel.savePermissionRule(perm, viewModel.getSessionDirectory() ?: "*")
+                        viewModel.replyToPermission(perm.id, "always")
+                        showAlwaysDialog = null
+                    },
+                    onDismiss = { showAlwaysDialog = null }
+                )
             }
         } // Box(weight)
     } // Column

@@ -135,7 +135,8 @@ class ChatViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     // OpenCodeApi still needed for ServerTerminalRegistry (terminal subsystem)
     private val api: OpenCodeApi,
-    val toolCardResolver: ToolCardResolver
+    val toolCardResolver: ToolCardResolver,
+    private val permissionAutoApprover: dev.minios.ocremote.data.repository.PermissionAutoApprover
 ) : ViewModel() {
 
     private val serverUrl: String = URLDecoder.decode(
@@ -1183,6 +1184,17 @@ class ChatViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to reply to permission $requestId: ${e.javaClass.simpleName}: ${e.message}", e)
             }
+        }
+    }
+
+    fun savePermissionRule(event: dev.minios.ocremote.domain.model.SseEvent.PermissionAsked, directory: String) {
+        viewModelScope.launch {
+            val rule = dev.minios.ocremote.domain.model.AutoApproveRule(
+                toolName = event.permission,
+                sessionId = null,
+                directoryPattern = directory
+            )
+            permissionAutoApprover.addRule(rule)
         }
     }
 
