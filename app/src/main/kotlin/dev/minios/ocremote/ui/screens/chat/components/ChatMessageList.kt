@@ -42,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.SoftwareKeyboardController
@@ -130,7 +129,6 @@ fun ChatMessageList(
                         item(key = "question_batch_actions") {
                             QuestionBatchActionBar(
                                 count = uiState.pendingQuestions.size,
-                                isAmoled = isAmoled,
                                 onSkipAll = {
                                     uiState.pendingQuestions.forEach { question ->
                                         viewModel.rejectQuestion(question.id)
@@ -159,7 +157,6 @@ fun ChatMessageList(
                         item(key = "perm_batch_actions") {
                             PermissionBatchActionBar(
                                 count = uiState.pendingPermissions.size,
-                                isAmoled = isAmoled,
                                 onAllowAll = {
                                     uiState.pendingPermissions.forEach { perm ->
                                         viewModel.replyToPermission(perm.id, "once")
@@ -378,7 +375,6 @@ private suspend fun LazyListState.snapToBottom() {
 @Composable
 private fun PermissionBatchActionBar(
     count: Int,
-    isAmoled: Boolean,
     onAllowAll: () -> Unit,
     onRejectAll: () -> Unit,
 ) {
@@ -418,7 +414,6 @@ private fun PermissionBatchActionBar(
 @Composable
 private fun QuestionBatchActionBar(
     count: Int,
-    isAmoled: Boolean,
     onSkipAll: () -> Unit,
 ) {
     Surface(

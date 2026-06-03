@@ -42,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -253,7 +252,7 @@ fun ChatTopBar(
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
-                        containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surface,
                         border = if (isAmoled) AmoledDefaultBorder else null
                     ) {
                         DropdownMenuItem(
