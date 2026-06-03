@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,7 +45,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.DrawerValue
@@ -88,6 +87,7 @@ import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import kotlinx.coroutines.launch
+import dev.minios.ocremote.ui.components.amoledTonalButtonColors
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
 
@@ -483,7 +483,7 @@ fun ChatTerminalView(
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedButton(
+                            FilledTonalButton(
                                 onClick = {
                                     viewModel.createTerminalTab { ok ->
                                         if (!ok) {
@@ -496,18 +496,13 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                shape = ShapeTokens.mediumSmall,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                )
+                                colors = amoledTonalButtonColors()
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
                                 Text("New")
                             }
-                            OutlinedButton(
+                            FilledTonalButton(
                                 onClick = {
                                     keyboardController?.show()
                                     coroutineScope.launch { terminalDrawerState.close() }
@@ -515,12 +510,7 @@ fun ChatTerminalView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(40.dp),
-                                shape = ShapeTokens.mediumSmall,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MEDIUM)),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                )
+                                colors = amoledTonalButtonColors()
                             ) {
                                 Icon(Icons.Default.Keyboard, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))

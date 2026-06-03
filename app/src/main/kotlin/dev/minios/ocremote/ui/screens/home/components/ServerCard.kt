@@ -1,6 +1,7 @@
 package dev.minios.ocremote.ui.screens.home.components
 
-import androidx.compose.foundation.BorderStroke
+import dev.minios.ocremote.ui.components.amoledTonalButtonBorder
+import dev.minios.ocremote.ui.components.amoledTonalButtonColors
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -139,22 +140,11 @@ internal fun ServerCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (isConnected) {
-                    Button(
+                    FilledTonalButton(
                         onClick = onOpenSessions,
                         modifier = Modifier.weight(1f),
-                        colors = if (isAmoled) {
-                            ButtonDefaults.buttonColors(
-                                containerColor = Color.Black,
-                                contentColor = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            ButtonDefaults.buttonColors()
-                        },
-                        border = if (isAmoled) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                        } else {
-                            null
-                        }
+                        colors = amoledTonalButtonColors(),
+                        border = amoledTonalButtonBorder()
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -167,22 +157,11 @@ internal fun ServerCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = onDisconnect,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = if (isAmoled) {
-                            ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.Black,
-                                contentColor = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            ButtonDefaults.outlinedButtonColors()
-                        },
-                        border = if (isAmoled) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                        } else {
-                            ButtonDefaults.outlinedButtonBorder
-                        }
+                        colors = amoledTonalButtonColors(),
+                        border = amoledTonalButtonBorder()
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -191,25 +170,12 @@ internal fun ServerCard(
                 }
             }
             if (!isConnected) {
-                Button(
+                FilledTonalButton(
                     onClick = onConnect,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isConnecting,
-                    colors = if (isAmoled) {
-                        ButtonDefaults.buttonColors(
-                            containerColor = Color.Black,
-                            contentColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = Color.Black,
-                            disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
-                        )
-                    } else {
-                        ButtonDefaults.buttonColors()
-                    },
-                    border = if (isAmoled) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                    } else {
-                        null
-                    }
+                    colors = amoledTonalButtonColors(),
+                    border = amoledTonalButtonBorder()
                 ) {
                     if (isConnecting) {
                         CircularProgressIndicator(

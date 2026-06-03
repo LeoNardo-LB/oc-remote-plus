@@ -3,20 +3,18 @@ package dev.minios.ocremote.ui.screens.chat.dialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -126,42 +124,39 @@ internal fun PermissionCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = {
-                        if (submitted) return@OutlinedButton
+                        if (submitted) return@FilledTonalButton
                         performHaptic(hapticView, hapticOn)
                         submitted = true
                         onReject()
                     },
                     modifier = Modifier.weight(1f),
-                    enabled = !submitted,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    enabled = !submitted
                 ) {
                     Text(stringResource(R.string.permission_deny), maxLines = 1)
                 }
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = {
-                        if (submitted) return@OutlinedButton
+                        if (submitted) return@FilledTonalButton
                         performHaptic(hapticView, hapticOn)
                         submitted = true
                         onOnce()
                     },
                     modifier = Modifier.weight(1f),
-                    enabled = !submitted,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    enabled = !submitted
                 ) {
                     Text(stringResource(R.string.permission_allow_once), maxLines = 1)
                 }
-                Button(
+                FilledTonalButton(
                     onClick = {
-                        if (submitted) return@Button
+                        if (submitted) return@FilledTonalButton
                         performHaptic(hapticView, hapticOn)
                         submitted = true
                         onAlways()
                     },
                     modifier = Modifier.weight(1f),
-                    enabled = !submitted,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    enabled = !submitted
                 ) {
                     Text(stringResource(R.string.permission_allow_always), maxLines = 1)
                 }

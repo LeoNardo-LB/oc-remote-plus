@@ -1,6 +1,5 @@
 package dev.minios.ocremote.ui.screens.home.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -9,11 +8,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.AmoledCard
+import dev.minios.ocremote.ui.components.amoledTonalButtonBorder
+import dev.minios.ocremote.ui.components.amoledTonalButtonColors
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.LocalAmoledMode
 import dev.minios.ocremote.ui.screens.home.LocalRuntimeStatus
@@ -115,22 +115,11 @@ internal fun LocalRuntimeCard(
 
             // Fix command copy button (for errors with a known fix)
             if (runtimeStatus == LocalRuntimeStatus.Error && !fixCommand.isNullOrBlank()) {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = { onCopyFixCommand(fixCommand) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = if (isAmoled) {
-                        ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Black,
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        )
-                    } else {
-                        ButtonDefaults.outlinedButtonColors()
-                    },
-                    border = if (isAmoled) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                    } else {
-                        ButtonDefaults.outlinedButtonBorder
-                    },
+                    colors = amoledTonalButtonColors(),
+                    border = amoledTonalButtonBorder(),
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -139,22 +128,11 @@ internal fun LocalRuntimeCard(
             }
 
             if (runtimeStatus == LocalRuntimeStatus.Error && needsOverlaySettings) {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = onOpenTermuxOverlaySettings,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = if (isAmoled) {
-                        ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Black,
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        )
-                    } else {
-                        ButtonDefaults.outlinedButtonColors()
-                    },
-                    border = if (isAmoled) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                    } else {
-                        ButtonDefaults.outlinedButtonBorder
-                    },
+                    colors = amoledTonalButtonColors(),
+                    border = amoledTonalButtonBorder(),
                 ) {
                     Icon(Icons.Default.OpenInNew, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -166,22 +144,11 @@ internal fun LocalRuntimeCard(
             when {
                 // Termux not installed — show install button
                 !termuxInstalled -> {
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = onInstallTermux,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = if (isAmoled) {
-                            ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.Black,
-                                contentColor = MaterialTheme.colorScheme.primary,
-                            )
-                        } else {
-                            ButtonDefaults.outlinedButtonColors()
-                        },
-                        border = if (isAmoled) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                        } else {
-                            ButtonDefaults.outlinedButtonBorder
-                        },
+                        colors = amoledTonalButtonColors(),
+                        border = amoledTonalButtonBorder(),
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -196,44 +163,22 @@ internal fun LocalRuntimeCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = cardContentColor.copy(alpha = AlphaTokens.AMOLED),
                     )
-                    Button(
+                    FilledTonalButton(
                         onClick = onSetup,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = if (isAmoled) {
-                            ButtonDefaults.buttonColors(
-                                containerColor = Color.Black,
-                                contentColor = MaterialTheme.colorScheme.primary,
-                            )
-                        } else {
-                            ButtonDefaults.buttonColors()
-                        },
-                        border = if (isAmoled) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                        } else {
-                            null
-                        },
+                        colors = amoledTonalButtonColors(),
+                        border = amoledTonalButtonBorder(),
                     ) {
                         Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.home_local_setup))
                     }
 
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = onStart,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = if (isAmoled) {
-                            ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.Black,
-                                contentColor = MaterialTheme.colorScheme.primary,
-                            )
-                        } else {
-                            ButtonDefaults.outlinedButtonColors()
-                        },
-                        border = if (isAmoled) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                        } else {
-                            ButtonDefaults.outlinedButtonBorder
-                        },
+                        colors = amoledTonalButtonColors(),
+                        border = amoledTonalButtonBorder(),
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -255,22 +200,11 @@ internal fun LocalRuntimeCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (localServerConnected) {
-                            Button(
+                            FilledTonalButton(
                                 onClick = onOpenLocalSessions,
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = if (isAmoled) {
-                                    ButtonDefaults.buttonColors(
-                                        containerColor = Color.Black,
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                    )
-                                } else {
-                                    ButtonDefaults.buttonColors()
-                                },
-                                border = if (isAmoled) {
-                                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                                } else {
-                                    null
-                                },
+                                colors = amoledTonalButtonColors(),
+                                border = amoledTonalButtonBorder(),
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
@@ -278,23 +212,12 @@ internal fun LocalRuntimeCard(
                             }
                         }
 
-                        OutlinedButton(
+                        FilledTonalButton(
                             onClick = onStop,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = runtimeStatus == LocalRuntimeStatus.Running,
-                            colors = if (isAmoled) {
-                                ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color.Black,
-                                    contentColor = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                ButtonDefaults.outlinedButtonColors()
-                            },
-                            border = if (isAmoled) {
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                            } else {
-                                ButtonDefaults.outlinedButtonBorder
-                            },
+                            colors = amoledTonalButtonColors(),
+                            border = amoledTonalButtonBorder(),
                         ) {
                             if (runtimeStatus == LocalRuntimeStatus.Starting || runtimeStatus == LocalRuntimeStatus.Stopping) {
                                 CircularProgressIndicator(
@@ -315,44 +238,22 @@ internal fun LocalRuntimeCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Button(
+                        FilledTonalButton(
                             onClick = onStart,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = if (isAmoled) {
-                                ButtonDefaults.buttonColors(
-                                    containerColor = Color.Black,
-                                    contentColor = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                ButtonDefaults.buttonColors()
-                            },
-                            border = if (isAmoled) {
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                            } else {
-                                null
-                            },
+                            colors = amoledTonalButtonColors(),
+                            border = amoledTonalButtonBorder(),
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.home_local_start))
                         }
 
-                        OutlinedButton(
+                        FilledTonalButton(
                             onClick = onSetup,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = if (isAmoled) {
-                                ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color.Black,
-                                    contentColor = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                ButtonDefaults.outlinedButtonColors()
-                            },
-                            border = if (isAmoled) {
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                            } else {
-                                ButtonDefaults.outlinedButtonBorder
-                            },
+                            colors = amoledTonalButtonColors(),
+                            border = amoledTonalButtonBorder(),
                         ) {
                             Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
@@ -380,22 +281,11 @@ internal fun LocalRuntimeCard(
                     )
                 }
 
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = onOpenLocalSessions,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = if (isAmoled) {
-                        ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Black,
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        )
-                    } else {
-                        ButtonDefaults.outlinedButtonColors()
-                    },
-                    border = if (isAmoled) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.HIGH))
-                    } else {
-                        ButtonDefaults.outlinedButtonBorder
-                    },
+                    colors = amoledTonalButtonColors(),
+                    border = amoledTonalButtonBorder(),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
                     Spacer(Modifier.width(8.dp))

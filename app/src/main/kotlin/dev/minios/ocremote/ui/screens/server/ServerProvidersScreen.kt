@@ -28,12 +28,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedButton
+
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -173,7 +173,7 @@ fun ServerProvidersScreen(
                     )
 
                     methods.forEachIndexed { idx, method ->
-                        Button(
+                        FilledTonalButton(
                             onClick = {
                                 if (method.type == "api") {
                                     connectProvider = null
@@ -184,7 +184,6 @@ fun ServerProvidersScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !uiState.isSaving,
-                            shape = ShapeTokens.medium,
                         ) {
                             Text(method.label)
                         }
@@ -363,13 +362,12 @@ fun ServerProvidersScreen(
                         )
                     }
                     if (pending.authorization.url.isNotBlank()) {
-                        Button(
+                        FilledTonalButton(
                             onClick = {
                                 oauthBrowserOpened = true
                                 uriHandler.openUri(pending.authorization.url)
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = ShapeTokens.medium,
                         ) {
                             Text(stringResource(R.string.server_settings_oauth_open_browser))
                         }
@@ -396,7 +394,7 @@ fun ServerProvidersScreen(
                             viewModel.cancelProviderOauth()
                         }) { Text(stringResource(R.string.cancel)) }
                         if (pending.authorization.method == "code") {
-                            TextButton(
+                            FilledTonalButton(
                                 onClick = {
                                     viewModel.completeProviderOauth(oauthCode)
                                     oauthCode = ""
