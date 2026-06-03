@@ -86,11 +86,20 @@ class OpenCodeApi @Inject constructor(
 
     // ============ Session ============
 
-    suspend fun listSessions(conn: ServerConnection, directory: String? = null): List<Session> {
+    suspend fun listSessions(
+        conn: ServerConnection,
+        directory: String? = null,
+        search: String? = null,
+        cursor: String? = null,
+        limit: Int = 50
+    ): List<Session> {
         return httpClient.get("${conn.baseUrl}/session") {
             conn.authHeader?.let { header("Authorization", it) }
             directory?.let { header("x-opencode-directory", it) }
             parameter("roots", "true")
+            search?.let { parameter("search", it) }
+            cursor?.let { parameter("cursor", it) }
+            parameter("limit", limit)
         }.body()
     }
 
@@ -135,6 +144,22 @@ class OpenCodeApi @Inject constructor(
         }.body()
     }
 
+    /**
+     * Update session with arbitrary fields (for archive, etc.).
+     * PATCH /session/{sessionId}
+     */
+    suspend fun updateSessionFields(
+        conn: ServerConnection,
+        sessionId: String,
+        fields: Map<String, Any>
+    ): Session {
+        return httpClient.patch("${conn.baseUrl}/session/$sessionId") {
+            conn.authHeader?.let { header("Authorization", it) }
+            contentType(ContentType.Application.Json)
+            setBody(fields)
+        }.body()
+    }
+
     suspend fun abortSession(conn: ServerConnection, sessionId: String, directory: String? = null): Boolean {
         val response = httpClient.post("${conn.baseUrl}/session/$sessionId/abort") {
             conn.authHeader?.let { header("Authorization", it) }
@@ -147,6 +172,28 @@ class OpenCodeApi @Inject constructor(
         return httpClient.get("${conn.baseUrl}/session/$sessionId/diff") {
             conn.authHeader?.let { header("Authorization", it) }
         }.body()
+    }
+
+    /**
+     * Delete a message from a session.
+     * DELETE /session/{sessionId}/message/{messageId}
+     */
+    suspend fun deleteMessage(conn: ServerConnection, sessionId: String, messageId: String): Boolean {
+        val response = httpClient.delete("${conn.baseUrl}/session/$sessionId/message/$messageId") {
+            conn.authHeader?.let { header("Authorization", it) }
+        }
+        return response.status.isSuccess()
+    }
+
+    /**
+     * Delete a specific part from a message by index.
+     * DELETE /session/{sessionId}/message/{messageId}/part/{partIndex}
+     */
+    suspend fun deleteMessagePart(conn: ServerConnection, sessionId: String, messageId: String, partIndex: Int): Boolean {
+        val response = httpClient.delete("${conn.baseUrl}/session/$sessionId/message/$messageId/part/$partIndex") {
+            conn.authHeader?.let { header("Authorization", it) }
+        }
+        return response.status.isSuccess()
     }
 
     /**
