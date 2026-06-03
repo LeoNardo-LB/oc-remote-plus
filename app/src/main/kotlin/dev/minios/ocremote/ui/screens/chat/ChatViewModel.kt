@@ -635,8 +635,11 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Query the OpenCode server for the actual session status and correct
+     * Query the OpenCode server for actual session statuses and correct
      * any UI state drift caused by missed SSE events.
+     *
+     * Writes ALL session statuses from REST response (not just current session).
+     * Only marks the current session's messages as completed if it's truly idle.
      *
      * Triggered on:
      * - Entering a session (LaunchedEffect(sessionId))
@@ -646,19 +649,24 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val result = api.fetchSessionStatus(conn)
             result.onSuccess { statuses ->
-                val statusInfo = statuses[sessionId] ?: return@onSuccess
-                _isLoading.value = false
-                when (statusInfo.type) {
-                    "idle" -> eventDispatcher.markSessionIdle(sessionId)
-                    "busy" -> eventDispatcher.updateSessionStatus(sessionId, SessionStatus.Busy)
-                    "retry" -> eventDispatcher.updateSessionStatus(
-                        sessionId,
-                        SessionStatus.Retry(
-                            attempt = statusInfo.attempt ?: 0,
-                            message = statusInfo.message ?: "",
-                            next = statusInfo.next ?: 0L
+                // Batch-update ALL session statuses (one REST call, all sessions)
+                val statusMap = statuses.mapValues { (_, info) ->
+                    when (info.type) {
+                        "busy" -> SessionStatus.Busy
+                        "retry" -> SessionStatus.Retry(
+                            attempt = info.attempt ?: 0,
+                            message = info.message ?: "",
+                            next = info.next ?: 0L
                         )
-                    )
+                        else -> SessionStatus.Idle
+                    }
+                }
+                eventDispatcher.syncAllSessionStatuses(statusMap)
+
+                // Only mark current session messages as completed if truly idle
+                val currentStatus = statusMap[sessionId]
+                if (currentStatus == null || currentStatus is SessionStatus.Idle) {
+                    eventDispatcher.markSessionIdle(sessionId)
                 }
             }
         }
