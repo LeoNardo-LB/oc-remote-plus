@@ -19,6 +19,8 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     companion object {
         private const val TAG = "SessionEventHandler"
+        /** SSE status is considered fresh within this window. REST won't overwrite. */
+        private const val SSE_FRESH_THRESHOLD_MS = 5000L
     }
 
     private val _serverSessions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
@@ -29,6 +31,9 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     private val _sessionStatuses = MutableStateFlow<Map<String, SessionStatus>>(emptyMap())
     val sessionStatuses: StateFlow<Map<String, SessionStatus>> = _sessionStatuses.asStateFlow()
+
+    /** Tracks when each session's status was last updated by SSE events. */
+    private val _sseTimestamps = MutableStateFlow<Map<String, Long>>(emptyMap())
 
     private val _sessionDiffs = MutableStateFlow<Map<String, List<FileDiff>>>(emptyMap())
     val sessionDiffs: StateFlow<Map<String, List<FileDiff>>> = _sessionDiffs.asStateFlow()
@@ -80,6 +85,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
             }
         }
         _sessionStatuses.update { it + (event.info.id to SessionStatus.Idle) }
+        _sseTimestamps.update { it + (event.info.id to System.currentTimeMillis()) }
     }
 
     private fun handleSessionUpdated(event: SseEvent.SessionUpdated, serverId: String) {
@@ -99,16 +105,19 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         val sessionId = event.info.id
         _sessions.update { it.filter { s -> s.id != sessionId } }
         _sessionStatuses.update { it - sessionId }
+        _sseTimestamps.update { it - sessionId }
         _sessionDiffs.update { it - sessionId }
     }
 
     private fun handleSessionStatus(event: SseEvent.SessionStatus) {
         _sessionStatuses.update { it + (event.sessionId to event.status) }
+        _sseTimestamps.update { it + (event.sessionId to System.currentTimeMillis()) }
         if (BuildConfig.DEBUG) Log.d(TAG, "Session ${event.sessionId} status: ${event.status}")
     }
 
     private fun handleSessionIdle(event: SseEvent.SessionIdle) {
         _sessionStatuses.update { it + (event.sessionId to SessionStatus.Idle) }
+        _sseTimestamps.update { it + (event.sessionId to System.currentTimeMillis()) }
     }
 
     private fun handleSessionDiff(event: SseEvent.SessionDiff) {
@@ -144,13 +153,65 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     /**
      * Batch-update session statuses from REST data.
-     * Used when fetchSessionStatus returns all session states at once.
+     * Protective: won't downgrade Busy/Retry to Idle if SSE updated the status
+     * within [SSE_FRESH_THRESHOLD_MS] milliseconds ago.
      */
     fun updateAllSessionStatuses(statuses: Map<String, SessionStatus>) {
+        val now = System.currentTimeMillis()
+        val timestamps = _sseTimestamps.value
         _sessionStatuses.update { current ->
-            current + statuses
+            val merged = current.toMutableMap()
+            for ((sessionId, newStatus) in statuses) {
+                val existing = current[sessionId]
+                if (shouldOverwrite(existing, newStatus, timestamps[sessionId], now)) {
+                    merged[sessionId] = newStatus
+                }
+            }
+            merged.toMap()
         }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Batch updated ${statuses.size} session statuses")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Batch updated ${statuses.size} session statuses (protected)")
+    }
+
+    /**
+     * Update a single session's status with SSE-freshness protection.
+     * Won't overwrite Busy/Retry with Idle if SSE updated it recently.
+     */
+    fun updateSessionStatusProtected(sessionId: String, newStatus: SessionStatus) {
+        val now = System.currentTimeMillis()
+        val existing = _sessionStatuses.value[sessionId]
+        val lastSseUpdate = _sseTimestamps.value[sessionId]
+        if (shouldOverwrite(existing, newStatus, lastSseUpdate, now)) {
+            _sessionStatuses.update { it + (sessionId to newStatus) }
+        }
+    }
+
+    /**
+     * Determine if REST data should overwrite existing status.
+     * Rules:
+     * - No existing status → always overwrite (cold start)
+     * - REST says Busy/Retry → always overwrite (upgrade)
+     * - REST says Idle but SSE recently said Busy/Retry → don't overwrite (protect)
+     * - REST says Idle and SSE data is stale (>5s) → overwrite (trust REST)
+     */
+    private fun shouldOverwrite(
+        existing: SessionStatus?,
+        newStatus: SessionStatus,
+        lastSseUpdate: Long?,
+        now: Long
+    ): Boolean {
+        if (existing == null) return true // Cold start, no data yet
+        if (newStatus !is SessionStatus.Idle) return true // REST says active, always trust
+        // REST says Idle. Check if SSE recently said active.
+        if (existing !is SessionStatus.Idle && lastSseUpdate != null) {
+            val age = now - lastSseUpdate
+            if (age < SSE_FRESH_THRESHOLD_MS) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Protecting ${existing::class.simpleName} status (SSE age=${age}ms < ${SSE_FRESH_THRESHOLD_MS}ms)")
+                }
+                return false
+            }
+        }
+        return true
     }
 
     fun clearForServer(serverId: String) {
@@ -163,6 +224,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         _serverSessions.update { it - serverId }
         _sessions.update { it.filter { s -> s.id !in sessionIds } }
         _sessionStatuses.update { it - sessionIds }
+        _sseTimestamps.update { it - sessionIds }
         _sessionDiffs.update { it - sessionIds }
     }
 
@@ -170,6 +232,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         _serverSessions.value = emptyMap()
         _sessions.value = emptyList()
         _sessionStatuses.value = emptyMap()
+        _sseTimestamps.value = emptyMap()
         _sessionDiffs.value = emptyMap()
         _vcsBranch.value = null
         _projectInfo.value = null
