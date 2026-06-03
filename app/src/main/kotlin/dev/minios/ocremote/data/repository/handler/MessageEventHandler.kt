@@ -116,6 +116,19 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         }
     }
 
+    /**
+     * Replace all messages and parts for a session with REST data.
+     * Unlike [mergeMessages], this treats REST as the source of truth,
+     * overwriting any existing local data. Used for SSE reconnection recovery.
+     */
+    fun replaceMessages(sessionId: String, newMessages: List<MessageWithParts>) {
+        _messages.update {
+            it + (sessionId to newMessages.map { m -> m.info }.sortedBy { m -> m.time.created })
+        }
+        val partsMap = newMessages.associate { it.info.id to it.parts }
+        _parts.update { it + partsMap }
+    }
+
     fun clearForSession(sessionId: String) {
         _messages.update { it - sessionId }
     }
