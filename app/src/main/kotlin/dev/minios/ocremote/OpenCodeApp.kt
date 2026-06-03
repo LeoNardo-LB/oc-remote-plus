@@ -67,6 +67,22 @@ class OpenCodeApp : Application() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to write crash log", e)
             }
+
+            // Restart main Activity with crash info
+            try {
+                val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    putExtra("crash_occurred", true)
+                    putExtra("crash_message", throwable.message ?: "Unknown error")
+                    putExtra("crash_exception", throwable.javaClass.simpleName)
+                }
+                if (intent != null) {
+                    startActivity(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restart activity after crash", e)
+            }
+
             defaultHandler?.uncaughtException(thread, throwable)
         }
 
