@@ -334,7 +334,7 @@ fun ChatTerminalView(
         gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surface,
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface,
                 drawerTonalElevation = 0.dp,
                 drawerShape = ShapeTokens.none
@@ -393,7 +393,7 @@ fun ChatTerminalView(
                                                     if (!tab.connected) {
                                                         Surface(
                                                             shape = CircleShape,
-                                                            color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.MUTED),
+                                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.MUTED),
                                                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED))
                                                         ) {
                                                             Row(
@@ -456,12 +456,8 @@ fun ChatTerminalView(
                                         selected = selected,
                                         shape = drawerItemShape,
                                         colors = NavigationDrawerItemDefaults.colors(
-                                            selectedContainerColor = if (isAmoled) {
-                                                Color.Black
-                                            } else {
-                                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AlphaTokens.MUTED)
-                                            },
-                                            unselectedContainerColor = if (isAmoled) Color.Black else Color.Transparent,
+                                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AlphaTokens.MUTED),
+                                            unselectedContainerColor = Color.Transparent,
                                             selectedTextColor = MaterialTheme.colorScheme.onSurface,
                                             unselectedTextColor = MaterialTheme.colorScheme.onSurface
                                         ),

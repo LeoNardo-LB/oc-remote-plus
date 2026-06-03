@@ -387,7 +387,7 @@ private fun PermissionBatchActionBar(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         shape = ShapeTokens.medium,
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.secondaryContainer,
+        color = MaterialTheme.colorScheme.secondaryContainer,
         tonalElevation = 1.dp,
     ) {
         Row(
@@ -426,7 +426,7 @@ private fun QuestionBatchActionBar(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         shape = ShapeTokens.medium,
-        color = if (isAmoled) Color.Black else MaterialTheme.colorScheme.tertiaryContainer,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
         tonalElevation = 1.dp,
     ) {
         Row(
