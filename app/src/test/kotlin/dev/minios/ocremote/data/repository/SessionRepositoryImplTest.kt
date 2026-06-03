@@ -35,7 +35,8 @@ class SessionRepositoryImplTest {
             messageHandler = messageHandler,
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
-            miscHandler = miscHandler
+            miscHandler = miscHandler,
+            sessionNextHandler = SessionNextEventHandler()
         )
         repo = SessionRepositoryImpl(api, eventDispatcher, serverRepo)
     }

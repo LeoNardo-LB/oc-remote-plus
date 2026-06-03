@@ -24,7 +24,8 @@ class EventDispatcher @Inject constructor(
     private val messageHandler: MessageEventHandler,
     private val permissionHandler: PermissionEventHandler,
     private val questionHandler: QuestionEventHandler,
-    private val miscHandler: MiscEventHandler
+    private val miscHandler: MiscEventHandler,
+    private val sessionNextHandler: SessionNextEventHandler
 ) {
     // ============ Public State (read-only) ============
 
@@ -40,6 +41,14 @@ class EventDispatcher @Inject constructor(
     val vcsBranch: StateFlow<String?> get() = sessionHandler.vcsBranch
     val projectInfo: StateFlow<Project?> get() = sessionHandler.projectInfo
 
+    // Session Next state
+    val currentAgent: StateFlow<Map<String, String>> get() = sessionNextHandler.currentAgent
+    val currentModel: StateFlow<Map<String, Pair<String, String>>> get() = sessionNextHandler.currentModel
+    val activeToolProgress: StateFlow<Map<String, List<ToolProgressInfo>>> get() = sessionNextHandler.activeToolProgress
+    val stepProgress: StateFlow<Map<String, StepProgressInfo>> get() = sessionNextHandler.stepProgress
+    val compactionState: StateFlow<Map<String, CompactionStateInfo>> get() = sessionNextHandler.compactionState
+    val shellState: StateFlow<Map<String, ShellStateInfo>> get() = sessionNextHandler.shellState
+
     // ============ Event Processing ============
 
     /**
@@ -54,6 +63,7 @@ class EventDispatcher @Inject constructor(
         permissionHandler.handle(event, serverId)
         questionHandler.handle(event, serverId)
         miscHandler.handle(event, serverId)
+        sessionNextHandler.handle(event, serverId)
 
         // Cross-handler: SessionDeleted cascades cleanup to other handlers
         if (event is SseEvent.SessionDeleted) {
@@ -62,6 +72,7 @@ class EventDispatcher @Inject constructor(
             permissionHandler.clearForSession(sessionId)
             questionHandler.clearForSession(sessionId)
             miscHandler.clearForSession(sessionId)
+            sessionNextHandler.clearForSession(sessionId)
         }
 
         // Cross-handler: CommandExecuted — only mark messages as completed.
@@ -121,6 +132,7 @@ class EventDispatcher @Inject constructor(
         permissionHandler.clearAll()
         questionHandler.clearAll()
         miscHandler.clearAll()
+        sessionNextHandler.clearAll()
     }
 
     fun clearForServer(serverId: String) {
@@ -130,6 +142,7 @@ class EventDispatcher @Inject constructor(
         permissionHandler.clearForServer(sessionIds)
         questionHandler.clearForServer(sessionIds)
         miscHandler.clearForServer(sessionIds)
+        sessionNextHandler.clearForServer(sessionIds)
     }
 
     // ============ State Correction ============

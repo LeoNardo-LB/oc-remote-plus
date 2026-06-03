@@ -74,7 +74,8 @@ class ChatViewModelPermissionTest {
             messageHandler = MessageEventHandler(),
             permissionHandler = PermissionEventHandler(),
             questionHandler = QuestionEventHandler(),
-            miscHandler = MiscEventHandler()
+            miscHandler = MiscEventHandler(),
+            sessionNextHandler = SessionNextEventHandler()
         )
 
         mockkStatic(Log::class)

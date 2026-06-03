@@ -16,6 +16,7 @@ class EventDispatcherTest {
     private lateinit var permissionHandler: PermissionEventHandler
     private lateinit var questionHandler: QuestionEventHandler
     private lateinit var miscHandler: MiscEventHandler
+    private lateinit var sessionNextHandler: SessionNextEventHandler
 
     @Before
     fun setup() {
@@ -24,13 +25,15 @@ class EventDispatcherTest {
         permissionHandler = PermissionEventHandler()
         questionHandler = QuestionEventHandler()
         miscHandler = MiscEventHandler()
+        sessionNextHandler = SessionNextEventHandler()
 
         dispatcher = EventDispatcher(
             sessionHandler = sessionHandler,
             messageHandler = messageHandler,
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
-            miscHandler = miscHandler
+            miscHandler = miscHandler,
+            sessionNextHandler = sessionNextHandler
         )
     }
 
@@ -290,5 +293,65 @@ class EventDispatcherTest {
     fun `SessionError does not change sessions`() = runTest {
         dispatcher.processEvent(SseEvent.SessionError("s1", "something failed"), "server1")
         assertTrue(dispatcher.sessionStatuses.value.isEmpty())
+    }
+
+    // ============ SessionNext Event Integration ============
+
+    @Test
+    fun `SessionNext event routed to SessionNextHandler`() = runTest {
+        val agentEvent = SessionNextEvent.AgentSwitched(sessionId = "s1", agent = "code")
+        dispatcher.processEvent(SseEvent.SessionNext(agentEvent), "server1")
+
+        assertEquals("code", dispatcher.currentAgent.value["s1"])
+    }
+
+    @Test
+    fun `SessionDeleted cascades cleanup to SessionNextHandler`() = runTest {
+        val session = testSession("s1")
+        dispatcher.processEvent(SseEvent.SessionCreated(session), "server1")
+
+        val agentEvent = SessionNextEvent.AgentSwitched(sessionId = "s1", agent = "code")
+        dispatcher.processEvent(SseEvent.SessionNext(agentEvent), "server1")
+
+        dispatcher.processEvent(SseEvent.SessionDeleted(session), "server1")
+
+        assertNull(dispatcher.currentAgent.value["s1"])
+    }
+
+    @Test
+    fun `SessionNext tool progress tracked`() = runTest {
+        val toolEvent = SessionNextEvent.ToolInputStarted(
+            sessionId = "s1", messageId = "m1", partId = "p1",
+            callId = "c1", tool = "bash"
+        )
+        dispatcher.processEvent(SseEvent.SessionNext(toolEvent), "server1")
+
+        val tools = dispatcher.activeToolProgress.value["s1"]
+        assertNotNull(tools)
+        assertEquals(1, tools!!.size)
+        assertEquals("bash", tools[0].tool)
+    }
+
+    @Test
+    fun `clearAll resets SessionNextHandler`() = runTest {
+        val agentEvent = SessionNextEvent.AgentSwitched(sessionId = "s1", agent = "code")
+        dispatcher.processEvent(SseEvent.SessionNext(agentEvent), "server1")
+
+        dispatcher.clearAll()
+
+        assertTrue(dispatcher.currentAgent.value.isEmpty())
+        assertTrue(dispatcher.activeToolProgress.value.isEmpty())
+    }
+
+    @Test
+    fun `clearForServer resets SessionNextHandler for server sessions`() = runTest {
+        val session = testSession("s1")
+        dispatcher.processEvent(SseEvent.SessionCreated(session), "server1")
+        val agentEvent = SessionNextEvent.AgentSwitched(sessionId = "s1", agent = "code")
+        dispatcher.processEvent(SseEvent.SessionNext(agentEvent), "server1")
+
+        dispatcher.clearForServer("server1")
+
+        assertNull(dispatcher.currentAgent.value["s1"])
     }
 }

@@ -38,7 +38,8 @@ class ChatRepositoryImplTest {
             messageHandler = messageHandler,
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
-            miscHandler = miscHandler
+            miscHandler = miscHandler,
+            sessionNextHandler = SessionNextEventHandler()
         )
         repo = ChatRepositoryImpl(api, eventDispatcher, serverRepo)
     }
