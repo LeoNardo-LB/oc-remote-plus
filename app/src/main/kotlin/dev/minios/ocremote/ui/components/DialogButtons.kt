@@ -8,7 +8,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,9 +17,9 @@ import dev.minios.ocremote.ui.theme.ButtonTokens
 /**
  * Role of a button inside a dialog.
  *
- * - [Primary]:   Main action (confirm, save, create). Renders as FilledTonalButton.
- * - [Secondary]: Cancel / dismiss. Renders as TextButton with default color.
- * - [Danger]:    Destructive action (delete, revert). Renders as TextButton with error color.
+ * - [Primary]:   Main action (confirm, save, create). FilledTonalButton with primary color.
+ * - [Secondary]: Cancel / dismiss. FilledTonalButton with surface variant color.
+ * - [Danger]:    Destructive action (delete, revert). FilledTonalButton with error color.
  */
 enum class DialogButtonRole {
     Primary,
@@ -95,20 +94,25 @@ private fun DialogActionButton(
             }
         }
         DialogButtonRole.Secondary -> {
-            TextButton(
+            FilledTonalButton(
                 onClick = onClick,
                 modifier = modifier,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
                 contentPadding = contentPadding,
             ) {
                 Text(text)
             }
         }
         DialogButtonRole.Danger -> {
-            TextButton(
+            FilledTonalButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 ),
                 contentPadding = contentPadding,
             ) {
