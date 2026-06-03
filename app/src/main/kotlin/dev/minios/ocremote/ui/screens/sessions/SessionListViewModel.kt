@@ -187,6 +187,8 @@ class SessionListViewModel @Inject constructor(
                     }
                     if (BuildConfig.DEBUG) Log.d(TAG, "Total: loaded $totalSessions sessions across ${projects.size} projects for server $serverId")
                 }
+                // Sync session statuses from server
+                syncSessionStatusesFromServer()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load sessions", e)
                 _error.value = e.message ?: "Failed to load sessions"
@@ -233,12 +235,41 @@ class SessionListViewModel @Inject constructor(
                         }
                     }
                 }
+                // Sync session statuses from server
+                syncSessionStatusesFromServer()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to refresh sessions", e)
                 _error.value = e.message ?: "Failed to refresh sessions"
             } finally {
                 _isRefreshing.value = false
             }
+        }
+    }
+
+    /**
+     * Sync session statuses from server via REST API.
+     * Batch-updates all session statuses so the session list shows correct
+     * busy/idle/retry states even after cold start or background recovery.
+     */
+    private suspend fun syncSessionStatusesFromServer() {
+        try {
+            val result = api.fetchSessionStatus(conn)
+            result.onSuccess { statuses ->
+                val statusMap = statuses.mapValues { (_, info) ->
+                    when (info.type) {
+                        "busy" -> SessionStatus.Busy
+                        "retry" -> SessionStatus.Retry(
+                            attempt = info.attempt ?: 0,
+                            message = info.message ?: "",
+                            next = info.next ?: 0L
+                        )
+                        else -> SessionStatus.Idle
+                    }
+                }
+                eventDispatcher.syncAllSessionStatuses(statusMap)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to sync session statuses: ${e.message}")
         }
     }
 
