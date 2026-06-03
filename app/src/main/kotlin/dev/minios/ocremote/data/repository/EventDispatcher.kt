@@ -48,6 +48,8 @@ class EventDispatcher @Inject constructor(
     val stepProgress: StateFlow<Map<String, StepProgressInfo>> get() = sessionNextHandler.stepProgress
     val compactionState: StateFlow<Map<String, CompactionStateInfo>> get() = sessionNextHandler.compactionState
     val shellState: StateFlow<Map<String, ShellStateInfo>> get() = sessionNextHandler.shellState
+    val retryState: StateFlow<Map<String, Int>> get() = sessionNextHandler.retryState
+    val gapDetected: StateFlow<Set<String>> get() = sessionNextHandler.gapDetected
 
     // ============ Event Processing ============
 
@@ -115,6 +117,14 @@ class EventDispatcher @Inject constructor(
 
     fun setQuestions(sessionId: String, questions: List<SseEvent.QuestionAsked>) =
         questionHandler.setQuestions(sessionId, questions)
+
+    fun trackSequence(sessionId: String, seq: Long) {
+        sessionNextHandler.trackSequence(sessionId, seq)
+    }
+
+    fun clearGap(sessionId: String) {
+        sessionNextHandler.clearGap(sessionId)
+    }
 
     // ============ Child-session Aggregation ============
 

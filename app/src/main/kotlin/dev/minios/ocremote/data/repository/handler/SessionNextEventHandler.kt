@@ -80,6 +80,15 @@ class SessionNextEventHandler @Inject constructor() : SseEventHandler {
     private val _shellState = MutableStateFlow<Map<String, ShellStateInfo>>(emptyMap())
     val shellState: StateFlow<Map<String, ShellStateInfo>> = _shellState.asStateFlow()
 
+    private val _retryState = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val retryState: StateFlow<Map<String, Int>> = _retryState.asStateFlow()
+
+    private val _lastEventSeq = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val lastEventSeq: StateFlow<Map<String, Long>> = _lastEventSeq.asStateFlow()
+
+    private val _gapDetected = MutableStateFlow<Set<String>>(emptySet())
+    val gapDetected: StateFlow<Set<String>> = _gapDetected.asStateFlow()
+
     /** Streaming state tracker for text parts. */
     val textStreamingState = StreamingStateTracker()
 
@@ -137,7 +146,9 @@ class SessionNextEventHandler @Inject constructor() : SseEventHandler {
             is SessionNextEvent.CompactionEnded -> handleCompactionEnded(event.sessionId)
 
             is SessionNextEvent.Prompted -> { /* informational */ }
-            is SessionNextEvent.Retried -> { /* informational — retry display handled by existing Part.Retry */ }
+            is SessionNextEvent.Retried -> {
+                _retryState.update { it + (event.sessionId to event.attempt) }
+            }
             is SessionNextEvent.Synthetic -> { /* informational */ }
             is SessionNextEvent.Unknown -> {
                 Log.w(TAG, "Unhandled session.next event: ${event.rawType}")
@@ -220,6 +231,19 @@ class SessionNextEventHandler @Inject constructor() : SseEventHandler {
         _compactionState.update { it - sessionId }
     }
 
+    fun trackSequence(sessionId: String, seq: Long) {
+        val last = _lastEventSeq.value[sessionId]
+        if (last != null && seq > last + 1) {
+            Log.w(TAG, "Sequence gap detected for session $sessionId: expected ${last + 1}, got $seq (missed ${seq - last - 1} events)")
+            _gapDetected.update { it + sessionId }
+        }
+        _lastEventSeq.update { it + (sessionId to seq) }
+    }
+
+    fun clearGap(sessionId: String) {
+        _gapDetected.update { it - sessionId }
+    }
+
     // ============ Cleanup ============
 
     fun clearForSession(sessionId: String) {
@@ -229,6 +253,9 @@ class SessionNextEventHandler @Inject constructor() : SseEventHandler {
         _stepProgress.update { it - sessionId }
         _compactionState.update { it - sessionId }
         _shellState.update { it - sessionId }
+        _retryState.update { it - sessionId }
+        _lastEventSeq.update { it - sessionId }
+        _gapDetected.update { it - sessionId }
         textStreamingState.clearForSession(sessionId)
         reasoningStreamingState.clearForSession(sessionId)
     }
@@ -246,6 +273,9 @@ class SessionNextEventHandler @Inject constructor() : SseEventHandler {
         _stepProgress.value = emptyMap()
         _compactionState.value = emptyMap()
         _shellState.value = emptyMap()
+        _retryState.value = emptyMap()
+        _lastEventSeq.value = emptyMap()
+        _gapDetected.value = emptySet()
         textStreamingState.clearAll()
         reasoningStreamingState.clearAll()
     }
