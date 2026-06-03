@@ -194,7 +194,8 @@ class ChatViewModelQueuedTest {
             shareExportUseCase = shareExportUseCase,
             undoRedoUseCase = undoRedoUseCase,
             settingsRepository = settingsRepository,
-            api = api
+            api = api,
+            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver()
         )
     }
 

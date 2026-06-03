@@ -1,6 +1,8 @@
 package dev.minios.ocremote.ui.screens.chat.util
 
 import androidx.compose.runtime.compositionLocalOf
+import dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver
+import dev.minios.ocremote.ui.screens.chat.tools.ToolCardResolver
 
 // ============ Chat Settings via CompositionLocal ============
 
@@ -30,3 +32,8 @@ val LocalToolExpandedStates = compositionLocalOf<Map<String, Boolean>> { emptyMa
 
 /** Callback to toggle a tool card's expanded state by its part id. */
 val LocalOnToggleToolExpanded = compositionLocalOf<(String, Boolean) -> Unit> { { _, _ -> } }
+
+/** Resolver for tool-specific card composables. */
+val LocalToolCardResolver = compositionLocalOf<ToolCardResolver> {
+    DefaultToolCardResolver()
+}

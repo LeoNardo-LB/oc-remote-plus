@@ -192,6 +192,7 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.LocalImageSaveRequest
 import dev.minios.ocremote.ui.screens.chat.util.LocalToolExpandedStates
 import dev.minios.ocremote.ui.screens.chat.util.LocalOnToggleToolExpanded
+import dev.minios.ocremote.ui.screens.chat.util.LocalToolCardResolver
 import dev.minios.ocremote.ui.screens.chat.util.ImageAttachment
 import dev.minios.ocremote.ui.screens.chat.util.PreparedAttachment
 import dev.minios.ocremote.ui.screens.chat.util.decodeDataUrlBytes
@@ -514,6 +515,7 @@ fun ChatScreen(
         LocalImageSaveRequest provides attachmentHandler.requestSaveImage,
         LocalToolExpandedStates provides uiState.toolExpandedStates,
         LocalOnToggleToolExpanded provides { toolId, defaultExpanded -> viewModel.toggleToolExpanded(toolId, defaultExpanded) },
+        LocalToolCardResolver provides viewModel.toolCardResolver,
     ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },

@@ -15,6 +15,7 @@ import dev.minios.ocremote.data.dto.response.CommandInfo
 import dev.minios.ocremote.data.dto.common.ModelSelection
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.ui.navigation.routes.ChatNav
+import dev.minios.ocremote.ui.screens.chat.tools.ToolCardResolver
 import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
@@ -133,7 +134,8 @@ class ChatViewModel @Inject constructor(
     private val undoRedoUseCase: UndoRedoUseCase,
     private val settingsRepository: SettingsRepository,
     // OpenCodeApi still needed for ServerTerminalRegistry (terminal subsystem)
-    private val api: OpenCodeApi
+    private val api: OpenCodeApi,
+    val toolCardResolver: ToolCardResolver
 ) : ViewModel() {
 
     private val serverUrl: String = URLDecoder.decode(

@@ -26,15 +26,10 @@ import dev.minios.ocremote.domain.model.Part
 import androidx.compose.foundation.text.selection.SelectionContainer
 import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
 import dev.minios.ocremote.ui.screens.chat.tools.ToolCallCard
-import dev.minios.ocremote.ui.screens.chat.tools.cards.BashToolCard
-import dev.minios.ocremote.ui.screens.chat.tools.cards.EditToolCard
 import dev.minios.ocremote.ui.screens.chat.tools.cards.PatchCard
-import dev.minios.ocremote.ui.screens.chat.tools.cards.ReadToolCard
-import dev.minios.ocremote.ui.screens.chat.tools.cards.SearchToolCard
-import dev.minios.ocremote.ui.screens.chat.tools.cards.TaskToolCard
 import dev.minios.ocremote.ui.screens.chat.tools.cards.TodoListCard
-import dev.minios.ocremote.ui.screens.chat.tools.cards.WriteToolCard
 import dev.minios.ocremote.ui.screens.chat.util.LocalCollapseTools
+import dev.minios.ocremote.ui.screens.chat.util.LocalToolCardResolver
 import dev.minios.ocremote.ui.screens.chat.util.LocalExpandReasoning
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.LocalOnToggleToolExpanded
@@ -92,47 +87,27 @@ internal fun PartContent(
                     onToggleExpand = { onToggleToolExpanded(part.id, true) }
                 )
             } else {
-                // Dispatch to tool-specific renderers (like WebUI)
+                // Use the resolver registry
                 val autoExpand = LocalCollapseTools.current
-                // Server sends TitleCase tool names ("Read", "Write", "Edit", "Bash"),
-                // so lowercase() ensures matching regardless of casing.
-                when (part.tool.lowercase()) {
-                    "edit", "multiedit" -> EditToolCard(
+                val expanded = toolExpandedStates[part.id] ?: autoExpand
+                val toggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
+
+                val resolved = LocalToolCardResolver.current.resolve(
+                    tool = part,
+                    isExpanded = expanded,
+                    onToggleExpand = toggleExpand,
+                    onViewSubSession = onViewSubSession,
+                    turnAgentName = turnAgentName
+                )
+
+                if (resolved != null) {
+                    resolved()
+                } else {
+                    // Fallback to generic ToolCallCard
+                    ToolCallCard(
                         tool = part,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
-                    )
-                    "write" -> WriteToolCard(
-                        tool = part,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
-                    )
-                    "bash" -> BashToolCard(
-                        tool = part,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
-                    )
-                    "read" -> ReadToolCard(
-                        tool = part,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
-                    )
-                    "glob", "grep" -> SearchToolCard(
-                        tool = part,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
-                    )
-                    "task" -> TaskToolCard(
-                        tool = part,
-                        onViewSubSession = onViewSubSession,
-                        turnAgentName = turnAgentName,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
-                    )
-                    else -> ToolCallCard(
-                        tool = part,
-                        isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                        onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
+                        isExpanded = expanded,
+                        onToggleExpand = toggleExpand
                     )
                 }
             }
