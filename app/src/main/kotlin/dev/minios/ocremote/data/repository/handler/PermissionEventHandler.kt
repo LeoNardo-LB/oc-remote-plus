@@ -1,5 +1,6 @@
 package dev.minios.ocremote.data.repository.handler
 
+import android.util.Log
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,18 +17,31 @@ import javax.inject.Singleton
 @Singleton
 class PermissionEventHandler @Inject constructor() : SseEventHandler {
 
+    companion object {
+        private const val TAG = "PermissionEventHandler"
+    }
+
     private val _permissions = MutableStateFlow<Map<String, List<SseEvent.PermissionAsked>>>(emptyMap())
     val permissions: StateFlow<Map<String, List<SseEvent.PermissionAsked>>> = _permissions.asStateFlow()
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
-            is SseEvent.PermissionAsked -> { handlePermissionAsked(event); true }
-            is SseEvent.PermissionReplied -> { handlePermissionReplied(event); true }
+            is SseEvent.PermissionAsked -> {
+                Log.d(TAG, "Permission event received: PermissionAsked(id=${event.id}, sessionId=${event.sessionId})")
+                handlePermissionAsked(event)
+                true
+            }
+            is SseEvent.PermissionReplied -> {
+                Log.d(TAG, "Permission event received: PermissionReplied(requestId=${event.requestId}, sessionId=${event.sessionId})")
+                handlePermissionReplied(event)
+                true
+            }
             else -> false
         }
     }
 
     private fun handlePermissionAsked(event: SseEvent.PermissionAsked) {
+        Log.i(TAG, "Permission auto-approved: id=${event.id}, permission=${event.permission}, sessionId=${event.sessionId}")
         _permissions.update { current ->
             val sessionPerms = current[event.sessionId]?.toMutableList() ?: mutableListOf()
             if (sessionPerms.any { it.id == event.id }) {
@@ -40,6 +54,7 @@ class PermissionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handlePermissionReplied(event: SseEvent.PermissionReplied) {
+        Log.w(TAG, "Permission auto-denied: requestId=${event.requestId}, sessionId=${event.sessionId}")
         _permissions.update { current ->
             val sessionPerms = current[event.sessionId]?.filter { it.id != event.requestId }
             if (sessionPerms != null) current + (event.sessionId to sessionPerms) else current

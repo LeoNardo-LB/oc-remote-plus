@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +43,9 @@ sealed class NetworkState {
 class NetworkMonitor @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
+    companion object {
+        private const val TAG = "NetworkMonitor"
+    }
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -65,6 +69,7 @@ class NetworkMonitor @Inject constructor(
 
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                Log.i(TAG, "Network available")
                 _networkState.value = NetworkState.Available
             }
 
@@ -73,10 +78,12 @@ class NetworkMonitor @Inject constructor(
             }
 
             override fun onLost(network: Network) {
+                Log.w(TAG, "Network lost")
                 _networkState.value = NetworkState.Lost
             }
 
             override fun onUnavailable() {
+                Log.i(TAG, "Network unavailable")
                 _networkState.value = NetworkState.Unavailable
             }
 
