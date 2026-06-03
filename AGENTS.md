@@ -115,6 +115,9 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 - **完整构建**（`assembleDevRelease` 等）: 300 秒
 - **依赖解析/首次构建**: 可延长至 600 秒
 
+**Windows Daemon 卡住问题：**
+Gradle Daemon 在 Windows 上间歇性不释放 stdout 管道，导致命令行工具看到 `BUILD SUCCESSFUL` 输出后永不返回。已在 `gradle.properties` 中设置 `org.gradle.daemon=false` 禁用 daemon。如遇到卡住，额外执行 `.\gradlew --stop` 清理残留 daemon。
+
 ### Verification & Testing
 See `docs/verification-requirements.md` for the full 4-dimension verification framework.
 
