@@ -1,0 +1,48 @@
+appId: dev.minios.ocremote.dev
+name: L2 - Session Load More
+tags:
+  - layer2
+  - sessions
+  - pagination
+  - manual
+---
+# Requires: Server configured, connected, with enough sessions (>1 page worth)
+# to trigger cursor-based pagination (default page size: 50)
+
+# Launch app
+- launchApp
+
+# Navigate to session list via Sessions button on a connected server card
+- extendedWaitUntil:
+    visible: "Sessions"
+    timeout: 15000
+- tapOn: "Sessions"
+
+# Wait for session list screen to load
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 15000
+
+# Screenshot before scrolling
+- takeScreenshot: l2_load_more_initial
+
+# Scroll down to trigger load more (pagination fires when near bottom)
+- scroll:
+    direction: DOWN
+
+# Wait for potential pagination API call
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+# Scroll down further to ensure bottom is reached
+- scroll:
+    direction: DOWN
+
+# Wait for any subsequent pagination
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+# Screenshot after scrolling (may show loading indicator or new items)
+- takeScreenshot: l2_load_more_scrolled

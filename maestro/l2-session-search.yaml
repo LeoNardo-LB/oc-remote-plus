@@ -1,0 +1,57 @@
+appId: dev.minios.ocremote.dev
+name: L2 - Session Search
+tags:
+  - layer2
+  - sessions
+  - search
+  - manual
+---
+# Requires: Server configured, connected, with sessions loaded
+
+# Launch app
+- launchApp
+
+# Navigate to session list via Sessions button on a connected server card
+- extendedWaitUntil:
+    visible: "Sessions"
+    timeout: 15000
+- tapOn: "Sessions"
+
+# Wait for session list screen to load (search bar placeholder visible)
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 15000
+
+# Screenshot before search
+- takeScreenshot: l2_session_search_initial
+
+# Tap search bar to focus it
+- tapOn: "Search sessions..."
+
+# Type a search query
+- inputText: "test"
+
+# Wait for 300ms debounce + API call to complete
+- extendedWaitUntil:
+    visible: "test"
+    timeout: 10000
+
+# Assert that search text is visible in the search bar
+- assertVisible: "test"
+
+# Screenshot of filtered results
+- takeScreenshot: l2_session_search_filtered
+
+# Clear search by tapping the trailing close icon
+- tapOn: "Clear search"
+
+# Wait for original list to restore
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 10000
+
+# Assert search placeholder is restored (search cleared)
+- assertVisible: "Search sessions..."
+
+# Screenshot after clearing search
+- takeScreenshot: l2_session_search_cleared

@@ -1,0 +1,60 @@
+appId: dev.minios.ocremote.dev
+name: L2 - Session Archive Filter
+tags:
+  - layer2
+  - sessions
+  - archive
+  - manual
+---
+# Requires: Server configured, connected, with sessions loaded
+# At least one archived session recommended for meaningful assertions
+
+# Launch app
+- launchApp
+
+# Navigate to session list via Sessions button on a connected server card
+- extendedWaitUntil:
+    visible: "Sessions"
+    timeout: 15000
+- tapOn: "Sessions"
+
+# Wait for session list screen to load (search bar visible)
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 15000
+
+# Wait for FilterChip to be visible
+- extendedWaitUntil:
+    visible: "Archived"
+    timeout: 5000
+
+# Screenshot before toggling archive filter
+- takeScreenshot: l2_archive_filter_before
+
+# Tap the Archived filter chip to show archived sessions
+- tapOn: "Archived"
+
+# Wait for list to update after toggle (API call)
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+# Assert the filter chip is selected (visual state change detected via screenshot)
+- assertVisible: "Archived"
+
+# Screenshot with archived sessions visible
+- takeScreenshot: l2_archive_filter_active
+
+# Tap the Archived filter chip again to hide archived sessions
+- tapOn: "Archived"
+
+# Wait for list to revert
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+# Assert filter chip is still visible (deselected state)
+- assertVisible: "Archived"
+
+# Screenshot after returning to non-archived view
+- takeScreenshot: l2_archive_filter_inactive
