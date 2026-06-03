@@ -20,7 +20,7 @@ android {
         versionCode = 356
         versionName = "2.0.0-beta.156"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "dev.minios.ocremote.HiltTestRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -169,5 +169,6 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.59.2")
 }
 
