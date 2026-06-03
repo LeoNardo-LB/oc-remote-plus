@@ -17,8 +17,8 @@ android {
         applicationId = "dev.minios.ocremote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 343
-        versionName = "2.0.0-beta.143"
+        versionCode = 344
+        versionName = "2.0.0-beta.144"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -61,6 +61,54 @@ object ButtonTokens {
         }
     }
 
+    // ── Secondary FilledTonalButton Colors ────────────────────────────
+
+    /**
+     * Colors for secondary [FilledTonalButton] (cancel / dismiss).
+     *
+     * - **Light**: surfaceContainerHighest / onSurfaceVariant — neutral grey fill.
+     * - **AMOLED**: Black container + onSurfaceVariant content + primary border.
+     */
+    @Composable
+    fun secondaryColors(): ButtonColors {
+        val isAmoled = LocalAmoledMode.current
+        return if (isAmoled) {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = Color.Black,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
+    // ── Danger FilledTonalButton Colors ───────────────────────────────
+
+    /**
+     * Colors for danger [FilledTonalButton] (delete / destructive).
+     *
+     * - **Light / Dark**: error / onError — saturated red fill with white text.
+     * - **AMOLED**: Black container + error content + primary border.
+     */
+    @Composable
+    fun dangerColors(): ButtonColors {
+        val isAmoled = LocalAmoledMode.current
+        return if (isAmoled) {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = Color.Black,
+                contentColor = MaterialTheme.colorScheme.error,
+            )
+        } else {
+            ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+            )
+        }
+    }
+
     // ── FilledTonalButton Border ──────────────────────────────────────
 
     /**

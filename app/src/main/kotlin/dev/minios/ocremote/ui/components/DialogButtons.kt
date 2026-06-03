@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -97,10 +96,8 @@ private fun DialogActionButton(
             FilledTonalButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
+                colors = ButtonTokens.secondaryColors(),
+                border = ButtonTokens.tonalBorder(),
                 contentPadding = contentPadding,
             ) {
                 Text(text)
@@ -110,10 +107,8 @@ private fun DialogActionButton(
             FilledTonalButton(
                 onClick = onClick,
                 modifier = modifier,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
+                colors = ButtonTokens.dangerColors(),
+                border = ButtonTokens.tonalBorder(),
                 contentPadding = contentPadding,
             ) {
                 Text(text)
