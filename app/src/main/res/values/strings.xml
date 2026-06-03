@@ -270,6 +270,7 @@
     <string name="chat_token_reasoning">Reasoning</string>
     <string name="chat_token_cache_read">Cache read</string>
     <string name="chat_token_cache_write">Cache write</string>
+    <string name="chat_task_output_summary">Output summary</string>
     
     <!-- Slash Commands -->
     <string name="cmd_new">Create a new session</string>

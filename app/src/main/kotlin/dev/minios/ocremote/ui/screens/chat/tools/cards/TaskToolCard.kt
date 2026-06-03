@@ -3,7 +3,9 @@ package dev.minios.ocremote.ui.screens.chat.tools.cards
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -146,9 +148,9 @@ internal fun TaskToolCard(
                 }
             }
         }
-    ) {
-        val halfScreenHeight = halfScreenHeight()
-        val scrollState = rememberScrollState()
+        ) {
+            val halfScreenHeight = halfScreenHeight()
+            val scrollState = rememberScrollState()
         Surface(
             shape = ShapeTokens.extraSmall,
             color = toolOutputContainerColor(),
@@ -158,12 +160,20 @@ internal fun TaskToolCard(
                 .heightIn(max = halfScreenHeight)
                 .verticalScroll(scrollState)
         ) {
-            SelectionContainer {
-                MarkdownContent(
-                    markdown = output,
-                    textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer,
-                    isUser = false
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = stringResource(R.string.chat_task_output_summary),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                SelectionContainer {
+                    MarkdownContent(
+                        markdown = output.take(2000),
+                        textColor = if (isAmoled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.AMOLED) else MaterialTheme.colorScheme.onSecondaryContainer,
+                        isUser = false
+                    )
+                }
             }
         }
     }
