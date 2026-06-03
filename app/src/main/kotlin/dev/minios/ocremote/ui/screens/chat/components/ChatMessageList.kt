@@ -220,21 +220,11 @@ fun ChatMessageList(
                                     onViewSubSession = navigateToChildSession,
                                     isAmoled = isAmoled,
                                     isTurnLast = isTurnLast,
-                                    onCopyText = if (isTurnLast) {
-                                        {
-                                            val messages = turnMessagesForMsg
-                                            val text = messages.flatMap { m ->
-                                                m.parts.filterIsInstance<Part.Text>().map { it.text }
-                                            }.joinToString("\n\n")
-                                            if (text.isNotBlank()) {
-                                                clipboardManager.setText(AnnotatedString(text))
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        context.getString(R.string.chat_copied_clipboard)
-                                                    )
-                                                }
-                                            }
-                                        }
+                                    copyText = if (isTurnLast) {
+                                        turnMessagesForMsg
+                                            .flatMap { m -> m.parts.filterIsInstance<Part.Text>().map { it.text } }
+                                            .joinToString("\n\n")
+                                            .takeIf { it.isNotBlank() }
                                     } else null
                                 )
                             }

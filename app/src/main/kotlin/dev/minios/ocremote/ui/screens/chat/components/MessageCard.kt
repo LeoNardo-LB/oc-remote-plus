@@ -70,6 +70,7 @@ internal fun MessageCard(
     onViewSubSession: ((String) -> Unit)? = null,
     onRevert: (() -> Unit)? = null,
     onCopyText: (() -> Unit)? = null,
+    copyText: String? = null,
     isAmoled: Boolean = false,
     isTurnLast: Boolean = false,
 ) {
@@ -86,6 +87,7 @@ internal fun MessageCard(
             currentMessage = currentMessage,
             onViewSubSession = onViewSubSession,
             onCopyText = onCopyText,
+            copyText = copyText,
             isAmoled = isAmoled,
             isTurnLast = isTurnLast,
         )
@@ -313,6 +315,7 @@ private fun MessageCardAssistant(
     currentMessage: ChatMessage,
     onViewSubSession: ((String) -> Unit)?,
     onCopyText: (() -> Unit)?,
+    copyText: String?,
     isAmoled: Boolean,
     isTurnLast: Boolean,
 ) {
@@ -466,23 +469,16 @@ private fun MessageCardAssistant(
                                 )
                             }
                             Spacer(modifier = Modifier.weight(1f))
-                            if (onCopyText != null) {
-                                Icon(
-                                    Icons.Default.ContentCopy,
-                                    contentDescription = stringResource(R.string.chat_copy),
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable {
-                                            performHaptic(hapticView, hapticOn)
-                                            onCopyText()
-                                        },
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
+                            if (copyText != null) {
+                                CopyButton(
+                                    text = copyText,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
                     }
                     // Fallback: no stats but copy button needed
-                    if (!hasFooter && isTurnLast && onCopyText != null) {
+                    if (!hasFooter && isTurnLast && copyText != null) {
                         Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -502,16 +498,9 @@ private fun MessageCardAssistant(
                                 )
                             }
                             Spacer(modifier = Modifier.weight(1f))
-                            Icon(
-                                Icons.Default.ContentCopy,
-                                contentDescription = stringResource(R.string.chat_copy),
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clickable {
-                                        performHaptic(hapticView, hapticOn)
-                                        onCopyText()
-                                    },
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
+                            CopyButton(
+                                text = copyText,
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
