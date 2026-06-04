@@ -1,0 +1,86 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Server Setup (Real OpenCode Server)
+tags:
+  - e2e
+  - server
+  - connection
+---
+
+# E2E Server Setup Flow
+# Requires: OpenCode server running on host at port 4096
+# Emulator accesses host via 10.0.2.2
+
+# Clear app data and launch fresh
+- clearState
+- launchApp
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+
+# Assert empty state before adding server
+- assertVisible: "No servers configured"
+- takeScreenshot: e2e_server_setup_empty_state
+
+# Open Add Server dialog
+- tapOn: "Add Server"
+
+# Wait for dialog to appear
+- extendedWaitUntil:
+    visible: "Server Name"
+    timeout: 10000
+
+- takeScreenshot: e2e_server_setup_dialog_open
+
+# Fill Server Name field
+- tapOn: "Server Name"
+- inputText: "Test Server"
+- takeScreenshot: e2e_server_setup_name_filled
+
+# Fill Server URL field
+# The field has default "http://" — triple-tap to select all, then type
+- tapOn: "Server URL"
+- doubleTapOn: "Server URL"
+- inputText: "http://10.0.2.2:4096"
+- takeScreenshot: e2e_server_setup_url_filled
+
+# Fill Username field — default is "opencode", triple-tap to select all
+- tapOn: "Username"
+- doubleTapOn: "Username"
+- inputText: "opencode"
+- takeScreenshot: e2e_server_setup_username_filled
+
+# Fill Password field
+- tapOn: "Password"
+- inputText: "testpassword"
+- takeScreenshot: e2e_server_setup_password_filled
+
+# Tap Save button
+- tapOn: "Save"
+
+# Wait for server card to appear — "Connect" or "Connected" or "Test Server"
+- extendedWaitUntil:
+    visible: "Test Server"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: e2e_server_setup_after_save
+
+# Check if already connected (auto-connect)
+- assertVisible:
+    text: "Connected"
+    optional: true
+
+# If not auto-connected, tap Connect manually
+- tapOn:
+    text: "Connect"
+    optional: true
+
+# Wait for connection to establish
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_server_setup_connected

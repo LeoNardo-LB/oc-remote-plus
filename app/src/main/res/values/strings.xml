@@ -93,6 +93,7 @@
     
     <!-- Session Screen -->
     <string name="sessions_title">Sessions</string>
+    <string name="search_sessions">Search sessions…</string>
     <string name="sessions_new">New Session</string>
     <string name="sessions_create_folder">Create folder</string>
     <string name="sessions_create_folder_title">Create folder</string>

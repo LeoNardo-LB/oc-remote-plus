@@ -136,7 +136,10 @@ class SessionListViewModel @Inject constructor(
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
         val filteredSessions = allSessions
-            .filter { it.id in serverSessionIds && (showArchived || !it.isArchived) && it.parentId == null }
+            .filter { it.id in serverSessionIds && it.parentId == null }
+            .let { sessions ->
+                if (showArchived) sessions.filter { it.isArchived } else sessions
+            }
             .sortedByDescending { it.time.updated }
 
         val baseFilteredSessions = if (baseDirectory != null) {
@@ -148,7 +151,18 @@ class SessionListViewModel @Inject constructor(
             filteredSessions
         }
 
-        val treeNodes = buildTreeNodes(baseFilteredSessions, expandedPaths, baseDirectory, statuses)
+        // Client-side search: filter by directory path OR session title
+        val searchedSessions = if (!searchQuery.isNullOrBlank()) {
+            val query = searchQuery.lowercase()
+            baseFilteredSessions.filter { session ->
+                session.directory.lowercase().contains(query) ||
+                    session.title?.lowercase()?.contains(query) == true
+            }
+        } else {
+            baseFilteredSessions
+        }
+
+        val treeNodes = buildTreeNodes(searchedSessions, expandedPaths, baseDirectory, statuses)
 
         val prefillDirectory = if (lastToggledDirectory != null && lastToggledDirectory in expandedPaths)
             lastToggledDirectory

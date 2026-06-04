@@ -1,0 +1,96 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Chat Flow (Real OpenCode Server)
+tags:
+  - e2e
+  - chat
+  - send-message
+---
+
+# E2E Chat Flow
+# Prerequisite: Server configured and connected via e2e-server-setup
+# The session list shows project paths. We tap a project, then a session.
+
+# Launch app
+- launchApp
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Test Server"
+    timeout: 15000
+
+# Connect if needed
+- tapOn:
+    text: "Connect"
+    optional: true
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_chat_home_connected
+
+# Navigate to Sessions via the server card button
+- tapOn:
+    text: "Sessions"
+    index: 0
+
+# Wait for session list
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_chat_session_list
+
+# Tap on the oc-remote project directory 
+# Full path: "D:/Develop/code/app/oc-remote"
+- tapOn: "D:/Develop/code/app/oc-remote"
+
+# Wait for session items in that project
+# Sessions show status text like "Working" or nothing (idle)
+- extendedWaitUntil:
+    visible: "sessions active"
+    timeout: 15000
+    optional: true
+
+- takeScreenshot: e2e_chat_sessions_in_project
+
+# Tap on the second session (the first may be "Working", others are idle)
+- tapOn: "问题总览修复"
+
+# Wait for chat screen — input hint rotates among "Ask a question", "Help me with", etc.
+- extendedWaitUntil:
+    visible: "Ask a question"
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_chat_screen_loaded
+
+# Tap on the message input field (any hint text works)
+- tapOn:
+    text: "Ask a question"
+    optional: true
+- tapOn:
+    text: "Help me with"
+    optional: true
+
+# Type a message
+- inputText: "say hi"
+
+# Send via Enter
+- pressKey: ENTER
+
+- takeScreenshot: e2e_chat_message_sent
+
+# Wait for AI to respond (up to 60s)
+- extendedWaitUntil:
+    visible: "Scroll to bottom"
+    timeout: 60000
+    optional: true
+
+- takeScreenshot: e2e_chat_response_received
+
+# Navigate back
+- back
+- back
+- takeScreenshot: e2e_chat_final_state

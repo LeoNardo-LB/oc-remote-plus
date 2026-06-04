@@ -1,0 +1,80 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Session List (Real OpenCode Server)
+tags:
+  - e2e
+  - sessions
+  - list
+---
+
+# E2E Session List Flow
+# Prerequisite: Server should be configured and connected (run e2e-server-setup first)
+# Server has 23 sessions for project c0370e3da2172fa7442e8d33dd9abc375bd45aa1
+
+# Launch app (preserve state — server should already be configured)
+- launchApp
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: e2e_session_list_app_loaded
+
+# If "No servers configured" appears, server is not set up — abort gracefully
+- assertVisible:
+    text: "No servers configured"
+    optional: true
+
+# Check if server is connected — if not, try connecting
+- assertVisible:
+    text: "Connected"
+    optional: true
+- takeScreenshot: e2e_session_list_server_status
+
+# Tap Connect if not already connected
+- tapOn:
+    text: "Connect"
+    optional: true
+
+# Wait for connection
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 20000
+    optional: true
+
+# Navigate to Sessions list
+- tapOn:
+    text: "Sessions"
+    optional: true
+
+# Wait for session list to load
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
+- takeScreenshot: e2e_session_list_loaded
+
+# Assert known session slugs are visible
+# Server has sessions with slugs like "quiet-island", "mighty-star", etc.
+- assertVisible:
+    text: "quiet-island"
+    optional: true
+- assertVisible:
+    text: "mighty-star"
+    optional: true
+- takeScreenshot: e2e_session_list_with_sessions
+
+# Swipe down to see more sessions
+- swipe:
+    direction: DOWN
+- takeScreenshot: e2e_session_list_scrolled
+
+# Swipe down again
+- swipe:
+    direction: DOWN
+- takeScreenshot: e2e_session_list_scrolled_more

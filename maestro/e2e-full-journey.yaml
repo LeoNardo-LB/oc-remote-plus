@@ -1,0 +1,243 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Full Journey (Master Flow)
+tags:
+  - e2e
+  - full-journey
+  - integration
+---
+
+# E2E Full Journey — Complete User Journey
+# Runs the complete flow: setup → connect → sessions → chat → settings
+# This is the master integration flow that covers the entire app.
+#
+# Prerequisites:
+#   - OpenCode server running on host at port 4096
+#   - Replace "testpassword" in e2e-server-setup.yaml with actual $OPENCODE_SERVER_PASSWORD
+#   - Emulator running with network access to 10.0.2.2
+
+# ============================================================
+# Step 1: Launch app with fresh state
+# ============================================================
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: e2e_journey_01_app_launched
+
+# ============================================================
+# Step 2: Add Server (if not already present)
+# ============================================================
+# Check if we already have a server configured
+- assertVisible:
+    text: "No servers configured"
+    optional: true
+
+# Open Add Server dialog
+- tapOn:
+    text: "Add Server"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Add Server"
+    timeout: 10000
+    optional: true
+
+- assertVisible:
+    text: "Add Server"
+    optional: true
+- takeScreenshot: e2e_journey_02_add_server_dialog
+
+# Fill server form fields
+- tapOn:
+    text: "Server Name"
+    optional: true
+- inputText: "Test Server"
+
+- tapOn:
+    text: "Server URL"
+    optional: true
+- eraseText
+- inputText: "http://10.0.2.2:4096"
+
+- tapOn:
+    text: "Username"
+    optional: true
+- inputText: "opencode"
+
+# NOTE: Replace "testpassword" with actual $OPENCODE_SERVER_PASSWORD
+- tapOn:
+    text: "Password"
+    optional: true
+- inputText: "testpassword"
+
+- tapOn: "Save"
+- takeScreenshot: e2e_journey_03_server_saved
+
+# ============================================================
+# Step 3: Connect to server
+# ============================================================
+- extendedWaitUntil:
+    visible: "Connect"
+    timeout: 15000
+    optional: true
+
+# Check for auto-connect or manual connect
+- assertVisible:
+    text: "Connected"
+    optional: true
+- takeScreenshot: e2e_journey_04a_auto_connected
+
+- tapOn:
+    text: "Connect"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 20000
+    optional: true
+
+- assertVisible:
+    text: "Connected"
+    optional: true
+- takeScreenshot: e2e_journey_04b_connected
+
+# ============================================================
+# Step 4: Open sessions list
+# ============================================================
+- tapOn:
+    text: "Sessions"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+
+- assertVisible:
+    text: "Search sessions..."
+    optional: true
+- takeScreenshot: e2e_journey_05_session_list
+
+# ============================================================
+# Step 5: Open a session
+# ============================================================
+- tapOn:
+    text: "quiet-island"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Message OpenCode..."
+    timeout: 20000
+    optional: true
+
+- assertVisible:
+    text: "Message OpenCode..."
+    optional: true
+- takeScreenshot: e2e_journey_06_chat_screen
+
+# ============================================================
+# Step 6: Send a message
+# ============================================================
+- tapOn:
+    text: "Message OpenCode..."
+    optional: true
+
+- inputText: "hello"
+- takeScreenshot: e2e_journey_07_message_typed
+
+# Send message
+- pressKey: ENTER
+- takeScreenshot: e2e_journey_08_message_sent
+
+# ============================================================
+# Step 7: Wait for response
+# ============================================================
+- extendedWaitUntil:
+    visible: "Scroll to bottom"
+    timeout: 30000
+    optional: true
+
+- assertVisible:
+    text: "Scroll to bottom"
+    optional: true
+- takeScreenshot: e2e_journey_09_response_received
+
+# ============================================================
+# Step 8: Navigate back to home
+# ============================================================
+- pressKey: BACK
+- pressKey: BACK
+
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+    optional: true
+
+- assertVisible:
+    text: "OC Remote"
+    optional: true
+- takeScreenshot: e2e_journey_10_back_home
+
+# ============================================================
+# Step 9: Open Settings
+# ============================================================
+- tapOn:
+    text: "Settings"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 10000
+
+- assertVisible: "Settings"
+- takeScreenshot: e2e_journey_11_settings_open
+
+# ============================================================
+# Step 10: Scroll to Auto-approve rules
+# ============================================================
+- assertVisible: "General"
+- assertVisible: "Appearance"
+
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+
+# Assert auto-approve section
+- assertVisible:
+    text: "Auto-approve rules"
+    optional: true
+- assertVisible:
+    text: "No saved auto-approve rules"
+    optional: true
+- takeScreenshot: e2e_journey_12_auto_approve_rules

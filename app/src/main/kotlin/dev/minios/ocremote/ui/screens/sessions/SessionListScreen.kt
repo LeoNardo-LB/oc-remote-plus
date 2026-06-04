@@ -63,12 +63,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Archive
+import dev.minios.ocremote.ui.components.amoledOutlinedTextFieldColors
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -149,6 +149,46 @@ fun SessionListScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                actions = {
+                    // All/Archived dropdown toggle — right-aligned in top bar
+                    var filterExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        TextButton(onClick = { filterExpanded = true }) {
+                            Text(
+                                text = if (viewModel.showArchived) "Archived" else "All",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = filterExpanded,
+                            onDismissRequest = { filterExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("All") },
+                                onClick = {
+                                    filterExpanded = false
+                                    if (viewModel.showArchived) {
+                                        viewModel.toggleArchivedFilter()
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Archived") },
+                                onClick = {
+                                    filterExpanded = false
+                                    if (!viewModel.showArchived) {
+                                        viewModel.toggleArchivedFilter()
+                                    }
+                                }
+                            )
+                        }
+                    }
+                },
             )
         },
         floatingActionButton = {
@@ -187,112 +227,97 @@ fun SessionListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search bar
+            // Search bar — always visible, independent of list state
             var searchInput by rememberSaveable { mutableStateOf("") }
             val searchJob = remember { mutableStateOf<Job?>(null) }
 
-            @Suppress("DEPRECATION")
-            SearchBar(
-                query = searchInput,
-                onQueryChange = { newQuery ->
-                    searchInput = newQuery
-                    searchJob.value?.cancel()
-                    searchJob.value = scope.launch {
-                        delay(300)
-                        viewModel.setSearchQuery(newQuery)
-                        viewModel.loadSessions()
-                    }
-                },
-                onSearch = {
-                    viewModel.setSearchQuery(searchInput)
-                    viewModel.loadSessions()
-                },
-                active = false,
-                onActiveChange = {},
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                placeholder = { Text("Search sessions...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchInput.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchInput = ""
-                            viewModel.clearSearchQuery()
-                            viewModel.loadSessions()
-                        }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear search")
-                        }
-                    }
-                },
-                colors = SearchBarDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
-            ) {}
-
-            // Archive filter chip row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Column(modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
             ) {
-                FilterChip(
-                    selected = viewModel.showArchived,
-                    onClick = { viewModel.toggleArchivedFilter() },
-                    label = { Text("Archived") },
+                OutlinedTextField(
+                    value = searchInput,
+                    onValueChange = { newQuery ->
+                        searchInput = newQuery
+                        searchJob.value?.cancel()
+                        searchJob.value = scope.launch {
+                            delay(300)
+                            viewModel.setSearchQuery(newQuery)
+                            viewModel.loadSessions()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
                     leadingIcon = {
-                        Icon(
-                            Icons.Default.Archive,
-                            contentDescription = null,
-                            modifier = Modifier.size(FilterChipDefaults.IconSize)
-                        )
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        if (searchInput.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchInput = ""
+                                viewModel.clearSearchQuery()
+                                viewModel.loadSessions()
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    placeholder = { Text(stringResource(R.string.search_sessions)) },
+                    singleLine = true,
+                    colors = if (isAmoled) {
+                        amoledOutlinedTextFieldColors()
+                    } else {
+                        OutlinedTextFieldDefaults.colors()
                     }
                 )
-            }
 
-            when {
-                uiState.isLoading && uiState.treeNodes.isEmpty() -> {
-                    PulsingDotsIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        dotSize = 12.dp,
-                        dotSpacing = 8.dp
-                    )
-                }
-                uiState.error != null && uiState.treeNodes.isEmpty() -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            text = uiState.error ?: stringResource(R.string.session_unknown_error),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Button(onClick = { viewModel.loadSessions() }) {
-                            Text(stringResource(R.string.retry))
+                when {
+                    uiState.isLoading && uiState.treeNodes.isEmpty() && uiState.searchQuery.isNullOrBlank() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PulsingDotsIndicator(dotSize = 12.dp, dotSpacing = 8.dp)
                         }
                     }
-                }
-                uiState.treeNodes.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = stringResource(R.string.sessions_empty_directory),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    uiState.error != null && uiState.treeNodes.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = uiState.error ?: stringResource(R.string.session_unknown_error),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Button(onClick = { viewModel.loadSessions() }) {
+                                    Text(stringResource(R.string.retry))
+                                }
+                            }
+                        }
                     }
-                }
-                else -> {
+                    uiState.treeNodes.isEmpty() -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = stringResource(R.string.sessions_empty_directory),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    else -> {
                     val untitledLabel = stringResource(R.string.session_untitled)
                     val listState = rememberLazyListState()
                     val shouldLoadMore by remember {
@@ -312,7 +337,7 @@ fun SessionListScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
                         itemsIndexed(uiState.treeNodes, key = { _, node -> node.id }) { index, node ->
                             when (node) {
@@ -379,6 +404,7 @@ fun SessionListScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

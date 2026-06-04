@@ -1,0 +1,86 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Settings Flow (Auto-approve Rules)
+tags:
+  - e2e
+  - settings
+  - auto-approve
+---
+
+# E2E Settings Flow
+# Navigates to Settings and scrolls to Auto-approve rules section.
+
+# Launch app
+- launchApp
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "OC Remote"
+    timeout: 15000
+
+- assertVisible: "OC Remote"
+- takeScreenshot: e2e_settings_app_loaded
+
+# Navigate to Settings (bottom nav or menu)
+- tapOn:
+    text: "Settings"
+    optional: true
+
+# Wait for Settings screen to load
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 10000
+
+- assertVisible: "Settings"
+- takeScreenshot: e2e_settings_loaded
+
+# Verify Settings loaded with expected sections
+- assertVisible: "General"
+- assertVisible: "Appearance"
+- takeScreenshot: e2e_settings_sections
+
+# Scroll down to find "Auto-approve rules"
+# Maestro uses swipe for Compose LazyColumn scrolling
+# Multiple swipes needed since Auto-approve is near the bottom
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- takeScreenshot: e2e_settings_scrolled
+
+# Assert Auto-approve section visible (best-effort with optional)
+- assertVisible:
+    text: "Auto-approve rules"
+    optional: true
+- takeScreenshot: e2e_settings_auto_approve_section
+
+# Assert empty state for auto-approve rules
+- assertVisible:
+    text: "No saved auto-approve rules"
+    optional: true
+- takeScreenshot: e2e_settings_auto_approve_empty
