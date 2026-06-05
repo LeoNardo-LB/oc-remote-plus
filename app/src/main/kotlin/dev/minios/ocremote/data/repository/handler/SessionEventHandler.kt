@@ -89,13 +89,15 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleSessionUpdated(event: SseEvent.SessionUpdated, serverId: String) {
+        Log.i(TAG, "SessionUpdated: id=${event.info.id} title=${event.info.title}")
         trackSession(serverId, event.info.id)
         _sessions.update { current ->
             val idx = current.indexOfFirst { it.id == event.info.id }
             if (idx >= 0) {
+                Log.i(TAG, "SessionUpdated: replacing existing session at index $idx (oldTitle=${current[idx].title}, newTitle=${event.info.title})")
                 current.toMutableList().apply { set(idx, event.info) }
             } else {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Session ${event.info.id} not found, upserting")
+                Log.i(TAG, "SessionUpdated: session ${event.info.id} not found, upserting (title=${event.info.title})")
                 (current + event.info).sortedByDescending { s -> s.time.updated }
             }
         }

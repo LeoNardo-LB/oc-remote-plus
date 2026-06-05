@@ -1123,6 +1123,33 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Schedule a delayed REST refresh to fetch the updated session title.
+     * Only refreshes if the current title looks like a default placeholder
+     * (null, empty, or matches "New session - ..." pattern).
+     */
+    private fun refreshSessionTitleDelayed(sid: String) {
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(8_000) // Wait for server async title generation
+            try {
+                val refreshed = manageSessionUseCase.getSession(conn, sid)
+                if (refreshed != null) {
+                    val currentSession = eventDispatcher.sessions.value.find { it.id == sid }
+                    val currentTitle = currentSession?.title
+                    // Only update if the title actually changed (skip if SSE already delivered it)
+                    if (refreshed.title != currentTitle) {
+                        val msg = "[Title] REST fallback: title updated from '$currentTitle' to '${refreshed.title}'"
+                        Log.i(TAG, msg)
+                        appendDiagnosticLog(msg)
+                        eventDispatcher.setSessions(serverId, listOf(refreshed))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to refresh session title for $sid: ${e.message}")
+            }
+        }
+    }
+
     private fun sendParts(parts: List<PromptPart>) {
         val pendingId = "pending-${java.util.UUID.randomUUID()}"
         _pendingMessageIds.update { it + pendingId }
@@ -1147,6 +1174,11 @@ class ChatViewModel @Inject constructor(
                     directory = sessionDirectory
                 )
                 if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
+                // Schedule a delayed session refresh to pick up the auto-generated title.
+                // The server generates a title asynchronously after the first message (step===1),
+                // typically within 5-15 seconds. SSE session.updated should deliver it,
+                // but this REST fallback ensures the title appears even if SSE misses it.
+                refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
                 _pendingMessageIds.update { it - pendingId }
@@ -1169,6 +1201,9 @@ class ChatViewModel @Inject constructor(
      */
     fun replyToPermission(requestId: String, reply: String) {
         viewModelScope.launch {
+            val logMsg = "[Permission] replyToPermission: id=$requestId reply=$reply dir=$sessionDirectory"
+            Log.i(TAG, logMsg)
+            appendDiagnosticLog(logMsg)
             try {
                 val success = managePermissionUseCase.replyToPermission(
                     conn = conn,
@@ -1176,13 +1211,27 @@ class ChatViewModel @Inject constructor(
                     reply = reply,
                     directory = sessionDirectory
                 )
+                val resultMsg = "[Permission] replyToPermission result: id=$requestId success=$success"
+                Log.i(TAG, resultMsg)
+                appendDiagnosticLog(resultMsg)
                 if (success) {
                     // Optimistically remove the permission card — SSE event may arrive late or not at all
                     eventDispatcher.removePermission(requestId)
+                } else {
+                    // API returned non-2xx (e.g. already replied by another client) — remove card anyway
+                    // to prevent permanently stuck permission cards
+                    val warnMsg = "[Permission] API returned failure for $requestId, removing card as fallback (likely already replied)"
+                    Log.w(TAG, warnMsg)
+                    appendDiagnosticLog(warnMsg)
+                    eventDispatcher.removePermission(requestId)
                 }
-                if (BuildConfig.DEBUG) Log.d(TAG, "Replied to permission $requestId with $reply (success=$success)")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to reply to permission $requestId: ${e.javaClass.simpleName}: ${e.message}", e)
+                val errMsg = "[Permission] Exception replying to $requestId: ${e.javaClass.simpleName}: ${e.message}"
+                Log.e(TAG, errMsg, e)
+                appendDiagnosticLog(errMsg)
+                // Network/timeout error — remove card to prevent stuck state;
+                // if the reply didn't reach the server, the server will re-emit the permission event
+                eventDispatcher.removePermission(requestId)
             }
         }
     }
@@ -1218,6 +1267,9 @@ class ChatViewModel @Inject constructor(
      */
     fun replyToQuestion(requestId: String, answers: List<List<String>>) {
         viewModelScope.launch {
+            val logMsg = "[Question] replyToQuestion: id=$requestId answers=$answers dir=$sessionDirectory"
+            Log.i(TAG, logMsg)
+            appendDiagnosticLog(logMsg)
             try {
                 val success = managePermissionUseCase.replyToQuestion(
                     conn = conn,
@@ -1225,12 +1277,17 @@ class ChatViewModel @Inject constructor(
                     answers = answers,
                     directory = sessionDirectory
                 )
-                if (success) {
-                    // Optimistically remove the question card — SSE event may arrive late or not at all
-                    eventDispatcher.removeQuestion(requestId)
-                }
+                val resultMsg = "[Question] replyToQuestion result: id=$requestId success=$success"
+                Log.i(TAG, resultMsg)
+                appendDiagnosticLog(resultMsg)
+                // Always remove the question card regardless of API result.
+                eventDispatcher.removeQuestion(requestId)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to reply to question $requestId: ${e.javaClass.simpleName}: ${e.message}", e)
+                val errMsg = "[Question] Exception replying to $requestId: ${e.javaClass.simpleName}: ${e.message}"
+                Log.e(TAG, errMsg, e)
+                appendDiagnosticLog(errMsg)
+                // Network/timeout — remove card; server will re-emit if still pending
+                eventDispatcher.removeQuestion(requestId)
             }
         }
     }
@@ -1240,14 +1297,23 @@ class ChatViewModel @Inject constructor(
      */
     fun rejectQuestion(requestId: String) {
         viewModelScope.launch {
+            val logMsg = "[Question] rejectQuestion: id=$requestId dir=$sessionDirectory"
+            Log.i(TAG, logMsg)
+            appendDiagnosticLog(logMsg)
             try {
                 val success = managePermissionUseCase.rejectQuestion(conn = conn, requestId = requestId, directory = sessionDirectory)
-                if (success) {
-                    // Optimistically remove the question card
-                    eventDispatcher.removeQuestion(requestId)
-                }
+                val resultMsg = "[Question] rejectQuestion result: id=$requestId success=$success"
+                Log.i(TAG, resultMsg)
+                appendDiagnosticLog(resultMsg)
+                // Always remove the question card regardless of API result.
+                // If already answered by another client, server returns non-2xx — card should still close.
+                eventDispatcher.removeQuestion(requestId)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to reject question $requestId: ${e.javaClass.simpleName}: ${e.message}", e)
+                val errMsg = "[Question] Exception rejecting $requestId: ${e.javaClass.simpleName}: ${e.message}"
+                Log.e(TAG, errMsg, e)
+                appendDiagnosticLog(errMsg)
+                // Network/timeout — remove card; server will re-emit if still pending
+                eventDispatcher.removeQuestion(requestId)
             }
         }
     }
@@ -1669,6 +1735,12 @@ class ChatViewModel @Inject constructor(
             .filterIsInstance<Part.Text>()
             .joinToString("") { it.text }
             .ifBlank { null }
+    }
+
+    /** Append a diagnostic log line for permission/question debugging. */
+    private fun appendDiagnosticLog(message: String) {
+        // Log to logcat only; file writing requires MediaStore on Android 11+
+        Log.i(TAG, message)
     }
 
     companion object {
