@@ -133,8 +133,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
 import dev.minios.ocremote.domain.model.*
-import dev.minios.ocremote.data.dto.response.AgentInfo
-import dev.minios.ocremote.data.dto.response.CommandInfo
+import dev.minios.ocremote.domain.model.AgentInfo
+import dev.minios.ocremote.domain.model.CommandInfo
 import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.dto.response.ProviderModel

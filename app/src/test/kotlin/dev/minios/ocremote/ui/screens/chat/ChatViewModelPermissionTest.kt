@@ -3,8 +3,8 @@
 import android.util.Log
 import app.cash.turbine.test
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.dto.response.PermissionRequest
 import dev.minios.ocremote.data.dto.response.ProvidersResponse
+import dev.minios.ocremote.domain.model.PermissionState
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.PermissionAutoApprover
@@ -27,9 +27,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -181,10 +178,10 @@ class ChatViewModelPermissionTest {
         sessionId: String = testSessionId,
         permission: String = "bash",
         patterns: List<String> = listOf("/home/user/project"),
-        metadata: Map<String, JsonPrimitive>? = null,
-        always: JsonElement? = null,
+        metadata: Map<String, String>? = null,
+        always: Boolean = false,
         tool: ToolRef? = null
-    ): PermissionRequest = PermissionRequest(
+    ): PermissionState = PermissionState(
         id = id,
         sessionId = sessionId,
         permission = permission,
@@ -231,8 +228,8 @@ class ChatViewModelPermissionTest {
             sessionId = testSessionId,
             permission = "bash",
             patterns = listOf("/home/user"),
-            metadata = mapOf("key" to JsonPrimitive("value")),
-            always = JsonArray(listOf(JsonPrimitive("pattern1")))
+            metadata = mapOf("key" to "value"),
+            always = true
         )
         coEvery { managePermissionUseCase.listPendingPermissions(any(), any()) } returns listOf(permRequest)
 
@@ -277,9 +274,9 @@ class ChatViewModelPermissionTest {
             createTestPermissionRequest(
                 id = "pm",
                 metadata = mapOf(
-                    "str" to JsonPrimitive("hello"),
-                    "num" to JsonPrimitive(42),
-                    "bool" to JsonPrimitive(true)
+                    "str" to "hello",
+                    "num" to "42",
+                    "bool" to "true"
                 )
             )
         )
@@ -296,8 +293,8 @@ class ChatViewModelPermissionTest {
     @Test
     fun `loadPendingPermissions maps always field`() = runTest {
         coEvery { managePermissionUseCase.listPendingPermissions(any(), any()) } returns listOf(
-            createTestPermissionRequest(id = "p-no", always = null),
-            createTestPermissionRequest(id = "p-yes", always = JsonArray(listOf(JsonPrimitive("pattern"))))
+            createTestPermissionRequest(id = "p-no", always = false),
+            createTestPermissionRequest(id = "p-yes", always = true)
         )
 
         createViewModel()

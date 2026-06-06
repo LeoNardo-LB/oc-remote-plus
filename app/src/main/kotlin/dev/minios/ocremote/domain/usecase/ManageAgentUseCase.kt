@@ -1,26 +1,23 @@
 ﻿package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.dto.response.AgentInfo
-import dev.minios.ocremote.data.dto.response.CommandInfo
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.domain.model.AgentInfo
+import dev.minios.ocremote.domain.model.CommandInfo
+import dev.minios.ocremote.domain.repository.AgentRepository
 import javax.inject.Inject
 
 /**
  * Use case: manage agents, commands, and file search.
- * Temporary shell — delegates to OpenCodeApi. Full impl with tests in Phase 4.
+ * Delegates to AgentRepository.
  */
 class ManageAgentUseCase @Inject constructor(
-    private val api: OpenCodeApi
+    private val agentRepository: AgentRepository
 ) {
-    // TODO: Phase 4 — replace api calls with AgentRepository methods
+    suspend fun loadAgents(serverId: String): List<AgentInfo> =
+        agentRepository.listAgents(serverId).getOrThrow()
 
-    suspend fun loadAgents(conn: ServerConnection): List<AgentInfo> =
-        api.listAgents(conn)
+    suspend fun loadCommands(serverId: String): List<CommandInfo> =
+        agentRepository.loadCommands(serverId).getOrThrow()
 
-    suspend fun loadCommands(conn: ServerConnection): List<CommandInfo> =
-        api.listCommands(conn)
-
-    suspend fun searchFiles(conn: ServerConnection, query: String, dirs: String, directory: String?, limit: Int): List<String> =
-        api.findFiles(conn, query, dirs, directory, limit)
+    suspend fun searchFiles(serverId: String, query: String, dirs: String, directory: String?, limit: Int): List<String> =
+        agentRepository.searchFiles(serverId, query, dirs, directory, limit).getOrThrow()
 }

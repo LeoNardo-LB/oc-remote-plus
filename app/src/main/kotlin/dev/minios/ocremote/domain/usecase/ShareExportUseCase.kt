@@ -1,36 +1,34 @@
 package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.domain.model.Session
+import dev.minios.ocremote.domain.repository.SessionRepository
 import java.io.OutputStream
 import javax.inject.Inject
 
 /**
  * Use case: share, export, and compact sessions.
- * Temporary shell — delegates to OpenCodeApi. Full impl with tests in Phase 4.
+ * Delegates to SessionRepository.
  */
 class ShareExportUseCase @Inject constructor(
-    private val api: OpenCodeApi
+    private val sessionRepository: SessionRepository
 ) {
-    // TODO: Phase 4 — replace api calls with SessionRepository methods
+    suspend fun shareSession(serverId: String, sessionId: String): Session =
+        sessionRepository.shareSession(serverId, sessionId).getOrThrow()
 
-    suspend fun shareSession(conn: ServerConnection, sessionId: String): dev.minios.ocremote.domain.model.Session =
-        api.shareSession(conn, sessionId)
-
-    suspend fun unshareSession(conn: ServerConnection, sessionId: String) {
-        api.unshareSession(conn, sessionId)
+    suspend fun unshareSession(serverId: String, sessionId: String) {
+        sessionRepository.unshareSession(serverId, sessionId).getOrThrow()
     }
 
-    suspend fun compactSession(conn: ServerConnection, sessionId: String, providerId: String, modelId: String) {
-        api.summarizeSession(conn, sessionId, providerId, modelId)
+    suspend fun compactSession(serverId: String, sessionId: String, providerId: String, modelId: String) {
+        sessionRepository.compactSession(serverId, sessionId, providerId, modelId).getOrThrow()
     }
 
     suspend fun exportSessionToStream(
-        conn: ServerConnection,
+        serverId: String,
         sessionId: String,
         outputStream: OutputStream,
         onProgress: (Long) -> Unit
     ) {
-        api.exportSessionToStream(conn, sessionId, outputStream, onProgress)
+        sessionRepository.exportSessionToStream(serverId, sessionId, outputStream, onProgress).getOrThrow()
     }
 }

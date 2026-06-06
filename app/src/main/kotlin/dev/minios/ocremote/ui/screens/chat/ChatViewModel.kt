@@ -10,8 +10,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.data.dto.response.AgentInfo
-import dev.minios.ocremote.data.dto.response.CommandInfo
+import dev.minios.ocremote.domain.model.AgentInfo
+import dev.minios.ocremote.domain.model.CommandInfo
 import dev.minios.ocremote.data.dto.common.ModelSelection
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.ui.navigation.routes.ChatNav
@@ -869,7 +869,7 @@ class ChatViewModel @Inject constructor(
     private fun loadProviders() {
         viewModelScope.launch {
             try {
-                val response = selectModelUseCase.loadProviders(conn)
+                val response = selectModelUseCase.loadProviders(serverId)
                 _allProviders.value = response.providers
                 applyProviderFilter()
                 _defaultModels.value = response.default
@@ -898,7 +898,7 @@ class ChatViewModel @Inject constructor(
     private fun loadAgents() {
         viewModelScope.launch {
             try {
-                val agents = manageAgentUseCase.loadAgents(conn)
+                val agents = manageAgentUseCase.loadAgents(serverId)
                 _agents.value = agents
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${agents.size} agents: ${agents.map { it.name }}")
             } catch (e: Exception) {
@@ -914,7 +914,7 @@ class ChatViewModel @Inject constructor(
     private fun loadCommands() {
         viewModelScope.launch {
             try {
-                val commands = manageAgentUseCase.loadCommands(conn)
+                val commands = manageAgentUseCase.loadCommands(serverId)
                 _commands.value = commands
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${commands.size} commands: ${commands.map { it.name }}")
             } catch (e: Exception) {
@@ -968,7 +968,7 @@ class ChatViewModel @Inject constructor(
             fileSearchJob = viewModelScope.launch {
                 try {
                     val results = manageAgentUseCase.searchFiles(
-                        conn = conn,
+                        serverId = serverId,
                         query = "",
                         dirs = "true",
                         directory = sessionDirectory,
@@ -986,7 +986,7 @@ class ChatViewModel @Inject constructor(
             delay(150) // debounce
             try {
                 val results = manageAgentUseCase.searchFiles(
-                    conn = conn,
+                    serverId = serverId,
                     query = query,
                     dirs = "true",
                     directory = sessionDirectory,
@@ -1316,7 +1316,7 @@ class ChatViewModel @Inject constructor(
     fun shareSession(onResult: (String?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = shareExportUseCase.shareSession(conn, sessionId)
+                val session = shareExportUseCase.shareSession(serverId, sessionId)
                 val url = session.share?.url
                 if (BuildConfig.DEBUG) Log.d(TAG, "Shared session $sessionId: $url")
                 onResult(url)
@@ -1330,7 +1330,7 @@ class ChatViewModel @Inject constructor(
     fun unshareSession(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                shareExportUseCase.unshareSession(conn, sessionId)
+                shareExportUseCase.unshareSession(serverId, sessionId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Unshared session $sessionId")
                 onResult(true)
             } catch (e: Exception) {
@@ -1352,7 +1352,7 @@ class ChatViewModel @Inject constructor(
                     onResult(false)
                     return@launch
                 }
-                shareExportUseCase.compactSession(conn, sessionId, providerId, modelId)
+                shareExportUseCase.compactSession(serverId, sessionId, providerId, modelId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Compacted session $sessionId")
                 onResult(true)
             } catch (e: Exception) {
@@ -1400,7 +1400,7 @@ class ChatViewModel @Inject constructor(
 
                 var lastNotifyTime = 0L
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    shareExportUseCase.exportSessionToStream(conn, sessionId, outputStream) { bytesWritten ->
+                    shareExportUseCase.exportSessionToStream(serverId, sessionId, outputStream) { bytesWritten ->
                         val now = System.currentTimeMillis()
                         if (now - lastNotifyTime > 500) { // throttle to 2 updates/sec
                             lastNotifyTime = now
@@ -1437,7 +1437,7 @@ class ChatViewModel @Inject constructor(
                     onResult(false)
                     return@launch
                 }
-                undoRedoUseCase.revertSession(conn, sessionId, lastUser.message.id)
+                undoRedoUseCase.revertSession(serverId, sessionId, lastUser.message.id)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message ${lastUser.message.id}")
                 // Restore the user message text to the input field
                 restoreRevertedDraft(extractRevertedDraft(lastUser))
@@ -1453,7 +1453,7 @@ class ChatViewModel @Inject constructor(
     fun revertMessage(messageId: String, revertedText: String? = null, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                undoRedoUseCase.revertSession(conn, sessionId, messageId)
+                undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
                 val targetMessage = uiState.value.messages
                     .firstOrNull { it.message.id == messageId && it.isUser }
@@ -1496,7 +1496,7 @@ class ChatViewModel @Inject constructor(
     fun redoMessage(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                undoRedoUseCase.unrevertSession(conn, sessionId)
+                undoRedoUseCase.unrevertSession(serverId, sessionId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Unreverted session $sessionId")
                 onResult(true)
             } catch (e: Exception) {
