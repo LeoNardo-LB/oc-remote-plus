@@ -17,10 +17,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dev.minios.ocremote.SessionDeepLink
-import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.ServerRepository
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.domain.repository.ServerRepository
+import dev.minios.ocremote.domain.repository.SessionRepository
+import dev.minios.ocremote.domain.repository.SettingsRepository
+import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.ui.navigation.routes.*
+import kotlinx.coroutines.launch
 import dev.minios.ocremote.ui.screens.about.AboutScreen
 import dev.minios.ocremote.ui.screens.chat.ChatScreen
 import dev.minios.ocremote.ui.screens.home.HomeRoute
@@ -51,9 +53,10 @@ fun NavGraph(
     sharedImagesFlow: SharedFlow<List<Uri>>,
     settingsRepository: SettingsRepository,
     serverRepository: ServerRepository,
-    eventDispatcher: EventDispatcher
+    sessionRepository: SessionRepository
 ) {
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
 
     // Use native UI by default (WebView is legacy)
     val useNativeUi = true
@@ -96,9 +99,16 @@ fun NavGraph(
             }
 
             // Otherwise, show the session picker
-            sharePickerServers = serverRepository.servers.firstOrNull() ?: emptyList()
-            sharePickerSessions = eventDispatcher.sessions.value
-            sharePickerServerSessions = eventDispatcher.serverSessions.value
+            sharePickerServers = serverRepository.getServersFlow().firstOrNull() ?: emptyList()
+            val allSessions = mutableListOf<Session>()
+            val sessionMap = mutableMapOf<String, Set<String>>()
+            for (sv in sharePickerServers) {
+                val serverSessions = sessionRepository.getSessionsFlow(sv.id).firstOrNull() ?: emptyList()
+                allSessions.addAll(serverSessions)
+                sessionMap[sv.id] = serverSessions.map { it.id }.toSet()
+            }
+            sharePickerSessions = allSessions
+            sharePickerServerSessions = sessionMap
             showSharePicker = true
         }
     }
@@ -419,21 +429,23 @@ fun NavGraph(
                     navController.navigate(route)
                 },
                 onOpenInWebView = {
-                    val session = eventDispatcher.sessions.value.find { it.id == params.sessionId }
-                    val dir = session?.directory ?: ""
-                    val encodedDir = android.util.Base64.encodeToString(
-                        dir.toByteArray(Charsets.UTF_8),
-                        android.util.Base64.NO_WRAP
-                    ).replace('+', '-').replace('/', '_').replace("=", "")
-                    val sessionPath = "/$encodedDir/session/${params.sessionId}"
-                    val route = WebViewNav.createRoute(
-                        serverUrl = params.server.serverUrl,
-                        username = params.server.username,
-                        password = params.server.password,
-                        serverName = params.server.serverName,
-                        initialPath = sessionPath
-                    )
-                    navController.navigate(route) { launchSingleTop = true }
+                    scope.launch {
+                        val session = sessionRepository.getSession(params.server.serverId, params.sessionId).getOrNull()
+                        val dir = session?.directory ?: ""
+                        val encodedDir = android.util.Base64.encodeToString(
+                            dir.toByteArray(Charsets.UTF_8),
+                            android.util.Base64.NO_WRAP
+                        ).replace('+', '-').replace('/', '_').replace("=", "")
+                        val sessionPath = "/$encodedDir/session/${params.sessionId}"
+                        val route = WebViewNav.createRoute(
+                            serverUrl = params.server.serverUrl,
+                            username = params.server.username,
+                            password = params.server.password,
+                            serverName = params.server.serverName,
+                            initialPath = sessionPath
+                        )
+                        navController.navigate(route) { launchSingleTop = true }
+                    }
                 },
                 initialSharedImages = imagesForThisSession,
                 onSharedImagesConsumed = {

@@ -18,10 +18,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
-import dev.minios.ocremote.data.repository.SettingsRepository
-import dev.minios.ocremote.data.repository.ServerRepository
-import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.domain.repository.SettingsRepository
+import dev.minios.ocremote.domain.repository.ServerRepository
+import dev.minios.ocremote.domain.repository.SessionRepository
+import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.service.OpenCodeConnectionService
+import kotlinx.coroutines.flow.map
 import dev.minios.ocremote.ui.navigation.NavGraph
 import dev.minios.ocremote.ui.theme.OpenCodeTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -63,7 +65,7 @@ class MainActivity : ComponentActivity() {
     lateinit var serverRepository: ServerRepository
 
     @Inject
-    lateinit var eventDispatcher: EventDispatcher
+    lateinit var sessionRepository: SessionRepository
     
     /**
      * Shared flow for deep-link events from notification taps.
@@ -99,7 +101,7 @@ class MainActivity : ComponentActivity() {
 
     override fun attachBaseContext(newBase: Context) {
         // Read stored language synchronously from SharedPreferences (no Hilt needed).
-        val languageCode = SettingsRepository.getStoredLanguage(newBase)
+        val languageCode = dev.minios.ocremote.data.repository.SettingsRepository.getStoredLanguage(newBase)
         appliedLanguage = languageCode
 
         if (languageCode.isNotEmpty()) {
@@ -124,7 +126,7 @@ class MainActivity : ComponentActivity() {
         // current value that attachBaseContext already applied, so we only
         // recreate when the user actually switches language in Settings.
         lifecycleScope.launch {
-            settingsRepository.appLanguage.drop(1).collect { languageCode ->
+            settingsRepository.getSettingsFlow().map { it.appLanguage }.drop(1).collect { languageCode ->
                 if (languageCode != appliedLanguage) {
                     recreate()
                 }
@@ -140,9 +142,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
             // Collect theme preference
-            val appTheme by settingsRepository.appTheme.collectAsState(initial = "system")
-            val dynamicColor by settingsRepository.dynamicColor.collectAsState(initial = true)
-            val amoledDark by settingsRepository.amoledDark.collectAsState(initial = false)
+            val settings by settingsRepository.getSettingsFlow().collectAsState(initial = AppSettings())
+            val appTheme = settings.appTheme
+            val dynamicColor = settings.dynamicColor
+            val amoledDark = settings.amoledDark
             
             // Determine if dark theme should be used
             val systemDarkTheme = isSystemInDarkTheme()
@@ -164,7 +167,7 @@ class MainActivity : ComponentActivity() {
                         sharedImagesFlow = sharedImagesFlow,
                         settingsRepository = settingsRepository,
                         serverRepository = serverRepository,
-                        eventDispatcher = eventDispatcher
+                        sessionRepository = sessionRepository
                     )
                 }
             }
