@@ -1215,9 +1215,9 @@ class SerializationTest {
 
     @Test
     fun `AgentInfo round-trip`() {
-        val agent = AgentInfo(name = "coder", description = "Code agent", mode = "primary", hidden = false, color = "#00ff00")
-        val encoded = json.encodeToString(AgentInfo.serializer(), agent)
-        val decoded = json.decodeFromString(AgentInfo.serializer(), encoded)
+        val agent = dev.minios.ocremote.data.dto.response.AgentInfo(name = "coder", description = "Code agent", mode = "primary", hidden = false, color = "#00ff00")
+        val encoded = json.encodeToString(dev.minios.ocremote.data.dto.response.AgentInfo.serializer(), agent)
+        val decoded = json.decodeFromString(dev.minios.ocremote.data.dto.response.AgentInfo.serializer(), encoded)
         assertEquals("coder", decoded.name)
         assertEquals("primary", decoded.mode)
         assertFalse(decoded.hidden)
@@ -1226,9 +1226,9 @@ class SerializationTest {
 
     @Test
     fun `CommandInfo round-trip`() {
-        val cmd = CommandInfo(name = "/compact", description = "Compact session", source = "command", hints = listOf("summarize"))
-        val encoded = json.encodeToString(CommandInfo.serializer(), cmd)
-        val decoded = json.decodeFromString(CommandInfo.serializer(), encoded)
+        val cmd = dev.minios.ocremote.data.dto.response.CommandInfo(name = "/compact", description = "Compact session", source = "command", hints = listOf("summarize"))
+        val encoded = json.encodeToString(dev.minios.ocremote.data.dto.response.CommandInfo.serializer(), cmd)
+        val decoded = json.decodeFromString(dev.minios.ocremote.data.dto.response.CommandInfo.serializer(), encoded)
         assertEquals("/compact", decoded.name)
         assertEquals("command", decoded.source)
         assertEquals(1, decoded.hints.size)
