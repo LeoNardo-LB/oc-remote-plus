@@ -51,8 +51,8 @@ fun ServerSettingsScreen(
             ListItem(
                 headlineContent = { Text(stringResource(R.string.server_settings_providers)) },
                 supportingContent = { Text(stringResource(R.string.server_settings_providers_desc)) },
-                leadingContent = { Icon(Icons.Default.Hub, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                leadingContent = { Icon(Icons.Default.Hub, contentDescription = stringResource(R.string.a11y_icon_providers)) },
+                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.a11y_icon_navigate_forward)) },
                 modifier = Modifier
                     .padding(top = 8.dp)
                     .clickable(onClick = onOpenProviders)
@@ -61,8 +61,8 @@ fun ServerSettingsScreen(
             ListItem(
                 headlineContent = { Text(stringResource(R.string.server_settings_models)) },
                 supportingContent = { Text(stringResource(R.string.server_settings_models_desc)) },
-                leadingContent = { Icon(Icons.Default.Tune, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                leadingContent = { Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.a11y_icon_models)) },
+                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.a11y_icon_navigate_forward)) },
                 modifier = Modifier.clickable(onClick = onOpenModels)
             )
         }

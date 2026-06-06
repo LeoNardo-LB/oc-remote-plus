@@ -151,7 +151,7 @@ internal fun LocalServerLaunchOptionsDialog(
                             IconButton(onClick = { maskServerPassword = !maskServerPassword }) {
                                 Icon(
                                     imageVector = if (maskServerPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_toggle_password),
                                 )
                             }
                         },
@@ -193,7 +193,7 @@ internal fun LocalServerLaunchOptionsDialog(
                                 IconButton(onClick = { maskProxyUrl = !maskProxyUrl }) {
                                     Icon(
                                         imageVector = if (maskProxyUrl) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(R.string.a11y_icon_toggle_password),
                                     )
                                 }
                             },

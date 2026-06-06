@@ -174,7 +174,7 @@ internal fun PartContent(
             ) {
                 Icon(
                     imageVector = Icons.Default.Android,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.a11y_icon_select_provider),
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
                 )

@@ -74,7 +74,7 @@ internal fun DirectoryTreeNode(
     ) {
         Icon(
             imageVector = if (node.isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
-            contentDescription = null,
+            contentDescription = stringResource(R.string.a11y_icon_toggle_directory),
             modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.primary,
         )

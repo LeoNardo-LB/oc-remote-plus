@@ -38,7 +38,7 @@ fun AboutScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 }
@@ -105,12 +105,12 @@ fun AboutScreen(
                         Text(githubUrl, style = MaterialTheme.typography.bodySmall)
                     },
                     leadingContent = {
-                        Icon(Icons.Default.Code, contentDescription = null)
+                        Icon(Icons.Default.Code, contentDescription = stringResource(R.string.a11y_icon_code))
                     },
                     trailingContent = {
                         Icon(
                             Icons.Default.OpenInNew,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.a11y_icon_open_in_browser),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                         )
@@ -132,12 +132,12 @@ fun AboutScreen(
                         Text(opencodeUrl, style = MaterialTheme.typography.bodySmall)
                     },
                     leadingContent = {
-                        Icon(Icons.Default.Code, contentDescription = null)
+                        Icon(Icons.Default.Code, contentDescription = stringResource(R.string.a11y_icon_code))
                     },
                     trailingContent = {
                         Icon(
                             Icons.Default.OpenInNew,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.a11y_icon_open_in_browser),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                         )
@@ -159,7 +159,7 @@ fun AboutScreen(
                         Text(stringResource(R.string.about_license_value))
                     },
                     leadingContent = {
-                        Icon(Icons.Default.Description, contentDescription = null)
+                        Icon(Icons.Default.Description, contentDescription = stringResource(R.string.a11y_icon_description))
                     }
                 )
             }

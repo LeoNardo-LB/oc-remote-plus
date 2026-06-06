@@ -1,6 +1,7 @@
 package dev.minios.ocremote.service
 
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.data.api.NetworkMonitor
 import dev.minios.ocremote.data.api.OpenCodeApi
@@ -57,10 +58,10 @@ class SseConnectionManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** All active/pending server connections keyed by serverId. */
-    val connections = mutableMapOf<String, ServerConnectionState>()
+    val connections = ConcurrentHashMap<String, ServerConnectionState>()
 
     /** Per-server timeout trackers for SSE read timeout cooldown logic. */
-    private val timeoutTrackers = mutableMapOf<String, SseReadTimeoutTracker>()
+    private val timeoutTrackers = ConcurrentHashMap<String, SseReadTimeoutTracker>()
 
     /** Observable set of server IDs that are actually connected (SSE stream active). */
     val connectedServerIds: StateFlow<Set<String>>
@@ -144,7 +145,7 @@ class SseConnectionManager @Inject constructor(
         timeoutTrackers[serverId]?.reset()
         state.sseJob.cancel()
         val newJob = startSseConnection(state.config, state.conn, state.onEvent)
-        connections[serverId] = state.copy(sseJob = newJob)
+        connections.replace(serverId, state.copy(sseJob = newJob))
     }
 
     /**
@@ -343,7 +344,7 @@ class SseConnectionManager @Inject constructor(
 
     private fun updateServerConnected(serverId: String, connected: Boolean) {
         val state = connections[serverId] ?: return
-        connections[serverId] = state.copy(isConnected = connected)
+        connections.replace(serverId, state.copy(isConnected = connected))
         if (connected) {
             _connectingServerIds.update { it - serverId }
             _connectedServerIds.update { it + serverId }

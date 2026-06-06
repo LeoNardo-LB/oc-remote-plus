@@ -59,7 +59,7 @@ internal fun FileCardFallback(file: Part.File) {
         ) {
             Icon(
                 Icons.Default.AttachFile,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.a11y_icon_file),
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )

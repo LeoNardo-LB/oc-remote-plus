@@ -120,7 +120,7 @@ internal fun LocalRuntimeCard(
                     colors = ButtonTokens.filledColors(),
                     border = ButtonTokens.amoledBorder(),
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                    Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.a11y_icon_copy))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.home_local_copy_fix_command))
                 }
@@ -133,7 +133,7 @@ internal fun LocalRuntimeCard(
                     colors = ButtonTokens.filledColors(),
                     border = ButtonTokens.amoledBorder(),
                 ) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = null)
+                    Icon(Icons.Default.OpenInNew, contentDescription = stringResource(R.string.a11y_icon_open_in_browser))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.home_local_open_termux_overlay_settings))
                 }
@@ -149,7 +149,7 @@ internal fun LocalRuntimeCard(
                         colors = ButtonTokens.filledColors(),
                         border = ButtonTokens.amoledBorder(),
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = null)
+                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.a11y_icon_download))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.home_local_install_termux))
                     }
@@ -168,10 +168,10 @@ internal fun LocalRuntimeCard(
                         colors = ButtonTokens.filledColors(),
                         border = ButtonTokens.amoledBorder(),
                     ) {
-                        Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Build, contentDescription = stringResource(R.string.a11y_icon_build), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.home_local_setup))
-                    }
+                    )
 
                     Button(
                         onClick = onStart,
@@ -179,7 +179,7 @@ internal fun LocalRuntimeCard(
                         colors = ButtonTokens.filledColors(),
                         border = ButtonTokens.amoledBorder(),
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.a11y_icon_start), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.home_local_start))
                     }
@@ -205,7 +205,7 @@ internal fun LocalRuntimeCard(
                                 colors = ButtonTokens.filledColors(),
                                 border = ButtonTokens.amoledBorder(),
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.a11y_icon_open_chat))
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.home_local_open_sessions))
                             }
@@ -243,10 +243,10 @@ internal fun LocalRuntimeCard(
                             colors = ButtonTokens.filledColors(),
                             border = ButtonTokens.amoledBorder(),
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.a11y_icon_start), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.home_local_start))
-                        }
+                        )
 
                         Button(
                             onClick = onSetup,
@@ -254,7 +254,7 @@ internal fun LocalRuntimeCard(
                             colors = ButtonTokens.filledColors(),
                             border = ButtonTokens.amoledBorder(),
                         ) {
-                            Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Build, contentDescription = stringResource(R.string.a11y_icon_build), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.home_local_setup))
                         }
@@ -286,7 +286,7 @@ internal fun LocalRuntimeCard(
                     colors = ButtonTokens.filledColors(),
                     border = ButtonTokens.amoledBorder(),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.a11y_icon_open_chat))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.home_local_open_sessions))
                 }

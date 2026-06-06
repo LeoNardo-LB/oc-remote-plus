@@ -116,7 +116,7 @@ internal fun AgentModelVariantSelector(
                     )
                     Icon(
                         Icons.Default.UnfoldMore,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.a11y_icon_model_variant),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                     )

@@ -106,7 +106,7 @@ internal fun ServerCard(
                                     onEdit()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.a11y_icon_edit))
                                 }
                             )
                             DropdownMenuItem(
@@ -116,7 +116,7 @@ internal fun ServerCard(
                                     onDelete()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.a11y_icon_delete))
                                 }
                             )
                         }
@@ -145,7 +145,7 @@ internal fun ServerCard(
                         colors = ButtonTokens.filledColors(),
                         border = ButtonTokens.amoledBorder()
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.a11y_icon_open_chat), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.sessions_title), maxLines = 1)
                     }
@@ -162,7 +162,7 @@ internal fun ServerCard(
                         colors = ButtonTokens.filledColors(),
                         border = ButtonTokens.amoledBorder()
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.a11y_icon_close), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.home_disconnect), maxLines = 1)
                     }
@@ -185,7 +185,7 @@ internal fun ServerCard(
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.home_connecting))
                     } else {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.a11y_icon_start), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.home_connect))
                     }

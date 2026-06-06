@@ -66,7 +66,7 @@ fun CompactionBanner(
         ) {
             Icon(
                 imageVector = Icons.Default.Compress,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.a11y_icon_compress),
                 modifier = Modifier
                     .size(16.dp)
                     .graphicsLayer { this.alpha = alpha },

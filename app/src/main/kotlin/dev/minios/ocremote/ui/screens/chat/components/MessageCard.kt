@@ -198,7 +198,7 @@ private fun MessageCardUser(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.RateReview,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.a11y_icon_rate_review),
                                 modifier = Modifier.size(16.dp),
                                 tint = textColor.copy(alpha = AlphaTokens.MEDIUM)
                             )

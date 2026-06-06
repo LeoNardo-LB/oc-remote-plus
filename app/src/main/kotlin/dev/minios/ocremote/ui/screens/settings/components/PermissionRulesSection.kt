@@ -41,7 +41,7 @@ internal fun PermissionRulesSection(
         ) {
             Icon(
                 imageVector = Icons.Default.Shield,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.settings_auto_approve_rules),
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )

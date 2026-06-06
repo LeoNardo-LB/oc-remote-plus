@@ -90,7 +90,7 @@ fun ServerModelFilterScreen(
                 onValueChange = { search = it },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null)
+                    Icon(Icons.Default.Search, contentDescription = stringResource(R.string.a11y_icon_search))
                 },
                 placeholder = { Text(stringResource(R.string.server_settings_search_placeholder)) },
                 singleLine = true,
@@ -112,7 +112,7 @@ fun ServerModelFilterScreen(
                 uiState.error != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Default.Warning, contentDescription = stringResource(R.string.a11y_icon_warning), tint = MaterialTheme.colorScheme.error)
                             androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                             Text(uiState.error ?: stringResource(R.string.server_settings_load_error))
                             androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))

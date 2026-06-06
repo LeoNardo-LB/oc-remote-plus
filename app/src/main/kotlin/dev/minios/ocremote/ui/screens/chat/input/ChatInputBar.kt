@@ -410,7 +410,7 @@ internal fun ChatInputBar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Terminal,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.a11y_icon_terminal),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )

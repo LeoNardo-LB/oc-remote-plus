@@ -495,7 +495,7 @@ fun ChatTerminalView(
                                 colors = ButtonTokens.filledColors(),
                                 border = ButtonTokens.amoledBorder(),
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.a11y_icon_add_tab))
                                 Spacer(Modifier.width(6.dp))
                                 Text("New")
                             }
@@ -510,7 +510,7 @@ fun ChatTerminalView(
                                 colors = ButtonTokens.filledColors(),
                                 border = ButtonTokens.amoledBorder(),
                             ) {
-                                Icon(Icons.Default.Keyboard, contentDescription = null)
+                                Icon(Icons.Default.Keyboard, contentDescription = stringResource(R.string.a11y_icon_keyboard_toggle))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Keyboard")
                             }

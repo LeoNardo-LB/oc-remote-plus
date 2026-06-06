@@ -169,7 +169,7 @@ internal fun LocalLaunchOptionsDialog(
                             IconButton(onClick = { maskPassword = !maskPassword }) {
                                 Icon(
                                     imageVector = if (maskPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_toggle_password),
                                 )
                             }
                         },
@@ -219,7 +219,7 @@ internal fun LocalLaunchOptionsDialog(
                                 IconButton(onClick = { maskProxy = !maskProxy }) {
                                     Icon(
                                         imageVector = if (maskProxy) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(R.string.a11y_icon_toggle_password),
                                     )
                                 }
                             },
@@ -293,7 +293,7 @@ internal fun LocalLaunchOptionsDialog(
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.home_local_startup_timeout_label)) },
                         supportingContent = { Text(stringResource(R.string.home_local_startup_timeout_value, startupTimeoutSec)) },
-                        trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                        trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = stringResource(R.string.a11y_icon_navigate_forward)) },
                         modifier = Modifier.clickable { showTimeoutDialog = true },
                     )
                 }

@@ -163,7 +163,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_language)) },
                 supportingContent = { Text(getLanguageDisplayName(currentLanguage)) },
                 leadingContent = {
-                    Icon(Icons.Default.Language, contentDescription = null)
+                    Icon(Icons.Default.Language, contentDescription = stringResource(R.string.a11y_settings_language))
                 },
                 modifier = Modifier.clickable { showLanguageDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -173,7 +173,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_reconnect_mode)) },
                 supportingContent = { Text(getReconnectModeDisplayName(reconnectMode)) },
                 leadingContent = {
-                    Icon(Icons.Default.Sync, contentDescription = null)
+                    Icon(Icons.Default.Sync, contentDescription = stringResource(R.string.a11y_settings_reconnect_mode))
                 },
                 modifier = Modifier.clickable { showReconnectModeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -188,7 +188,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_theme)) },
                 supportingContent = { Text(getThemeDisplayName(currentTheme)) },
                 leadingContent = {
-                    Icon(Icons.Default.Palette, contentDescription = null)
+                    Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.a11y_settings_theme))
                 },
                 modifier = Modifier.clickable { showThemeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -199,7 +199,7 @@ fun SettingsScreen(
                     headlineContent = { Text(stringResource(R.string.settings_dynamic_color)) },
                     supportingContent = { Text(stringResource(R.string.settings_dynamic_color_desc)) },
                     leadingContent = {
-                        Icon(Icons.Default.Palette, contentDescription = null)
+                        Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.a11y_settings_dynamic_color))
                     },
                     trailingContent = {
                         Switch(
@@ -217,7 +217,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_amoled_dark)) },
                 supportingContent = { Text(stringResource(R.string.settings_amoled_dark_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.DarkMode, contentDescription = null)
+                    Icon(Icons.Default.DarkMode, contentDescription = stringResource(R.string.a11y_settings_amoled_dark))
                 },
                 trailingContent = {
                     Switch(
@@ -239,7 +239,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_font_size)) },
                 supportingContent = { Text(getFontSizeDisplayName(chatFontSize)) },
                 leadingContent = {
-                    Icon(Icons.Default.FormatSize, contentDescription = null)
+                    Icon(Icons.Default.FormatSize, contentDescription = stringResource(R.string.a11y_settings_font_size))
                 },
                 modifier = Modifier.clickable { showFontSizeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -249,7 +249,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_compact_messages)) },
                 supportingContent = { Text(stringResource(R.string.settings_compact_messages_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.ViewCompact, contentDescription = null)
+                    Icon(Icons.Default.ViewCompact, contentDescription = stringResource(R.string.a11y_settings_compact_messages))
                 },
                 trailingContent = {
                     Switch(
@@ -266,7 +266,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_code_word_wrap)) },
                 supportingContent = { Text(stringResource(R.string.settings_code_word_wrap_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.WrapText, contentDescription = null)
+                    Icon(Icons.Default.WrapText, contentDescription = stringResource(R.string.a11y_settings_code_word_wrap))
                 },
                 trailingContent = {
                     Switch(
@@ -283,7 +283,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_auto_expand_tools)) },
                 supportingContent = { Text(stringResource(R.string.settings_auto_expand_tools_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.UnfoldMore, contentDescription = null)
+                    Icon(Icons.Default.UnfoldMore, contentDescription = stringResource(R.string.a11y_settings_auto_expand_tools))
                 },
                 trailingContent = {
                     Switch(
@@ -300,7 +300,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_expand_reasoning)) },
                 supportingContent = { Text(stringResource(R.string.settings_expand_reasoning_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.Psychology, contentDescription = null)
+                    Icon(Icons.Default.Psychology, contentDescription = stringResource(R.string.a11y_settings_expand_reasoning))
                 },
                 trailingContent = {
                     Switch(
@@ -322,7 +322,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_initial_messages)) },
                 supportingContent = { Text("$initialMessageCount") },
                 leadingContent = {
-                    Icon(Icons.Default.Storage, contentDescription = null)
+                    Icon(Icons.Default.Storage, contentDescription = stringResource(R.string.a11y_settings_initial_messages))
                 },
                 modifier = Modifier.clickable { showMessageCountDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -332,7 +332,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_confirm_send)) },
                 supportingContent = { Text(stringResource(R.string.settings_confirm_send_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.Send, contentDescription = null)
+                    Icon(Icons.Default.Send, contentDescription = stringResource(R.string.a11y_settings_confirm_send))
                 },
                 trailingContent = {
                     Switch(
@@ -349,7 +349,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_haptic_feedback)) },
                 supportingContent = { Text(stringResource(R.string.settings_haptic_feedback_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.Vibration, contentDescription = null)
+                    Icon(Icons.Default.Vibration, contentDescription = stringResource(R.string.a11y_settings_haptic_feedback))
                 },
                 trailingContent = {
                     Switch(
@@ -366,7 +366,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_keep_screen_on)) },
                 supportingContent = { Text(stringResource(R.string.settings_keep_screen_on_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.ScreenLockPortrait, contentDescription = null)
+                    Icon(Icons.Default.ScreenLockPortrait, contentDescription = stringResource(R.string.a11y_settings_keep_screen_on))
                 },
                 trailingContent = {
                     Switch(
@@ -383,7 +383,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_compress_images)) },
                 supportingContent = { Text(stringResource(R.string.settings_compress_images_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = null)
+                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_compress_images))
                 },
                 trailingContent = {
                     Switch(
@@ -401,7 +401,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_compress_images_max_side)) },
                 supportingContent = { Text(getImageMaxSideDisplayName(imageAttachmentMaxLongSide)) },
                 leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = null)
+                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_image_max_side))
                 },
                 modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageMaxSideDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -412,7 +412,7 @@ fun SettingsScreen(
                     Text(stringResource(R.string.settings_compress_images_quality_value, imageAttachmentWebpQuality))
                 },
                 leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = null)
+                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_image_quality))
                 },
                 modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageQualityDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -423,7 +423,7 @@ fun SettingsScreen(
                     Text(stringResource(R.string.settings_terminal_font_size_value, terminalFontSize.roundToInt()))
                 },
                 leadingContent = {
-                    Icon(Icons.Default.Terminal, contentDescription = null)
+                    Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.a11y_settings_terminal_font_size))
                 },
                 modifier = Modifier.clickable { showTerminalFontSizeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
             )
@@ -437,7 +437,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_local_runtime)) },
                 supportingContent = { Text(stringResource(R.string.settings_local_runtime_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.Code, contentDescription = null)
+                    Icon(Icons.Default.Code, contentDescription = stringResource(R.string.a11y_settings_local_runtime))
                 },
                 trailingContent = {
                     Switch(
@@ -453,7 +453,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.home_local_launch_options)) },
                 supportingContent = { Text(stringResource(R.string.home_local_launch_options_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.Settings, contentDescription = null)
+                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.a11y_settings_launch_options))
                 },
                 modifier = Modifier.clickable { showLocalLaunchOptionsDialog = true }.padding(ListItemTokens.ContentPaddingMedium),
             )
@@ -468,7 +468,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_notifications)) },
                 supportingContent = { Text(stringResource(R.string.settings_notifications_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.Notifications, contentDescription = null)
+                    Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.a11y_settings_notifications))
                 },
                 trailingContent = {
                     Switch(
@@ -485,7 +485,7 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_silent_notifications)) },
                 supportingContent = { Text(stringResource(R.string.settings_silent_notifications_desc)) },
                 leadingContent = {
-                    Icon(Icons.Default.NotificationsOff, contentDescription = null)
+                    Icon(Icons.Default.NotificationsOff, contentDescription = stringResource(R.string.a11y_settings_silent_notifications))
                 },
                 trailingContent = {
                     Switch(

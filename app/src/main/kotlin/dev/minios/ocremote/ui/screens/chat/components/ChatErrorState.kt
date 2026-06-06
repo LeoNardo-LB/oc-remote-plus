@@ -34,7 +34,7 @@ fun ChatErrorState(
     ) {
         Icon(
             imageVector = Icons.Default.Warning,
-            contentDescription = null,
+            contentDescription = stringResource(R.string.a11y_icon_warning),
             modifier = Modifier.size(48.dp),
             tint = MaterialTheme.colorScheme.error
         )

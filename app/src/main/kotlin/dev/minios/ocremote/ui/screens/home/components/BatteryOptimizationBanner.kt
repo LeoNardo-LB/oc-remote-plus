@@ -31,7 +31,7 @@ internal fun BatteryOptimizationBanner(
         ) {
             Icon(
                 imageVector = Icons.Default.BatteryAlert,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.a11y_icon_warning),
                 tint = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.size(24.dp)
             )

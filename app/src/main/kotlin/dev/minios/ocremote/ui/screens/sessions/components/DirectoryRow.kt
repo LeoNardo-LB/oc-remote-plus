@@ -54,7 +54,7 @@ internal fun DirectoryRow(
     ) {
         Icon(
             Icons.Default.Folder,
-            contentDescription = null,
+            contentDescription = stringResource(R.string.a11y_icon_toggle_directory),
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.primary
         )

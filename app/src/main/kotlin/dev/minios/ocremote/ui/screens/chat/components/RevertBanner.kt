@@ -54,7 +54,7 @@ internal fun RevertBanner(onRedo: () -> Unit) {
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.Undo,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.a11y_icon_revert),
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onTertiaryContainer
             )

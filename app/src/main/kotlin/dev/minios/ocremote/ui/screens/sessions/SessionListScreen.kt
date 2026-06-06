@@ -136,7 +136,7 @@ fun SessionListScreen(
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_navigate_forward),
                                     modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -160,7 +160,7 @@ fun SessionListScreen(
                             )
                             Icon(
                                 Icons.Default.ArrowDropDown,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.a11y_icon_navigate_forward),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -250,7 +250,7 @@ fun SessionListScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.a11y_icon_search))
                     },
                     trailingIcon = {
                         if (searchInput.isNotEmpty()) {
@@ -293,7 +293,7 @@ fun SessionListScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_warning),
                                     modifier = Modifier.size(48.dp),
                                     tint = MaterialTheme.colorScheme.error
                                 )

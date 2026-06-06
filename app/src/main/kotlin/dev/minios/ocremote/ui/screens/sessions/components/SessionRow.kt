@@ -90,7 +90,7 @@ internal fun SessionRow(
         }
         Icon(
             imageVector = statusIcon,
-            contentDescription = null,
+            contentDescription = stringResource(R.string.a11y_icon_toggle_session),
             modifier = Modifier.size(20.dp),
             tint = statusIconColor,
         )

@@ -225,7 +225,7 @@ fun ChatTopBar(
                                 onTerminalMode()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Terminal, contentDescription = null)
+                                Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.a11y_icon_terminal))
                             }
                         )
                         DropdownMenuItem(
@@ -235,7 +235,7 @@ fun ChatTopBar(
                                 onOpenInWebView()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Language, contentDescription = null)
+                                Icon(Icons.Default.Language, contentDescription = stringResource(R.string.a11y_icon_language))
                             }
                         )
                         DropdownMenuItem(
@@ -245,7 +245,7 @@ fun ChatTopBar(
                                 onNewSession()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Add, contentDescription = null)
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.a11y_icon_add))
                             }
                         )
                         DropdownMenuItem(
@@ -255,7 +255,7 @@ fun ChatTopBar(
                                 onForkSession()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.CopyAll, contentDescription = null)
+                                Icon(Icons.Default.CopyAll, contentDescription = stringResource(R.string.a11y_icon_copy_all))
                             }
                         )
                         DropdownMenuItem(
@@ -265,7 +265,7 @@ fun ChatTopBar(
                                 onCompactSession()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Compress, contentDescription = null)
+                                Icon(Icons.Default.Compress, contentDescription = stringResource(R.string.a11y_icon_compress))
                             }
                         )
                         DropdownMenuItem(
@@ -275,7 +275,7 @@ fun ChatTopBar(
                                 onReviewChanges()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.RateReview, contentDescription = null)
+                                Icon(Icons.Default.RateReview, contentDescription = stringResource(R.string.a11y_icon_rate_review))
                             },
                         )
                         // Show Share or Unshare depending on current share status
@@ -287,7 +287,7 @@ fun ChatTopBar(
                                     onUnshare()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.LinkOff, contentDescription = null)
+                                    Icon(Icons.Default.LinkOff, contentDescription = stringResource(R.string.a11y_icon_unlink))
                                 }
                             )
                         } else {
@@ -298,7 +298,7 @@ fun ChatTopBar(
                                     onShare()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Share, contentDescription = null)
+                                    Icon(Icons.Default.Share, contentDescription = stringResource(R.string.a11y_icon_share))
                                 }
                             )
                         }
@@ -309,7 +309,7 @@ fun ChatTopBar(
                                 onRename()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Edit, contentDescription = null)
+                                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.a11y_icon_edit))
                             }
                         )
                         DropdownMenuItem(
@@ -319,7 +319,7 @@ fun ChatTopBar(
                                 onExport()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.FileDownload, contentDescription = null)
+                                Icon(Icons.Default.FileDownload, contentDescription = stringResource(R.string.a11y_icon_file_download))
                             }
                         )
                     }

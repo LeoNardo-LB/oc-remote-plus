@@ -68,7 +68,7 @@ fun ToolProgressCard(
             )
             Icon(
                 imageVector = if (toolInfo.status == "started") Icons.Default.Sync else Icons.Default.Build,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.a11y_icon_build),
                 modifier = Modifier
                     .size(16.dp)
                     .rotate(rotation),
