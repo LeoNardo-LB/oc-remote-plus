@@ -1608,7 +1608,7 @@ class ChatViewModel @Inject constructor(
                 }
 
                 val ok = manageTerminalUseCase.executeCommand(
-                    conn = conn,
+                    serverId = serverId,
                     sessionId = sessionId,
                     command = normalizedCommand,
                     arguments = effectiveArguments,
@@ -1644,7 +1644,7 @@ class ChatViewModel @Inject constructor(
                     )
                 } else null
                 val ok = manageTerminalUseCase.runShellCommand(
-                    conn = conn,
+                    serverId = serverId,
                     sessionId = sessionId,
                     command = trimmed,
                     agent = uiState.value.selectedAgent,
