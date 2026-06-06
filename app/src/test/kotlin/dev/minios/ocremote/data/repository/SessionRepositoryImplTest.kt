@@ -17,7 +17,7 @@ class SessionRepositoryImplTest {
     private lateinit var repo: SessionRepositoryImpl
     private lateinit var api: OpenCodeApi
     private lateinit var eventDispatcher: EventDispatcher
-    private lateinit var serverRepo: ServerRepository
+    private lateinit var serverRepo: ServerDataStore
     private lateinit var sessionHandler: SessionEventHandler
 
     @Before

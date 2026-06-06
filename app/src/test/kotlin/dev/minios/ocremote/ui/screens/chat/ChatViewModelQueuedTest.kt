@@ -6,7 +6,7 @@ import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.data.repository.handler.*
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.usecase.*
 import io.mockk.*
@@ -48,7 +48,7 @@ class ChatViewModelQueuedTest {
 
     private lateinit var eventDispatcher: EventDispatcher
     private val api: OpenCodeApi = mockk(relaxed = true)
-    private val settingsRepository: SettingsRepository = mockk()
+    private val settingsRepository: SettingsDataStore = mockk()
     private val testDispatcher = UnconfinedTestDispatcher()
 
     // UseCase mocks

@@ -6,19 +6,12 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.minios.ocremote.data.repository.ChatRepositoryImpl
 import dev.minios.ocremote.data.repository.SessionRepositoryImpl
-import dev.minios.ocremote.data.repository.ServerRepositoryImpl
-import dev.minios.ocremote.data.repository.SettingsRepositoryImpl
 import dev.minios.ocremote.domain.repository.ChatRepository
 import dev.minios.ocremote.domain.repository.SessionRepository
-import dev.minios.ocremote.domain.repository.ServerRepository
-import dev.minios.ocremote.domain.repository.SettingsRepository
 
 /**
- * Hilt module that binds domain Repository interfaces to their Data-layer implementations.
- *
- * Phase 3 introduces ChatRepositoryImpl and SessionRepositoryImpl.
- * ServerRepositoryImpl and SettingsRepositoryImpl wrap existing data-layer classes
- * and adapt them to the clean domain interfaces.
+ * Hilt module that binds Chat and Session domain interfaces to their Data-layer implementations.
+ * Server and Settings bindings live in di/DomainModule.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -29,10 +22,4 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindSessionRepository(impl: SessionRepositoryImpl): SessionRepository
-
-    @Binds
-    abstract fun bindServerRepository(impl: ServerRepositoryImpl): ServerRepository
-
-    @Binds
-    abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
 }

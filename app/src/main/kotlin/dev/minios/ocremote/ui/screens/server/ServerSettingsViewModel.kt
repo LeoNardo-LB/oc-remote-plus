@@ -15,7 +15,7 @@ import dev.minios.ocremote.data.dto.response.ProviderOauthAuthorization
 import dev.minios.ocremote.data.dto.request.ServerConfigPatch
 import dev.minios.ocremote.data.dto.response.ServerConfigResponse
 import dev.minios.ocremote.data.api.ServerConnection
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,7 +80,7 @@ data class ModelToggle(
 class ServerSettingsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val api: OpenCodeApi,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsDataStore
 ) : ViewModel() {
 
     private val serverUrl: String = URLDecoder.decode(

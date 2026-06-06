@@ -14,7 +14,7 @@ import dev.minios.ocremote.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.minios.ocremote.data.repository.LocalServerManager
-import dev.minios.ocremote.data.repository.ServerRepository
+import dev.minios.ocremote.data.repository.ServerDataStore
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.usecase.GetSettingsFlowUseCase
@@ -82,7 +82,7 @@ private data class LocalRuntimeErrorInfo(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     application: Application,
-    private val serverRepository: ServerRepository,
+    private val serverDataStore: ServerDataStore,
     private val localServerManager: LocalServerManager,
     private val getSettingsFlowUseCase: GetSettingsFlowUseCase,
     private val updateSettingsUseCase: UpdateSettingsUseCase,
@@ -188,7 +188,7 @@ class HomeViewModel @Inject constructor(
 
     private fun loadServers() {
         viewModelScope.launch {
-            serverRepository.getAllServers().collect { servers ->
+            serverDataStore.getAllServers().collect { servers ->
                 _uiState.update { 
                     it.copy(
                         servers = servers,
@@ -276,9 +276,9 @@ class HomeViewModel @Inject constructor(
                     password = password,
                     autoConnect = autoConnect
                 )
-                serverRepository.updateServer(updatedServer)
+                serverDataStore.updateServer(updatedServer)
             } else {
-                serverRepository.addServer(
+                serverDataStore.addServer(
                     url = url,
                     username = username,
                     password = password,
@@ -298,7 +298,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.value.connectingServerIds.contains(serverId)) {
                 disconnectFromServer(serverId)
             }
-            serverRepository.deleteServer(serverId)
+            serverDataStore.deleteServer(serverId)
         }
     }
 
@@ -321,7 +321,7 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val isHealthy = serverRepository.checkServerHealth(server)
+                val isHealthy = serverDataStore.checkServerHealth(server)
                 if (!isHealthy) {
                     _uiState.update {
                         it.copy(
@@ -692,13 +692,13 @@ class HomeViewModel @Inject constructor(
                     username = desiredUsername,
                     password = desiredPassword,
                 )
-                serverRepository.updateServer(updated)
+                serverDataStore.updateServer(updated)
                 return updated
             }
             return existing
         }
 
-        return serverRepository.addServer(
+        return serverDataStore.addServer(
             url = LocalServerManager.LOCAL_SERVER_URL,
             username = desiredUsername,
             password = desiredPassword,

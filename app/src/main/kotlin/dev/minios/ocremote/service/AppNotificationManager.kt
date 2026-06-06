@@ -13,7 +13,7 @@ import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.ServerConfig
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -31,7 +31,7 @@ private const val NOTIFICATION_CHANNEL_PERMISSIONS_ID = "opencode_permissions"
 @Singleton
 class AppNotificationManager @Inject constructor(
     private val eventDispatcher: EventDispatcher,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsDataStore
 ) {
     private val TAG = "AppNotificationMgr"
 

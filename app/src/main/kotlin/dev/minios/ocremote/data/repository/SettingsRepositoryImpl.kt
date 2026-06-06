@@ -9,14 +9,14 @@ import javax.inject.Singleton
 /**
  * Implementation of [SettingsRepository].
  * Wraps the existing DataStore-based settings repository,
- * delegating to its atomic [dev.minios.ocremote.data.repository.SettingsRepository.appSettingsFlow].
+ * delegating to its atomic [dev.minios.ocremote.data.repository.SettingsDataStore.appSettingsFlow].
  *
  * Phase 3: compiled but not yet wired to UseCases. Phase 4 will migrate
  * SettingsViewModel direct calls to go through this repository.
  */
 @Singleton
 class SettingsRepositoryImpl @Inject constructor(
-    private val dataRepo: dev.minios.ocremote.data.repository.SettingsRepository
+    private val dataRepo: dev.minios.ocremote.data.repository.SettingsDataStore
 ) : SettingsRepository {
 
     override fun getSettingsFlow(): Flow<AppSettings> = dataRepo.appSettingsFlow

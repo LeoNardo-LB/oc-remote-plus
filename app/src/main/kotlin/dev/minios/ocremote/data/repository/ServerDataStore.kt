@@ -18,16 +18,14 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "ServerRepository"
+private const val TAG = "ServerDataStore"
 private const val SERVERS_KEY = "servers"
 
 /**
- * Server Repository - manages saved OpenCode servers
- * 
- * Uses DataStore to persist server configurations
+ * ServerDataStore - manages saved OpenCode servers using DataStore.
  */
 @Singleton
-class ServerRepository @Inject constructor(
+class ServerDataStore @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val api: OpenCodeApi,
     private val json: Json

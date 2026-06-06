@@ -11,7 +11,7 @@ import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.model.SseEvent
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +51,7 @@ class SseConnectionManager @Inject constructor(
     private val api: OpenCodeApi,
     private val sseClient: SseClient,
     private val eventDispatcher: EventDispatcher,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsDataStore,
     private val networkMonitor: NetworkMonitor
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

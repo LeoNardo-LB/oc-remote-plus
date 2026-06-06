@@ -101,7 +101,7 @@ class MainActivity : ComponentActivity() {
 
     override fun attachBaseContext(newBase: Context) {
         // Read stored language synchronously from SharedPreferences (no Hilt needed).
-        val languageCode = dev.minios.ocremote.data.repository.SettingsRepository.getStoredLanguage(newBase)
+        val languageCode = dev.minios.ocremote.data.repository.SettingsDataStore.getStoredLanguage(newBase)
         appliedLanguage = languageCode
 
         if (languageCode.isNotEmpty()) {

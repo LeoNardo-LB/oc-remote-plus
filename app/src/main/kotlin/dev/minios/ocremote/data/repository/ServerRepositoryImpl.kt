@@ -20,7 +20,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class ServerRepositoryImpl @Inject constructor(
-    private val dataRepo: dev.minios.ocremote.data.repository.ServerRepository,
+    private val dataRepo: dev.minios.ocremote.data.repository.ServerDataStore,
     private val localServerManager: LocalServerManager,
     private val api: OpenCodeApi,
     @ApplicationContext private val appContext: Context

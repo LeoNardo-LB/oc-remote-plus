@@ -25,7 +25,7 @@ import javax.inject.Singleton
 class ChatRepositoryImpl @Inject constructor(
     private val api: OpenCodeApi,
     private val eventDispatcher: EventDispatcher,
-    private val serverRepo: ServerRepository
+    private val serverRepo: ServerDataStore
 ) : ChatRepository {
 
     private val toolExpandedStates = mutableMapOf<String, Boolean>()

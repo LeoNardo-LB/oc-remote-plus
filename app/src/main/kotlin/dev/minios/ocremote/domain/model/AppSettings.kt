@@ -3,7 +3,7 @@ package dev.minios.ocremote.domain.model
 /**
  * Aggregate of all application settings.
  * Each property corresponds to a key in the DataStore preferences
- * managed by [dev.minios.ocremote.data.repository.SettingsRepository].
+ * managed by [dev.minios.ocremote.data.repository.SettingsDataStore].
  */
 data class AppSettings(
     // --- Appearance ---

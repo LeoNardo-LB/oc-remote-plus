@@ -6,7 +6,7 @@ import dev.minios.ocremote.data.dto.response.ProvidersResponse
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.PermissionAutoApprover
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.model.Session
@@ -38,7 +38,7 @@ class ChatViewModelDeleteTest {
 
     private lateinit var eventDispatcher: EventDispatcher
     private lateinit var api: OpenCodeApi
-    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var settingsRepository: SettingsDataStore
     private lateinit var sendMessageUseCase: SendMessageUseCase
     private lateinit var manageSessionUseCase: ManageSessionUseCase
     private lateinit var managePermissionUseCase: ManagePermissionUseCase

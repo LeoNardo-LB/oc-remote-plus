@@ -15,8 +15,8 @@ import dev.minios.ocremote.data.api.NetworkMonitor
 import dev.minios.ocremote.data.api.NetworkState
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.LocalServerManager
-import dev.minios.ocremote.data.repository.ServerRepository
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.ServerDataStore
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.domain.repository.SettingsRepository as DomainSettingsRepository
@@ -49,7 +49,7 @@ private const val WAKELOCK_TAG = "OpenCodeRemote::SSEConnection"
 class OpenCodeConnectionService : Service() {
 
     override fun attachBaseContext(newBase: Context) {
-        val languageCode = SettingsRepository.getStoredLanguage(newBase)
+        val languageCode = SettingsDataStore.getStoredLanguage(newBase)
         if (languageCode.isNotEmpty()) {
             val locale = MainActivity.parseLocale(languageCode)
             Locale.setDefault(locale)
@@ -71,10 +71,10 @@ class OpenCodeConnectionService : Service() {
     lateinit var eventDispatcher: EventDispatcher
 
     @Inject
-    lateinit var settingsRepository: SettingsRepository
+    lateinit var settingsDataStore: SettingsDataStore
 
     @Inject
-    lateinit var serverRepository: ServerRepository
+    lateinit var serverDataStore: ServerDataStore
 
     @Inject
     lateinit var networkMonitor: NetworkMonitor
@@ -283,7 +283,7 @@ class OpenCodeConnectionService : Service() {
 
     private suspend fun autoConnectConfiguredServers() {
         try {
-            val autoConnectServers = serverRepository.servers.first().filter { it.autoConnect }
+            val autoConnectServers = serverDataStore.servers.first().filter { it.autoConnect }
             if (autoConnectServers.isEmpty()) return
             Log.i(TAG, "Auto-connecting ${autoConnectServers.size} server(s)")
             autoConnectServers.forEach { connect(it) }
@@ -312,7 +312,7 @@ class OpenCodeConnectionService : Service() {
             is SseEvent.SessionIdle -> {
                 if (appNotificationManager.isChildSession(event.sessionId)) return
                 serviceScope.launch {
-                    if (!settingsRepository.notificationsEnabled.first()) return@launch
+                    if (!settingsDataStore.notificationsEnabled.first()) return@launch
 
                     // Give reducer a brief moment to receive trailing message/part events.
                     delay(250)

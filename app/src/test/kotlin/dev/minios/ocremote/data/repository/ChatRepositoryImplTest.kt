@@ -17,7 +17,7 @@ class ChatRepositoryImplTest {
     private lateinit var repo: ChatRepositoryImpl
     private lateinit var api: OpenCodeApi
     private lateinit var eventDispatcher: EventDispatcher
-    private lateinit var serverRepo: ServerRepository
+    private lateinit var serverRepo: ServerDataStore
     private lateinit var sessionHandler: SessionEventHandler
     private lateinit var messageHandler: MessageEventHandler
     private lateinit var permissionHandler: PermissionEventHandler

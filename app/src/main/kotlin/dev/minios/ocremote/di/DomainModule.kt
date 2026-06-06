@@ -7,6 +7,7 @@ import dagger.hilt.components.SingletonComponent
 import dev.minios.ocremote.data.repository.AgentRepositoryImpl
 import dev.minios.ocremote.data.repository.DraftDataStore
 import dev.minios.ocremote.data.repository.ServerRepositoryImpl
+import dev.minios.ocremote.data.repository.SettingsRepositoryImpl
 import dev.minios.ocremote.data.repository.TerminalRepositoryImpl
 import dev.minios.ocremote.domain.repository.AgentRepository
 import dev.minios.ocremote.domain.repository.DraftRepository
@@ -15,6 +16,7 @@ import dev.minios.ocremote.domain.repository.ProviderRepository
 import dev.minios.ocremote.domain.repository.ServerConfigRepository
 import dev.minios.ocremote.domain.repository.ServerConnectionRepository
 import dev.minios.ocremote.domain.repository.ServerRepository
+import dev.minios.ocremote.domain.repository.SettingsRepository
 import dev.minios.ocremote.domain.repository.TerminalRepository
 
 @Module
@@ -44,4 +46,7 @@ abstract class DomainModule {
 
     @Binds
     abstract fun bindProviderRepository(impl: ServerRepositoryImpl): ProviderRepository
+
+    @Binds
+    abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
 }

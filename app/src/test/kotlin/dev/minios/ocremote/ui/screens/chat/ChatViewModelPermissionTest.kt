@@ -9,7 +9,7 @@ import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.data.repository.handler.*
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.domain.model.ToolRef
@@ -48,7 +48,7 @@ class ChatViewModelPermissionTest {
 
     private lateinit var eventDispatcher: EventDispatcher
     private lateinit var api: OpenCodeApi
-    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var settingsRepository: SettingsDataStore
     // UseCase mocks
     private lateinit var sendMessageUseCase: SendMessageUseCase
     private lateinit var manageSessionUseCase: ManageSessionUseCase

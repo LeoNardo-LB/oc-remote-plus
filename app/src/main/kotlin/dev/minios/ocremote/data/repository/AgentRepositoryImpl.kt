@@ -11,7 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class AgentRepositoryImpl @Inject constructor(
     private val api: OpenCodeApi,
-    private val serverRepo: ServerRepository
+    private val serverRepo: ServerDataStore
 ) : AgentRepository {
 
     override suspend fun listAgents(serverId: String): Result<List<AgentInfo>> = runCatching {

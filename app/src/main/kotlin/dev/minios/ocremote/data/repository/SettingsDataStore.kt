@@ -19,7 +19,7 @@ import javax.inject.Singleton
  * App-wide settings stored in DataStore.
  */
 @Singleton
-class SettingsRepository @Inject constructor(
+class SettingsDataStore @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {

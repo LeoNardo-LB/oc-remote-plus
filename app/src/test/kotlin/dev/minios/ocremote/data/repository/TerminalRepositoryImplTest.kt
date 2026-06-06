@@ -9,7 +9,7 @@ import org.junit.Test
 
 class TerminalRepositoryImplTest {
     private val api: OpenCodeApi = mockk(relaxed = true)
-    private val serverRepo: ServerRepository = mockk(relaxed = true)
+    private val serverRepo: ServerDataStore = mockk(relaxed = true)
 
     @Test
     fun `impl creates successfully`() = runTest {

@@ -22,7 +22,7 @@ import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.domain.model.Draft
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.SettingsRepository
+import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.usecase.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -130,7 +130,7 @@ class ChatViewModel @Inject constructor(
     private val draftUseCase: DraftUseCase,
     private val shareExportUseCase: ShareExportUseCase,
     private val undoRedoUseCase: UndoRedoUseCase,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsDataStore,
     // OpenCodeApi still needed for ServerTerminalRegistry (terminal subsystem)
     private val api: OpenCodeApi,
     val toolCardResolver: ToolCardResolver,

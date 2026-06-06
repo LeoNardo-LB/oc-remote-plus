@@ -7,20 +7,20 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 /**
- * Characterization Tests for SettingsRepository's public API contract.
+ * Characterization Tests for SettingsDataStore's public API contract.
  * Validates that all Flow properties exist with correct types and
  * all setter functions exist with correct signatures.
  *
  * Uses Java reflection (java.lang.reflect) to avoid kotlin-reflect dependency.
  * These tests ensure the public API surface doesn't regress during refactoring.
  */
-class SettingsRepositoryTest {
+class SettingsDataStoreTest {
 
     // ============ Flow Property Contracts ============
 
     @Test
     fun `all expected Flow properties exist as getter methods`() {
-        val methods = SettingsRepository::class.java.methods
+        val methods = SettingsDataStore::class.java.methods
             .filter { Modifier.isPublic(it.modifiers) }
             .map { it.name }.toSet()
 
@@ -49,7 +49,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `hiddenModels is a function with correct parameter count`() {
-        val method = SettingsRepository::class.java.getDeclaredMethod("hiddenModels", String::class.java)
+        val method = SettingsDataStore::class.java.getDeclaredMethod("hiddenModels", String::class.java)
         assertNotNull("hiddenModels(String) should exist", method)
         assertEquals(1, method.parameterCount)
     }
@@ -58,7 +58,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `all expected setter functions exist`() {
-        val methods = SettingsRepository::class.java.methods
+        val methods = SettingsDataStore::class.java.methods
             .filter { Modifier.isPublic(it.modifiers) }
             .map { it.name }.toSet()
 
@@ -89,7 +89,7 @@ class SettingsRepositoryTest {
     fun `setModelVisibility has correct parameter count`() {
         // Kotlin suspend functions get an extra Continuation parameter at the JVM level.
         // setModelVisibility(serverId, providerId, modelId, visible) → 4 params + Continuation
-        val method = SettingsRepository::class.java.getDeclaredMethod(
+        val method = SettingsDataStore::class.java.getDeclaredMethod(
             "setModelVisibility",
             String::class.java, String::class.java, String::class.java,
             Boolean::class.javaPrimitiveType,

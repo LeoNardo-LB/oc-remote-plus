@@ -12,7 +12,7 @@ import javax.inject.Singleton
 @Singleton
 class TerminalRepositoryImpl @Inject constructor(
     private val api: OpenCodeApi,
-    private val serverRepo: ServerRepository
+    private val serverRepo: ServerDataStore
 ) : TerminalRepository {
 
     override fun connectTerminal(serverId: String, sessionId: String): Flow<TerminalEvent> {
