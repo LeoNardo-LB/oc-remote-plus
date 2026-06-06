@@ -662,4 +662,24 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Remove from list</string>
     <string name="a11y_icon_scroll_to_top">Scroll to top</string>
     <string name="a11y_icon_hide_keyboard">Hide keyboard</string>
+
+    <!-- Session List filter tabs -->
+    <string name="sessions_filter_all">All</string>
+    <string name="sessions_filter_archived">Archived</string>
+    <string name="sessions_clear_search">Clear search</string>
+
+    <!-- Terminal tabs -->
+    <string name="terminal_new_tab">New</string>
+    <string name="terminal_keyboard">Keyboard</string>
+    <string name="terminal_reconnect_tab">Reconnect tab</string>
+    <string name="terminal_close_tab">Close tab</string>
+
+    <!-- Markdown Preview Dialog -->
+    <string name="markdown_preview_title">Agent response</string>
+    <string name="markdown_preview_back">Back</string>
+
+    <!-- Connection Error Screen -->
+    <string name="connection_error_title">Server unreachable</string>
+    <string name="connection_error_retrying_in">Retrying in %1$ds…</string>
+    <string name="connection_error_switch_server">Switch to another server</string>
 </resources>

@@ -436,7 +436,7 @@ fun ChatTerminalView(
                                                             }
                                                         )
                                                     ) {
-                                                        Icon(Icons.Default.Refresh, contentDescription = "Reconnect tab")
+                                                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.terminal_reconnect_tab))
                                                     }
                                                 }
                                                 IconButton(
@@ -450,7 +450,7 @@ fun ChatTerminalView(
                                                         }
                                                     )
                                                 ) {
-                                                    Icon(Icons.Default.Close, contentDescription = "Close tab")
+                                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.terminal_close_tab))
                                                 }
                                             }
                                         },
@@ -498,7 +498,7 @@ fun ChatTerminalView(
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.a11y_icon_add_tab))
                                 Spacer(Modifier.width(6.dp))
-                                Text("New")
+                                Text(stringResource(R.string.terminal_new_tab))
                             }
                             Button(
                                 onClick = {
@@ -513,7 +513,7 @@ fun ChatTerminalView(
                             ) {
                                 Icon(Icons.Default.Keyboard, contentDescription = stringResource(R.string.a11y_icon_keyboard_toggle))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Keyboard")
+                                Text(stringResource(R.string.terminal_keyboard))
                             }
                         }
 

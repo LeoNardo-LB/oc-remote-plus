@@ -15,12 +15,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.screens.chat.markdown.MarkdownContent
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 
@@ -61,12 +63,12 @@ internal fun MarkdownPreviewDialog(
             Column(modifier = Modifier.fillMaxSize()) {
                 // TopAppBar
                 TopAppBar(
-                    title = { Text("Agent 回答") },
+                    title = { Text(stringResource(R.string.markdown_preview_title)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回"
+                                contentDescription = stringResource(R.string.markdown_preview_back)
                             )
                         }
                     },

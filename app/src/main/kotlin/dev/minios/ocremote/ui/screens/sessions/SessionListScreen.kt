@@ -170,7 +170,7 @@ fun SessionListScreen(
                             onDismissRequest = { filterExpanded = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("All") },
+                                text = { Text(stringResource(R.string.sessions_filter_all)) },
                                 onClick = {
                                     filterExpanded = false
                                     if (viewModel.showArchived) {
@@ -179,7 +179,7 @@ fun SessionListScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Archived") },
+                                text = { Text(stringResource(R.string.sessions_filter_archived)) },
                                 onClick = {
                                     filterExpanded = false
                                     if (!viewModel.showArchived) {
@@ -260,7 +260,7 @@ fun SessionListScreen(
                                 viewModel.clearSearchQuery()
                                 viewModel.loadSessions()
                             }) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear search")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.sessions_clear_search))
                             }
                         }
                     },

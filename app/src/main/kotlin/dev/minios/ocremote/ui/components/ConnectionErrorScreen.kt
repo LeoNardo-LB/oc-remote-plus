@@ -27,10 +27,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import kotlinx.coroutines.delay
@@ -89,7 +91,7 @@ fun ConnectionErrorScreen(
             // ── Error icon ──
             Icon(
                 imageVector = Icons.Filled.CloudOff,
-                contentDescription = "Server unreachable",
+                contentDescription = stringResource(R.string.connection_error_title),
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MEDIUM),
             )
@@ -126,7 +128,7 @@ fun ConnectionErrorScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Retrying in ${secondsRemaining}s…",
+                    text = stringResource(R.string.connection_error_retrying_in, secondsRemaining),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface.copy(
                         alpha = AlphaTokens.MUTED,
@@ -134,7 +136,7 @@ fun ConnectionErrorScreen(
                 )
             } else {
                 Button(onClick = onRetryClick) {
-                    Text("Retry")
+                    Text(stringResource(R.string.retry))
                 }
             }
 
@@ -147,7 +149,7 @@ fun ConnectionErrorScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Switch to another server",
+                    text = stringResource(R.string.connection_error_switch_server),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(
                         alpha = AlphaTokens.MEDIUM,
