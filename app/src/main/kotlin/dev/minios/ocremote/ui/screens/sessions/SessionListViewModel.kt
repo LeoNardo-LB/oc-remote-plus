@@ -16,6 +16,7 @@ import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
+import dev.minios.ocremote.domain.usecase.DeleteSessionUseCase
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
 import dev.minios.ocremote.ui.screens.sessions.components.TreeNode
 import dev.minios.ocremote.ui.screens.sessions.components.buildTreeNodes
@@ -65,7 +66,8 @@ class SessionListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val eventDispatcher: EventDispatcher,
     private val api: OpenCodeApi,
-    private val manageSessionUseCase: ManageSessionUseCase
+    private val manageSessionUseCase: ManageSessionUseCase,
+    private val deleteSessionUseCase: DeleteSessionUseCase
 ) : ViewModel() {
 
     val serverUrl: String = URLDecoder.decode(
@@ -303,8 +305,8 @@ class SessionListViewModel @Inject constructor(
     fun deleteSession(sessionId: String) {
         viewModelScope.launch {
             try {
-                val success = api.deleteSession(conn, sessionId)
-                if (success) {
+                val result = deleteSessionUseCase(serverId, sessionId)
+                if (result.isSuccess) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "Deleted session $sessionId")
                     loadSessions()
                 } else {
@@ -343,7 +345,7 @@ class SessionListViewModel @Inject constructor(
             try {
                 val results = coroutineScope {
                     ids.map { id ->
-                        async { id to api.deleteSession(conn, id) }
+                        async { id to deleteSessionUseCase(serverId, id).isSuccess }
                     }.awaitAll()
                 }
                 val failed = results.filterNot { it.second }
@@ -582,7 +584,7 @@ class SessionListViewModel @Inject constructor(
                     }
                 }
             } finally {
-                runCatching { api.deleteSession(conn, tempSession.id) }
+                runCatching { deleteSessionUseCase(serverId, tempSession.id) }
             }
 
             repeat(6) {

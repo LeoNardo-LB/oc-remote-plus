@@ -5,6 +5,7 @@ import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
+import dev.minios.ocremote.domain.usecase.DeleteSessionUseCase
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
 import io.mockk.every
 import io.mockk.mockk
@@ -23,6 +24,7 @@ class SessionListViewModelSearchTest {
     private val api: OpenCodeApi = mockk()
     private val eventDispatcher: EventDispatcher = mockk(relaxed = true)
     private val manageSessionUseCase: ManageSessionUseCase = mockk()
+    private val deleteSessionUseCase: DeleteSessionUseCase = mockk()
 
     @Before
     fun setup() {
@@ -78,7 +80,8 @@ class SessionListViewModelSearchTest {
             savedStateHandle = savedStateHandle,
             eventDispatcher = eventDispatcher,
             api = api,
-            manageSessionUseCase = manageSessionUseCase
+            manageSessionUseCase = manageSessionUseCase,
+            deleteSessionUseCase = deleteSessionUseCase
         )
     }
 }

@@ -13,13 +13,12 @@ import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.repository.LocalServerManager
 import dev.minios.ocremote.data.repository.ServerRepository
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.usecase.GetSettingsFlowUseCase
+import dev.minios.ocremote.domain.usecase.ManageServerProvidersUseCase
 import dev.minios.ocremote.domain.usecase.UpdateSettingsUseCase
 import dev.minios.ocremote.service.OpenCodeConnectionService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -84,10 +83,10 @@ private data class LocalRuntimeErrorInfo(
 class HomeViewModel @Inject constructor(
     application: Application,
     private val serverRepository: ServerRepository,
-    private val api: OpenCodeApi,
     private val localServerManager: LocalServerManager,
     private val getSettingsFlowUseCase: GetSettingsFlowUseCase,
     private val updateSettingsUseCase: UpdateSettingsUseCase,
+    private val manageServerProvidersUseCase: ManageServerProvidersUseCase,
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -219,9 +218,8 @@ class HomeViewModel @Inject constructor(
                 }
 
                 try {
-                    val conn = ServerConnection.from(server.url, server.username, server.password)
-                    val response = api.getProviders(conn)
-                    val hasModels = response.providers.any { it.models.isNotEmpty() }
+                    val result = manageServerProvidersUseCase.loadProviders(serverId)
+                    val hasModels = result.getOrNull()?.any { it.models.isNotEmpty() } == true
                     _uiState.update {
                         it.copy(
                             serverSettingsReadyIds = if (hasModels) {
