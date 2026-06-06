@@ -3,9 +3,7 @@ package dev.minios.ocremote.data.api.sse.parsers
 import android.util.Log
 import dev.minios.ocremote.domain.model.SessionNextEvent
 import dev.minios.ocremote.domain.model.SseEvent
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 
 private const val TAG = "SseClient"
 
@@ -15,9 +13,9 @@ private const val TAG = "SseClient"
  */
 class SessionNextEventParser(private val json: Json) : SseEventParser {
 
-    private const val PREFIX = "session.next."
+    private val prefix = "session.next."
 
-    override fun canParse(eventType: String): Boolean = eventType.startsWith(PREFIX)
+    override fun canParse(eventType: String): Boolean = eventType.startsWith(prefix)
 
     override fun parse(eventType: String, props: JsonObject): SseEvent? {
         val nextEvent = parseSessionNextEvent(eventType, props)

@@ -189,7 +189,7 @@ class HomeViewModel @Inject constructor(
 
     private fun loadServers() {
         viewModelScope.launch {
-            serverDataStore.getAllServers().collect { servers ->
+            serverRepository.getServersFlow().collect { servers ->
                 _uiState.update { 
                     it.copy(
                         servers = servers,
@@ -277,14 +277,17 @@ class HomeViewModel @Inject constructor(
                     password = password,
                     autoConnect = autoConnect
                 )
-                serverDataStore.updateServer(updatedServer)
+                serverRepository.updateServer(updatedServer)
             } else {
-                serverDataStore.addServer(
-                    url = url,
-                    username = username,
-                    password = password,
-                    name = name,
-                    autoConnect = autoConnect
+                serverRepository.addServer(
+                    ServerConfig(
+                        id = UUID.randomUUID().toString(),
+                        url = url.trimEnd('/'),
+                        username = username,
+                        password = password,
+                        name = name,
+                        autoConnect = autoConnect,
+                    )
                 )
             }
             
@@ -299,7 +302,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.value.connectingServerIds.contains(serverId)) {
                 disconnectFromServer(serverId)
             }
-            serverDataStore.deleteServer(serverId)
+            serverRepository.removeServer(serverId)
         }
     }
 
@@ -322,7 +325,7 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val isHealthy = serverDataStore.checkServerHealth(server)
+                val isHealthy = serverRepository.testConnection(server).getOrElse { false }
                 if (!isHealthy) {
                     _uiState.update {
                         it.copy(
@@ -693,19 +696,22 @@ class HomeViewModel @Inject constructor(
                     username = desiredUsername,
                     password = desiredPassword,
                 )
-                serverDataStore.updateServer(updated)
+                serverRepository.updateServer(updated)
                 return updated
             }
             return existing
         }
 
-        return serverDataStore.addServer(
+        val newServer = ServerConfig(
+            id = UUID.randomUUID().toString(),
             url = LocalServerManager.LOCAL_SERVER_URL,
             username = desiredUsername,
             password = desiredPassword,
             name = LOCAL_SERVER_NAME,
             autoConnect = false,
         )
+        serverRepository.addServer(newServer)
+        return newServer
     }
 
     private fun mapLocalRuntimeError(rawMessage: String?): LocalRuntimeErrorInfo {

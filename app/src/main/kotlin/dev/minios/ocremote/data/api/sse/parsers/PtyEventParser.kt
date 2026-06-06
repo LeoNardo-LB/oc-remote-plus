@@ -2,8 +2,7 @@ package dev.minios.ocremote.data.api.sse.parsers
 
 import android.util.Log
 import dev.minios.ocremote.domain.model.SseEvent
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 private const val TAG = "SseClient"
 
