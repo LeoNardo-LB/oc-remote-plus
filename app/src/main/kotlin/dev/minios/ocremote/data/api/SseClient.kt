@@ -2,6 +2,7 @@ package dev.minios.ocremote.data.api
 
 import android.util.Log
 import dev.minios.ocremote.BuildConfig
+import dev.minios.ocremote.data.api.sse.parsers.*
 import dev.minios.ocremote.domain.model.*
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -67,6 +68,18 @@ class SseClient @Inject constructor(
     private val httpClient: HttpClient,
     private val json: Json
 ) {
+    private val parsers: List<SseEventParser> = listOf(
+        MiscEventParser(),
+        SessionEventParser(json),
+        MessageEventParser(json),
+        PermissionEventParser(),
+        QuestionEventParser(),
+        PtyEventParser(),
+        SessionNextEventParser(json)
+    )
+
+    /** Public accessor for the session.next parser (used by tests). */
+    val sessionNextParser: SessionNextEventParser get() = parsers.filterIsInstance<SessionNextEventParser>().first()
 
     /**
      * Connect to the global event stream.
@@ -264,407 +277,22 @@ class SseClient @Inject constructor(
     }
 
     private fun parseEventByType(type: String, props: JsonObject): SseEvent? {
-        return try {
-            when (type) {
-                "server.connected" -> SseEvent.ServerConnected
-                "server.heartbeat" -> SseEvent.ServerHeartbeat
-
-                "session.status" -> {
-                    val sessionId = props.str("sessionID")
-                    val statusObj = props["status"]?.jsonObject
-                    val statusType = statusObj?.get("type")?.jsonPrimitive?.content ?: "idle"
-
-                    val status = when (statusType) {
-                        "idle" -> SessionStatus.Idle
-                        "busy" -> SessionStatus.Busy
-                        "retry" -> SessionStatus.Retry(
-                            attempt = statusObj?.get("attempt")?.jsonPrimitive?.int ?: 0,
-                            message = statusObj?.get("message")?.jsonPrimitive?.content ?: "",
-                            next = statusObj?.get("next")?.jsonPrimitive?.long ?: 0
-                        )
-                        else -> SessionStatus.Idle
-                    }
-
-                    Log.i(TAG, "Session $sessionId status -> $statusType")
-                    SseEvent.SessionStatus(sessionId = sessionId, status = status)
-                }
-
-                "session.idle" -> {
-                    val sessionId = props.str("sessionID")
-                    Log.i(TAG, "Session $sessionId idle")
-                    SseEvent.SessionIdle(sessionId = sessionId)
-                }
-
-                "session.created" -> {
-                    val infoObj = props["info"]?.jsonObject ?: props
-                    val info = json.decodeFromJsonElement<Session>(infoObj)
-                    SseEvent.SessionCreated(info)
-                }
-
-                "session.updated" -> {
-                    val infoObj = props["info"]?.jsonObject ?: props
-                    val info = json.decodeFromJsonElement<Session>(infoObj)
-                    SseEvent.SessionUpdated(info)
-                }
-
-                "session.deleted" -> {
-                    val infoObj = props["info"]?.jsonObject ?: props
-                    val info = json.decodeFromJsonElement<Session>(infoObj)
-                    SseEvent.SessionDeleted(info)
-                }
-
-                "session.error" -> {
-                    val sessionId = props["sessionID"]?.jsonPrimitive?.content
-                    val error = props.str("error", "Unknown error")
-                    SseEvent.SessionError(sessionId = sessionId, error = error)
-                }
-
-                "session.diff" -> {
-                    val sessionId = props.str("sessionID")
-                    val diffArr = props["diff"]?.jsonArray
-                    val diffs = diffArr?.map { json.decodeFromJsonElement<FileDiff>(it) } ?: emptyList()
-                    SseEvent.SessionDiff(sessionId = sessionId, diff = diffs)
-                }
-
-                "message.updated" -> {
-                    val infoObj = props["info"]?.jsonObject ?: return null
-                    val message = parseMessage(infoObj) ?: return null
-                    SseEvent.MessageUpdated(info = message)
-                }
-
-                "message.removed" -> {
-                    val sessionId = props.str("sessionID")
-                    val messageId = props.str("messageID")
-                    SseEvent.MessageRemoved(sessionId = sessionId, messageId = messageId)
-                }
-
-                "message.part.updated" -> {
-                    val partObj = props["part"]?.jsonObject ?: return null
-                    val part = parsePart(partObj) ?: return null
-                    SseEvent.MessagePartUpdated(part = part)
-                }
-
-                "message.part.delta" -> {
-                    val sessionId = props.str("sessionID")
-                    val messageId = props.str("messageID")
-                    val partId = props.str("partID")
-                    val field = props.str("field", "text")
-                    val delta = props.str("delta")
-                    SseEvent.MessagePartDelta(
-                        sessionId = sessionId,
-                        messageId = messageId,
-                        partId = partId,
-                        field = field,
-                        delta = delta
-                    )
-                }
-
-                "message.part.removed" -> {
-                    val sessionId = props.str("sessionID")
-                    val messageId = props.str("messageID")
-                    val partId = props.str("partID")
-                    SseEvent.MessagePartRemoved(
-                        sessionId = sessionId,
-                        messageId = messageId,
-                        partId = partId
-                    )
-                }
-
-                "permission.asked" -> {
-                    val id = props.str("id")
-                    val sessionId = props.str("sessionID")
-                    val permission = props.str("permission")
-                    val patterns = props["patterns"]?.jsonArray
-                        ?.map { it.jsonPrimitive.content } ?: emptyList()
-                    // V2: always is Boolean; fallback to V1 List<String> for backward compat
-                    val always = props["always"]?.let { el ->
-                        when {
-                            el is JsonPrimitive -> el.booleanOrNull ?: false
-                            el is JsonArray -> el.isNotEmpty()
-                            else -> false
-                        }
-                    } ?: false
-                    val metadata = props["metadata"]?.jsonObject?.let { obj ->
-                        obj.mapValues { (_, v) -> v.jsonPrimitive.contentOrNull ?: v.toString() }
-                    }
-                    val toolRef = props["tool"]?.jsonObject?.let { toolObj ->
-                        ToolRef(
-                            messageId = toolObj.str("messageID"),
-                            callId = toolObj.str("callID")
-                        )
-                    }
-
-                    Log.i(TAG, "Permission asked: $permission for session $sessionId")
-                    SseEvent.PermissionAsked(
-                        id = id,
-                        sessionId = sessionId,
-                        permission = permission,
-                        patterns = patterns,
-                        always = always,
-                        metadata = metadata,
-                        tool = toolRef
-                    )
-                }
-
-                "permission.replied" -> {
-                    val sessionId = props.str("sessionID")
-                    val requestId = props.str("requestID")
-                    SseEvent.PermissionReplied(sessionId = sessionId, requestId = requestId)
-                }
-
-                "question.asked" -> {
-                    val id = props.str("id")
-                    val sessionId = props.str("sessionID")
-                    val toolRef = props["tool"]?.jsonObject?.let { toolObj ->
-                        ToolRef(
-                            messageId = toolObj.str("messageID"),
-                            callId = toolObj.str("callID")
-                        )
-                    }
-                    Log.i(TAG, "Question asked for session $sessionId")
-                    val questionsArr = props["questions"]?.jsonArray
-                    val questions = questionsArr?.map { qElement ->
-                        val qObj = qElement.jsonObject
-                        val optionsArr = qObj["options"]?.jsonArray ?: JsonArray(emptyList())
-                        val options = optionsArr.map { oElement ->
-                            val oObj = oElement.jsonObject
-                            SseEvent.QuestionAsked.Option(
-                                label = oObj.str("label"),
-                                description = oObj.str("description")
-                            )
-                        }
-                        SseEvent.QuestionAsked.Question(
-                            header = qObj.str("header"),
-                            question = qObj.str("question"),
-                            multiple = qObj["multiple"]?.jsonPrimitive?.booleanOrNull ?: false,
-                            custom = qObj["custom"]?.jsonPrimitive?.booleanOrNull ?: true,
-                            options = options
-                        )
-                    } ?: emptyList()
-                    SseEvent.QuestionAsked(
-                        id = id,
-                        sessionId = sessionId,
-                        questions = questions,
-                        tool = toolRef
-                    )
-                }
-
-                "question.replied" -> {
-                    val sessionId = props.str("sessionID")
-                    val requestId = props.str("requestID")
-                    SseEvent.QuestionReplied(sessionId = sessionId, requestId = requestId)
-                }
-
-                "question.rejected" -> {
-                    val sessionId = props.str("sessionID")
-                    val requestId = props.str("requestID")
-                    SseEvent.QuestionRejected(sessionId = sessionId, requestId = requestId)
-                }
-
-                "todo.updated" -> {
-                    val sessionId = props.str("sessionID")
-                    val todosArr = props["todos"]?.jsonArray
-                    val todos = todosArr?.map { tElement ->
-                        val tObj = tElement.jsonObject
-                        SseEvent.TodoUpdated.Todo(
-                            content = tObj.str("content"),
-                            status = tObj.str("status", "pending"),
-                            priority = tObj.str("priority", "medium")
-                        )
-                    } ?: emptyList()
-                    SseEvent.TodoUpdated(sessionId = sessionId, todos = todos)
-                }
-
-                "vcs.branch.updated" -> {
-                    val branch = props.str("branch")
-                    SseEvent.VcsBranchUpdated(branch = branch)
-                }
-
-                "lsp.updated" -> SseEvent.LspUpdated
-
-                "project.updated" -> {
-                    val infoObj = props["info"]?.jsonObject ?: props
-                    val info = json.decodeFromJsonElement<Project>(infoObj)
-                    SseEvent.ProjectUpdated(info)
-                }
-
-                // V2 new events
-                "session.compacted" -> {
-                    SseEvent.SessionCompacted(sessionId = props.str("sessionID"))
-                }
-
-                "pty.created" -> {
-                    SseEvent.PtyCreated(
-                        id = props.str("id"),
-                        title = props.str("title"),
-                        command = props.str("command"),
-                        cwd = props.str("cwd")
-                    )
-                }
-
-                "pty.updated" -> {
-                    SseEvent.PtyUpdated(
-                        id = props.str("id"),
-                        title = props.str("title"),
-                        command = props.str("command"),
-                        status = props.str("status")
-                    )
-                }
-
-                "pty.deleted" -> {
-                    SseEvent.PtyDeleted(id = props.str("id"))
-                }
-
-                "workspace.ready" -> {
-                    SseEvent.WorkspaceReady(workspaceId = props.str("workspaceID"))
-                }
-
-                "workspace.failed" -> {
-                    SseEvent.WorkspaceFailed(
-                        workspaceId = props.str("workspaceID"),
-                        error = props.strOrNull("error")
-                    )
-                }
-
-                "file.edited" -> {
-                    SseEvent.FileEdited(path = props.str("path"))
-                }
-
-                "mcp.tools.changed" -> {
-                    SseEvent.McpToolsChanged(server = props.str("server"))
-                }
-
-                "command.executed" -> {
-                    SseEvent.CommandExecuted(
-                        name = props.str("name"),
-                        sessionId = props.str("sessionID"),
-                        arguments = props.str("arguments"),
-                        messageId = props.str("messageID")
-                    )
-                }
-
-                "file.watcher.updated" -> {
-                    SseEvent.FileWatcherUpdated(path = props.str("path"))
-                }
-
-                "installation.updated" -> {
-                    SseEvent.InstallationUpdated(version = props.str("version"))
-                }
-
-                "installation.update_available" -> {
-                    SseEvent.InstallationUpdateAvailable(version = props.str("version"))
-                }
-
-                "worktree.ready" -> {
-                    SseEvent.WorktreeReady(path = props.str("path"))
-                }
-
-                "worktree.failed" -> {
-                    SseEvent.WorktreeFailed(
-                        path = props.str("path"),
-                        error = props.strOrNull("error")
-                    )
-                }
-
-                else -> if (type.startsWith("session.next.")) {
-                    val nextEvent = parseSessionNextEvent(type, props)
-                    SseEvent.SessionNext(nextEvent)
-                } else {
-                    if (BuildConfig.DEBUG) Log.d(TAG, "Unhandled event: $type")
-                    null
-                }
+        for (parser in parsers) {
+            if (parser.canParse(type)) {
+                return parser.parse(type, props)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse $type: ${e.message}", e)
-            null
         }
+        if (BuildConfig.DEBUG) Log.d(TAG, "Unhandled event: $type")
+        return null
     }
 
-    // ============ Session Next Event Parsing ============
-
     /**
-     * Parse a session.next.* event from type string and properties.
-     * Called when the SSE event type starts with "session.next.".
-     * Uses kotlinx.serialization Json to decode into the appropriate SessionNextEvent variant.
+     * Public API kept for backward compatibility (used by tests).
+     * Delegates to [SessionNextEventParser].
      */
     fun parseSessionNextEvent(type: String, props: JsonObject): SessionNextEvent {
-        return try {
-            // Inject the type into props so the discriminator can select the correct variant
-            val propsWithType = JsonObject(props + ("type" to JsonPrimitive(type)))
-            val result = json.decodeFromString<SessionNextEvent>(propsWithType.toString())
-            // Serializer routes unknown types to Unknown but doesn't populate rawType from "type"
-            if (result is SessionNextEvent.Unknown && result.rawType.isEmpty()) {
-                result.copy(rawType = type, rawJson = props.toString())
-            } else {
-                result
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse session.next event: $type — ${e.message}")
-            SessionNextEvent.Unknown(rawType = type, rawJson = props.toString())
-        }
+        return sessionNextParser.parseSessionNextEvent(type, props)
     }
-
-    // ============ Message Parsing ============
-
-    /**
-     * Parse a Message from JSON, dispatching on "role" field.
-     */
-    private fun parseMessage(obj: JsonObject): Message? {
-        val role = obj["role"]?.jsonPrimitive?.content ?: return null
-        return when (role) {
-            "user" -> json.decodeFromJsonElement<Message.User>(obj)
-            "assistant" -> json.decodeFromJsonElement<Message.Assistant>(obj)
-            else -> {
-                Log.w(TAG, "Unknown message role: $role")
-                null
-            }
-        }
-    }
-
-    /**
-     * Parse a Part from JSON, dispatching on "type" field.
-     */
-    private fun parsePart(obj: JsonObject): Part? {
-        val type = obj["type"]?.jsonPrimitive?.content ?: return null
-        return try {
-            when (type) {
-                "text" -> json.decodeFromJsonElement<Part.Text>(obj)
-                "reasoning" -> json.decodeFromJsonElement<Part.Reasoning>(obj)
-                "tool" -> json.decodeFromJsonElement<Part.Tool>(obj)
-                "step-start" -> json.decodeFromJsonElement<Part.StepStart>(obj)
-                "step-finish" -> json.decodeFromJsonElement<Part.StepFinish>(obj)
-                "file" -> json.decodeFromJsonElement<Part.File>(obj)
-                "snapshot" -> json.decodeFromJsonElement<Part.Snapshot>(obj)
-                "patch" -> json.decodeFromJsonElement<Part.Patch>(obj)
-                "subtask" -> json.decodeFromJsonElement<Part.Subtask>(obj)
-                "compaction" -> json.decodeFromJsonElement<Part.Compaction>(obj)
-                "retry" -> json.decodeFromJsonElement<Part.Retry>(obj)
-                "agent" -> json.decodeFromJsonElement<Part.Agent>(obj)
-                else -> {
-                    Log.w(TAG, "Unknown part type: $type")
-                    // Return an Unknown part so it's at least tracked
-                    Part.Unknown(
-                        id = obj.str("id"),
-                        sessionId = obj.str("sessionID"),
-                        messageId = obj.str("messageID")
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse part type=$type: ${e.message}", e)
-            null
-        }
-    }
-
-    // ============ Helpers ============
-
-    /** Safe string extraction with default. */
-    private fun JsonObject.str(key: String, default: String = ""): String =
-        this[key]?.jsonPrimitive?.content ?: default
-
-    /** Nullable string extraction. */
-    private fun JsonObject.strOrNull(key: String): String? =
-        this[key]?.jsonPrimitive?.contentOrNull
 }
 
 // ============ SSE Read Timeout Tracking ============
