@@ -136,58 +136,7 @@ internal fun clientCommands(): List<SlashCommand> {
 }
 
 // BreathingCircleIndicator moved to components/BreathingCircleIndicator.kt
-
-/**
- * Visual transformation that highlights confirmed @file mentions in the input field.
- * Confirmed paths get a colored background + bold style.
- * Unconfirmed @query mentions (still searching) and plain text
- * remain unstyled so the user can see they haven't been selected yet.
- */
-private class FileMentionVisualTransformation(
-    private val confirmedFilePaths: Set<String>,
-    private val highlightColor: Color,
-    private val bgColor: Color
-) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        if (confirmedFilePaths.isEmpty()) {
-            return TransformedText(text, OffsetMapping.Identity)
-        }
-        val raw = text.text
-        val annotated = buildAnnotatedString {
-            append(raw)
-            // For each confirmed path, find all occurrences of @path in the text
-            for (path in confirmedFilePaths) {
-                val needle = "@$path"
-                var searchFrom = 0
-                while (true) {
-                    val idx = raw.indexOf(needle, searchFrom)
-                    if (idx == -1) break
-                    // Ensure the match is not part of a longer token:
-                    // next char after needle should be whitespace, end-of-string, or another @
-                    val endIdx = idx + needle.length
-                    if (endIdx < raw.length) {
-                        val next = raw[endIdx]
-                        if (!next.isWhitespace() && next != '@') {
-                            searchFrom = endIdx
-                            continue
-                        }
-                    }
-                    addStyle(
-                        SpanStyle(
-                            color = highlightColor,
-                            background = bgColor,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        start = idx,
-                        end = endIdx
-                    )
-                    searchFrom = endIdx
-                }
-            }
-        }
-        return TransformedText(annotated, OffsetMapping.Identity)
-    }
-}
+// FileMentionVisualTransformation moved to input/FileMentionVisualTransformation.kt
 
 /**
  * Splits raw input text into a list of [PromptPart] objects.
@@ -344,7 +293,6 @@ internal fun ChatInputBar(
 
     val text = textFieldValue.text
     val canSend = (text.isNotBlank() || attachments.isNotEmpty()) && !isSending && (!isShellMode || !isBusy)
-    var previewAttachmentIndex by remember { mutableStateOf(-1) }
 
     // Build merged slash commands: client commands + server commands + skills (deduplicated)
     val clientCmds = clientCommands()
@@ -376,136 +324,26 @@ internal fun ChatInputBar(
         )
 
         // Slash command suggestions popup (scrollable, max 40% screen height)
-        AnimatedVisibility(
-            visible = showSlashSuggestions && filteredCommands.isNotEmpty(),
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            val configuration = LocalConfiguration.current
-            val maxHeight = (configuration.screenHeightDp * 0.4f).dp
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maxHeight)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(vertical = 4.dp)
-            ) {
-                items(filteredCommands, key = { it.name }) { cmd ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (cmd.type == "skill") {
-                                    // Put skill command into input field for user to add additional input
-                                    val skillText = "/${cmd.name} "
-                                    onTextFieldValueChange(TextFieldValue(skillText, TextRange(skillText.length)))
-                                } else {
-                                    onTextFieldValueChange(TextFieldValue(""))
-                                    onSlashCommand(cmd)
-                                }
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "/${cmd.name}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (cmd.type == "skill") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        if (cmd.type == "skill") {
-                            Text(
-                                text = "skill",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.tertiary.copy(alpha = AlphaTokens.MEDIUM),
-                                modifier = Modifier.padding(end = 4.dp)
-                            )
-                        }
-                        if (cmd.description != null) {
-                            Text(
-                                text = cmd.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
+        if (!isShellMode) {
+            SlashCommandSuggestions(
+                commands = filteredCommands,
+                onSkillClick = { cmd ->
+                    val skillText = "/${cmd.name} "
+                    onTextFieldValueChange(TextFieldValue(skillText, TextRange(skillText.length)))
+                },
+                onCommandClick = { cmd ->
+                    onTextFieldValueChange(TextFieldValue(""))
+                    onSlashCommand(cmd)
                 }
-            }
+            )
         }
 
         // @ file mention suggestions popup
-        AnimatedVisibility(
-            visible = !isShellMode && fileSearchResults.isNotEmpty(),
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            val configuration = LocalConfiguration.current
-            val maxHeight = (configuration.screenHeightDp * 0.4f).dp
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maxHeight)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(vertical = 4.dp)
-            ) {
-                items(
-                    fileSearchResults.take(10),
-                    key = { it }
-                ) { path ->
-                    val isDir = path.endsWith("/")
-                    // Split into directory part + filename for display
-                    val displayPath = if (isDir) path.trimEnd('/') else path
-                    val lastSlash = displayPath.lastIndexOf('/')
-                    val dirPart = if (lastSlash >= 0) displayPath.substring(0, lastSlash + 1) else ""
-                    val namePart = if (lastSlash >= 0) displayPath.substring(lastSlash + 1) else displayPath
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onFileSelected(path) }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isDir) Icons.Default.Folder else Icons.Default.Description,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (isDir)
-                                MaterialTheme.colorScheme.tertiary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                if (dirPart.isNotEmpty()) {
-                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED))) {
-                                        append(dirPart)
-                                    }
-                                }
-                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
-                                    append(namePart)
-                                }
-                                if (isDir) {
-                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED))) {
-                                        append("/")
-                                    }
-                                }
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
+        if (!isShellMode) {
+            FileMentionSuggestions(
+                results = fileSearchResults,
+                onFileSelected = onFileSelected
+            )
         }
 
         // Status: indeterminate progress bar when busy
@@ -524,185 +362,25 @@ internal fun ChatInputBar(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             // Agent + Model + Variant + Attach selector row — small, subtle
-            if ((modelLabel.isNotEmpty() || agents.size > 1)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Scrollable area for agent/model/variant so paperclip always stays visible
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .horizontalScroll(rememberScrollState()),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Agent selector — single button, tap to cycle
-                        // Fixed width: all agent names rendered invisible to reserve max width
-                        if (agents.size > 1) {
-                            val agentColor = agentColor(selectedAgent, agents)
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .clip(ShapeTokens.smallMedium)
-                                    .background(agentColor.copy(alpha = AlphaTokens.FAINT))
-                                    .clickable {
-                                        val currentIndex = agents.indexOfFirst { it.name == selectedAgent }
-                                        val nextIndex = (currentIndex + 1) % agents.size
-                                        onAgentSelect(agents[nextIndex].name)
-                                    }
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                // Invisible ghost texts for all agent names — fixes width to the widest
-                                agents.forEach { agent ->
-                                    Text(
-                                        text = agent.name.replaceFirstChar { it.uppercase() },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Transparent
-                                    )
-                                }
-                                // Visible label with accent color
-                                Text(
-                                    text = selectedAgent.replaceFirstChar { it.uppercase() },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = agentColor
-                                )
-                            }
-                        }
-
-                        // Model selector — SECOND
-                        if (modelLabel.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(ShapeTokens.smallMedium)
-                                    .clickable { onModelClick() }
-                                    .padding(horizontal = 3.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                if (selectedProviderId != null) {
-                                    ProviderIcon(
-                                        providerId = selectedProviderId,
-                                        size = 13.dp,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
-                                    )
-                                }
-                                Text(
-                                    text = modelLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
-                                )
-                                Icon(
-                                    Icons.Default.UnfoldMore,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                                )
-                            }
-                        }
-
-                        // Variant cycle button (thinking effort) — THIRD
-                        if (variantNames.isNotEmpty()) {
-                            Text(
-                                text = selectedVariant?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.chat_default_variant),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (selectedVariant != null) {
-                                    MaterialTheme.colorScheme.tertiary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                                },
-                                modifier = Modifier
-                                    .clip(ShapeTokens.smallMedium)
-                                    .clickable { onCycleVariant() }
-                                    .padding(horizontal = 3.dp, vertical = 3.dp)
-                            )
-                        }
-
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        // Attach button (paperclip) — always visible, pinned right, aligned with Send button
-                        IconButton(
-                            onClick = onAttach,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.AttachFile,
-                                contentDescription = stringResource(R.string.chat_attach),
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
-                            )
-                        }
-                    }
-                }
-            }
+            AgentModelVariantSelector(
+                modelLabel = modelLabel,
+                selectedProviderId = selectedProviderId,
+                agents = agents,
+                selectedAgent = selectedAgent,
+                variantNames = variantNames,
+                selectedVariant = selectedVariant,
+                onModelClick = onModelClick,
+                onAgentSelect = onAgentSelect,
+                onCycleVariant = onCycleVariant,
+                onAttach = onAttach
+            )
 
             // Image attachment thumbnails
-            if (attachments.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(attachments.size) { index ->
-                        val attachment = attachments[index]
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(ShapeTokens.mediumSmall)
-                        ) {
-                            AsyncImage(
-                                model = imageThumbnailModel(attachment),
-                                contentDescription = attachment.filename,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clickable { previewAttachmentIndex = index },
-                                contentScale = ContentScale.Crop
-                            )
-                            Surface(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(2.dp)
-                                    .size(18.dp)
-                                    .clickable { onRemoveAttachment(index) },
-                                shape = ShapeTokens.mediumSmall,
-                                color = MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.AMOLED)
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.chat_remove),
-                                        modifier = Modifier.size(12.dp),
-                                        tint = MaterialTheme.colorScheme.onError
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (previewAttachmentIndex >= 0 && previewAttachmentIndex < attachments.size) {
-                val attachment = attachments[previewAttachmentIndex]
-                val imageBytes = remember(attachment.dataUrl) { decodeDataUrlBytes(attachment.dataUrl) }
-                val bitmap = remember(imageBytes) {
-                    imageBytes?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
-                }
-
-                if (bitmap != null) {
-                    ImagePreviewDialog(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = attachment.filename,
-                        onDismiss = { previewAttachmentIndex = -1 },
-                        onSave = {
-                            if (imageBytes != null) {
-                                onSaveAttachment(imageBytes, attachment.mime, attachment.filename)
-                            }
-                        },
-                    )
-                }
-            }
+            ImageAttachmentRow(
+                attachments = attachments,
+                onRemoveAttachment = onRemoveAttachment,
+                onSaveAttachment = onSaveAttachment
+            )
 
             AnimatedVisibility(
                 visible = isShellMode,
