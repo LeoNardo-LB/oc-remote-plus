@@ -1,6 +1,7 @@
 package dev.minios.ocremote.data.repository
 
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.domain.model.LocalServerState
@@ -14,17 +15,15 @@ import javax.inject.Singleton
 
 /**
  * Implementation of [ServerRepository].
- * Wraps the existing [data.repository.ServerRepository] (DataStore CRUD),
+ * Wraps the existing [ServerDataStore] (DataStore CRUD),
  * [LocalServerManager] (Termux lifecycle), and [OpenCodeApi] (providers/config).
- *
- * Phase 3: compiled but not yet wired to UseCases. Phase 4 will migrate
- * ViewModel direct calls to go through this repository.
  */
 @Singleton
 class ServerRepositoryImpl @Inject constructor(
     private val dataRepo: dev.minios.ocremote.data.repository.ServerRepository,
     private val localServerManager: LocalServerManager,
-    private val api: OpenCodeApi
+    private val api: OpenCodeApi,
+    @ApplicationContext private val appContext: Context
 ) : ServerRepository {
 
     // ── Server CRUD ──
@@ -52,7 +51,6 @@ class ServerRepositoryImpl @Inject constructor(
     override suspend fun getServer(id: String): ServerConfig? = dataRepo.getServer(id)
 
     // ── Connection lifecycle ──
-    // Phase 4: will delegate to OpenCodeConnectionService
 
     override suspend fun connect(server: ServerConfig): Result<Unit> = runCatching {
         // Phase 4: delegate to OpenCodeConnectionService.connect(server)
@@ -72,19 +70,17 @@ class ServerRepositoryImpl @Inject constructor(
 
     override fun getLocalSetupCommand(): String = localServerManager.getSetupCommand()
 
-    override suspend fun setupLocalServer(context: Context): Result<Unit> = runCatching {
-        // Setup is a user-driven action (paste command into Termux).
-        // Mark setup as completed if Termux is installed.
+    override suspend fun setupLocalServer(): Result<Unit> = runCatching {
         if (localServerManager.isTermuxInstalled()) Unit
         else throw IllegalStateException("Termux is not installed")
     }
 
-    override suspend fun startLocalServer(context: Context): Result<Unit> = runCatching {
-        localServerManager.startServer(context)
+    override suspend fun startLocalServer(): Result<Unit> = runCatching {
+        localServerManager.startServer(appContext)
     }
 
-    override suspend fun stopLocalServer(context: Context): Result<Unit> = runCatching {
-        localServerManager.stopServer(context)
+    override suspend fun stopLocalServer(): Result<Unit> = runCatching {
+        localServerManager.stopServer(appContext)
     }
 
     override suspend fun getLocalServerState(): Result<LocalServerState> = runCatching {
