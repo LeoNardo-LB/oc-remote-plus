@@ -1,7 +1,7 @@
 package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.repository.Draft
-import dev.minios.ocremote.data.repository.DraftRepository
+import dev.minios.ocremote.domain.model.Draft
+import dev.minios.ocremote.domain.repository.DraftRepository
 import javax.inject.Inject
 
 /**

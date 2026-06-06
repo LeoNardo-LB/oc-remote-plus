@@ -20,8 +20,8 @@ import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.mapper.PermissionMapper
-import dev.minios.ocremote.data.repository.Draft
-import dev.minios.ocremote.data.repository.DraftRepository
+import dev.minios.ocremote.domain.model.Draft
+import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.*

@@ -1,5 +1,6 @@
 package dev.minios.ocremote.data.repository
 
+import dev.minios.ocremote.domain.model.Draft
 import org.junit.Assert.*
 import org.junit.Test
 import java.lang.reflect.Method
