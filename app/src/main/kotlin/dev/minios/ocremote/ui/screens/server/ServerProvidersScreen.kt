@@ -193,9 +193,9 @@ fun ServerProvidersScreen(
                         }
                     }
 
-                    if (!uiState.error.isNullOrBlank()) {
+                    uiState.error?.takeIf { it.isNotBlank() }?.let { error ->
                         Text(
-                            text = uiState.error!!,
+                            text = error,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -421,10 +421,10 @@ fun ServerProvidersScreen(
                 .padding(padding),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            if (!uiState.error.isNullOrBlank()) {
+            uiState.error?.takeIf { it.isNotBlank() }?.let { error ->
                 item {
                     Text(
-                        text = uiState.error!!,
+                        text = error,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)

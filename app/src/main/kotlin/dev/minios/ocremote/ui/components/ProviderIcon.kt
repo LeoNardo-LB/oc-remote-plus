@@ -38,13 +38,6 @@ fun ProviderIcon(
     )
 }
 
-/**
- * Returns the drawable resource ID for a provider, or null if not bundled.
- */
-@DrawableRes
-fun getProviderIconRes(providerId: String): Int {
-    return providerIconMap[providerId] ?: R.drawable.ic_provider_synthetic
-}
 
 /**
  * Mapping from provider ID to drawable resource.

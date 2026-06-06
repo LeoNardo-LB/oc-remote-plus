@@ -1,6 +1,7 @@
 package dev.minios.ocremote.data.repository.handler
 
 import android.util.Log
+import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,12 +28,12 @@ class PermissionEventHandler @Inject constructor() : SseEventHandler {
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
             is SseEvent.PermissionAsked -> {
-                Log.d(TAG, "Permission event received: PermissionAsked(id=${event.id}, sessionId=${event.sessionId})")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Permission event received: PermissionAsked(id=${event.id}, sessionId=${event.sessionId})")
                 handlePermissionAsked(event)
                 true
             }
             is SseEvent.PermissionReplied -> {
-                Log.d(TAG, "Permission event received: PermissionReplied(requestId=${event.requestId}, sessionId=${event.sessionId})")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Permission event received: PermissionReplied(requestId=${event.requestId}, sessionId=${event.sessionId})")
                 handlePermissionReplied(event)
                 true
             }

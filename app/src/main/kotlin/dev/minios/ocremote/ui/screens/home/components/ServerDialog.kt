@@ -138,6 +138,7 @@ internal fun ServerDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    val currentUrlError = urlError
                     OutlinedTextField(
                         value = url,
                         onValueChange = {
@@ -147,8 +148,8 @@ internal fun ServerDialog(
                         label = { Text(stringResource(R.string.server_url)) },
                         placeholder = { Text(stringResource(R.string.server_url_hint)) },
                         isError = urlError != null,
-                        supportingText = if (urlError != null) {
-                            { Text(urlError!!) }
+                        supportingText = if (currentUrlError != null) {
+                            { Text(currentUrlError) }
                         } else {
                             { Text(stringResource(R.string.server_url_example)) }
                         },

@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import dev.minios.ocremote.BuildConfig
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -56,7 +57,7 @@ fun WebViewScreen(
         }
     }
     
-    Log.d("WebViewScreen", "Composable invoked: serverUrl=$serverUrl, initialPath=$initialPath, fullUrl=$fullUrl")
+    if (BuildConfig.DEBUG) Log.d("WebViewScreen", "Composable invoked: serverUrl=$serverUrl, initialPath=$initialPath, fullUrl=$fullUrl")
     var webView by remember { mutableStateOf<WebView?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -67,7 +68,7 @@ fun WebViewScreen(
     val fileChooserLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
-        Log.d("WebViewScreen", "File chooser result: ${uris.size} files selected")
+        if (BuildConfig.DEBUG) Log.d("WebViewScreen", "File chooser result: ${uris.size} files selected")
         fileChooserCallback?.onReceiveValue(uris.toTypedArray())
         fileChooserCallback = null
     }
@@ -161,12 +162,12 @@ fun WebViewScreen(
 
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                Log.d("WebViewScreen", "Page started: $url")
+                                if (BuildConfig.DEBUG) Log.d("WebViewScreen", "Page started: $url")
                                 isLoading = true
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
-                                Log.d("WebViewScreen", "Page finished: $url")
+                                if (BuildConfig.DEBUG) Log.d("WebViewScreen", "Page finished: $url")
                                 isLoading = false
                                 isRefreshing = false
                                 // Inject theme to match app's dark/light mode
@@ -198,7 +199,7 @@ fun WebViewScreen(
                                 host: String?,
                                 realm: String?
                             ) {
-                                Log.d("WebViewScreen", "HTTP Auth requested for host=$host, realm=$realm")
+                                if (BuildConfig.DEBUG) Log.d("WebViewScreen", "HTTP Auth requested for host=$host, realm=$realm")
                                 if (username.isNotBlank()) {
                                     handler?.proceed(username, password)
                                 } else {
@@ -244,7 +245,7 @@ fun WebViewScreen(
                                 callback: ValueCallback<Array<Uri>>?,
                                 params: FileChooserParams?
                             ): Boolean {
-                                Log.d("WebViewScreen", "onShowFileChooser: mode=${params?.mode}, acceptTypes=${params?.acceptTypes?.toList()}")
+                                if (BuildConfig.DEBUG) Log.d("WebViewScreen", "onShowFileChooser: mode=${params?.mode}, acceptTypes=${params?.acceptTypes?.toList()}")
                                 // Cancel any previous pending callback
                                 fileChooserCallback?.onReceiveValue(null)
                                 fileChooserCallback = callback

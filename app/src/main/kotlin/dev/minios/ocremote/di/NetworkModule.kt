@@ -8,6 +8,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.minios.ocremote.BuildConfig
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -47,7 +48,7 @@ object NetworkModule {
         
         install(Logging) {
             logger = Logger.ANDROID
-            level = LogLevel.HEADERS
+            level = if (BuildConfig.DEBUG) LogLevel.HEADERS else LogLevel.NONE
         }
         
         install(HttpTimeout) {
