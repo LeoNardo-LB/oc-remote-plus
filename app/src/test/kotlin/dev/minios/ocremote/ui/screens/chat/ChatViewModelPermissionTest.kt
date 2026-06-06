@@ -14,6 +14,7 @@ import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.domain.model.ToolRef
 import dev.minios.ocremote.domain.usecase.*
+import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -22,6 +23,7 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -59,6 +61,8 @@ class ChatViewModelPermissionTest {
     private lateinit var draftUseCase: DraftUseCase
     private lateinit var shareExportUseCase: ShareExportUseCase
     private lateinit var undoRedoUseCase: UndoRedoUseCase
+    private lateinit var messagePaging: MessagePaginationUseCase
+    private val tokenStatsTracker = TokenStatsTracker()
 
     private val testSessionId = "session-123"
     private val testServerId = "server-1"
@@ -98,6 +102,7 @@ class ChatViewModelPermissionTest {
         draftUseCase = mockk(relaxed = true)
         shareExportUseCase = mockk(relaxed = true)
         undoRedoUseCase = mockk(relaxed = true)
+        messagePaging = mockk(relaxed = true)
 
         every { draftUseCase.getDraft(any()) } returns null
 
@@ -124,6 +129,11 @@ class ChatViewModelPermissionTest {
         coEvery { manageAgentUseCase.loadAgents(any()) } returns emptyList()
         coEvery { manageAgentUseCase.loadCommands(any()) } returns emptyList()
         // NOTE: listPendingPermissions is NOT set here — each test sets its own stub
+
+        // Wire messagePaging.observeMessages to delegate to eventDispatcher.messages
+        every { messagePaging.observeMessages(any()) } answers {
+            eventDispatcher.messages.map { msgs -> msgs[firstArg<String>()] ?: emptyList() }
+        }
     }
 
     @After
@@ -159,7 +169,9 @@ class ChatViewModelPermissionTest {
             settingsRepository = settingsRepository,
             api = api,
             permissionAutoApprover = mockk<PermissionAutoApprover>(relaxed = true),
-            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver()
+            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
+            messagePaging = messagePaging,
+            tokenStatsTracker = tokenStatsTracker
         )
     }
 

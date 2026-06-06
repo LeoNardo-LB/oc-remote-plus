@@ -24,6 +24,7 @@ import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.*
+import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import dev.minios.ocremote.domain.usecase.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -134,7 +135,9 @@ class ChatViewModel @Inject constructor(
     // OpenCodeApi still needed for ServerTerminalRegistry (terminal subsystem)
     private val api: OpenCodeApi,
     val toolCardResolver: ToolCardResolver,
-    private val permissionAutoApprover: dev.minios.ocremote.data.repository.PermissionAutoApprover
+    private val permissionAutoApprover: dev.minios.ocremote.data.repository.PermissionAutoApprover,
+    private val messagePaging: MessagePaginationUseCase,
+    private val tokenStatsTracker: TokenStatsTracker,
 ) : ViewModel() {
 
     private val serverUrl: String = URLDecoder.decode(
@@ -304,7 +307,7 @@ class ChatViewModel @Inject constructor(
 
     val uiState: StateFlow<ChatUiState> = combine(
         eventDispatcher.sessions,
-        eventDispatcher.messages,
+        messagePaging.observeMessages(sessionId),
         eventDispatcher.parts,
         eventDispatcher.sessionStatuses,
         eventDispatcher.permissions,
@@ -327,15 +330,16 @@ class ChatViewModel @Inject constructor(
         eventDispatcher.currentAgent,
         eventDispatcher.currentModel,
         _pendingMessageIds,
-        _restoredDraft
+        _restoredDraft,
+        tokenStatsTracker.stats
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val allSessions = args[0] as List<Session>
-        val allMessages = args[1] as Map<String, List<Message>>
+        val sessionMessages = args[1] as List<Message>
         val allParts = args[2] as Map<String, List<Part>>
         val statuses = args[3] as Map<String, SessionStatus>
-        val permissions = args[4] as Map<String, List<SseEvent.PermissionAsked>>
-        val questions = args[5] as Map<String, List<SseEvent.QuestionAsked>>
+        // args[4] = permissions (used via eventDispatcher.getPermissionsWithChildren)
+        // args[5] = questions (used via eventDispatcher.getQuestionsWithChildren)
         val loading = args[6] as Boolean
         val error = args[7] as String?
         val sending = args[8] as Boolean
@@ -362,9 +366,9 @@ class ChatViewModel @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val pendingMessageIds = args[23] as Set<String>
         val restoredDraft = args[24] as RevertedDraftPayload?
+        val tokenStats = args[25] as TokenStatsTracker.TokenStats
 
         val session = allSessions.find { it.id == sessionId }
-        val sessionMessages = allMessages[sessionId] ?: emptyList()
         val revertState = session?.revert
 
         // While the REST call is still loading, suppress SSE-only messages to prevent
@@ -432,23 +436,6 @@ class ChatViewModel @Inject constructor(
             _selectedModelId.value = effectiveModelId
         }
 
-        // Compute cost/token totals — always sum from loaded assistant messages.
-        // session.tokens is NOT cumulative in the OpenCode backend (overwrite, not +=).
-        val assistantMessages = sessionMessages.filterIsInstance<Message.Assistant>()
-        val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
-        val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
-        val totalOutputTokens = assistantMessages.sumOf { it.tokens?.output ?: 0 }
-        val totalReasoningTokens = assistantMessages.sumOf { it.tokens?.reasoning ?: 0 }
-        val totalCacheReadTokens = assistantMessages.sumOf { it.tokens?.cache?.read ?: 0 }
-        val totalCacheWriteTokens = assistantMessages.sumOf { it.tokens?.cache?.write ?: 0 }
-        // Context usage: tokens from the last assistant message with output > 0
-        // This represents the current context window usage (OpenCode WebUI pattern:
-        // lastAssistantWithTokens → single API call's input+output+reasoning+cache)
-        val lastAssistantWithTokens = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
-        val lastContextTokens = lastAssistantWithTokens?.tokens?.let { t ->
-            t.input + t.output + t.reasoning + t.cache.read + t.cache.write
-        } ?: 0
-
         // Resolve available variants for the currently selected model.
         // If selected model is no longer visible (filtered out), fall back to first visible model.
         var currentModel = if (effectiveProviderId != null && effectiveModelId != null) {
@@ -507,12 +494,12 @@ class ChatViewModel @Inject constructor(
             defaultModels = defaultModels,
             selectedProviderId = effectiveProviderId,
             selectedModelId = effectiveModelId,
-            totalCost = totalCost,
-            totalInputTokens = totalInputTokens,
-            totalOutputTokens = totalOutputTokens,
-            totalReasoningTokens = totalReasoningTokens,
-            totalCacheReadTokens = totalCacheReadTokens,
-            totalCacheWriteTokens = totalCacheWriteTokens,
+            totalCost = tokenStats.totalCost,
+            totalInputTokens = tokenStats.totalInputTokens,
+            totalOutputTokens = tokenStats.totalOutputTokens,
+            totalReasoningTokens = tokenStats.totalReasoningTokens,
+            totalCacheReadTokens = tokenStats.totalCacheReadTokens,
+            totalCacheWriteTokens = tokenStats.totalCacheWriteTokens,
             agents = agents.filter { it.mode != "subagent" && !it.hidden },
             selectedAgent = effectiveAgent,
             variantNames = availableVariants,
@@ -521,10 +508,12 @@ class ChatViewModel @Inject constructor(
             hasOlderMessages = hasOlderMessages,
             isLoadingOlder = isLoadingOlder,
             shareUrl = session?.share?.url,
-            contextWindow = session?.model?.let { sm ->
-                providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.limit?.context
-            } ?: currentModel?.limit?.context ?: 0,
-            lastContextTokens = lastContextTokens,
+            contextWindow = tokenStats.contextWindow.let { cw ->
+                if (cw > 0) cw else session?.model?.let { sm ->
+                    providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.limit?.context
+                } ?: currentModel?.limit?.context ?: 0
+            },
+            lastContextTokens = tokenStats.lastContextTokens,
             queuedMessageIds = queuedMessageIds,
             sessionParentId = session?.parentId,
             sessionAgent = session?.agent,
@@ -542,6 +531,34 @@ class ChatViewModel @Inject constructor(
 
     init {
         val isNewSession = sessionId.isEmpty()
+
+        // Observe messages and update token stats tracker (computed outside combine for performance)
+        viewModelScope.launch {
+            messagePaging.observeMessages(sessionId).collect { messages ->
+                val assistantMessages = messages.filterIsInstance<Message.Assistant>()
+                val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
+                val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
+                val totalOutputTokens = assistantMessages.sumOf { it.tokens?.output ?: 0 }
+                val totalReasoningTokens = assistantMessages.sumOf { it.tokens?.reasoning ?: 0 }
+                val totalCacheReadTokens = assistantMessages.sumOf { it.tokens?.cache?.read ?: 0 }
+                val totalCacheWriteTokens = assistantMessages.sumOf { it.tokens?.cache?.write ?: 0 }
+                val lastAssistantWithTokens = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
+                val lastContextTokens = lastAssistantWithTokens?.tokens?.let { t ->
+                    t.input + t.output + t.reasoning + t.cache.read + t.cache.write
+                } ?: 0
+                tokenStatsTracker.update {
+                    copy(
+                        totalCost = totalCost,
+                        totalInputTokens = totalInputTokens,
+                        totalOutputTokens = totalOutputTokens,
+                        totalReasoningTokens = totalReasoningTokens,
+                        totalCacheReadTokens = totalCacheReadTokens,
+                        totalCacheWriteTokens = totalCacheWriteTokens,
+                        lastContextTokens = lastContextTokens
+                    )
+                }
+            }
+        }
 
         // Restore draft from disk
         if (!isNewSession) {

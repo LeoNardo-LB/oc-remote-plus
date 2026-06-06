@@ -9,12 +9,14 @@ import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.usecase.*
+import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -43,6 +45,8 @@ class ChatViewModelSendTest {
     private val draftUseCase: DraftUseCase = mockk(relaxed = true)
     private val shareExportUseCase: ShareExportUseCase = mockk(relaxed = true)
     private val undoRedoUseCase: UndoRedoUseCase = mockk(relaxed = true)
+    private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
+    private val tokenStatsTracker = TokenStatsTracker()
 
     @Before
     fun setup() {
@@ -88,6 +92,11 @@ class ChatViewModelSendTest {
         coEvery { selectModelUseCase.loadProviders(any()) } returns ProvidersResponse(emptyList())
         coEvery { manageAgentUseCase.loadAgents(any()) } returns emptyList()
         coEvery { manageAgentUseCase.loadCommands(any()) } returns emptyList()
+
+        // Wire messagePaging.observeMessages to delegate to eventDispatcher.messages
+        every { messagePaging.observeMessages(any()) } answers {
+            eventDispatcher.messages.map { msgs -> msgs[firstArg<String>()] ?: emptyList() }
+        }
     }
 
     @After
@@ -127,7 +136,9 @@ class ChatViewModelSendTest {
             settingsRepository = settingsRepository,
             api = api,
             permissionAutoApprover = mockk<PermissionAutoApprover>(relaxed = true),
-            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver()
+            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
+            messagePaging = messagePaging,
+            tokenStatsTracker = tokenStatsTracker
         )
     }
 

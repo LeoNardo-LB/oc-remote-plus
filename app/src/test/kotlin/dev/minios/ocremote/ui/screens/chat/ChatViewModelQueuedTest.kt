@@ -9,11 +9,13 @@ import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.usecase.*
+import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -61,6 +63,8 @@ class ChatViewModelQueuedTest {
     private val draftUseCase: DraftUseCase = mockk(relaxed = true)
     private val shareExportUseCase: ShareExportUseCase = mockk(relaxed = true)
     private val undoRedoUseCase: UndoRedoUseCase = mockk(relaxed = true)
+    private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
+    private val tokenStatsTracker = TokenStatsTracker()
 
     private val testSessionId = "test-session-1"
     private val testServerId = "test-server-1"
@@ -113,6 +117,11 @@ class ChatViewModelQueuedTest {
         coEvery { selectModelUseCase.loadProviders(any()) } returns ProvidersResponse(emptyList())
         coEvery { manageAgentUseCase.loadAgents(any()) } returns emptyList()
         coEvery { manageAgentUseCase.loadCommands(any()) } returns emptyList()
+
+        // Wire messagePaging.observeMessages to delegate to eventDispatcher.messages
+        every { messagePaging.observeMessages(any()) } answers {
+            eventDispatcher.messages.map { msgs -> msgs[firstArg<String>()] ?: emptyList() }
+        }
     }
 
     @After
@@ -197,12 +206,13 @@ class ChatViewModelQueuedTest {
             settingsRepository = settingsRepository,
             api = api,
             permissionAutoApprover = mockk<PermissionAutoApprover>(relaxed = true),
-            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver()
+            toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
+            messagePaging = messagePaging,
+            tokenStatsTracker = tokenStatsTracker
         )
     }
 
     /**
-     * Push messages into EventDispatcher after VM is created.
      * This simulates SSE updates arriving after initial load.
      */
     private fun pushMessages(messages: List<Pair<Message, List<Part>>>) {
