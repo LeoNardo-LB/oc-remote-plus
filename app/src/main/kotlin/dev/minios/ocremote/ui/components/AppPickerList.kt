@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.screens.sessions.components.isAmoledTheme
@@ -87,7 +89,7 @@ fun <K> AppPickerList(
                 if (isSelected) {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.a11y_icon_select_provider),
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )

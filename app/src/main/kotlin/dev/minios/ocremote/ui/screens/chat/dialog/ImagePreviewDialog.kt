@@ -94,7 +94,7 @@ internal fun ImageThumbnailRow(
                 ) {
                     Icon(
                         Icons.Default.BrokenImage,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.a11y_icon_image),
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                     )

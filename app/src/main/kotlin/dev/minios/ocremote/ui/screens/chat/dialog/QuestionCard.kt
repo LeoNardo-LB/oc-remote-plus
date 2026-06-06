@@ -103,7 +103,7 @@ internal fun QuestionCard(
                 Icon(
                     @Suppress("DEPRECATION")
                     Icons.Default.HelpOutline,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.a11y_icon_question),
                     modifier = Modifier.size(18.dp),
                     tint = accentColor
                 )
@@ -223,7 +223,7 @@ internal fun QuestionCard(
                             ) {
                                 Icon(
                                     if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_select_provider),
                                     modifier = Modifier.size(16.dp),
                                     tint = if (isSelected) accentColor else accentColor.copy(alpha = AlphaTokens.MEDIUM)
                                 )
@@ -265,7 +265,7 @@ internal fun QuestionCard(
                             ) {
                                 Icon(
                                     Icons.Default.RadioButtonChecked,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_submit_answer),
                                     modifier = Modifier.size(16.dp),
                                     tint = accentColor
                                 )
@@ -314,7 +314,7 @@ internal fun QuestionCard(
                                 ) {
                                     Icon(
                                         Icons.Default.Edit,
-                                        contentDescription = null,
+                    contentDescription = stringResource(R.string.a11y_icon_custom_answer),
                                         modifier = Modifier.size(14.dp),
                                         tint = accentColor.copy(alpha = AlphaTokens.MEDIUM)
                                     )

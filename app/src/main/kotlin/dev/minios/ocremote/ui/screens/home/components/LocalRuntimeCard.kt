@@ -171,7 +171,7 @@ internal fun LocalRuntimeCard(
                         Icon(Icons.Default.Build, contentDescription = stringResource(R.string.a11y_icon_build), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.home_local_setup))
-                    )
+                    }
 
                     Button(
                         onClick = onStart,
@@ -245,10 +245,10 @@ internal fun LocalRuntimeCard(
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.a11y_icon_start), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.home_local_start))
-                        )
+                        Text(stringResource(R.string.home_local_start))
+                    }
 
-                        Button(
+                    Button(
                             onClick = onSetup,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonTokens.filledColors(),

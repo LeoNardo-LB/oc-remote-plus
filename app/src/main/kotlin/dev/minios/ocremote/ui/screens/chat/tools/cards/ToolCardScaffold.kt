@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.components.AmoledSurface
 import dev.minios.ocremote.ui.components.indicators.PulsingDotsIndicator
@@ -112,7 +113,7 @@ internal fun ToolCardScaffold(
                     ) {
                         Icon(
                             imageVector = icon,
-                            contentDescription = null,
+                                contentDescription = stringResource(if (expanded) R.string.a11y_icon_collapse else R.string.a11y_icon_expand),
                             modifier = Modifier.size(16.dp),
                             tint = iconTint
                         )
@@ -163,7 +164,7 @@ internal fun ToolCardScaffold(
                         if (showExpandIcon) {
                             Icon(
                                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = null,
+                            contentDescription = title,
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                             )

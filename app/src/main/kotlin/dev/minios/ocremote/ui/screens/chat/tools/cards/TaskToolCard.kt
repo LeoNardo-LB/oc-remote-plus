@@ -110,7 +110,7 @@ internal fun TaskToolCard(
         rightSideExtras = if (showNavArrow) {
             { Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.a11y_icon_navigate_forward),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
@@ -124,7 +124,7 @@ internal fun TaskToolCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.AccountTree,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.tool_sub_agent),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )

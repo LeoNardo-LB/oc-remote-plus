@@ -149,7 +149,7 @@ internal fun ModelPickerDialog(
                             if (isSelected) {
                                 Icon(
                                     Icons.Default.Check,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_select_model),
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )

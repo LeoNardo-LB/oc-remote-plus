@@ -79,7 +79,7 @@ internal fun PermissionCard(
             ) {
                 Icon(
                     Icons.Default.Security,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.permission_title),
                     modifier = Modifier.size(20.dp),
                     tint = accentTint
                 )

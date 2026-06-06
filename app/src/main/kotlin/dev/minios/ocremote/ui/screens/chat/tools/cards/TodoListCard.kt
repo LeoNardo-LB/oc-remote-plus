@@ -112,7 +112,7 @@ internal fun TodoListCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Checklist,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.chat_tasks_label),
                         modifier = Modifier.size(16.dp),
                         tint = if (completedCount == totalCount) {
                             MaterialTheme.colorScheme.primary

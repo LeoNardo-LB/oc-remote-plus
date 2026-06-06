@@ -108,7 +108,7 @@ internal fun ToolCallCard(
                 ) {
                     Icon(
                         imageVector = resolvedIcon,
-                        contentDescription = null,
+                        contentDescription = toolDisplay.title,
                         modifier = Modifier.size(16.dp),
                         tint = resolvedIconTint
                     )
@@ -140,7 +140,7 @@ internal fun ToolCallCard(
                 ) {
                     Icon(
                         imageVector = resolvedIcon,
-                        contentDescription = null,
+                        contentDescription = toolDisplay.title,
                         modifier = Modifier.size(16.dp),
                         tint = resolvedIconTint
                     )

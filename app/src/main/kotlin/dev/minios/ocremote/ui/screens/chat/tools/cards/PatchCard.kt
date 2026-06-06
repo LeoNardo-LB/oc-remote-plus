@@ -68,7 +68,7 @@ internal fun PatchCard(
                 ) {
                     Icon(
                         Icons.Default.Code,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.a11y_icon_code),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )

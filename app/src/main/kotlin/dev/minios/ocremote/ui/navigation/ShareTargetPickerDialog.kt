@@ -125,7 +125,7 @@ internal fun ShareTargetPickerDialog(
                         ) {
                             Icon(
                                 Icons.Default.CloudOff,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.share_no_connected_servers),
                                 modifier = Modifier.size(40.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.FAINT)
                             )
@@ -165,7 +165,7 @@ internal fun ShareTargetPickerDialog(
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.Chat,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.a11y_icon_open_chat),
                                     modifier = Modifier.size(20.dp),
                                     tint = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
                                 )
@@ -225,7 +225,7 @@ internal fun ShareTargetPickerDialog(
                         ) {
                             Icon(
                                 Icons.Default.Add,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.a11y_icon_add),
                                 modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
                             )

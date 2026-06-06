@@ -614,6 +614,7 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_rate_review">Review</string>
     <string name="a11y_icon_file_download">Download file</string>
     <string name="a11y_icon_keyboard_toggle">Toggle keyboard</string>
+    <string name="a11y_icon_custom_answer">Custom answer</string>
     <string name="a11y_icon_add_tab">Add tab</string>
     <string name="a11y_icon_select_provider">Select provider</string>
     <string name="a11y_icon_toggle_password">Toggle password visibility</string>
