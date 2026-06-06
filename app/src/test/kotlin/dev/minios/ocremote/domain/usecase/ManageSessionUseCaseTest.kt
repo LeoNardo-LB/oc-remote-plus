@@ -1,8 +1,7 @@
 package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.domain.model.Session
+import dev.minios.ocremote.domain.repository.SessionRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -12,25 +11,24 @@ import org.junit.Test
 
 class ManageSessionUseCaseTest {
 
-    private val api: OpenCodeApi = mockk()
-    private val useCase = ManageSessionUseCase(api)
-    private val conn = ServerConnection.from("http://localhost:8080")
+    private val sessionRepository: SessionRepository = mockk()
+    private val useCase = ManageSessionUseCase(sessionRepository)
 
     @Test
-    fun `getSession delegates to api`() = runTest {
+    fun `getSession delegates to sessionRepository`() = runTest {
         val session = Session(id = "s1", title = "Chat", time = Session.Time(created = 1000L, updated = 1000L))
-        coEvery { api.getSession(any(), "s1") } returns session
+        coEvery { sessionRepository.getSession("server1", "s1") } returns Result.success(session)
 
-        val result = useCase.getSession(conn, "s1")
+        val result = useCase.getSession("server1", "s1")
 
         assertEquals(session, result)
     }
 
     @Test
-    fun `listMessages delegates to api`() = runTest {
-        coEvery { api.listMessages(any(), "s1", any()) } returns emptyList()
+    fun `listMessages delegates to sessionRepository`() = runTest {
+        coEvery { sessionRepository.listMessages("server1", "s1", any()) } returns Result.success(emptyList())
 
-        val result = useCase.listMessages(conn, "s1", limit = 50)
+        val result = useCase.listMessages("server1", "s1", limit = 50)
 
         assertTrue(result.isEmpty())
     }

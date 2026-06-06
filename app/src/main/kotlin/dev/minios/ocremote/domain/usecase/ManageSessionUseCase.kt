@@ -1,52 +1,51 @@
 package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.model.Session
+import dev.minios.ocremote.domain.repository.SessionRepository
 import javax.inject.Inject
 
 /**
  * Use case: manage session lifecycle (load, refresh, create, fork, rename).
- * Temporary shell — delegates to OpenCodeApi. Full impl with tests in Phase 4.
+ * Delegates to SessionRepository.
  */
 class ManageSessionUseCase @Inject constructor(
-    private val api: OpenCodeApi
+    private val sessionRepository: SessionRepository
 ) {
-    // TODO: Phase 4 — replace api calls with ChatRepository/SessionRepository methods
+    suspend fun getSession(serverId: String, sessionId: String): Session =
+        sessionRepository.getSession(serverId, sessionId).getOrThrow()
 
-    suspend fun getSession(conn: ServerConnection, sessionId: String): Session =
-        api.getSession(conn, sessionId)
+    suspend fun listMessages(serverId: String, sessionId: String, limit: Int): List<MessageWithParts> =
+        sessionRepository.listMessages(serverId, sessionId, limit).getOrThrow()
 
-    suspend fun listMessages(conn: ServerConnection, sessionId: String, limit: Int): List<MessageWithParts> =
-        api.listMessages(conn, sessionId, limit)
-
-    suspend fun createSession(conn: ServerConnection, directory: String?): Session =
-        api.createSession(conn, directory = directory)
-
-    suspend fun forkSession(conn: ServerConnection, sessionId: String): Session =
-        api.forkSession(conn, sessionId)
-
-    suspend fun renameSession(conn: ServerConnection, sessionId: String, title: String) {
-        api.updateSession(conn, sessionId, title)
+    suspend fun createSession(serverId: String, directory: String?): Session {
+        val opts = dev.minios.ocremote.domain.model.CreateSessionOpts(directory = directory)
+        return sessionRepository.createSession(serverId, opts).getOrThrow()
     }
 
-    suspend fun abortSession(conn: ServerConnection, sessionId: String, directory: String?) {
-        api.abortSession(conn, sessionId, directory)
+    suspend fun forkSession(serverId: String, sessionId: String): Session =
+        sessionRepository.fork(serverId, sessionId).getOrThrow()
+
+    suspend fun renameSession(serverId: String, sessionId: String, title: String) {
+        sessionRepository.rename(serverId, sessionId, title).getOrThrow()
     }
 
-    suspend fun deleteMessage(conn: ServerConnection, sessionId: String, messageId: String): Boolean =
-        api.deleteMessage(conn, sessionId, messageId)
+    suspend fun abortSession(serverId: String, sessionId: String, directory: String?) {
+        sessionRepository.abort(serverId, sessionId, directory).getOrThrow()
+    }
 
-    suspend fun deleteMessagePart(conn: ServerConnection, sessionId: String, messageId: String, partIndex: Int): Boolean =
-        api.deleteMessagePart(conn, sessionId, messageId, partIndex)
+    suspend fun deleteMessage(serverId: String, sessionId: String, messageId: String): Boolean =
+        sessionRepository.deleteMessage(serverId, sessionId, messageId).getOrThrow()
 
-    suspend fun archiveSession(conn: ServerConnection, sessionId: String): Session =
-        api.updateSessionFields(conn, sessionId, mapOf("archived" to true))
+    suspend fun deleteMessagePart(serverId: String, sessionId: String, messageId: String, partIndex: Int): Boolean =
+        sessionRepository.deleteMessagePart(serverId, sessionId, messageId, partIndex).getOrThrow()
 
-    suspend fun unarchiveSession(conn: ServerConnection, sessionId: String): Session =
-        api.updateSessionFields(conn, sessionId, mapOf("archived" to false))
+    suspend fun archiveSession(serverId: String, sessionId: String): Session =
+        sessionRepository.archive(serverId, sessionId).getOrThrow()
 
-    suspend fun importSession(conn: ServerConnection, shareUrl: String): Session =
-        api.importSession(conn, shareUrl)
+    suspend fun unarchiveSession(serverId: String, sessionId: String): Session =
+        sessionRepository.unarchive(serverId, sessionId).getOrThrow()
+
+    suspend fun importSession(serverId: String, shareUrl: String): Session =
+        sessionRepository.importSession(serverId, shareUrl).getOrThrow()
 }

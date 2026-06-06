@@ -362,7 +362,7 @@ class SessionListViewModel @Inject constructor(
     fun renameSession(sessionId: String, newTitle: String) {
         viewModelScope.launch {
             try {
-                manageSessionUseCase.renameSession(conn, sessionId, newTitle)
+                manageSessionUseCase.renameSession(serverId, sessionId, newTitle)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Renamed session $sessionId to '$newTitle'")
                 loadSessions()
             } catch (e: Exception) {
@@ -482,7 +482,7 @@ class SessionListViewModel @Inject constructor(
     fun importSession(shareUrl: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = manageSessionUseCase.importSession(conn, shareUrl)
+                val session = manageSessionUseCase.importSession(serverId, shareUrl)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Imported session ${session.id}")
                 eventDispatcher.setSessions(serverId, listOf(session))
                 onResult(true)

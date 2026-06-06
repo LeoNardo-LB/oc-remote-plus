@@ -622,7 +622,7 @@ class ChatViewModel @Inject constructor(
     /** Load the session info to get its directory for correct project context. */
     private suspend fun loadSession() {
         try {
-            val session = manageSessionUseCase.getSession(conn, sessionId)
+            val session = manageSessionUseCase.getSession(serverId, sessionId)
             if (session.directory.isNotBlank()) {
                 sessionDirectory = session.directory
                 if (BuildConfig.DEBUG) Log.d(TAG, "Session directory: ${session.directory}")
@@ -646,7 +646,7 @@ class ChatViewModel @Inject constructor(
             _error.value = null
             try {
                 // Load messages with current limit
-                val messages = manageSessionUseCase.listMessages(conn, sessionId, limit = currentMessageLimit)
+                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
                 eventDispatcher.setMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
@@ -659,7 +659,7 @@ class ChatViewModel @Inject constructor(
                     Log.w(TAG, "OOM loading messages, retrying with smaller limit")
                     currentMessageLimit = (currentMessageLimit / 2).coerceAtLeast(10)
                     try {
-                        val messages = manageSessionUseCase.listMessages(conn, sessionId, limit = currentMessageLimit)
+                        val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
                         eventDispatcher.mergeMessages(sessionId, messages)
                         _hasOlderMessages.value = messages.size >= currentMessageLimit
                         if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
@@ -738,7 +738,7 @@ class ChatViewModel @Inject constructor(
             _isLoadingOlder.value = true
             currentMessageLimit = currentMessageLimit * 2
             try {
-                val messages = manageSessionUseCase.listMessages(conn, sessionId, limit = currentMessageLimit)
+                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
                 eventDispatcher.mergeMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
@@ -1104,7 +1104,7 @@ class ChatViewModel @Inject constructor(
             // Double-check after acquiring lock
             if (sessionId.isNotEmpty()) return sessionId
             val dir = if (directoryParam.isNotEmpty()) directoryParam else sessionDirectory
-            val session = manageSessionUseCase.createSession(conn, directory = dir)
+            val session = manageSessionUseCase.createSession(serverId, directory = dir)
             eventDispatcher.setSessions(serverId, listOf(session))
             sessionId = session.id
             sessionDirectory = session.directory.ifBlank { dir }
@@ -1124,7 +1124,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             kotlinx.coroutines.delay(8_000) // Wait for server async title generation
             try {
-                val refreshed = manageSessionUseCase.getSession(conn, sid)
+                val refreshed = manageSessionUseCase.getSession(serverId, sid)
                 if (refreshed != null) {
                     val currentSession = eventDispatcher.sessions.value.find { it.id == sid }
                     val currentTitle = currentSession?.title
@@ -1242,7 +1242,7 @@ class ChatViewModel @Inject constructor(
     fun abortSession() {
         viewModelScope.launch {
             try {
-                manageSessionUseCase.abortSession(conn, sessionId, directory = sessionDirectory)
+                manageSessionUseCase.abortSession(serverId, sessionId, directory = sessionDirectory)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
                 // Optimistically update session status to Idle so UI reflects change immediately
                 eventDispatcher.updateSessionStatus(sessionId, SessionStatus.Idle)
@@ -1510,7 +1510,7 @@ class ChatViewModel @Inject constructor(
     fun deleteMessage(messageId: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                val success = manageSessionUseCase.deleteMessage(conn, sessionId, messageId)
+                val success = manageSessionUseCase.deleteMessage(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Deleted message $messageId: success=$success")
                 onResult(success)
             } catch (e: Exception) {
@@ -1524,7 +1524,7 @@ class ChatViewModel @Inject constructor(
     fun deleteMessagePart(messageId: String, partIndex: Int, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                val success = manageSessionUseCase.deleteMessagePart(conn, sessionId, messageId, partIndex)
+                val success = manageSessionUseCase.deleteMessagePart(serverId, sessionId, messageId, partIndex)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Deleted part $partIndex from message $messageId: success=$success")
                 onResult(success)
             } catch (e: Exception) {
@@ -1542,7 +1542,7 @@ class ChatViewModel @Inject constructor(
         if (session.id != sessionId) return
         viewModelScope.launch {
             try {
-                val messages = manageSessionUseCase.listMessages(conn, sessionId, 100)
+                val messages = manageSessionUseCase.listMessages(serverId, sessionId, 100)
                 eventDispatcher.replaceMessages(sessionId, messages)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Refreshed messages after session update")
             } catch (e: Exception) {
@@ -1555,7 +1555,7 @@ class ChatViewModel @Inject constructor(
     fun forkSession(onResult: (Session?) -> Unit) {
         viewModelScope.launch {
             try {
-                val session = manageSessionUseCase.forkSession(conn, sessionId)
+                val session = manageSessionUseCase.forkSession(serverId, sessionId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Forked session $sessionId -> ${session.id}")
                 onResult(session)
             } catch (e: Exception) {
@@ -1569,7 +1569,7 @@ class ChatViewModel @Inject constructor(
     fun renameSession(title: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                manageSessionUseCase.renameSession(conn, sessionId, title)
+                manageSessionUseCase.renameSession(serverId, sessionId, title)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Renamed session $sessionId to $title")
                 onResult(true)
             } catch (e: Exception) {
