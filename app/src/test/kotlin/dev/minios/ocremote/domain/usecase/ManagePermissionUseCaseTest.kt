@@ -1,8 +1,7 @@
 ﻿package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.dto.response.PermissionRequest
-import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.domain.model.PermissionState
+import dev.minios.ocremote.domain.repository.ChatRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -12,25 +11,37 @@ import org.junit.Test
 
 class ManagePermissionUseCaseTest {
 
-    private val api: OpenCodeApi = mockk()
-    private val useCase = ManagePermissionUseCase(api)
-    private val conn = ServerConnection.from("http://localhost:8080")
+    private val chatRepository: ChatRepository = mockk()
+    private val useCase = ManagePermissionUseCase(chatRepository)
 
     @Test
-    fun `replyToPermission delegates to api and returns true`() = runTest {
-        coEvery { api.replyToPermission(any(), "p1", "allow", any()) } returns true
+    fun `replyToPermission delegates to chatRepository and returns true`() = runTest {
+        coEvery { chatRepository.respondPermission("server1", "p1", "allow", any()) } returns Result.success(true)
 
-        val result = useCase.replyToPermission(conn, "p1", "allow", null)
+        val result = useCase.replyToPermission("server1", "p1", "allow", null)
 
         assertTrue(result)
     }
 
     @Test
-    fun `replyToPermission delegates to api and returns false`() = runTest {
-        coEvery { api.replyToPermission(any(), "p1", "deny", any()) } returns false
+    fun `replyToPermission delegates to chatRepository and returns false`() = runTest {
+        coEvery { chatRepository.respondPermission("server1", "p1", "deny", any()) } returns Result.success(false)
 
-        val result = useCase.replyToPermission(conn, "p1", "deny", null)
+        val result = useCase.replyToPermission("server1", "p1", "deny", null)
 
         assertEquals(false, result)
+    }
+
+    @Test
+    fun `listPendingPermissions delegates to chatRepository`() = runTest {
+        val permissions = listOf(
+            PermissionState(id = "p1", sessionId = "s1", permission = "file_read")
+        )
+        coEvery { chatRepository.listPendingPermissions("server1", null) } returns Result.success(permissions)
+
+        val result = useCase.listPendingPermissions("server1", null)
+
+        assertEquals(1, result.size)
+        assertEquals("p1", result[0].id)
     }
 }

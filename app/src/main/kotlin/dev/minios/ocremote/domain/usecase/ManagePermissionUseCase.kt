@@ -1,32 +1,29 @@
 ﻿package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.dto.response.PermissionRequest
-import dev.minios.ocremote.data.dto.response.QuestionRequest
-import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.domain.model.PermissionState
+import dev.minios.ocremote.domain.model.QuestionState
+import dev.minios.ocremote.domain.repository.ChatRepository
 import javax.inject.Inject
 
 /**
  * Use case: manage permission and question requests (reply, reject, list pending).
- * Temporary shell — delegates to OpenCodeApi. Full impl with tests in Phase 4.
+ * Delegates to ChatRepository.
  */
 class ManagePermissionUseCase @Inject constructor(
-    private val api: OpenCodeApi
+    private val chatRepository: ChatRepository
 ) {
-    // TODO: Phase 4 — replace api calls with ChatRepository methods
+    suspend fun listPendingPermissions(serverId: String, directory: String?): List<PermissionState> =
+        chatRepository.listPendingPermissions(serverId, directory).getOrThrow()
 
-    suspend fun listPendingPermissions(conn: ServerConnection, directory: String?): List<PermissionRequest> =
-        api.listPendingPermissions(conn, directory)
+    suspend fun replyToPermission(serverId: String, requestId: String, reply: String, directory: String?): Boolean =
+        chatRepository.respondPermission(serverId, requestId, reply, directory).getOrThrow()
 
-    suspend fun replyToPermission(conn: ServerConnection, requestId: String, reply: String, directory: String?): Boolean =
-        api.replyToPermission(conn, requestId, reply, directory)
+    suspend fun listPendingQuestions(serverId: String, directory: String?): List<QuestionState> =
+        chatRepository.listPendingQuestions(serverId, directory).getOrThrow()
 
-    suspend fun listPendingQuestions(conn: ServerConnection, directory: String?): List<QuestionRequest> =
-        api.listPendingQuestions(conn, directory)
+    suspend fun replyToQuestion(serverId: String, requestId: String, answers: List<List<String>>, directory: String?): Boolean =
+        chatRepository.replyToQuestion(serverId, requestId, answers, directory).getOrThrow()
 
-    suspend fun replyToQuestion(conn: ServerConnection, requestId: String, answers: List<List<String>>, directory: String?): Boolean =
-        api.replyToQuestion(conn, requestId, answers, directory)
-
-    suspend fun rejectQuestion(conn: ServerConnection, requestId: String, directory: String?): Boolean =
-        api.rejectQuestion(conn, requestId, directory)
+    suspend fun rejectQuestion(serverId: String, requestId: String, directory: String?): Boolean =
+        chatRepository.rejectQuestion(serverId, requestId, directory).getOrThrow()
 }

@@ -19,14 +19,12 @@ import dev.minios.ocremote.ui.screens.chat.tools.ToolCardResolver
 import dev.minios.ocremote.data.dto.request.PromptPart
 import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
-import dev.minios.ocremote.data.mapper.PermissionMapper
 import dev.minios.ocremote.domain.model.Draft
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.SettingsRepository
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.usecase.*
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -763,7 +761,7 @@ class ChatViewModel @Inject constructor(
      */
     private suspend fun loadPendingQuestions() {
         try {
-            val allQuestions = managePermissionUseCase.listPendingQuestions(conn, directory = sessionDirectory)
+            val allQuestions = managePermissionUseCase.listPendingQuestions(serverId, directory = sessionDirectory)
             if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingQuestions: ${allQuestions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
 
             // Include questions from child sessions
@@ -819,7 +817,7 @@ class ChatViewModel @Inject constructor(
     /** Load pending permissions from the server REST API on session open (REST recovery). */
     private suspend fun loadPendingPermissions() {
         try {
-            val allPermissions = managePermissionUseCase.listPendingPermissions(conn, directory = sessionDirectory)
+            val allPermissions = managePermissionUseCase.listPendingPermissions(serverId, directory = sessionDirectory)
             if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingPermissions: ${allPermissions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
 
             // Include permissions from child sessions
@@ -837,14 +835,8 @@ class ChatViewModel @Inject constructor(
                         sessionId = req.sessionId,
                         permission = req.permission,
                         patterns = req.patterns,
-                        metadata = req.metadata?.mapValues { (_, v) ->
-                            // JsonElement → String: primitives use content, others use toString
-                            when (v) {
-                                is JsonPrimitive -> v.content
-                                else -> v.toString()
-                            }
-                        },
-                        always = PermissionMapper.parseAlways(req.always),
+                        metadata = req.metadata,
+                        always = req.always,
                         tool = req.tool,
                         sourceSessionTitle = if (isChild) {
                             eventDispatcher.sessions.value.find { it.id == req.sessionId }?.title
@@ -1206,7 +1198,7 @@ class ChatViewModel @Inject constructor(
             appendDiagnosticLog(logMsg)
             try {
                 val success = managePermissionUseCase.replyToPermission(
-                    conn = conn,
+                    serverId = serverId,
                     requestId = requestId,
                     reply = reply,
                     directory = sessionDirectory
@@ -1272,7 +1264,7 @@ class ChatViewModel @Inject constructor(
             appendDiagnosticLog(logMsg)
             try {
                 val success = managePermissionUseCase.replyToQuestion(
-                    conn = conn,
+                    serverId = serverId,
                     requestId = requestId,
                     answers = answers,
                     directory = sessionDirectory
@@ -1301,7 +1293,7 @@ class ChatViewModel @Inject constructor(
             Log.i(TAG, logMsg)
             appendDiagnosticLog(logMsg)
             try {
-                val success = managePermissionUseCase.rejectQuestion(conn = conn, requestId = requestId, directory = sessionDirectory)
+                val success = managePermissionUseCase.rejectQuestion(serverId = serverId, requestId = requestId, directory = sessionDirectory)
                 val resultMsg = "[Question] rejectQuestion result: id=$requestId success=$success"
                 Log.i(TAG, resultMsg)
                 appendDiagnosticLog(resultMsg)
