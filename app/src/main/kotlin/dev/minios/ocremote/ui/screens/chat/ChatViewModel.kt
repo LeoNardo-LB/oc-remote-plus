@@ -1165,7 +1165,7 @@ class ChatViewModel @Inject constructor(
                 } else null
 
                 sendMessageUseCase.sendPrompt(
-                    conn = conn,
+                    serverId = serverId,
                     sessionId = currentSessionId,
                     parts = parts,
                     model = model,
