@@ -92,21 +92,33 @@ class SessionRepositoryImplTest {
     // ============ deleteSession ============
 
     @Test
-    fun `deleteSession returns failure when session not tracked`() = runTest {
-        val result = repo.deleteSession("unknown")
-        assertTrue(result.isFailure)
-    }
-
-    @Test
-    fun `deleteSession calls API when session tracked`() = runTest {
-        sessionHandler.setSessions("server1", listOf(testSession("s1")))
+    fun `deleteSession delegates to API when server exists`() = runTest {
         coEvery { serverRepo.getServer("server1") } returns ServerConfig(
             id = "server1", url = "http://localhost:4096"
         )
         coEvery { api.deleteSession(any(), "s1") } returns true
 
-        val result = repo.deleteSession("s1")
+        val result = repo.deleteSession("server1", "s1")
         assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun `deleteSession returns failure when server not found`() = runTest {
+        coEvery { serverRepo.getServer("noserver") } returns null
+
+        val result = repo.deleteSession("noserver", "s1")
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `deleteSession propagates API failure`() = runTest {
+        coEvery { serverRepo.getServer("server1") } returns ServerConfig(
+            id = "server1", url = "http://localhost:4096"
+        )
+        coEvery { api.deleteSession(any(), "s1") } throws java.io.IOException("Connection reset")
+
+        val result = repo.deleteSession("server1", "s1")
+        assertTrue(result.isFailure)
     }
 
     // ============ switchSession ============

@@ -14,20 +14,20 @@ class DeleteSessionUseCaseTest {
 
     @Test
     fun `invoke returns success when repository succeeds`() = runTest {
-        coEvery { sessionRepository.deleteSession("s1") } returns Result.success(Unit)
+        coEvery { sessionRepository.deleteSession("server1", "s1") } returns Result.success(Unit)
 
-        val result = useCase("s1")
+        val result = useCase("server1", "s1")
 
         assertTrue(result.isSuccess)
     }
 
     @Test
     fun `invoke returns failure when repository fails`() = runTest {
-        coEvery { sessionRepository.deleteSession("nonexistent") } returns Result.failure(
+        coEvery { sessionRepository.deleteSession("server1", "nonexistent") } returns Result.failure(
             NoSuchElementException("Session not found")
         )
 
-        val result = useCase("nonexistent")
+        val result = useCase("server1", "nonexistent")
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is NoSuchElementException)
@@ -35,11 +35,11 @@ class DeleteSessionUseCaseTest {
 
     @Test
     fun `invoke returns failure on network error`() = runTest {
-        coEvery { sessionRepository.deleteSession("s1") } returns Result.failure(
+        coEvery { sessionRepository.deleteSession("server1", "s1") } returns Result.failure(
             java.io.IOException("Connection reset")
         )
 
-        val result = useCase("s1")
+        val result = useCase("server1", "s1")
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is java.io.IOException)

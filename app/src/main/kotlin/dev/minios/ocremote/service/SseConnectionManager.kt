@@ -2,9 +2,11 @@ package dev.minios.ocremote.service
 
 import android.util.Log
 import dev.minios.ocremote.BuildConfig
+import dev.minios.ocremote.data.api.NetworkMonitor
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.api.SseClient
+import dev.minios.ocremote.data.api.SseReadTimeoutTracker
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.model.SessionStatus
@@ -24,6 +26,7 @@ private const val TAG = "SseConnManager"
 private const val RECONNECT_BASE_DELAY_MS = 1_000L
 private const val RECONNECT_MAX_DELAY_MS = 30_000L
 private const val RECONNECT_BACKOFF_FACTOR = 2.0
+private const val COOLDOWN_CHECK_INTERVAL_MS = 30_000L
 
 /**
  * Per-server connection state.
@@ -32,7 +35,8 @@ data class ServerConnectionState(
     val config: ServerConfig,
     val conn: ServerConnection,
     val sseJob: Job,
-    val isConnected: Boolean = false
+    val isConnected: Boolean = false,
+    val onEvent: (ServerConfig, SseEvent) -> Unit = { _, _ -> }
 )
 
 /**
@@ -47,12 +51,16 @@ class SseConnectionManager @Inject constructor(
     private val api: OpenCodeApi,
     private val sseClient: SseClient,
     private val eventDispatcher: EventDispatcher,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val networkMonitor: NetworkMonitor
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** All active/pending server connections keyed by serverId. */
     val connections = mutableMapOf<String, ServerConnectionState>()
+
+    /** Per-server timeout trackers for SSE read timeout cooldown logic. */
+    private val timeoutTrackers = mutableMapOf<String, SseReadTimeoutTracker>()
 
     /** Observable set of server IDs that are actually connected (SSE stream active). */
     val connectedServerIds: StateFlow<Set<String>>
@@ -79,7 +87,7 @@ class SseConnectionManager @Inject constructor(
         val job = startSseConnection(server, conn, onEvent)
 
         connections[server.id] = ServerConnectionState(
-            config = server, conn = conn, sseJob = job, isConnected = false
+            config = server, conn = conn, sseJob = job, isConnected = false, onEvent = onEvent
         )
         _connectingServerIds.update { it + server.id }
 
@@ -92,6 +100,7 @@ class SseConnectionManager @Inject constructor(
     fun stopConnection(serverId: String) {
         val state = connections.remove(serverId) ?: return
         state.sseJob.cancel()
+        timeoutTrackers.remove(serverId)
         _connectedServerIds.update { it - serverId }
         _connectingServerIds.update { it - serverId }
         eventDispatcher.clearForServer(serverId)
@@ -106,11 +115,36 @@ class SseConnectionManager @Inject constructor(
         }
         val serverIds = connections.keys.toList()
         connections.clear()
+        timeoutTrackers.clear()
         _connectedServerIds.value = emptySet()
         _connectingServerIds.value = emptySet()
         for (serverId in serverIds) {
             eventDispatcher.clearForServer(serverId)
         }
+    }
+
+    /**
+     * Reconnect all active connections. Used when network recovers from a loss.
+     * Restarts the SSE connection for each server so the auto-reconnect loop
+     * resets its attempt counter and reconnects immediately.
+     */
+    fun reconnectAll() {
+        for ((serverId, state) in connections.toMap()) {
+            reconnectServer(serverId)
+        }
+    }
+
+    /**
+     * Reconnect a single server connection. Restarts the SSE connection so
+     * the auto-reconnect loop resets its attempt counter and reconnects immediately.
+     */
+    private fun reconnectServer(serverId: String) {
+        val state = connections[serverId] ?: return
+        Log.i(TAG, "Reconnecting server $serverId after network recovery")
+        timeoutTrackers[serverId]?.reset()
+        state.sseJob.cancel()
+        val newJob = startSseConnection(state.config, state.conn, state.onEvent)
+        connections[serverId] = state.copy(sseJob = newJob)
     }
 
     /**
@@ -143,9 +177,18 @@ class SseConnectionManager @Inject constructor(
     ): Job {
         return scope.launch {
             var attempt = 0
+            val tracker = timeoutTrackers.getOrPut(server.id) { SseReadTimeoutTracker() }
 
             while (isActive) {
                 attempt++
+
+                // If in cooldown, wait and skip reconnection attempt
+                if (tracker.isInCooldown()) {
+                    Log.i(TAG, "[${server.displayName}] SSE in cooldown, waiting ${COOLDOWN_CHECK_INTERVAL_MS}ms")
+                    delay(COOLDOWN_CHECK_INTERVAL_MS)
+                    continue
+                }
+
                 Log.i(TAG, "[${server.displayName}] SSE connection attempt #$attempt")
 
                 // Pre-load sessions via REST API for all projects
@@ -161,6 +204,7 @@ class SseConnectionManager @Inject constructor(
                         .catch { error ->
                             Log.e(TAG, "[${server.displayName}] SSE stream error", error)
                             updateServerConnected(server.id, false)
+                            tracker.recordTimeout()
                             throw error
                         }
                         .collect { event ->
@@ -168,6 +212,7 @@ class SseConnectionManager @Inject constructor(
                                 updateServerConnected(server.id, true)
                                 attempt = 0
                             }
+                            tracker.recordSuccess()
                             // Dispatch to EventDispatcher for state updates
                             eventDispatcher.processEvent(event, server.id)
                             // Route to caller for notification handling
@@ -177,12 +222,24 @@ class SseConnectionManager @Inject constructor(
                     // Flow completed normally (server closed connection)
                     Log.w(TAG, "[${server.displayName}] SSE stream completed")
                     updateServerConnected(server.id, false)
+                    if (tracker.shouldEnterCooldown()) {
+                        tracker.enterCooldown()
+                        Log.w(TAG, "[${server.displayName}] Entering SSE cooldown after ${tracker.consecutiveTimeouts} consecutive timeouts")
+                    } else {
+                        tracker.recordTimeout()
+                    }
                 } catch (e: CancellationException) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "[${server.displayName}] SSE job cancelled, not reconnecting")
                     throw e
                 } catch (e: Exception) {
                     Log.e(TAG, "[${server.displayName}] SSE connection failed: ${e.message}")
                     updateServerConnected(server.id, false)
+                    if (tracker.shouldEnterCooldown()) {
+                        tracker.enterCooldown()
+                        Log.w(TAG, "[${server.displayName}] Entering SSE cooldown after ${tracker.consecutiveTimeouts} consecutive timeouts")
+                    } else {
+                        tracker.recordTimeout()
+                    }
                 }
 
                 // If this server was removed from connections, stop the loop
@@ -216,7 +273,6 @@ class SseConnectionManager @Inject constructor(
                 }
                 Log.i(TAG, "[${server.displayName}] Pre-loaded $totalSessions sessions across ${projects.size} projects")
             }
-
             // Initialize session statuses from server
             syncSessionStatuses(conn)
         } catch (e: Exception) {
@@ -272,10 +328,10 @@ class SseConnectionManager @Inject constructor(
                 }
                 eventDispatcher.syncAllSessionStatuses(statusMap)
 
-                // Only mark truly idle sessions with message completion fix
+                // Only mark truly idle sessions with message completion fix (protected)
                 for ((sessionId, status) in statusMap) {
                     if (status is SessionStatus.Idle) {
-                        eventDispatcher.markSessionIdle(sessionId)
+                        eventDispatcher.markSessionIdleProtected(sessionId)
                     }
                 }
                 Log.i(TAG, "Synced statuses for ${statusMap.size} sessions from REST")

@@ -32,7 +32,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import javax.inject.Inject
@@ -50,6 +52,7 @@ data class SessionListUiState(
     val baseDirectories: Set<String> = emptySet(),
     val isRefreshing: Boolean = false,
     val prefillDirectory: String? = null,
+    val searchQuery: String? = null,
 )
 
 data class SessionItem(
@@ -82,6 +85,7 @@ class SessionListViewModel @Inject constructor(
     )
 
     private val conn = ServerConnection.from(serverUrl, username, password.ifEmpty { null })
+    private val pollingJobs = mutableMapOf<String, Job>()
 
     private val _error = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(true)
@@ -91,8 +95,13 @@ class SessionListViewModel @Inject constructor(
     private val _baseDirectory = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
     private val _lastToggledDirectory = MutableStateFlow<String?>(null)
-    private val _navigateToSession = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val navigateToSession: SharedFlow<String> = _navigateToSession.asSharedFlow()
+    private val _searchQuery = MutableStateFlow<String?>(null)
+    private val _currentCursor = MutableStateFlow<String?>(null)
+    private val _hasMorePages = MutableStateFlow(true)
+    private val _isLoadingMore = MutableStateFlow(false)
+    private val _showArchived = MutableStateFlow(false)
+
+    val showArchived: Boolean get() = _showArchived.value
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
@@ -106,7 +115,9 @@ class SessionListViewModel @Inject constructor(
         _selectedIds,
         _baseDirectory,
         _isRefreshing,
-        _lastToggledDirectory
+        _lastToggledDirectory,
+        _searchQuery,
+        _showArchived
     ) { values ->
         val allSessions = values[0] as List<Session>
         val statuses = values[1] as Map<String, SessionStatus>
@@ -119,11 +130,16 @@ class SessionListViewModel @Inject constructor(
         val baseDirectory = values[8] as String?
         val isRefreshing = values[9] as Boolean
         val lastToggledDirectory = values[10] as String?
+        val searchQuery = values[11] as String?
+        val showArchived = values[12] as Boolean
 
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
         val filteredSessions = allSessions
-            .filter { it.id in serverSessionIds && !it.isArchived && it.parentId == null }
+            .filter { it.id in serverSessionIds && it.parentId == null }
+            .let { sessions ->
+                if (showArchived) sessions.filter { it.isArchived } else sessions
+            }
             .sortedByDescending { it.time.updated }
 
         val baseFilteredSessions = if (baseDirectory != null) {
@@ -135,7 +151,18 @@ class SessionListViewModel @Inject constructor(
             filteredSessions
         }
 
-        val treeNodes = buildTreeNodes(baseFilteredSessions, expandedPaths, baseDirectory, statuses)
+        // Client-side search: filter by directory path OR session title
+        val searchedSessions = if (!searchQuery.isNullOrBlank()) {
+            val query = searchQuery.lowercase()
+            baseFilteredSessions.filter { session ->
+                session.directory.lowercase().contains(query) ||
+                    session.title?.lowercase()?.contains(query) == true
+            }
+        } else {
+            baseFilteredSessions
+        }
+
+        val treeNodes = buildTreeNodes(searchedSessions, expandedPaths, baseDirectory, statuses)
 
         val prefillDirectory = if (lastToggledDirectory != null && lastToggledDirectory in expandedPaths)
             lastToggledDirectory
@@ -153,6 +180,7 @@ class SessionListViewModel @Inject constructor(
             baseDirectories = emptySet(),
             isRefreshing = isRefreshing,
             prefillDirectory = prefillDirectory,
+            searchQuery = searchQuery,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionListUiState())
 
@@ -164,20 +192,21 @@ class SessionListViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
+            resetPagination()
             try {
                 val projects = api.listProjects(conn)
                 _projects.value = projects
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${projects.size} projects for multi-project session fetch")
 
                 if (projects.isEmpty()) {
-                    val sessions = api.listSessions(conn)
+                    val sessions = api.listSessions(conn, search = _searchQuery.value)
                     eventDispatcher.setSessions(serverId, sessions)
                     if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions (no projects)")
                 } else {
                     var totalSessions = 0
                     for (project in projects) {
                         try {
-                            val sessions = api.listSessions(conn, directory = project.worktree)
+                            val sessions = api.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
                             eventDispatcher.setSessions(serverId, sessions)
                             totalSessions += sessions.size
                             if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions for project ${project.displayName}")
@@ -223,12 +252,12 @@ class SessionListViewModel @Inject constructor(
                 val projects = api.listProjects(conn)
                 _projects.value = projects
                 if (projects.isEmpty()) {
-                    val sessions = api.listSessions(conn)
+                    val sessions = api.listSessions(conn, search = _searchQuery.value)
                     eventDispatcher.setSessions(serverId, sessions)
                 } else {
                     for (project in projects) {
                         try {
-                            val sessions = api.listSessions(conn, directory = project.worktree)
+                            val sessions = api.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
                             eventDispatcher.setSessions(serverId, sessions)
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed to refresh sessions for project ${project.displayName}: ${e.message}")
@@ -246,15 +275,11 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Sync session statuses from server via REST API.
-     * Batch-updates all session statuses so the session list shows correct
-     * busy/idle/retry states even after cold start or background recovery.
-     */
-    private suspend fun syncSessionStatusesFromServer() {
+    private suspend fun syncSessionStatuses(directory: String? = null) {
         try {
-            val result = api.fetchSessionStatus(conn)
+            val result = api.fetchSessionStatus(conn, directory = directory)
             result.onSuccess { statuses ->
+                if (BuildConfig.DEBUG) Log.d(TAG, "Polled ${statuses.size} session statuses for directory: ${directory ?: "all"}")
                 val statusMap = statuses.mapValues { (_, info) ->
                     when (info.type) {
                         "busy" -> SessionStatus.Busy
@@ -273,17 +298,7 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
-    fun createNewSession(directory: String? = null) {
-        viewModelScope.launch {
-            try {
-                val session = manageSessionUseCase.createSession(conn, directory = directory)
-                eventDispatcher.setSessions(serverId, listOf(session))
-                _navigateToSession.tryEmit(session.id)
-            } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to create session"
-            }
-        }
-    }
+    private suspend fun syncSessionStatusesFromServer() = syncSessionStatuses()
 
     fun deleteSession(sessionId: String) {
         viewModelScope.launch {
@@ -363,8 +378,36 @@ class SessionListViewModel @Inject constructor(
         val normalized = path.replace('\\', '/')
         _lastToggledDirectory.value = normalized
         _expandedPaths.update { paths ->
-            if (normalized in paths) paths - normalized else paths + normalized
+            if (normalized in paths) {
+                stopDirectoryPolling(normalized)
+                paths - normalized
+            } else {
+                startDirectoryPolling(normalized)
+                paths + normalized
+            }
         }
+    }
+
+    private fun startDirectoryPolling(path: String) {
+        pollingJobs[path]?.cancel()
+        if (BuildConfig.DEBUG) Log.d(TAG, "Start polling directory: $path")
+        pollingJobs[path] = viewModelScope.launch {
+            while (isActive) {
+                syncSessionStatuses(directory = path)
+                delay(5000L)
+            }
+        }
+    }
+
+    private fun stopDirectoryPolling(path: String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "Stop polling directory: $path")
+        pollingJobs.remove(path)?.cancel()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        pollingJobs.values.forEach { it.cancel() }
+        pollingJobs.clear()
     }
 
     fun setBaseDirectory(directory: String?) {
@@ -374,6 +417,82 @@ class SessionListViewModel @Inject constructor(
     }
 
     val currentBaseDirectory: String? get() = _baseDirectory.value
+
+    val searchQuery: String? get() = _searchQuery.value
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query.ifBlank { null }
+    }
+
+    fun clearSearchQuery() {
+        _searchQuery.value = null
+    }
+
+    val currentCursor: String? get() = _currentCursor.value
+    val hasMorePages: Boolean get() = _hasMorePages.value
+    val isLoadingMore: Boolean get() = _isLoadingMore.value
+
+    fun resetPagination() {
+        _currentCursor.value = null
+        _hasMorePages.value = true
+        _isLoadingMore.value = false
+    }
+
+    /**
+     * Load the next page of sessions using cursor-based pagination.
+     * Called by UI when user scrolls near the bottom of the session list.
+     */
+    fun loadMore() {
+        if (_isLoadingMore.value || !_hasMorePages.value) return
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            try {
+                val cursor = _currentCursor.value
+                val sessions = api.listSessions(
+                    conn,
+                    directory = _baseDirectory.value,
+                    search = _searchQuery.value,
+                    cursor = cursor,
+                    limit = 50
+                )
+                if (sessions.isNotEmpty()) {
+                    eventDispatcher.setSessions(serverId, sessions)
+                    _currentCursor.value = sessions.last().id
+                }
+                if (sessions.size < 50) {
+                    _hasMorePages.value = false
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load more sessions", e)
+            } finally {
+                _isLoadingMore.value = false
+            }
+        }
+    }
+
+    fun toggleArchivedFilter() {
+        _showArchived.value = !_showArchived.value
+        loadSessions()
+    }
+
+    /**
+     * Import a session from a share URL.
+     * On success, reload the session list.
+     */
+    fun importSession(shareUrl: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val session = manageSessionUseCase.importSession(conn, shareUrl)
+                if (BuildConfig.DEBUG) Log.d(TAG, "Imported session ${session.id}")
+                eventDispatcher.setSessions(serverId, listOf(session))
+                onResult(true)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to import session", e)
+                _error.value = e.message ?: "Failed to import session"
+                onResult(false)
+            }
+        }
+    }
 
     fun copyToClipboard(text: String, context: Context) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
