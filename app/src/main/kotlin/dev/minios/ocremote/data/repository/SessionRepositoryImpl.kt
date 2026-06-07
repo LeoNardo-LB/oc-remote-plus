@@ -196,4 +196,22 @@ class SessionRepositoryImpl @Inject constructor(
             ?: throw IllegalStateException("Server config not found: $serverId")
         return ServerConnection.from(config.url, config.username, config.password)
     }
+
+    // ============ Session Status Sync ============
+
+    override suspend fun fetchSessionStatuses(serverId: String, directory: String?): Result<Map<String, SessionStatus>> = runCatching {
+        val conn = resolveConnection(serverId)
+        val rawStatuses = api.fetchSessionStatus(conn, directory = directory).getOrThrow()
+        rawStatuses.mapValues { (_, info) ->
+            when (info.type) {
+                "busy" -> SessionStatus.Busy
+                "retry" -> SessionStatus.Retry(
+                    attempt = info.attempt ?: 0,
+                    message = info.message ?: "",
+                    next = info.next ?: 0L
+                )
+                else -> SessionStatus.Idle
+            }
+        }
+    }
 }

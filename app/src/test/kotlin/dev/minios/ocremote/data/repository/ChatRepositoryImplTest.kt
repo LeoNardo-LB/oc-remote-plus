@@ -2,6 +2,7 @@ package dev.minios.ocremote.data.repository
 
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.data.repository.PermissionAutoApprover
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.model.*
 import io.mockk.coEvery
@@ -18,6 +19,7 @@ class ChatRepositoryImplTest {
     private lateinit var api: OpenCodeApi
     private lateinit var eventDispatcher: EventDispatcher
     private lateinit var serverRepo: ServerDataStore
+    private lateinit var permissionAutoApprover: PermissionAutoApprover
     private lateinit var sessionHandler: SessionEventHandler
     private lateinit var messageHandler: MessageEventHandler
     private lateinit var permissionHandler: PermissionEventHandler
@@ -27,6 +29,7 @@ class ChatRepositoryImplTest {
     fun setup() {
         api = mockk(relaxed = true)
         serverRepo = mockk(relaxed = true)
+        permissionAutoApprover = mockk(relaxed = true)
         sessionHandler = SessionEventHandler()
         messageHandler = MessageEventHandler()
         permissionHandler = PermissionEventHandler()
@@ -41,7 +44,7 @@ class ChatRepositoryImplTest {
             miscHandler = miscHandler,
             sessionNextHandler = SessionNextEventHandler()
         )
-        repo = ChatRepositoryImpl(api, eventDispatcher, serverRepo)
+        repo = ChatRepositoryImpl(api, eventDispatcher, serverRepo, permissionAutoApprover)
     }
 
     // ============ getMessagesFlow ============

@@ -19,4 +19,10 @@ interface SettingsRepository {
      * Update the application settings.
      */
     suspend fun updateSettings(settings: AppSettings): Result<Unit>
+
+    /**
+     * Observe the set of hidden model keys for a server.
+     * Key format: "providerId:modelId".
+     */
+    fun hiddenModels(serverId: String): Flow<Set<String>>
 }

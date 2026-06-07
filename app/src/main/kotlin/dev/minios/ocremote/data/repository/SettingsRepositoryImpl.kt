@@ -21,6 +21,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override fun getSettingsFlow(): Flow<AppSettings> = dataRepo.appSettingsFlow
 
+    override fun hiddenModels(serverId: String): Flow<Set<String>> = dataRepo.hiddenModels(serverId)
+
     override suspend fun updateSettings(settings: AppSettings): Result<Unit> = runCatching {
         dataRepo.setAppLanguage(settings.appLanguage)
         dataRepo.setAppTheme(settings.appTheme)

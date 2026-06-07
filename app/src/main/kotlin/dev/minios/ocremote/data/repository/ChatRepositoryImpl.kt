@@ -37,7 +37,8 @@ import javax.inject.Singleton
 class ChatRepositoryImpl @Inject constructor(
     private val api: OpenCodeApi,
     private val eventDispatcher: EventDispatcher,
-    private val serverRepo: ServerDataStore
+    private val serverRepo: ServerDataStore,
+    private val permissionAutoApprover: PermissionAutoApprover
 ) : ChatRepository {
 
     private val toolExpandedStates = mutableMapOf<String, Boolean>()
@@ -372,4 +373,10 @@ class ChatRepositoryImpl @Inject constructor(
     private fun ModelSelection.toData() = DataModelSelection(
         providerId = providerId, modelId = modelId
     )
+
+    // ============ Permission Auto-Approve ============
+
+    override suspend fun addPermissionAutoApproveRule(rule: dev.minios.ocremote.domain.model.AutoApproveRule) {
+        permissionAutoApprover.addRule(rule)
+    }
 }

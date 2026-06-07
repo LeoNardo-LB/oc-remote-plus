@@ -23,8 +23,10 @@ import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.domain.model.Draft
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.domain.model.*
+import dev.minios.ocremote.domain.repository.ChatRepository
+import dev.minios.ocremote.domain.repository.SessionRepository
+import dev.minios.ocremote.domain.repository.SettingsRepository
 import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import dev.minios.ocremote.domain.usecase.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -215,11 +217,13 @@ class ChatViewModel @Inject constructor(
     private val draftUseCase: DraftUseCase,
     private val shareExportUseCase: ShareExportUseCase,
     private val undoRedoUseCase: UndoRedoUseCase,
-    private val settingsRepository: SettingsDataStore,
+    private val settingsRepository: SettingsRepository,
     // OpenCodeApi still needed for ServerTerminalRegistry (terminal subsystem)
+    // TODO: migrate terminal subsystem to use TerminalRepository exclusively
     private val api: OpenCodeApi,
     val toolCardResolver: ToolCardResolver,
-    private val permissionAutoApprover: dev.minios.ocremote.data.repository.PermissionAutoApprover,
+    private val chatRepository: ChatRepository,
+    private val sessionRepository: SessionRepository,
     private val messagePaging: MessagePaginationUseCase,
     private val tokenStatsTracker: TokenStatsTracker,
 ) : ViewModel() {
@@ -306,19 +310,19 @@ class ChatViewModel @Inject constructor(
     val confirmedFilePaths: StateFlow<Set<String>> = _confirmedFilePaths
 
     // ============ Settings (exposed for ChatScreen) ============
-    val chatFontSize = settingsRepository.chatFontSize.stateIn(
+    val chatFontSize = settingsRepository.getSettingsFlow().map { it.chatFontSize }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), "medium"
     )
-    val codeWordWrap = settingsRepository.codeWordWrap.stateIn(
+    val codeWordWrap = settingsRepository.getSettingsFlow().map { it.codeWordWrap }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    val confirmBeforeSend = settingsRepository.confirmBeforeSend.stateIn(
+    val confirmBeforeSend = settingsRepository.getSettingsFlow().map { it.confirmBeforeSend }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    val compactMessages = settingsRepository.compactMessages.stateIn(
+    val compactMessages = settingsRepository.getSettingsFlow().map { it.compactMessages }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    val collapseTools = settingsRepository.collapseTools.stateIn(
+    val collapseTools = settingsRepository.getSettingsFlow().map { it.collapseTools }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
 
@@ -363,22 +367,22 @@ class ChatViewModel @Inject constructor(
         savedScrollOffset = offset
         scrollRestoreVersion++
     }
-    val expandReasoning = settingsRepository.expandReasoning.stateIn(
+    val expandReasoning = settingsRepository.getSettingsFlow().map { it.expandReasoning }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    val hapticFeedback = settingsRepository.hapticFeedback.stateIn(
+    val hapticFeedback = settingsRepository.getSettingsFlow().map { it.hapticFeedback }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), true
     )
-    val keepScreenOn = settingsRepository.keepScreenOn.stateIn(
+    val keepScreenOn = settingsRepository.getSettingsFlow().map { it.keepScreenOn }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    val compressImageAttachments = settingsRepository.compressImageAttachments.stateIn(
+    val compressImageAttachments = settingsRepository.getSettingsFlow().map { it.compressImageAttachments }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), true
     )
-    val imageAttachmentMaxLongSide = settingsRepository.imageAttachmentMaxLongSide.stateIn(
+    val imageAttachmentMaxLongSide = settingsRepository.getSettingsFlow().map { it.imageAttachmentMaxLongSide }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 1440
     )
-    val imageAttachmentWebpQuality = settingsRepository.imageAttachmentWebpQuality.stateIn(
+    val imageAttachmentWebpQuality = settingsRepository.getSettingsFlow().map { it.imageAttachmentWebpQuality }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 60
     )
     // ============ Pagination ============
@@ -823,7 +827,7 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            settingsRepository.terminalFontSize.collect { size ->
+            settingsRepository.getSettingsFlow().map { it.terminalFontSize }.collect { size ->
                 terminalWorkspace.setDefaultFontSize(size)
             }
         }
@@ -831,7 +835,7 @@ class ChatViewModel @Inject constructor(
         // Load initial message count from settings, then load data
         if (!isNewSession) {
             viewModelScope.launch {
-                currentMessageLimit = settingsRepository.initialMessageCount.first()
+                currentMessageLimit = settingsRepository.getSettingsFlow().map { it.initialMessageCount }.first()
                 try {
                     loadSession()
                 } catch (e: Exception) {
@@ -947,20 +951,9 @@ class ChatViewModel @Inject constructor(
      */
     fun syncSessionStatus() {
         viewModelScope.launch {
-            val result = api.fetchSessionStatus(conn, directory = sessionDirectory)
-            result.onSuccess { statuses ->
+            val result = sessionRepository.fetchSessionStatuses(serverId, directory = sessionDirectory)
+            result.onSuccess { statusMap ->
                 // Batch-update ALL session statuses (one REST call, all sessions)
-                val statusMap = statuses.mapValues { (_, info) ->
-                    when (info.type) {
-                        "busy" -> SessionStatus.Busy
-                        "retry" -> SessionStatus.Retry(
-                            attempt = info.attempt ?: 0,
-                            message = info.message ?: "",
-                            next = info.next ?: 0L
-                        )
-                        else -> SessionStatus.Idle
-                    }
-                }
                 eventDispatcher.syncAllSessionStatuses(statusMap)
 
                 // Only mark current session as idle if REST explicitly confirmed it's idle.
@@ -1479,7 +1472,7 @@ class ChatViewModel @Inject constructor(
                 sessionId = null,
                 directoryPattern = directory
             )
-            permissionAutoApprover.addRule(rule)
+            chatRepository.addPermissionAutoApproveRule(rule)
         }
     }
 

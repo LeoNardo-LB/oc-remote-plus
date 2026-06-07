@@ -49,4 +49,5 @@ abstract class DomainModule {
 
     @Binds
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
 }

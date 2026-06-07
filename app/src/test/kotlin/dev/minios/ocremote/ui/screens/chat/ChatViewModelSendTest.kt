@@ -3,11 +3,13 @@ package dev.minios.ocremote.ui.screens.chat
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.api.OpenCodeApi
+import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.PermissionAutoApprover
-import dev.minios.ocremote.data.repository.SettingsDataStore
 import dev.minios.ocremote.data.repository.handler.*
+import dev.minios.ocremote.domain.repository.ChatRepository
+import dev.minios.ocremote.domain.repository.SessionRepository
+import dev.minios.ocremote.domain.repository.SettingsRepository
 import dev.minios.ocremote.domain.usecase.*
 import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import io.mockk.*
@@ -33,7 +35,7 @@ class ChatViewModelSendTest {
 
     private lateinit var eventDispatcher: EventDispatcher
     private val api: OpenCodeApi = mockk(relaxed = true)
-    private val settingsRepository: SettingsDataStore = mockk()
+    private val settingsRepository: SettingsRepository = mockk()
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private val sendMessageUseCase: SendMessageUseCase = mockk()
@@ -71,19 +73,23 @@ class ChatViewModelSendTest {
         every { draftUseCase.getDraft(any()) } returns null
 
         every { settingsRepository.hiddenModels(any()) } returns flowOf(emptySet())
-        every { settingsRepository.terminalFontSize } returns flowOf(13f)
-        every { settingsRepository.initialMessageCount } returns flowOf(50)
-        every { settingsRepository.chatFontSize } returns flowOf("medium")
-        every { settingsRepository.codeWordWrap } returns flowOf(false)
-        every { settingsRepository.confirmBeforeSend } returns flowOf(false)
-        every { settingsRepository.compactMessages } returns flowOf(false)
-        every { settingsRepository.collapseTools } returns flowOf(false)
-        every { settingsRepository.expandReasoning } returns flowOf(false)
-        every { settingsRepository.hapticFeedback } returns flowOf(true)
-        every { settingsRepository.keepScreenOn } returns flowOf(false)
-        every { settingsRepository.compressImageAttachments } returns flowOf(true)
-        every { settingsRepository.imageAttachmentMaxLongSide } returns flowOf(1440)
-        every { settingsRepository.imageAttachmentWebpQuality } returns flowOf(60)
+        every { settingsRepository.getSettingsFlow() } returns flowOf(
+            AppSettings(
+                terminalFontSize = 13f,
+                initialMessageCount = 50,
+                chatFontSize = "medium",
+                codeWordWrap = false,
+                confirmBeforeSend = false,
+                compactMessages = false,
+                collapseTools = false,
+                expandReasoning = false,
+                hapticFeedback = true,
+                keepScreenOn = false,
+                compressImageAttachments = true,
+                imageAttachmentMaxLongSide = 1440,
+                imageAttachmentWebpQuality = 60,
+            )
+        )
 
         coEvery { manageSessionUseCase.getSession(any(), any()) } returns createTestSession()
         coEvery { manageSessionUseCase.listMessages(any(), any(), any()) } returns emptyList()
@@ -135,8 +141,9 @@ class ChatViewModelSendTest {
             undoRedoUseCase = undoRedoUseCase,
             settingsRepository = settingsRepository,
             api = api,
-            permissionAutoApprover = mockk<PermissionAutoApprover>(relaxed = true),
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
+            chatRepository = mockk<ChatRepository>(relaxed = true),
+            sessionRepository = mockk<SessionRepository>(relaxed = true),
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker
         )

@@ -132,4 +132,13 @@ interface SessionRepository {
      * List messages in a session.
      */
     suspend fun listMessages(serverId: String, sessionId: String, limit: Int): Result<List<MessageWithParts>>
+
+    // ============ Session Status Sync ============
+
+    /**
+     * Fetch all session statuses from the server via REST.
+     * Used as a fallback when SSE events may have been missed.
+     * @return Map of sessionId → [SessionStatus].
+     */
+    suspend fun fetchSessionStatuses(serverId: String, directory: String? = null): Result<Map<String, SessionStatus>>
 }

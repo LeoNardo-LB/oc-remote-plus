@@ -1,5 +1,6 @@
 package dev.minios.ocremote.domain.repository
 
+import dev.minios.ocremote.domain.model.AutoApproveRule
 import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.ModelSelection
@@ -191,4 +192,11 @@ interface ChatRepository {
      * Set the expanded state for a specific tool card.
      */
     fun setToolExpanded(toolId: String, expanded: Boolean)
+
+    // ============ Permission Auto-Approve ============
+
+    /**
+     * Persist a new permission auto-approve rule (user chose "always approve").
+     */
+    suspend fun addPermissionAutoApproveRule(rule: AutoApproveRule)
 }
