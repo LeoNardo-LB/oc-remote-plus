@@ -9,6 +9,7 @@ import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.data.api.SseReadTimeoutTracker
 import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.model.SseEvent

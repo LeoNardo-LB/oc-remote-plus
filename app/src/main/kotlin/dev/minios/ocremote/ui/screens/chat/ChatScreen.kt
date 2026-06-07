@@ -136,9 +136,8 @@ import coil3.compose.AsyncImage
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.model.AgentInfo
 import dev.minios.ocremote.domain.model.CommandInfo
-import dev.minios.ocremote.data.dto.request.PromptPart
-import dev.minios.ocremote.data.dto.response.ProviderInfo
-import dev.minios.ocremote.data.dto.response.ProviderModel
+import dev.minios.ocremote.domain.model.ModelCatalog
+import dev.minios.ocremote.domain.model.ProviderCatalog
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.coroutines.channels.Channel
@@ -265,7 +264,8 @@ fun ChatScreen(
     val sessionMeta by viewModel.sessionMetaState.collectAsStateWithLifecycle()
     val interaction by viewModel.interactionState.collectAsStateWithLifecycle()
     val tokenStats by viewModel.tokenStatsState.collectAsStateWithLifecycle()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val modelConfig by viewModel.modelConfigState.collectAsStateWithLifecycle()
+    val restoredDraft by viewModel.restoredDraftState.collectAsStateWithLifecycle()
     val draftText by viewModel.draftText.collectAsStateWithLifecycle()
     val draftAttachmentUris by viewModel.draftAttachmentUris.collectAsStateWithLifecycle()
     var inputText by remember { mutableStateOf(TextFieldValue("")) }
@@ -607,10 +607,10 @@ fun ChatScreen(
             if (sessionMeta.sessionParentId == null && !isTerminalMode &&
                 (messageState.messages.isNotEmpty() || !interaction.isLoading) && interaction.error == null
             ) {
-                val modelLabel = if (uiState.selectedModelId != null && uiState.providers.isNotEmpty()) {
-                    val provider = uiState.providers.find { it.id == uiState.selectedProviderId }
-                    val model = provider?.models?.get(uiState.selectedModelId)
-                    model?.name ?: uiState.selectedModelId ?: ""
+                val modelLabel = if (modelConfig.selectedModelId != null && modelConfig.providers.isNotEmpty()) {
+                    val provider = modelConfig.providers.find { it.id == modelConfig.selectedProviderId }
+                    val model = provider?.models?.get(modelConfig.selectedModelId)
+                    model?.name ?: modelConfig.selectedModelId ?: ""
                 } else ""
                 Column(
                     modifier = Modifier
@@ -787,15 +787,15 @@ fun ChatScreen(
                             attachmentHandler.requestSaveImage(bytes, mime, filename)
                         },
                         modelLabel = modelLabel,
-                        selectedProviderId = uiState.selectedProviderId,
+                        selectedProviderId = modelConfig.selectedProviderId,
                         onModelClick = { showModelPicker = true },
-                        agents = uiState.agents,
-                        selectedAgent = uiState.selectedAgent,
+                        agents = modelConfig.agents,
+                        selectedAgent = modelConfig.selectedAgent,
                         onAgentSelect = { viewModel.selectAgent(it) },
-                        variantNames = uiState.variantNames,
-                        selectedVariant = uiState.selectedVariant,
+                        variantNames = modelConfig.variantNames,
+                        selectedVariant = modelConfig.selectedVariant,
                         onCycleVariant = { viewModel.cycleVariant() },
-                        commands = uiState.commands,
+                        commands = modelConfig.commands,
                         fileSearchResults = fileSearchResults,
                         confirmedFilePaths = confirmedFilePaths,
                         onFileSelected = { path ->
@@ -910,7 +910,7 @@ fun ChatScreen(
 
                         },
                         onStop = { viewModel.abortSession() },
-                        restoredDraft = uiState.restoredDraft,
+                        restoredDraft = restoredDraft,
                         onConsumeRestoredDraft = { viewModel.consumeRestoredDraft() }
                     )
                 }
@@ -1024,9 +1024,9 @@ fun ChatScreen(
     // Model picker dialog
     if (showModelPicker) {
         ModelPickerDialog(
-            providers = uiState.providers,
-            selectedProviderId = uiState.selectedProviderId,
-            selectedModelId = uiState.selectedModelId,
+            providers = modelConfig.providers,
+            selectedProviderId = modelConfig.selectedProviderId,
+            selectedModelId = modelConfig.selectedModelId,
             onSelect = { providerId, modelId ->
                 viewModel.selectModel(providerId, modelId)
             },

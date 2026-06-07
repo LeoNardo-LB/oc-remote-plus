@@ -1,12 +1,14 @@
 package dev.minios.ocremote.domain.repository
 
 import dev.minios.ocremote.domain.model.ProviderInfo
+import dev.minios.ocremote.domain.model.ProvidersResponse
 
 /**
  * Provider/model management for a connected server.
  */
 interface ProviderRepository {
     suspend fun loadProviders(serverId: String): Result<List<ProviderInfo>>
+    suspend fun loadProviderCatalog(serverId: String): Result<ProvidersResponse>
     suspend fun setProviderEnabled(serverId: String, providerId: String, enabled: Boolean): Result<Unit>
     suspend fun connectProviderApi(serverId: String, providerId: String, apiKey: String): Result<Unit>
     suspend fun disconnectProvider(serverId: String, providerId: String): Result<Unit>

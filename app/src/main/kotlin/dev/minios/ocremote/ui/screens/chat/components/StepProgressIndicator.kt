@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.data.repository.handler.StepProgressInfo
+import dev.minios.ocremote.domain.model.StepProgressInfo
 import dev.minios.ocremote.ui.theme.AlphaTokens
 
 /**

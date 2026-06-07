@@ -13,12 +13,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.minios.ocremote.domain.model.AgentInfo
 import dev.minios.ocremote.domain.model.CommandInfo
-import dev.minios.ocremote.data.dto.common.ModelSelection
+import dev.minios.ocremote.domain.model.ModelSelection
+import dev.minios.ocremote.domain.model.PromptPart
+import dev.minios.ocremote.domain.model.ProviderCatalog
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.ui.navigation.routes.ChatNav
 import dev.minios.ocremote.ui.screens.chat.tools.ToolCardResolver
-import dev.minios.ocremote.data.dto.request.PromptPart
-import dev.minios.ocremote.data.dto.response.ProviderInfo
 import dev.minios.ocremote.data.api.ServerConnection
 import dev.minios.ocremote.domain.model.Draft
 import dev.minios.ocremote.domain.repository.DraftRepository
@@ -109,6 +109,27 @@ data class TokenStatsState(
     val lastContextTokens: Int = 0,
 )
 
+/**
+ * Split state: model/agent configuration and resolved selections.
+ * Changes on provider loads, user selection, or message history updates (for auto-resolution).
+ * Contains side-effect logic for model/agent resolution from message history.
+ */
+@Immutable
+data class ModelConfigState(
+    val providers: List<ProviderCatalog> = emptyList(),
+    val hasServerModelCatalog: Boolean = false,
+    val defaultModels: Map<String, String> = emptyMap(),
+    val selectedProviderId: String? = null,
+    val selectedModelId: String? = null,
+    val agents: List<AgentInfo> = emptyList(),
+    val selectedAgent: String = "build",
+    val variantNames: List<String> = emptyList(),
+    val selectedVariant: String? = null,
+    val commands: List<CommandInfo> = emptyList(),
+    /** Context window size — resolved from token stats with provider fallback. */
+    val contextWindow: Int = 0,
+)
+
 data class ChatUiState(
     val sessionTitle: String = "",
     val serverName: String = "",
@@ -121,7 +142,7 @@ data class ChatUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val isSending: Boolean = false,
-    val providers: List<ProviderInfo> = emptyList(),
+    val providers: List<ProviderCatalog> = emptyList(),
     val hasServerModelCatalog: Boolean = false,
     val defaultModels: Map<String, String> = emptyMap(),
     val selectedProviderId: String? = null,
@@ -234,8 +255,8 @@ class ChatViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(true)
     private val _error = MutableStateFlow<String?>(null)
     private val _isSending = MutableStateFlow(false)
-    private val _allProviders = MutableStateFlow<List<ProviderInfo>>(emptyList())
-    private val _providers = MutableStateFlow<List<ProviderInfo>>(emptyList())
+    private val _allProviders = MutableStateFlow<List<ProviderCatalog>>(emptyList())
+    private val _providers = MutableStateFlow<List<ProviderCatalog>>(emptyList())
     private val _hiddenModels = MutableStateFlow<Set<String>>(emptySet())
     private val _defaultModels = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _selectedProviderId = MutableStateFlow<String?>(null)
@@ -368,112 +389,60 @@ class ChatViewModel @Inject constructor(
     /** Whether a "load older" request is in flight. */
     private val _isLoadingOlder = MutableStateFlow(false)
 
-    val uiState: StateFlow<ChatUiState> = combine(
-        eventDispatcher.sessions,
-        messagePaging.observeMessages(sessionId),
-        eventDispatcher.parts,
-        eventDispatcher.sessionStatuses,
-        eventDispatcher.permissions,
-        eventDispatcher.questions,
-        _isLoading,
-        _error,
-        _isSending,
-        _selectedProviderId,
-        _selectedModelId,
+    // ============ Model/Agent Config State (with resolution side effects) ============
+
+    /**
+     * Model and agent configuration — providers, agents, model/agent selection, variants.
+     * Performs side effects: model/agent resolution from message history, model caching,
+     * and sync-back to raw StateFlows so sendParts()/runShellCommand() use consistent values.
+     */
+    val modelConfigState: StateFlow<ModelConfigState> = combine(
         _allProviders,
         _providers,
         _defaultModels,
+        _selectedProviderId,
+        _selectedModelId,
         _agents,
         _selectedAgent,
         _selectedVariant,
         _commands,
-        _hasOlderMessages,
-        _isLoadingOlder,
-        _toolExpandedStates,
-        eventDispatcher.currentAgent,
-        eventDispatcher.currentModel,
-        _pendingMessageIds,
-        _restoredDraft,
-        tokenStatsTracker.stats
+        messagePaging.observeMessages(sessionId),
+        eventDispatcher.sessions,
+        tokenStatsTracker.stats,
     ) { args ->
+        val allProviders = args[0] as List<ProviderCatalog>
+        val providers = args[1] as List<ProviderCatalog>
+        val defaultModels = args[2] as Map<String, String>
+        val selProviderId = args[3] as String?
+        val selModelId = args[4] as String?
+        val agents = args[5] as List<AgentInfo>
         @Suppress("UNCHECKED_CAST")
-        val allSessions = args[0] as List<Session>
-        val sessionMessages = args[1] as List<Message>
-        val allParts = args[2] as Map<String, List<Part>>
-        val statuses = args[3] as Map<String, SessionStatus>
-        // args[4] = permissions (used via eventDispatcher.getPermissionsWithChildren)
-        // args[5] = questions (used via eventDispatcher.getQuestionsWithChildren)
-        val loading = args[6] as Boolean
-        val error = args[7] as String?
-        val sending = args[8] as Boolean
-        val selProviderId = args[9] as String?
-        val selModelId = args[10] as String?
-        val allProviders = args[11] as List<ProviderInfo>
-        val providers = args[12] as List<ProviderInfo>
-        val defaultModels = args[13] as Map<String, String>
-        val agents = args[14] as List<AgentInfo>
-        @Suppress("UNCHECKED_CAST")
-        val agentSelection = args[15] as Pair<String, Boolean>
+        val agentSelection = args[6] as Pair<String, Boolean>
         val selectedAgent = agentSelection.first
         val isAgentExplicitlySelected = agentSelection.second
-        val selectedVariant = args[16] as String?
-        val commands = args[17] as List<CommandInfo>
-        val hasOlderMessages = args[18] as Boolean
-        val isLoadingOlder = args[19] as Boolean
+        val selectedVariant = args[7] as String?
+        val commands = args[8] as List<CommandInfo>
+        val sessionMessages = args[9] as List<Message>
         @Suppress("UNCHECKED_CAST")
-        val toolExpandedStates = args[20] as Map<String, Boolean>
-        @Suppress("UNCHECKED_CAST")
-        val currentAgentMap = args[21] as Map<String, String>
-        @Suppress("UNCHECKED_CAST")
-        val currentModelMap = args[22] as Map<String, Pair<String, String>>
-        @Suppress("UNCHECKED_CAST")
-        val pendingMessageIds = args[23] as Set<String>
-        val restoredDraft = args[24] as RevertedDraftPayload?
-        val tokenStats = args[25] as TokenStatsTracker.TokenStats
-
-        val session = allSessions.find { it.id == sessionId }
-        val revertState = session?.revert
-
-        // While the REST call is still loading, suppress SSE-only messages to prevent
-        // showing a flash of partial data (e.g., 1-2 messages from SSE when opening via
-        // notification deep-link before the full history arrives).
-        val chatMessages = if (loading && sessionMessages.size < 3) {
-            // Likely only SSE-provided messages; wait for REST to complete
-            emptyList()
-        } else {
-            val sorted = sessionMessages.sortedBy { it.time.created }
-            // Filter out reverted messages (at or after revert point)
-            val visible = if (revertState != null) {
-                sorted.filter { it.id < revertState.messageId }
-            } else {
-                sorted
-            }
-            visible.map { msg ->
-                ChatMessage(
-                    message = msg,
-                    parts = allParts[msg.id] ?: emptyList()
-                )
-            }
-        }
+        val allSessions = args[10] as List<Session>
+        val tokenStats = args[11] as TokenStatsTracker.TokenStats
 
         // Resolve model: explicit selection > last user message's model > provider default
         var effectiveProviderId = selProviderId
         var effectiveModelId = selModelId
 
-        // If no explicit selection, try to resolve from history
         if (!isModelExplicitlySelected) {
-             val lastUserWithModel = sessionMessages
+            val lastUserWithModel = sessionMessages
                 .filterIsInstance<Message.User>()
                 .lastOrNull { it.model != null }
-             if (lastUserWithModel?.model != null) {
-                 effectiveProviderId = lastUserWithModel.model.providerId
-                 effectiveModelId = lastUserWithModel.model.modelId
-             } else if (effectiveModelId == null && defaultModels.isNotEmpty()) {
-                 // Fallback to default if nothing in history and nothing selected
-                 val entry = defaultModels.entries.first()
-                 effectiveProviderId = entry.key
-                 effectiveModelId = entry.value
-             }
+            if (lastUserWithModel?.model != null) {
+                effectiveProviderId = lastUserWithModel.model.providerId
+                effectiveModelId = lastUserWithModel.model.modelId
+            } else if (effectiveModelId == null && defaultModels.isNotEmpty()) {
+                val entry = defaultModels.entries.first()
+                effectiveProviderId = entry.key
+                effectiveModelId = entry.value
+            }
         }
 
         // Resolve agent from last user message if not explicitly changed
@@ -492,15 +461,13 @@ class ChatViewModel @Inject constructor(
             _selectedAgent.value = effectiveAgent to false
         }
 
-        // Keep model StateFlows in sync with the effective model,
-        // mirroring the agent sync logic above.
+        // Keep model StateFlows in sync with the effective model
         if ((effectiveProviderId != selProviderId || effectiveModelId != selModelId) && !isModelExplicitlySelected) {
             _selectedProviderId.value = effectiveProviderId
             _selectedModelId.value = effectiveModelId
         }
 
         // Resolve available variants for the currently selected model.
-        // If selected model is no longer visible (filtered out), fall back to first visible model.
         var currentModel = if (effectiveProviderId != null && effectiveModelId != null) {
             providers.find { it.id == effectiveProviderId }
                 ?.models?.get(effectiveModelId)
@@ -514,89 +481,50 @@ class ChatViewModel @Inject constructor(
                 currentModel = firstModel
             }
         }
-        val availableVariants = currentModel?.variants?.keys?.toList()?.sorted() ?: emptyList()
+        val availableVariants = currentModel?.variantNames?.sorted() ?: emptyList()
 
-        // Persist the resolved model to the in-memory cache so it survives
-        // session switching (ViewModel recreation).  This runs on every
-        // combine emission but is cheap (Map.put).
+        // Persist the resolved model to the in-memory cache
         if (effectiveProviderId != null && effectiveModelId != null) {
             sessionModelCache[sessionId] = effectiveProviderId to effectiveModelId
         }
 
-        // Compute queued message IDs: messages sent while assistant is still generating
-        // Ascending order (oldest-first): indexOfLast finds the most recent pending assistant,
-        // then drop(index+1) collects user messages after it (i.e. queued for later processing).
-        val pendingAssistantIndex = chatMessages.indexOfLast {
-            it.message is Message.Assistant && it.message.time.completed == null
-        }
-        val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-            chatMessages.drop(pendingAssistantIndex + 1)
-                .filter { it.isUser }
-                .map { it.message.id }
-                .toSet()
-        } else {
-            emptySet<String>()
+        // Resolve context window with fallback to provider model info
+        val session = allSessions.find { it.id == sessionId }
+        val contextWindow = tokenStats.contextWindow.let { cw ->
+            if (cw > 0) cw else session?.model?.let { sm ->
+                providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.contextWindow
+            } ?: currentModel?.contextWindow ?: 0
         }
 
-        val messageCount = chatMessages.size
-
-        ChatUiState(
-            sessionTitle = session?.title ?: "",
-            serverName = serverName,
-            messages = chatMessages,
-            messageCount = messageCount,
-            revert = revertState,
-            sessionStatus = statuses[sessionId] ?: SessionStatus.Idle,
-            pendingPermissions = eventDispatcher.getPermissionsWithChildren(sessionId, allSessions),
-            pendingQuestions = eventDispatcher.getQuestionsWithChildren(sessionId, allSessions),
-            isLoading = loading,
-            error = error,
-            isSending = sending,
+        ModelConfigState(
             providers = providers,
             hasServerModelCatalog = allProviders.any { it.models.isNotEmpty() },
             defaultModels = defaultModels,
             selectedProviderId = effectiveProviderId,
             selectedModelId = effectiveModelId,
-            totalCost = tokenStats.totalCost,
-            totalInputTokens = tokenStats.totalInputTokens,
-            totalOutputTokens = tokenStats.totalOutputTokens,
-            totalReasoningTokens = tokenStats.totalReasoningTokens,
-            totalCacheReadTokens = tokenStats.totalCacheReadTokens,
-            totalCacheWriteTokens = tokenStats.totalCacheWriteTokens,
             agents = agents.filter { it.mode != "subagent" && !it.hidden },
             selectedAgent = effectiveAgent,
             variantNames = availableVariants,
             selectedVariant = if (selectedVariant != null && selectedVariant in availableVariants) selectedVariant else null,
             commands = commands,
-            hasOlderMessages = hasOlderMessages,
-            isLoadingOlder = isLoadingOlder,
-            shareUrl = session?.share?.url,
-            contextWindow = tokenStats.contextWindow.let { cw ->
-                if (cw > 0) cw else session?.model?.let { sm ->
-                    providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.limit?.context
-                } ?: currentModel?.limit?.context ?: 0
-            },
-            lastContextTokens = tokenStats.lastContextTokens,
-            queuedMessageIds = queuedMessageIds,
-            sessionParentId = session?.parentId,
-            sessionAgent = session?.agent,
-            currentAgentName = currentAgentMap[sessionId],
-            currentModelId = currentModelMap[sessionId]?.second,
-            toolExpandedStates = toolExpandedStates,
-            pendingMessageIds = pendingMessageIds,
-            restoredDraft = restoredDraft
+            contextWindow = contextWindow,
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ChatUiState()
+        ModelConfigState()
     )
+
+    /** Expose restored draft as StateFlow for ChatScreen consumption. */
+    val restoredDraftState: StateFlow<RevertedDraftPayload?> = _restoredDraft
+
+    // NOTE: Legacy uiState is declared after the 5 split StateFlows below (needs forward references).
 
     // ============ Split State Flows (independent combines for fine-grained recomposition) ============
 
     /**
      * Message list state — changes on every message/part/update.
-     * Independent from the main [uiState] combine to limit recomposition scope.
+     * Independent from other combines to limit recomposition scope.
      */
     val messageListState: StateFlow<MessageListState> = combine(
         eventDispatcher.sessions,
@@ -753,6 +681,77 @@ class ChatViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         TokenStatsState()
+    )
+
+    /**
+     * Legacy uiState for backward compatibility (tests).
+     * Lightweight assembly from the 5 split StateFlows — no business logic.
+     */
+    val uiState: StateFlow<ChatUiState> = combine(
+        messageListState,
+        sessionMetaState,
+        interactionState,
+        tokenStatsState,
+        modelConfigState,
+        _restoredDraft,
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        val msgList = args[0] as MessageListState
+        @Suppress("UNCHECKED_CAST")
+        val sessMeta = args[1] as SessionMetaState
+        @Suppress("UNCHECKED_CAST")
+        val inter = args[2] as InteractionState
+        @Suppress("UNCHECKED_CAST")
+        val tokens = args[3] as TokenStatsState
+        @Suppress("UNCHECKED_CAST")
+        val modelCfg = args[4] as ModelConfigState
+        val restoredDraft = args[5] as RevertedDraftPayload?
+        ChatUiState(
+            sessionTitle = sessMeta.sessionTitle,
+            serverName = sessMeta.serverName,
+            messages = msgList.messages,
+            messageCount = msgList.messageCount,
+            revert = sessMeta.revert,
+            sessionStatus = sessMeta.sessionStatus,
+            pendingPermissions = inter.pendingPermissions,
+            pendingQuestions = inter.pendingQuestions,
+            isLoading = inter.isLoading,
+            error = inter.error,
+            isSending = inter.isSending,
+            providers = modelCfg.providers,
+            hasServerModelCatalog = modelCfg.hasServerModelCatalog,
+            defaultModels = modelCfg.defaultModels,
+            selectedProviderId = modelCfg.selectedProviderId,
+            selectedModelId = modelCfg.selectedModelId,
+            totalCost = tokens.totalCost,
+            totalInputTokens = tokens.totalInputTokens,
+            totalOutputTokens = tokens.totalOutputTokens,
+            totalReasoningTokens = tokens.totalReasoningTokens,
+            totalCacheReadTokens = tokens.totalCacheReadTokens,
+            totalCacheWriteTokens = tokens.totalCacheWriteTokens,
+            agents = modelCfg.agents,
+            selectedAgent = modelCfg.selectedAgent,
+            variantNames = modelCfg.variantNames,
+            selectedVariant = modelCfg.selectedVariant,
+            commands = modelCfg.commands,
+            hasOlderMessages = msgList.hasOlderMessages,
+            isLoadingOlder = msgList.isLoadingOlder,
+            shareUrl = sessMeta.shareUrl,
+            contextWindow = modelCfg.contextWindow,
+            lastContextTokens = tokens.lastContextTokens,
+            queuedMessageIds = msgList.queuedMessageIds,
+            sessionParentId = sessMeta.sessionParentId,
+            sessionAgent = sessMeta.sessionAgent,
+            currentAgentName = sessMeta.currentAgentName,
+            currentModelId = sessMeta.currentModelId,
+            toolExpandedStates = msgList.toolExpandedStates,
+            pendingMessageIds = msgList.pendingMessageIds,
+            restoredDraft = restoredDraft,
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        ChatUiState()
     )
 
     init {
@@ -1171,8 +1170,7 @@ class ChatViewModel @Inject constructor(
      * Cycles: none -> first -> second -> ... -> last -> none (default).
      */
     fun cycleVariant() {
-        val state = uiState.value
-        val variants = state.variantNames
+        val variants = modelConfigState.value.variantNames
         if (variants.isEmpty()) return
         val current = _selectedVariant.value
         if (current == null || current !in variants) {
@@ -1404,7 +1402,7 @@ class ChatViewModel @Inject constructor(
                     sessionId = currentSessionId,
                     parts = parts,
                     model = model,
-                    agent = uiState.value.selectedAgent,
+                    agent = modelConfigState.value.selectedAgent,
                     variant = _selectedVariant.value,
                     directory = sessionDirectory
                 )
@@ -1587,9 +1585,9 @@ class ChatViewModel @Inject constructor(
     fun compactSession(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                val state = uiState.value
-                val providerId = state.selectedProviderId
-                val modelId = state.selectedModelId
+                val config = modelConfigState.value
+                val providerId = config.selectedProviderId
+                val modelId = config.selectedModelId
                 if (providerId == null || modelId == null) {
                     Log.e(TAG, "Cannot compact: no model selected")
                     onResult(false)
@@ -1674,7 +1672,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Find the last user message (before any existing revert point)
-                val messages = uiState.value.messages
+                val messages = messageListState.value.messages
                 val lastUser = messages.firstOrNull { it.isUser }
                 if (lastUser == null) {
                     onResult(false)
@@ -1698,7 +1696,7 @@ class ChatViewModel @Inject constructor(
             try {
                 undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
-                val targetMessage = uiState.value.messages
+                val targetMessage = messageListState.value.messages
                     .firstOrNull { it.message.id == messageId && it.isUser }
                 val fallbackPayload = RevertedDraftPayload(text = revertedText.orEmpty())
                 restoreRevertedDraft(targetMessage?.let { extractRevertedDraft(it) } ?: fallbackPayload)
@@ -1890,7 +1888,7 @@ class ChatViewModel @Inject constructor(
                     serverId = serverId,
                     sessionId = sessionId,
                     command = trimmed,
-                    agent = uiState.value.selectedAgent,
+                    agent = modelConfigState.value.selectedAgent,
                     model = model,
                     directory = sessionDirectory
                 )
@@ -1964,7 +1962,7 @@ class ChatViewModel @Inject constructor(
 
     /** Get the last assistant message text for copying. */
     fun getLastAssistantText(): String? {
-        val msgs = uiState.value.messages
+        val msgs = messageListState.value.messages
         val last = msgs.firstOrNull { it.isAssistant } ?: return null
         return last.parts
             .filterIsInstance<Part.Text>()

@@ -13,6 +13,6 @@ class PermissionHandlerUseCase @Inject constructor(
 
     suspend fun respond(serverId: String, permissionId: String, approved: Boolean, message: String?): Result<Boolean> {
         val reply = if (approved) "allow" else "deny"
-        return chatRepository.respondPermission(serverId, permissionId, reply, null)
+        return chatRepository.respondPermission(serverId, permissionId, reply, message)
     }
 }

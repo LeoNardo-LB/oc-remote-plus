@@ -83,7 +83,7 @@ import coil3.compose.AsyncImage
  import dev.minios.ocremote.R
  import dev.minios.ocremote.domain.model.AgentInfo
  import dev.minios.ocremote.domain.model.CommandInfo
-import dev.minios.ocremote.data.dto.request.PromptPart
+import dev.minios.ocremote.domain.model.PromptPart
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage

@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import dev.minios.ocremote.R
-import dev.minios.ocremote.data.repository.handler.CompactionStateInfo
+import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.AppMotion
 

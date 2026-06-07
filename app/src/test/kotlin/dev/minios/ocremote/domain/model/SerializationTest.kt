@@ -1,9 +1,27 @@
 package dev.minios.ocremote.domain.model
 
 import dev.minios.ocremote.data.api.ServerConnection
-import dev.minios.ocremote.data.dto.common.*
-import dev.minios.ocremote.data.dto.request.*
-import dev.minios.ocremote.data.dto.response.*
+import dev.minios.ocremote.data.dto.common.ModelSelection as DtoModelSelection
+import dev.minios.ocremote.data.dto.request.PromptPart as DtoPromptPart
+import dev.minios.ocremote.data.dto.request.PromptRequest
+import dev.minios.ocremote.data.dto.request.QuestionReplyBody
+import dev.minios.ocremote.data.dto.request.ServerConfigPatch
+import dev.minios.ocremote.data.dto.response.ModelCapabilities
+import dev.minios.ocremote.data.dto.response.ModelCost
+import dev.minios.ocremote.data.dto.response.ModelLimit
+import dev.minios.ocremote.data.dto.response.PermissionRequest
+import dev.minios.ocremote.data.dto.response.ProviderInfo as DtoProviderInfo
+import dev.minios.ocremote.data.dto.response.ProviderModel
+import dev.minios.ocremote.data.dto.response.ProvidersResponse as DtoProvidersResponse
+import dev.minios.ocremote.data.dto.response.PtyInfo
+import dev.minios.ocremote.data.dto.response.QuestionInfo
+import dev.minios.ocremote.data.dto.response.QuestionOption
+import dev.minios.ocremote.data.dto.response.QuestionRequest
+import dev.minios.ocremote.data.dto.response.ServerConfigResponse
+import dev.minios.ocremote.data.dto.response.FileContent
+import dev.minios.ocremote.data.dto.response.FileNode
+import dev.minios.ocremote.data.dto.response.SkillInfo
+import dev.minios.ocremote.data.dto.response.TodoItem
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
@@ -902,8 +920,8 @@ class SerializationTest {
 
     @Test
     fun `ModelSelection serializes providerID and modelID`() {
-        val ms = ModelSelection(providerId = "openai", modelId = "gpt-4o")
-        val encoded = json.encodeToString(ModelSelection.serializer(), ms)
+        val ms = DtoModelSelection(providerId = "openai", modelId = "gpt-4o")
+        val encoded = json.encodeToString(DtoModelSelection.serializer(), ms)
         assertTrue(encoded.contains("providerID"))
         assertTrue(encoded.contains("modelID"))
         assertFalse(encoded.contains("providerId"))
@@ -913,8 +931,8 @@ class SerializationTest {
     @Test
     fun `PromptRequest round-trip`() {
         val req = PromptRequest(
-            parts = listOf(PromptPart(type = "text", text = "Hello")),
-            model = ModelSelection(providerId = "openai", modelId = "gpt-4o"),
+            parts = listOf(DtoPromptPart(type = "text", text = "Hello")),
+            model = DtoModelSelection(providerId = "openai", modelId = "gpt-4o"),
             agent = "coder",
             variant = "v2"
         )
@@ -930,14 +948,14 @@ class SerializationTest {
 
     @Test
     fun `PromptPart with file attachment round-trip`() {
-        val part = PromptPart(
+        val part = DtoPromptPart(
             type = "file",
             path = "/tmp/img.png",
             mime = "image/png",
             filename = "screenshot.png"
         )
-        val encoded = json.encodeToString(PromptPart.serializer(), part)
-        val decoded = json.decodeFromString(PromptPart.serializer(), encoded)
+        val encoded = json.encodeToString(DtoPromptPart.serializer(), part)
+        val decoded = json.decodeFromString(DtoPromptPart.serializer(), encoded)
         assertEquals("file", decoded.type)
         assertEquals("/tmp/img.png", decoded.path)
         assertEquals("image/png", decoded.mime)
@@ -1045,9 +1063,9 @@ class SerializationTest {
 
     @Test
     fun `ProvidersResponse round-trip`() {
-        val resp = ProvidersResponse(
+        val resp = DtoProvidersResponse(
             providers = listOf(
-                ProviderInfo(
+                DtoProviderInfo(
                     id = "openai",
                     name = "OpenAI",
                     models = mapOf(
@@ -1067,8 +1085,8 @@ class SerializationTest {
             ),
             default = mapOf("providerID" to "openai", "modelID" to "gpt-4o")
         )
-        val encoded = json.encodeToString(ProvidersResponse.serializer(), resp)
-        val decoded = json.decodeFromString(ProvidersResponse.serializer(), encoded)
+        val encoded = json.encodeToString(DtoProvidersResponse.serializer(), resp)
+        val decoded = json.decodeFromString(DtoProvidersResponse.serializer(), encoded)
         assertEquals(1, decoded.providers.size)
         assertEquals("openai", decoded.providers[0].id)
         val model = decoded.providers[0].models["gpt-4o"]!!

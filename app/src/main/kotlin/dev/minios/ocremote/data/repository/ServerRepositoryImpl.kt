@@ -4,9 +4,13 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
+import dev.minios.ocremote.data.dto.response.ProvidersResponse as DataProvidersResponse
 import dev.minios.ocremote.domain.model.LocalServerState
+import dev.minios.ocremote.domain.model.ModelCatalog
+import dev.minios.ocremote.domain.model.ProviderCatalog
 import dev.minios.ocremote.domain.model.ProviderInfo as DomainProviderInfo
 import dev.minios.ocremote.domain.model.ModelInfo
+import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.model.ServerConfig
 import dev.minios.ocremote.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.Flow
@@ -117,6 +121,30 @@ class ServerRepositoryImpl @Inject constructor(
                 }
             )
         }
+    }
+
+    override suspend fun loadProviderCatalog(serverId: String): Result<ProvidersResponse> = runCatching {
+        val conn = resolveConnection(serverId)
+        val response: DataProvidersResponse = api.getProviders(conn)
+        ProvidersResponse(
+            providers = response.providers.map { dto ->
+                ProviderCatalog(
+                    id = dto.id,
+                    name = dto.name,
+                    source = dto.source,
+                    models = dto.models.mapValues { (_, model) ->
+                        ModelCatalog(
+                            id = model.id,
+                            name = model.name,
+                            contextWindow = model.limit?.context ?: 0,
+                            costInput = model.cost?.input ?: 0.0,
+                            variantNames = model.variants?.keys?.toList()?.sorted() ?: emptyList()
+                        )
+                    }
+                )
+            },
+            default = response.default
+        )
     }
 
     override suspend fun setProviderEnabled(

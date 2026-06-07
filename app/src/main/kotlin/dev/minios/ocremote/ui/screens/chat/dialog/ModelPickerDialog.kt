@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
-import dev.minios.ocremote.data.dto.response.ProviderInfo
-import dev.minios.ocremote.data.dto.response.ProviderModel
+import dev.minios.ocremote.domain.model.ModelCatalog
+import dev.minios.ocremote.domain.model.ProviderCatalog
 import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
@@ -42,7 +42,7 @@ import dev.minios.ocremote.ui.theme.ShapeTokens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ModelPickerDialog(
-    providers: List<ProviderInfo>,
+    providers: List<ProviderCatalog>,
     selectedProviderId: String?,
     selectedModelId: String?,
     onSelect: (providerId: String, modelId: String) -> Unit,
@@ -51,17 +51,16 @@ internal fun ModelPickerDialog(
     val isAmoled = isAmoledTheme()
     val params = amoledDialogParams(shape = ShapeTokens.largeMedium)
 
-    fun isModelFree(providerId: String, model: ProviderModel): Boolean {
+    fun isModelFree(providerId: String, model: ModelCatalog): Boolean {
         if (providerId != "opencode") return false
-        val cost = model.cost ?: return true
-        return cost.input == 0.0
+        return model.costInput == 0.0
     }
 
     // Sort providers: "opencode" first, then by name
     val sortedProviders = remember(providers) {
         providers
             .filter { it.models.isNotEmpty() }
-            .sortedWith(compareBy<ProviderInfo> { it.id != "opencode" }.thenBy { it.name.lowercase() })
+            .sortedWith(compareBy<ProviderCatalog> { it.id != "opencode" }.thenBy { it.name.lowercase() })
     }
 
     BasicAlertDialog(
@@ -85,7 +84,7 @@ internal fun ModelPickerDialog(
                     val topPad = if (index == 0) 0.dp else 12.dp
 
                     val sortedModels = provider.models.values
-                        .sortedWith(compareBy<ProviderModel> { !isModelFree(provider.id, it) }.thenBy { it.name.lowercase() })
+                        .sortedWith(compareBy<ModelCatalog> { !isModelFree(provider.id, it) }.thenBy { it.name.lowercase() })
 
                     item(key = "provider_header_${provider.id}") {
                         Row(

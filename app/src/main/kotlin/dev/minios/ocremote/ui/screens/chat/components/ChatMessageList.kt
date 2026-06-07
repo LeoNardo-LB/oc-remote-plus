@@ -50,10 +50,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
-import dev.minios.ocremote.data.repository.handler.CompactionStateInfo
-import dev.minios.ocremote.data.repository.handler.StepProgressInfo
-import dev.minios.ocremote.data.repository.handler.ToolProgressInfo
+import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.domain.model.StepProgressInfo
+import dev.minios.ocremote.domain.model.ToolProgressInfo
 import dev.minios.ocremote.ui.components.ConfirmDialog
 import dev.minios.ocremote.ui.components.DialogButtonRole
 import dev.minios.ocremote.ui.components.DialogButtons
@@ -102,14 +102,20 @@ fun ChatMessageList(
 ) {
     val turnGroups = remember(rawMessages) { computeTurnGroups(rawMessages) }
 
-    // Real-time status from EventDispatcher
+    // Real-time status from EventDispatcher — mapped to domain types
     val toolProgress by viewModel.eventDispatcher.activeToolProgress.collectAsStateWithLifecycle()
     val stepProgress by viewModel.eventDispatcher.stepProgress.collectAsStateWithLifecycle()
     val compactionState by viewModel.eventDispatcher.compactionState.collectAsStateWithLifecycle()
     val currentSessionId = viewModel.sessionId
-    val activeTools = toolProgress[currentSessionId].orEmpty()
-    val currentStep = stepProgress[currentSessionId]
-    val currentCompaction = compactionState[currentSessionId]
+    val activeTools = toolProgress[currentSessionId].orEmpty().map { 
+        ToolProgressInfo(callId = it.callId, partId = it.partId, tool = it.tool, status = it.status, progress = it.progress, title = it.title)
+    }
+    val currentStep = stepProgress[currentSessionId]?.let { 
+        StepProgressInfo(step = it.step, agent = it.agent, model = it.model)
+    }
+    val currentCompaction = compactionState[currentSessionId]?.let { 
+        CompactionStateInfo(isActive = it.isActive, reason = it.reason)
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Box(

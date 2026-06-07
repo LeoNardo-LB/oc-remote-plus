@@ -1,14 +1,14 @@
 package dev.minios.ocremote.domain.repository
 
-import dev.minios.ocremote.data.dto.common.ModelSelection
-import dev.minios.ocremote.data.dto.request.PromptPart
-import dev.minios.ocremote.data.repository.handler.CompactionStateInfo
-import dev.minios.ocremote.data.repository.handler.StepProgressInfo
-import dev.minios.ocremote.data.repository.handler.ToolProgressInfo
+import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.ModelSelection
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.PermissionState
+import dev.minios.ocremote.domain.model.PromptPart
 import dev.minios.ocremote.domain.model.QuestionState
+import dev.minios.ocremote.domain.model.StepProgressInfo
+import dev.minios.ocremote.domain.model.ToolProgressInfo
 import kotlinx.coroutines.flow.Flow
 
 /**

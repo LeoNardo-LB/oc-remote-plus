@@ -1,6 +1,6 @@
 package dev.minios.ocremote.domain.usecase
 
-import dev.minios.ocremote.data.dto.common.ModelSelection
+import dev.minios.ocremote.domain.model.ModelSelection
 import dev.minios.ocremote.domain.repository.ChatRepository
 import javax.inject.Inject
 

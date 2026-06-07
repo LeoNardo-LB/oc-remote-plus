@@ -2,12 +2,22 @@ package dev.minios.ocremote.data.repository
 
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
-import dev.minios.ocremote.data.dto.common.ModelSelection
-import dev.minios.ocremote.data.dto.request.PromptPart
-import dev.minios.ocremote.data.repository.handler.CompactionStateInfo
-import dev.minios.ocremote.data.repository.handler.StepProgressInfo
-import dev.minios.ocremote.data.repository.handler.ToolProgressInfo
-import dev.minios.ocremote.domain.model.*
+import dev.minios.ocremote.data.dto.common.ModelSelection as DataModelSelection
+import dev.minios.ocremote.data.dto.request.PromptPart as DataPromptPart
+import dev.minios.ocremote.data.repository.handler.CompactionStateInfo as DataCompactionStateInfo
+import dev.minios.ocremote.data.repository.handler.StepProgressInfo as DataStepProgressInfo
+import dev.minios.ocremote.data.repository.handler.ToolProgressInfo as DataToolProgressInfo
+import dev.minios.ocremote.domain.model.CompactionStateInfo
+import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.ModelSelection
+import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.domain.model.PermissionState
+import dev.minios.ocremote.domain.model.PromptPart
+import dev.minios.ocremote.domain.model.QuestionState
+import dev.minios.ocremote.domain.model.SseEvent
+import dev.minios.ocremote.domain.model.StepProgressInfo
+import dev.minios.ocremote.domain.model.TimeInfo
+import dev.minios.ocremote.domain.model.ToolProgressInfo
 import dev.minios.ocremote.domain.repository.ChatRepository
 import android.util.Log
 import kotlinx.coroutines.flow.Flow
@@ -69,21 +79,21 @@ class ChatRepositoryImpl @Inject constructor(
     // ============ EventDispatcher Flow Exposure ============
 
     override fun getActiveToolProgress(serverId: String): Flow<List<ToolProgressInfo>?> =
-        eventDispatcher.activeToolProgress.map { it[serverId] }
+        eventDispatcher.activeToolProgress.map { list -> list[serverId]?.map { it.toDomain() } }
             .catch { e ->
                 Log.e("ChatRepository", "Error in getActiveToolProgress", e)
                 emit(null)
             }
 
     override fun getStepProgress(serverId: String): Flow<StepProgressInfo?> =
-        eventDispatcher.stepProgress.map { it[serverId] }
+        eventDispatcher.stepProgress.map { it[serverId]?.toDomain() }
             .catch { e ->
                 Log.e("ChatRepository", "Error in getStepProgress", e)
                 emit(null)
             }
 
     override fun getCompactionState(serverId: String): Flow<CompactionStateInfo?> =
-        eventDispatcher.compactionState.map { it[serverId] }
+        eventDispatcher.compactionState.map { it[serverId]?.toDomain() }
             .catch { e ->
                 Log.e("ChatRepository", "Error in getCompactionState", e)
                 emit(null)
@@ -93,7 +103,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun sendMessage(sessionId: String, parts: List<Part>): Result<Message> = runCatching {
         val conn = resolveConnectionForSession(sessionId)
-        val promptParts = parts.map { it.toPromptPart() }
+        val promptParts = parts.map { it.toDataPromptPart() }
         api.promptAsync(conn, sessionId, promptParts)
         // The actual message arrives via SSE — return a lightweight placeholder.
         // Callers should observe [getMessagesFlow] for the real Message.
@@ -128,7 +138,7 @@ class ChatRepositoryImpl @Inject constructor(
         directory: String?
     ): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.promptAsync(conn, sessionId, parts, model, agent, variant, directory)
+        api.promptAsync(conn, sessionId, parts.map { it.toData() }, model?.toData(), agent, variant, directory)
     }
 
     override suspend fun revertSession(serverId: String, sessionId: String, messageId: String): Result<Unit> = runCatching {
@@ -233,7 +243,7 @@ class ChatRepositoryImpl @Inject constructor(
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
         val model = if (providerId != null && modelId != null) {
-            ModelSelection(providerId = providerId, modelId = modelId)
+            DataModelSelection(providerId = providerId, modelId = modelId)
         } else null
         api.runShellCommand(conn, sessionId, command, agent, model, directory)
     }
@@ -324,14 +334,38 @@ class ChatRepositoryImpl @Inject constructor(
         tool = tool
     )
 
-    private fun Part.toPromptPart(): PromptPart = when (this) {
-        is Part.Text -> PromptPart(type = "text", text = this.text)
-        is Part.File -> PromptPart(
+    private fun Part.toDataPromptPart(): DataPromptPart = when (this) {
+        is Part.Text -> DataPromptPart(type = "text", text = this.text)
+        is Part.File -> DataPromptPart(
             type = "file",
             mime = this.mime,
             url = this.url,
             filename = this.filename
         )
-        else -> PromptPart(type = "text", text = "")
+        else -> DataPromptPart(type = "text", text = "")
     }
+
+    // ============ Data ↔ Domain Mappers ============
+
+    private fun DataToolProgressInfo.toDomain() = ToolProgressInfo(
+        callId = callId, partId = partId, tool = tool,
+        status = status, progress = progress, title = title
+    )
+
+    private fun DataStepProgressInfo.toDomain() = StepProgressInfo(
+        step = step, agent = agent, model = model
+    )
+
+    private fun DataCompactionStateInfo.toDomain() = CompactionStateInfo(
+        isActive = isActive, reason = reason
+    )
+
+    private fun PromptPart.toData() = DataPromptPart(
+        type = type, text = text, path = path,
+        mime = mime, url = url, filename = filename
+    )
+
+    private fun ModelSelection.toData() = DataModelSelection(
+        providerId = providerId, modelId = modelId
+    )
 }

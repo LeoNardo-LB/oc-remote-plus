@@ -2,7 +2,7 @@ package dev.minios.ocremote.ui.screens.chat
 
 import android.util.Log
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.dto.response.ProvidersResponse
+import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.data.repository.PermissionAutoApprover

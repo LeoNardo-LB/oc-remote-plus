@@ -3,7 +3,7 @@
 import android.util.Log
 import app.cash.turbine.test
 import dev.minios.ocremote.data.api.OpenCodeApi
-import dev.minios.ocremote.data.dto.response.ProvidersResponse
+import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.model.PermissionState
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
