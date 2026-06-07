@@ -102,18 +102,18 @@ fun ChatMessageList(
 ) {
     val turnGroups = remember(rawMessages.size) { computeTurnGroups(rawMessages) }
 
-    // Real-time status from EventDispatcher — mapped to domain types
-    val toolProgress by viewModel.eventDispatcher.activeToolProgress.collectAsStateWithLifecycle()
-    val stepProgress by viewModel.eventDispatcher.stepProgress.collectAsStateWithLifecycle()
-    val compactionState by viewModel.eventDispatcher.compactionState.collectAsStateWithLifecycle()
+    // Real-time status from ChatRepository — domain types
     val currentSessionId = viewModel.sessionId
-    val activeTools = toolProgress[currentSessionId].orEmpty().map { 
+    val toolProgress by viewModel.chatRepositoryExposed.getActiveToolProgressForSession(currentSessionId).collectAsStateWithLifecycle(initialValue = null)
+    val stepProgress by viewModel.chatRepositoryExposed.getStepProgressForSession(currentSessionId).collectAsStateWithLifecycle(initialValue = null)
+    val compactionState by viewModel.chatRepositoryExposed.getCompactionStateForSession(currentSessionId).collectAsStateWithLifecycle(initialValue = null)
+    val activeTools = toolProgress.orEmpty().map { 
         ToolProgressInfo(callId = it.callId, partId = it.partId, tool = it.tool, status = it.status, progress = it.progress, title = it.title)
     }
-    val currentStep = stepProgress[currentSessionId]?.let { 
+    val currentStep = stepProgress?.let { 
         StepProgressInfo(step = it.step, agent = it.agent, model = it.model)
     }
-    val currentCompaction = compactionState[currentSessionId]?.let { 
+    val currentCompaction = compactionState?.let { 
         CompactionStateInfo(isActive = it.isActive, reason = it.reason)
     }
 

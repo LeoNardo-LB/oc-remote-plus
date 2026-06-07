@@ -120,10 +120,8 @@ class ChatViewModelDeleteTest {
         coEvery { manageAgentUseCase.loadAgents(any()) } returns emptyList()
         coEvery { manageAgentUseCase.loadCommands(any()) } returns emptyList()
 
-        // Wire messagePaging.observeMessages to delegate to eventDispatcher.messages
-        every { messagePaging.observeMessages(any()) } answers {
-            eventDispatcher.messages.map { msgs -> msgs[firstArg<String>()] ?: emptyList() }
-        }
+        // Wire messagePaging.observeMessages to return empty messages
+        every { messagePaging.observeMessages(any()) } returns flowOf(emptyList())
     }
 
     @After
@@ -187,7 +185,6 @@ class ChatViewModelDeleteTest {
         ))
         return ChatViewModel(
             savedStateHandle = savedState,
-            eventDispatcher = eventDispatcher,
             sendMessageUseCase = sendMessageUseCase,
             manageSessionUseCase = manageSessionUseCase,
             managePermissionUseCase = managePermissionUseCase,
@@ -200,8 +197,22 @@ class ChatViewModelDeleteTest {
             settingsRepository = settingsRepository,
             terminalRegistry = terminalRegistry,
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
-            chatRepository = mockk<ChatRepository>(relaxed = true),
-            sessionRepository = mockk<SessionRepository>(relaxed = true),
+            chatRepository = mockk<ChatRepository>(relaxed = true).also { chatRepo ->
+                every { chatRepo.replaceMessages(any(), any()) } answers { eventDispatcher.replaceMessages(firstArg(), secondArg()) }
+                every { chatRepo.getParts(any()) } answers { eventDispatcher.parts.map { it[firstArg<String>()] ?: emptyList() } }
+                every { chatRepo.getAllPartsMap() } returns eventDispatcher.parts
+                every { chatRepo.getPermissionsSnapshot() } answers { eventDispatcher.permissions.value }
+                every { chatRepo.getQuestionsSnapshot() } answers { eventDispatcher.questions.value }
+                every { chatRepo.getSessionsSnapshot() } answers { eventDispatcher.sessions.value }
+                every { chatRepo.getPermissionsWithChildren(any(), any()) } answers { eventDispatcher.getPermissionsWithChildren(firstArg(), secondArg()) }
+                every { chatRepo.getQuestionsWithChildren(any(), any()) } answers { eventDispatcher.getQuestionsWithChildren(firstArg(), secondArg()) }
+            },
+            sessionRepository = mockk<SessionRepository>(relaxed = true).also { sessRepo ->
+                every { sessRepo.getSessionsFlow(any()) } returns eventDispatcher.sessions
+                every { sessRepo.getSessionStatusesFlow(any()) } returns eventDispatcher.sessionStatuses
+                every { sessRepo.getCurrentAgentFlow(any()) } returns eventDispatcher.currentAgent
+                every { sessRepo.getCurrentModelFlow(any()) } returns eventDispatcher.currentModel
+            },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker
         )

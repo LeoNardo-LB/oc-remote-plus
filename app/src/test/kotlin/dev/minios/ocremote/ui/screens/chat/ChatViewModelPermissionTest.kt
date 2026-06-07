@@ -24,6 +24,7 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -160,9 +161,44 @@ class ChatViewModelPermissionTest {
             "serverId"   to serverId,
             "sessionId"  to sessionId
         ))
+        // ChatRepository mock: delegate state operations to real EventDispatcher for verification
+        val chatRepo = mockk<ChatRepository>(relaxed = true)
+        every { chatRepo.setPermissions(any(), any()) } answers {
+            val sid = firstArg<String>()
+            val perms = secondArg<List<SseEvent.PermissionAsked>>()
+            eventDispatcher.setPermissions(sid, perms)
+        }
+        every { chatRepo.removePermission(any()) } answers {
+            eventDispatcher.removePermission(firstArg())
+        }
+        every { chatRepo.getPermissionsSnapshot() } answers {
+            eventDispatcher.permissions.value
+        }
+        every { chatRepo.getQuestionsSnapshot() } answers {
+            eventDispatcher.questions.value
+        }
+        every { chatRepo.getSessionsSnapshot() } answers {
+            eventDispatcher.sessions.value
+        }
+        every { chatRepo.setMessages(any(), any()) } answers {
+            eventDispatcher.setMessages(firstArg(), secondArg())
+        }
+        every { chatRepo.mergeMessages(any(), any()) } answers {
+            eventDispatcher.mergeMessages(firstArg(), secondArg())
+        }
+        every { chatRepo.replaceMessages(any(), any()) } answers {
+            eventDispatcher.replaceMessages(firstArg(), secondArg())
+        }
+        every { chatRepo.getPermissionsWithChildren(any(), any()) } answers {
+            eventDispatcher.getPermissionsWithChildren(firstArg(), secondArg())
+        }
+        every { chatRepo.getQuestionsWithChildren(any(), any()) } answers {
+            eventDispatcher.getQuestionsWithChildren(firstArg(), secondArg())
+        }
+        every { chatRepo.getParts(any()) } returns flowOf(emptyList())
+        every { chatRepo.getAllPartsMap() } returns eventDispatcher.parts
         return ChatViewModel(
             savedStateHandle = savedState,
-            eventDispatcher = eventDispatcher,
             sendMessageUseCase = sendMessageUseCase,
             manageSessionUseCase = manageSessionUseCase,
             managePermissionUseCase = managePermissionUseCase,
@@ -175,8 +211,13 @@ class ChatViewModelPermissionTest {
             settingsRepository = settingsRepository,
             terminalRegistry = terminalRegistry,
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
-            chatRepository = mockk<ChatRepository>(relaxed = true),
-            sessionRepository = mockk<SessionRepository>(relaxed = true),
+            chatRepository = chatRepo,
+            sessionRepository = mockk<SessionRepository>(relaxed = true).also {
+                every { it.getSessionsFlow(any()) } returns eventDispatcher.sessions
+                every { it.getSessionStatusesFlow(any()) } returns eventDispatcher.sessionStatuses
+                every { it.getCurrentAgentFlow(any()) } returns eventDispatcher.currentAgent
+                every { it.getCurrentModelFlow(any()) } returns eventDispatcher.currentModel
+            },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker
         )

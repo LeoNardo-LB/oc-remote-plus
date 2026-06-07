@@ -197,6 +197,44 @@ class SessionRepositoryImpl @Inject constructor(
         return ServerConnection.from(config.url, config.username, config.password)
     }
 
+    // ============ Current Agent/Model (SSE session.next) ============
+
+    override fun getCurrentAgentFlow(serverId: String): Flow<Map<String, String>> =
+        combine(
+            eventDispatcher.serverSessions,
+            eventDispatcher.currentAgent
+        ) { mapping, agentMap ->
+            val sessionIds = mapping[serverId] ?: emptySet()
+            agentMap.filterKeys { it in sessionIds }
+        }
+
+    override fun getCurrentModelFlow(serverId: String): Flow<Map<String, Pair<String, String>>> =
+        combine(
+            eventDispatcher.serverSessions,
+            eventDispatcher.currentModel
+        ) { mapping, modelMap ->
+            val sessionIds = mapping[serverId] ?: emptySet()
+            modelMap.filterKeys { it in sessionIds }
+        }
+
+    // ============ Write Operations (State Updates) ============
+
+    override fun setSessions(serverId: String, sessions: List<Session>) {
+        eventDispatcher.setSessions(serverId, sessions)
+    }
+
+    override fun updateSessionStatus(sessionId: String, status: SessionStatus) {
+        eventDispatcher.updateSessionStatus(sessionId, status)
+    }
+
+    override fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>) {
+        eventDispatcher.syncAllSessionStatuses(statuses)
+    }
+
+    override fun markSessionIdleProtected(sessionId: String) {
+        eventDispatcher.markSessionIdleProtected(sessionId)
+    }
+
     // ============ Session Status Sync ============
 
     override suspend fun fetchSessionStatuses(serverId: String, directory: String?): Result<Map<String, SessionStatus>> = runCatching {

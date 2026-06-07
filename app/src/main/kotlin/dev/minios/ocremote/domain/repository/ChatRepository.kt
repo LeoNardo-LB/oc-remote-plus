@@ -3,11 +3,14 @@ package dev.minios.ocremote.domain.repository
 import dev.minios.ocremote.domain.model.AutoApproveRule
 import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.model.ModelSelection
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.PermissionState
 import dev.minios.ocremote.domain.model.PromptPart
 import dev.minios.ocremote.domain.model.QuestionState
+import dev.minios.ocremote.domain.model.Session
+import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.domain.model.StepProgressInfo
 import dev.minios.ocremote.domain.model.ToolProgressInfo
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +34,12 @@ interface ChatRepository {
      * Observe the list of parts for a session.
      */
     fun getParts(sessionId: String): Flow<List<Part>>
+
+    /**
+     * Observe the parts map (sessionId → parts) for all sessions.
+     * Needed by combines that build per-message ChatMessage objects.
+     */
+    fun getAllPartsMap(): Flow<Map<String, List<Part>>>
 
     /**
      * Observe the list of pending permission requests for a session.
@@ -199,4 +208,86 @@ interface ChatRepository {
      * Persist a new permission auto-approve rule (user chose "always approve").
      */
     suspend fun addPermissionAutoApproveRule(rule: AutoApproveRule)
+
+    // ============ Write Operations (State Updates) ============
+
+    /**
+     * Set messages for a session (full replace from REST load).
+     */
+    fun setMessages(sessionId: String, messages: List<MessageWithParts>)
+
+    /**
+     * Merge messages into a session (REST restore / pagination).
+     */
+    fun mergeMessages(sessionId: String, messages: List<MessageWithParts>)
+
+    /**
+     * Replace all messages for a session (session update refresh).
+     */
+    fun replaceMessages(sessionId: String, messages: List<MessageWithParts>)
+
+    /**
+     * Remove a permission card by ID (optimistic removal after reply).
+     */
+    fun removePermission(permissionId: String)
+
+    /**
+     * Set permissions for a session (REST merge).
+     */
+    fun setPermissions(sessionId: String, permissions: List<SseEvent.PermissionAsked>)
+
+    /**
+     * Remove a question card by ID (optimistic removal after reply).
+     */
+    fun removeQuestion(questionId: String)
+
+    /**
+     * Set questions for a session (REST merge).
+     */
+    fun setQuestions(sessionId: String, questions: List<SseEvent.QuestionAsked>)
+
+    /**
+     * Aggregate permissions for a session including its child sessions.
+     */
+    fun getPermissionsWithChildren(sessionId: String, sessions: List<Session>): List<SseEvent.PermissionAsked>
+
+    /**
+     * Aggregate questions for a session including its child sessions.
+     */
+    fun getQuestionsWithChildren(sessionId: String, sessions: List<Session>): List<SseEvent.QuestionAsked>
+
+    // ============ Raw State Reads (for complex read-write patterns) ============
+
+    /**
+     * Read the current permissions map snapshot.
+     * Needed for REST merge logic that reads existing SSE state before merging.
+     */
+    fun getPermissionsSnapshot(): Map<String, List<SseEvent.PermissionAsked>>
+
+    /**
+     * Read the current questions map snapshot.
+     * Needed for REST merge logic that reads existing SSE state before merging.
+     */
+    fun getQuestionsSnapshot(): Map<String, List<SseEvent.QuestionAsked>>
+
+    /**
+     * Read the current sessions list snapshot.
+     * Needed for REST merge logic that looks up child sessions and titles.
+     */
+    fun getSessionsSnapshot(): List<Session>
+
+    /**
+     * Observe active tool progress for a specific session (keyed by sessionId).
+     */
+    fun getActiveToolProgressForSession(sessionId: String): Flow<List<ToolProgressInfo>?>
+
+    /**
+     * Observe step progress for a specific session (keyed by sessionId).
+     */
+    fun getStepProgressForSession(sessionId: String): Flow<StepProgressInfo?>
+
+    /**
+     * Observe compaction state for a specific session (keyed by sessionId).
+     */
+    fun getCompactionStateForSession(sessionId: String): Flow<CompactionStateInfo?>
 }

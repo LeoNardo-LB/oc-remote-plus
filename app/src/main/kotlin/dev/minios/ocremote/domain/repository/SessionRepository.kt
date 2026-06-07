@@ -133,6 +133,42 @@ interface SessionRepository {
      */
     suspend fun listMessages(serverId: String, sessionId: String, limit: Int): Result<List<MessageWithParts>>
 
+    // ============ Current Agent/Model (SSE session.next) ============
+
+    /**
+     * Observe the current agent name map (sessionId → agent name) from SSE session.next events.
+     */
+    fun getCurrentAgentFlow(serverId: String): Flow<Map<String, String>>
+
+    /**
+     * Observe the current model map (sessionId → Pair(providerId, modelId)) from SSE session.next events.
+     */
+    fun getCurrentModelFlow(serverId: String): Flow<Map<String, Pair<String, String>>>
+
+    // ============ Write Operations (State Updates) ============
+
+    /**
+     * Inject REST-loaded sessions into the state holder.
+     * Used when REST fallback loads session info before SSE delivers it.
+     */
+    fun setSessions(serverId: String, sessions: List<Session>)
+
+    /**
+     * Update a single session's status optimistically.
+     */
+    fun updateSessionStatus(sessionId: String, status: SessionStatus)
+
+    /**
+     * Batch-update all session statuses from a REST response.
+     */
+    fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>)
+
+    /**
+     * Mark a session as idle with SSE-freshness protection.
+     * Won't overwrite a recent SSE Busy/Retry status (within 5s).
+     */
+    fun markSessionIdleProtected(sessionId: String)
+
     // ============ Session Status Sync ============
 
     /**

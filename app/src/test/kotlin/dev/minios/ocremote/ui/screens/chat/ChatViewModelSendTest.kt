@@ -5,8 +5,6 @@ import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ProvidersResponse
-import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.repository.ChatRepository
 import dev.minios.ocremote.domain.repository.SessionRepository
 import dev.minios.ocremote.domain.repository.SettingsRepository
@@ -17,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -33,7 +32,6 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelSendTest {
 
-    private lateinit var eventDispatcher: EventDispatcher
     private val terminalRegistry: ServerTerminalRegistry = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk()
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -53,14 +51,6 @@ class ChatViewModelSendTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        eventDispatcher = EventDispatcher(
-            sessionHandler = SessionEventHandler(),
-            messageHandler = MessageEventHandler(),
-            permissionHandler = PermissionEventHandler(),
-            questionHandler = QuestionEventHandler(),
-            miscHandler = MiscEventHandler(),
-            sessionNextHandler = SessionNextEventHandler()
-        )
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
@@ -99,10 +89,8 @@ class ChatViewModelSendTest {
         coEvery { manageAgentUseCase.loadAgents(any()) } returns emptyList()
         coEvery { manageAgentUseCase.loadCommands(any()) } returns emptyList()
 
-        // Wire messagePaging.observeMessages to delegate to eventDispatcher.messages
-        every { messagePaging.observeMessages(any()) } answers {
-            eventDispatcher.messages.map { msgs -> msgs[firstArg<String>()] ?: emptyList() }
-        }
+        // Wire messagePaging.observeMessages to return empty messages
+        every { messagePaging.observeMessages(any()) } returns flowOf(emptyList())
     }
 
     @After
@@ -129,7 +117,6 @@ class ChatViewModelSendTest {
         ))
         return ChatViewModel(
             savedStateHandle = savedState,
-            eventDispatcher = eventDispatcher,
             sendMessageUseCase = sendMessageUseCase,
             manageSessionUseCase = manageSessionUseCase,
             managePermissionUseCase = managePermissionUseCase,
@@ -142,8 +129,15 @@ class ChatViewModelSendTest {
             settingsRepository = settingsRepository,
             terminalRegistry = terminalRegistry,
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
-            chatRepository = mockk<ChatRepository>(relaxed = true),
-            sessionRepository = mockk<SessionRepository>(relaxed = true),
+            chatRepository = mockk<ChatRepository>(relaxed = true).also {
+                every { it.getAllPartsMap() } returns kotlinx.coroutines.flow.MutableStateFlow(emptyMap<String, List<dev.minios.ocremote.domain.model.Part>>())
+            },
+            sessionRepository = mockk<SessionRepository>(relaxed = true).also {
+                every { it.getSessionsFlow(any()) } returns flowOf(emptyList())
+                every { it.getSessionStatusesFlow(any()) } returns flowOf(emptyMap())
+                every { it.getCurrentAgentFlow(any()) } returns flowOf(emptyMap())
+                every { it.getCurrentModelFlow(any()) } returns flowOf(emptyMap())
+            },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker
         )

@@ -16,6 +16,7 @@ import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -199,7 +200,6 @@ class ChatViewModelQueuedTest {
         ))
         return ChatViewModel(
             savedStateHandle = savedState,
-            eventDispatcher = eventDispatcher,
             sendMessageUseCase = sendMessageUseCase,
             manageSessionUseCase = manageSessionUseCase,
             managePermissionUseCase = managePermissionUseCase,
@@ -212,8 +212,25 @@ class ChatViewModelQueuedTest {
             settingsRepository = settingsRepository,
             terminalRegistry = terminalRegistry,
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
-            chatRepository = mockk<ChatRepository>(relaxed = true),
-            sessionRepository = mockk<SessionRepository>(relaxed = true),
+            chatRepository = mockk<ChatRepository>(relaxed = true).also { chatRepo ->
+                every { chatRepo.getParts(any()) } answers { eventDispatcher.parts.map { it[firstArg<String>()] ?: emptyList() } }
+                every { chatRepo.getAllPartsMap() } returns eventDispatcher.parts
+                every { chatRepo.setMessages(any(), any()) } answers { eventDispatcher.setMessages(firstArg(), secondArg()) }
+                every { chatRepo.mergeMessages(any(), any()) } answers { eventDispatcher.mergeMessages(firstArg(), secondArg()) }
+                every { chatRepo.replaceMessages(any(), any()) } answers { eventDispatcher.replaceMessages(firstArg(), secondArg()) }
+                every { chatRepo.getPermissionsSnapshot() } answers { eventDispatcher.permissions.value }
+                every { chatRepo.getQuestionsSnapshot() } answers { eventDispatcher.questions.value }
+                every { chatRepo.getSessionsSnapshot() } answers { eventDispatcher.sessions.value }
+                every { chatRepo.getPermissionsWithChildren(any(), any()) } answers { eventDispatcher.getPermissionsWithChildren(firstArg(), secondArg()) }
+                every { chatRepo.getQuestionsWithChildren(any(), any()) } answers { eventDispatcher.getQuestionsWithChildren(firstArg(), secondArg()) }
+            },
+            sessionRepository = mockk<SessionRepository>(relaxed = true).also { sessRepo ->
+                every { sessRepo.getSessionsFlow(any()) } returns eventDispatcher.sessions
+                every { sessRepo.getSessionStatusesFlow(any()) } returns eventDispatcher.sessionStatuses
+                every { sessRepo.getCurrentAgentFlow(any()) } returns eventDispatcher.currentAgent
+                every { sessRepo.getCurrentModelFlow(any()) } returns eventDispatcher.currentModel
+                every { sessRepo.setSessions(any(), any()) } answers { eventDispatcher.setSessions(firstArg(), secondArg()) }
+            },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker
         )

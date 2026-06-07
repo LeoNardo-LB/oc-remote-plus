@@ -9,11 +9,13 @@ import dev.minios.ocremote.data.repository.handler.StepProgressInfo as DataStepP
 import dev.minios.ocremote.data.repository.handler.ToolProgressInfo as DataToolProgressInfo
 import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.model.ModelSelection
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.domain.model.PermissionState
 import dev.minios.ocremote.domain.model.PromptPart
 import dev.minios.ocremote.domain.model.QuestionState
+import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.domain.model.StepProgressInfo
 import dev.minios.ocremote.domain.model.TimeInfo
@@ -58,6 +60,9 @@ class ChatRepositoryImpl @Inject constructor(
                 Log.e("ChatRepository", "Error in getParts", e)
                 emit(emptyList())
             }
+
+    override fun getAllPartsMap(): Flow<Map<String, List<Part>>> =
+        eventDispatcher.parts
 
     override fun getPermissionsFlow(sessionId: String): Flow<List<PermissionState>> =
         eventDispatcher.permissions.map { events ->
@@ -373,6 +378,62 @@ class ChatRepositoryImpl @Inject constructor(
     private fun ModelSelection.toData() = DataModelSelection(
         providerId = providerId, modelId = modelId
     )
+
+    // ============ Write Operations (State Updates) ============
+
+    override fun setMessages(sessionId: String, messages: List<MessageWithParts>) {
+        eventDispatcher.setMessages(sessionId, messages)
+    }
+
+    override fun mergeMessages(sessionId: String, messages: List<MessageWithParts>) {
+        eventDispatcher.mergeMessages(sessionId, messages)
+    }
+
+    override fun replaceMessages(sessionId: String, messages: List<MessageWithParts>) {
+        eventDispatcher.replaceMessages(sessionId, messages)
+    }
+
+    override fun removePermission(permissionId: String) {
+        eventDispatcher.removePermission(permissionId)
+    }
+
+    override fun setPermissions(sessionId: String, permissions: List<SseEvent.PermissionAsked>) {
+        eventDispatcher.setPermissions(sessionId, permissions)
+    }
+
+    override fun removeQuestion(questionId: String) {
+        eventDispatcher.removeQuestion(questionId)
+    }
+
+    override fun setQuestions(sessionId: String, questions: List<SseEvent.QuestionAsked>) {
+        eventDispatcher.setQuestions(sessionId, questions)
+    }
+
+    override fun getPermissionsWithChildren(sessionId: String, sessions: List<Session>): List<SseEvent.PermissionAsked> =
+        eventDispatcher.getPermissionsWithChildren(sessionId, sessions)
+
+    override fun getQuestionsWithChildren(sessionId: String, sessions: List<Session>): List<SseEvent.QuestionAsked> =
+        eventDispatcher.getQuestionsWithChildren(sessionId, sessions)
+
+    // ============ Raw State Reads ============
+
+    override fun getPermissionsSnapshot(): Map<String, List<SseEvent.PermissionAsked>> =
+        eventDispatcher.permissions.value
+
+    override fun getQuestionsSnapshot(): Map<String, List<SseEvent.QuestionAsked>> =
+        eventDispatcher.questions.value
+
+    override fun getSessionsSnapshot(): List<Session> =
+        eventDispatcher.sessions.value
+
+    override fun getActiveToolProgressForSession(sessionId: String): Flow<List<ToolProgressInfo>?> =
+        eventDispatcher.activeToolProgress.map { map -> map[sessionId]?.map { it.toDomain() } }
+
+    override fun getStepProgressForSession(sessionId: String): Flow<StepProgressInfo?> =
+        eventDispatcher.stepProgress.map { it[sessionId]?.toDomain() }
+
+    override fun getCompactionStateForSession(sessionId: String): Flow<CompactionStateInfo?> =
+        eventDispatcher.compactionState.map { it[sessionId]?.toDomain() }
 
     // ============ Permission Auto-Approve ============
 

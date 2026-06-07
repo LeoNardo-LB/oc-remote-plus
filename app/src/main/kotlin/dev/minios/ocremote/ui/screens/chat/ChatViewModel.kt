@@ -21,7 +21,6 @@ import dev.minios.ocremote.ui.navigation.routes.ChatNav
 import dev.minios.ocremote.ui.screens.chat.tools.ToolCardResolver
 import dev.minios.ocremote.domain.model.Draft
 import dev.minios.ocremote.domain.repository.DraftRepository
-import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.repository.ChatRepository
 import dev.minios.ocremote.domain.repository.SessionRepository
@@ -206,7 +205,6 @@ data class ChatMessage(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    val eventDispatcher: EventDispatcher,
     private val sendMessageUseCase: SendMessageUseCase,
     private val manageSessionUseCase: ManageSessionUseCase,
     private val managePermissionUseCase: ManagePermissionUseCase,
@@ -224,6 +222,9 @@ class ChatViewModel @Inject constructor(
     private val messagePaging: MessagePaginationUseCase,
     private val tokenStatsTracker: TokenStatsTracker,
 ) : ViewModel() {
+
+    /** Expose chatRepository for ChatMessageList composable (tool progress, step progress, compaction state). */
+    val chatRepositoryExposed: ChatRepository get() = chatRepository
 
     private val serverUrl: String = URLDecoder.decode(
         savedStateHandle.get<String>("serverUrl") ?: "", "UTF-8"
@@ -408,7 +409,7 @@ class ChatViewModel @Inject constructor(
         _selectedVariant,
         _commands,
         messagePaging.observeMessages(sessionId),
-        eventDispatcher.sessions,
+        sessionRepository.getSessionsFlow(serverId),
         tokenStatsTracker.stats,
     ) { args ->
         val allProviders = args[0] as List<ProviderCatalog>
@@ -528,9 +529,9 @@ class ChatViewModel @Inject constructor(
      * Independent from other combines to limit recomposition scope.
      */
     val messageListState: StateFlow<MessageListState> = combine(
-        eventDispatcher.sessions,
+        sessionRepository.getSessionsFlow(serverId),
         messagePaging.observeMessages(sessionId),
-        eventDispatcher.parts,
+        chatRepository.getAllPartsMap(),
         _isLoading,
         _hasOlderMessages,
         _isLoadingOlder,
@@ -600,10 +601,10 @@ class ChatViewModel @Inject constructor(
      * Session metadata — changes when session info is updated (title, status, agent).
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
-        eventDispatcher.sessions,
-        eventDispatcher.sessionStatuses,
-        eventDispatcher.currentAgent,
-        eventDispatcher.currentModel,
+        sessionRepository.getSessionsFlow(serverId),
+        sessionRepository.getSessionStatusesFlow(serverId),
+        sessionRepository.getCurrentAgentFlow(serverId),
+        sessionRepository.getCurrentModelFlow(serverId),
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val allSessions = args[0] as List<Session>
@@ -640,22 +641,20 @@ class ChatViewModel @Inject constructor(
         _isLoading,
         _error,
         _isSending,
-        eventDispatcher.permissions,
-        eventDispatcher.questions,
-        eventDispatcher.sessions,
+        sessionRepository.getSessionsFlow(serverId),
     ) { args ->
         val loading = args[0] as Boolean
         val error = args[1] as String?
         val sending = args[2] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val allSessions = args[5] as List<Session>
+        val allSessions = args[3] as List<Session>
 
         InteractionState(
             isLoading = loading,
             isSending = sending,
             error = error,
-            pendingPermissions = eventDispatcher.getPermissionsWithChildren(sessionId, allSessions),
-            pendingQuestions = eventDispatcher.getQuestionsWithChildren(sessionId, allSessions),
+            pendingPermissions = chatRepository.getPermissionsWithChildren(sessionId, allSessions),
+            pendingQuestions = chatRepository.getQuestionsWithChildren(sessionId, allSessions),
         )
     }.stateIn(
         viewModelScope,
@@ -877,7 +876,7 @@ class ChatViewModel @Inject constructor(
             // Inject the REST-loaded session into the reducer so that title, parentId,
             // cost, tokens etc. are immediately available even before SSE delivers them.
             // This is critical for sub-sessions which may not be in the SSE session list.
-            eventDispatcher.setSessions(serverId, listOf(session))
+            sessionRepository.setSessions(serverId, listOf(session))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load session info", e)
         } finally {
@@ -894,7 +893,7 @@ class ChatViewModel @Inject constructor(
             try {
                 // Load messages with current limit
                 val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-                eventDispatcher.setMessages(sessionId, messages)
+                chatRepository.setMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
                 if (BuildConfig.DEBUG) {
@@ -907,7 +906,7 @@ class ChatViewModel @Inject constructor(
                     currentMessageLimit = (currentMessageLimit / 2).coerceAtLeast(10)
                     try {
                         val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-                        eventDispatcher.mergeMessages(sessionId, messages)
+                        chatRepository.mergeMessages(sessionId, messages)
                         _hasOlderMessages.value = messages.size >= currentMessageLimit
                         if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
                     } catch (retryEx: Throwable) {
@@ -952,7 +951,7 @@ class ChatViewModel @Inject constructor(
             val result = sessionRepository.fetchSessionStatuses(serverId, directory = sessionDirectory)
             result.onSuccess { statusMap ->
                 // Batch-update ALL session statuses (one REST call, all sessions)
-                eventDispatcher.syncAllSessionStatuses(statusMap)
+                sessionRepository.syncAllSessionStatuses(statusMap)
 
                 // Only mark current session as idle if REST explicitly confirmed it's idle.
                 // null means the server didn't report this session (possibly wrong directory),
@@ -960,7 +959,7 @@ class ChatViewModel @Inject constructor(
                 // overwrite a legitimate Busy status from SSE and break ongoing tasks.
                 val currentStatus = statusMap[sessionId]
                 if (currentStatus is SessionStatus.Idle) {
-                    eventDispatcher.markSessionIdleProtected(sessionId)
+                    sessionRepository.markSessionIdleProtected(sessionId)
                 }
             }
         }
@@ -975,7 +974,7 @@ class ChatViewModel @Inject constructor(
             currentMessageLimit = currentMessageLimit * 2
             try {
                 val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-                eventDispatcher.mergeMessages(sessionId, messages)
+                chatRepository.mergeMessages(sessionId, messages)
                 _hasOlderMessages.value = messages.size >= currentMessageLimit
 
                 if (BuildConfig.DEBUG) {
@@ -1001,7 +1000,7 @@ class ChatViewModel @Inject constructor(
             if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingQuestions: ${allQuestions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
 
             // Include questions from child sessions
-            val childSessionIds = eventDispatcher.sessions.value
+            val childSessionIds = chatRepository.getSessionsSnapshot()
                 .filter { it.parentId == sessionId }
                 .map { it.id }
                 .toSet()
@@ -1029,17 +1028,17 @@ class ChatViewModel @Inject constructor(
                         },
                         tool = req.tool,
                         sourceSessionTitle = if (isChild) {
-                            eventDispatcher.sessions.value.find { it.id == req.sessionId }?.title
+                            chatRepository.getSessionsSnapshot().find { it.id == req.sessionId }?.title
                         } else null
                     )
                 }
             if (sessionQuestions.isNotEmpty()) {
                 // 合并 SSE 已有的问题 + REST 恢复的问题（去重），防止覆盖 SSE 新推送的问题
-                val existingSseQs = eventDispatcher.questions.value[sessionId] ?: emptyList()
+                val existingSseQs = chatRepository.getQuestionsSnapshot()[sessionId] ?: emptyList()
                 val existingIds = existingSseQs.map { it.id }.toSet()
                 val newQs = sessionQuestions.filter { it.id !in existingIds }
                 if (newQs.isNotEmpty()) {
-                    eventDispatcher.setQuestions(sessionId, existingSseQs + newQs)
+                    chatRepository.setQuestions(sessionId, existingSseQs + newQs)
                     if (BuildConfig.DEBUG) Log.d(TAG, "Merged ${newQs.size} new + ${existingSseQs.size} existing questions for session $sessionId")
                 } else {
                     if (BuildConfig.DEBUG) Log.d(TAG, "All ${sessionQuestions.size} REST questions already present via SSE for session $sessionId")
@@ -1057,7 +1056,7 @@ class ChatViewModel @Inject constructor(
             if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingPermissions: ${allPermissions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
 
             // Include permissions from child sessions
-            val childSessionIds = eventDispatcher.sessions.value
+            val childSessionIds = chatRepository.getSessionsSnapshot()
                 .filter { it.parentId == sessionId }
                 .map { it.id }
                 .toSet()
@@ -1075,7 +1074,7 @@ class ChatViewModel @Inject constructor(
                         always = req.always,
                         tool = req.tool,
                         sourceSessionTitle = if (isChild) {
-                            eventDispatcher.sessions.value.find { it.id == req.sessionId }?.title
+                            chatRepository.getSessionsSnapshot().find { it.id == req.sessionId }?.title
                         } else null
                     )
                 }
@@ -1084,11 +1083,11 @@ class ChatViewModel @Inject constructor(
                 // SSE stores child session permissions under childSessionId, REST should do the same
                 val permissionsByTarget = sessionPermissions.groupBy { it.sessionId }
                 for ((targetSessionId, perms) in permissionsByTarget) {
-                    val existingSsePerms = eventDispatcher.permissions.value[targetSessionId] ?: emptyList()
+                    val existingSsePerms = chatRepository.getPermissionsSnapshot()[targetSessionId] ?: emptyList()
                     val existingIds = existingSsePerms.map { it.id }.toSet()
                     val newPerms = perms.filter { it.id !in existingIds }
                     if (newPerms.isNotEmpty()) {
-                        eventDispatcher.setPermissions(targetSessionId, existingSsePerms + newPerms)
+                        chatRepository.setPermissions(targetSessionId, existingSsePerms + newPerms)
                         if (BuildConfig.DEBUG) Log.d(TAG, "Merged ${newPerms.size} new + ${existingSsePerms.size} existing permissions for session $targetSessionId")
                     } else {
                         if (BuildConfig.DEBUG) Log.d(TAG, "All ${perms.size} REST permissions already present via SSE for session $targetSessionId")
@@ -1340,7 +1339,7 @@ class ChatViewModel @Inject constructor(
             if (sessionId.isNotEmpty()) return sessionId
             val dir = if (directoryParam.isNotEmpty()) directoryParam else sessionDirectory
             val session = manageSessionUseCase.createSession(serverId, directory = dir)
-            eventDispatcher.setSessions(serverId, listOf(session))
+            sessionRepository.setSessions(serverId, listOf(session))
             sessionId = session.id
             sessionDirectory = session.directory.ifBlank { dir }
             if (!sessionLoaded.isCompleted) {
@@ -1361,14 +1360,14 @@ class ChatViewModel @Inject constructor(
             try {
                 val refreshed = manageSessionUseCase.getSession(serverId, sid)
                 if (refreshed != null) {
-                    val currentSession = eventDispatcher.sessions.value.find { it.id == sid }
+                    val currentSession = chatRepository.getSessionsSnapshot().find { it.id == sid }
                     val currentTitle = currentSession?.title
                     // Only update if the title actually changed (skip if SSE already delivered it)
                     if (refreshed.title != currentTitle) {
                         val msg = "[Title] REST fallback: title updated from '$currentTitle' to '${refreshed.title}'"
                         Log.i(TAG, msg)
                         appendDiagnosticLog(msg)
-                        eventDispatcher.setSessions(serverId, listOf(refreshed))
+                        sessionRepository.setSessions(serverId, listOf(refreshed))
                     }
                 }
             } catch (e: Exception) {
@@ -1443,14 +1442,14 @@ class ChatViewModel @Inject constructor(
                 appendDiagnosticLog(resultMsg)
                 if (success) {
                     // Optimistically remove the permission card — SSE event may arrive late or not at all
-                    eventDispatcher.removePermission(requestId)
+                    chatRepository.removePermission(requestId)
                 } else {
                     // API returned non-2xx (e.g. already replied by another client) — remove card anyway
                     // to prevent permanently stuck permission cards
                     val warnMsg = "[Permission] API returned failure for $requestId, removing card as fallback (likely already replied)"
                     Log.w(TAG, warnMsg)
                     appendDiagnosticLog(warnMsg)
-                    eventDispatcher.removePermission(requestId)
+                    chatRepository.removePermission(requestId)
                 }
             } catch (e: Exception) {
                 val errMsg = "[Permission] Exception replying to $requestId: ${e.javaClass.simpleName}: ${e.message}"
@@ -1458,7 +1457,7 @@ class ChatViewModel @Inject constructor(
                 appendDiagnosticLog(errMsg)
                 // Network/timeout error — remove card to prevent stuck state;
                 // if the reply didn't reach the server, the server will re-emit the permission event
-                eventDispatcher.removePermission(requestId)
+                chatRepository.removePermission(requestId)
             }
         }
     }
@@ -1480,7 +1479,7 @@ class ChatViewModel @Inject constructor(
                 manageSessionUseCase.abortSession(serverId, sessionId, directory = sessionDirectory)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
                 // Optimistically update session status to Idle so UI reflects change immediately
-                eventDispatcher.updateSessionStatus(sessionId, SessionStatus.Idle)
+                sessionRepository.updateSessionStatus(sessionId, SessionStatus.Idle)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
@@ -1508,13 +1507,13 @@ class ChatViewModel @Inject constructor(
                 Log.i(TAG, resultMsg)
                 appendDiagnosticLog(resultMsg)
                 // Always remove the question card regardless of API result.
-                eventDispatcher.removeQuestion(requestId)
+                chatRepository.removeQuestion(requestId)
             } catch (e: Exception) {
                 val errMsg = "[Question] Exception replying to $requestId: ${e.javaClass.simpleName}: ${e.message}"
                 Log.e(TAG, errMsg, e)
                 appendDiagnosticLog(errMsg)
                 // Network/timeout — remove card; server will re-emit if still pending
-                eventDispatcher.removeQuestion(requestId)
+                chatRepository.removeQuestion(requestId)
             }
         }
     }
@@ -1534,13 +1533,13 @@ class ChatViewModel @Inject constructor(
                 appendDiagnosticLog(resultMsg)
                 // Always remove the question card regardless of API result.
                 // If already answered by another client, server returns non-2xx — card should still close.
-                eventDispatcher.removeQuestion(requestId)
+                chatRepository.removeQuestion(requestId)
             } catch (e: Exception) {
                 val errMsg = "[Question] Exception rejecting $requestId: ${e.javaClass.simpleName}: ${e.message}"
                 Log.e(TAG, errMsg, e)
                 appendDiagnosticLog(errMsg)
                 // Network/timeout — remove card; server will re-emit if still pending
-                eventDispatcher.removeQuestion(requestId)
+                chatRepository.removeQuestion(requestId)
             }
         }
     }
@@ -1778,7 +1777,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val messages = manageSessionUseCase.listMessages(serverId, sessionId, 100)
-                eventDispatcher.replaceMessages(sessionId, messages)
+                chatRepository.replaceMessages(sessionId, messages)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Refreshed messages after session update")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to refresh messages after session update", e)
@@ -1827,7 +1826,7 @@ class ChatViewModel @Inject constructor(
 
                 val normalizedCommand = command.removePrefix("/").trim()
                 val effectiveDirectory = sessionDirectory
-                    ?: eventDispatcher.sessions.value
+                    ?: chatRepository.getSessionsSnapshot()
                         .firstOrNull { it.id == sessionId }
                         ?.directory
                         ?.takeIf { it.isNotBlank() }
