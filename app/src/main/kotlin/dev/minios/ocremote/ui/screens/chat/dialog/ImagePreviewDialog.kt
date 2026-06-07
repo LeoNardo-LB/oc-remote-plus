@@ -190,7 +190,7 @@ internal fun ImagePreviewDialog(
                         IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = stringResource(R.string.close),
+                                contentDescription = stringResource(R.string.a11y_icon_dismiss),
                                 tint = actionTintColor,
                             )
                         }

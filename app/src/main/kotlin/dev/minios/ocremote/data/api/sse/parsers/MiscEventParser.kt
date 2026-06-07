@@ -100,9 +100,6 @@ class MiscEventParser : SseEventParser {
         }
     }
 
-    private fun JsonObject.str(key: String, default: String = ""): String =
-        this[key]?.jsonPrimitive?.content ?: default
-
     private fun JsonObject.strOrNull(key: String): String? =
         this[key]?.jsonPrimitive?.contentOrNull
 }

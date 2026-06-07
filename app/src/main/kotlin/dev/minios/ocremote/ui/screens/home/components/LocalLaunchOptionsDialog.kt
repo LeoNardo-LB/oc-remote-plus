@@ -97,7 +97,7 @@ internal fun LocalLaunchOptionsDialog(
                         },
                         navigationIcon = {
                             IconButton(onClick = onDismiss) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.close))
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                             }
                         },
                     )

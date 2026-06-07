@@ -1,6 +1,7 @@
 package dev.minios.ocremote.domain.usecase
 
 import dev.minios.ocremote.domain.model.Message
+import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.repository.ChatRepository
 import dev.minios.ocremote.domain.repository.SessionRepository
 import io.mockk.coEvery
@@ -33,6 +34,7 @@ class MessagePaginationUseCaseTest {
     @Test
     fun `loadOlderMessages delegates to sessionRepository`() = runTest {
         coEvery { sessionRepo.listMessages("server1", "session1", 50) } returns Result.success(emptyList())
-        useCase.loadOlderMessages("server1", "session1", 50)
+        val result = useCase.loadOlderMessages("server1", "session1", 50)
+        assertEquals(Result.success(emptyList<MessageWithParts>()), result)
     }
 }

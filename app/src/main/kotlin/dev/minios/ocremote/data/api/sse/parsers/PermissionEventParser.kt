@@ -69,7 +69,4 @@ class PermissionEventParser : SseEventParser {
             null
         }
     }
-
-    private fun JsonObject.str(key: String, default: String = ""): String =
-        this[key]?.jsonPrimitive?.content ?: default
 }

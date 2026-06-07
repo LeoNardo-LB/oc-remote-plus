@@ -757,6 +757,9 @@ class ChatViewModel @Inject constructor(
     init {
         val isNewSession = sessionId.isEmpty()
 
+        // Reset token stats from previous session (TokenStatsTracker is @Singleton, shared across sessions)
+        tokenStatsTracker.reset()
+
         // Observe messages and update token stats tracker (computed outside combine for performance)
         viewModelScope.launch {
             messagePaging.observeMessages(sessionId).collect { messages ->

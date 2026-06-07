@@ -80,9 +80,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
- import dev.minios.ocremote.R
- import dev.minios.ocremote.domain.model.AgentInfo
- import dev.minios.ocremote.domain.model.CommandInfo
+import dev.minios.ocremote.R
+import dev.minios.ocremote.domain.model.AgentInfo
+import dev.minios.ocremote.domain.model.CommandInfo
 import dev.minios.ocremote.domain.model.PromptPart
 import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.ui.components.ProviderIcon

@@ -109,7 +109,4 @@ class SessionEventParser(private val json: Json) : SseEventParser {
             null
         }
     }
-
-    private fun JsonObject.str(key: String, default: String = ""): String =
-        this[key]?.jsonPrimitive?.content ?: default
 }
