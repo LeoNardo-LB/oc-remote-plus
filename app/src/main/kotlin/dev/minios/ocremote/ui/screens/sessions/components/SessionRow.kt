@@ -226,7 +226,7 @@ private fun SessionDetailsDialog(
                             stringResource(R.string.session_details_status),
                             when (item.status) {
                                 is SessionStatus.Busy -> stringResource(R.string.session_status_busy)
-                                is SessionStatus.Retry -> stringResource(R.string.session_status_retry)
+                                is SessionStatus.Retry -> stringResource(R.string.sessions_retrying)
                                 else -> stringResource(R.string.session_status_idle)
                             }
                         )
