@@ -773,7 +773,7 @@ fun ChatScreen(
                             }
                         },
                         isSending = interaction.isSending,
-                        isBusy = sessionMeta.sessionStatus is SessionStatus.Busy,
+                        isBusy = sessionMeta.sessionStatus is SessionStatus.Busy || sessionMeta.sessionStatus is SessionStatus.Retry,
                         messages = messageState.messages,
                         attachments = attachments,
                         onAttach = { attachmentHandler.pickImages() },

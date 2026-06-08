@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.model.StepProgressInfo
 import dev.minios.ocremote.domain.model.ToolProgressInfo
 import dev.minios.ocremote.ui.components.ConfirmDialog
@@ -229,6 +231,14 @@ fun ChatMessageList(
                     if (currentCompaction != null && currentCompaction.isActive) {
                         item(key = "compaction_banner") {
                             CompactionBanner(state = currentCompaction)
+                        }
+                    }
+
+                    // Retry banner — shown when session is in Retry status
+                    val retryStatus = sessionMeta.sessionStatus
+                    if (retryStatus is SessionStatus.Retry) {
+                        item(key = "retry_banner") {
+                            RetryBanner(retryStatus)
                         }
                     }
 
@@ -491,6 +501,45 @@ private fun QuestionBatchActionBar(
                     Triple("全部跳过", DialogButtonRole.Secondary) { onSkipAll() },
                 )
             )
+        }
+    }
+}
+
+@Composable
+private fun RetryBanner(retry: SessionStatus.Retry) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+        shape = ShapeTokens.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.size(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.session_status_retry, retry.attempt, retry.attempt),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                if (retry.message.isNotBlank()) {
+                    Text(
+                        text = retry.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                    )
+                }
+            }
         }
     }
 }

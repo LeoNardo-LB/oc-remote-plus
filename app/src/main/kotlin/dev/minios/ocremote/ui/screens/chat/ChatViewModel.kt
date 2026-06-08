@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -202,6 +203,7 @@ data class ChatMessage(
     val isAssistant: Boolean get() = message is Message.Assistant
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -244,10 +246,10 @@ class ChatViewModel @Inject constructor(
     private val directoryParam: String = URLDecoder.decode(
         savedStateHandle.get<String>(ChatNav.PARAM_DIRECTORY) ?: "", "UTF-8"
     )
-    var sessionId: String = URLDecoder.decode(
+    private val _sessionId = MutableStateFlow(URLDecoder.decode(
         savedStateHandle.get<String>("sessionId") ?: "", "UTF-8"
-    )
-        private set
+    ))
+    val sessionId: String get() = _sessionId.value
 
     init {
     }
@@ -398,119 +400,121 @@ class ChatViewModel @Inject constructor(
      * Performs side effects: model/agent resolution from message history, model caching,
      * and sync-back to raw StateFlows so sendParts()/runShellCommand() use consistent values.
      */
-    val modelConfigState: StateFlow<ModelConfigState> = combine(
-        _allProviders,
-        _providers,
-        _defaultModels,
-        _selectedProviderId,
-        _selectedModelId,
-        _agents,
-        _selectedAgent,
-        _selectedVariant,
-        _commands,
-        messagePaging.observeMessages(sessionId),
-        sessionRepository.getSessionsFlow(serverId),
-        tokenStatsTracker.stats,
-    ) { args ->
-        val allProviders = args[0] as List<ProviderCatalog>
-        val providers = args[1] as List<ProviderCatalog>
-        val defaultModels = args[2] as Map<String, String>
-        val selProviderId = args[3] as String?
-        val selModelId = args[4] as String?
-        val agents = args[5] as List<AgentInfo>
-        @Suppress("UNCHECKED_CAST")
-        val agentSelection = args[6] as Pair<String, Boolean>
-        val selectedAgent = agentSelection.first
-        val isAgentExplicitlySelected = agentSelection.second
-        val selectedVariant = args[7] as String?
-        val commands = args[8] as List<CommandInfo>
-        val sessionMessages = args[9] as List<Message>
-        @Suppress("UNCHECKED_CAST")
-        val allSessions = args[10] as List<Session>
-        val tokenStats = args[11] as TokenStatsTracker.TokenStats
+    val modelConfigState: StateFlow<ModelConfigState> = _sessionId.flatMapLatest { sid ->
+        combine(
+            _allProviders,
+            _providers,
+            _defaultModels,
+            _selectedProviderId,
+            _selectedModelId,
+            _agents,
+            _selectedAgent,
+            _selectedVariant,
+            _commands,
+            messagePaging.observeMessages(sid),
+            sessionRepository.getSessionsFlow(serverId),
+            tokenStatsTracker.stats,
+        ) { args ->
+            val allProviders = args[0] as List<ProviderCatalog>
+            val providers = args[1] as List<ProviderCatalog>
+            val defaultModels = args[2] as Map<String, String>
+            val selProviderId = args[3] as String?
+            val selModelId = args[4] as String?
+            val agents = args[5] as List<AgentInfo>
+            @Suppress("UNCHECKED_CAST")
+            val agentSelection = args[6] as Pair<String, Boolean>
+            val selectedAgent = agentSelection.first
+            val isAgentExplicitlySelected = agentSelection.second
+            val selectedVariant = args[7] as String?
+            val commands = args[8] as List<CommandInfo>
+            val sessionMessages = args[9] as List<Message>
+            @Suppress("UNCHECKED_CAST")
+            val allSessions = args[10] as List<Session>
+            val tokenStats = args[11] as TokenStatsTracker.TokenStats
 
-        // Resolve model: explicit selection > last user message's model > provider default
-        var effectiveProviderId = selProviderId
-        var effectiveModelId = selModelId
+            // Resolve model: explicit selection > last user message's model > provider default
+            var effectiveProviderId = selProviderId
+            var effectiveModelId = selModelId
 
-        if (!isModelExplicitlySelected) {
-            val lastUserWithModel = sessionMessages
-                .filterIsInstance<Message.User>()
-                .lastOrNull { it.model != null }
-            if (lastUserWithModel?.model != null) {
-                effectiveProviderId = lastUserWithModel.model.providerId
-                effectiveModelId = lastUserWithModel.model.modelId
-            } else if (effectiveModelId == null && defaultModels.isNotEmpty()) {
-                val entry = defaultModels.entries.first()
-                effectiveProviderId = entry.key
-                effectiveModelId = entry.value
+            if (!isModelExplicitlySelected) {
+                val lastUserWithModel = sessionMessages
+                    .filterIsInstance<Message.User>()
+                    .lastOrNull { it.model != null }
+                if (lastUserWithModel?.model != null) {
+                    effectiveProviderId = lastUserWithModel.model.providerId
+                    effectiveModelId = lastUserWithModel.model.modelId
+                } else if (effectiveModelId == null && defaultModels.isNotEmpty()) {
+                    val entry = defaultModels.entries.first()
+                    effectiveProviderId = entry.key
+                    effectiveModelId = entry.value
+                }
             }
-        }
 
-        // Resolve agent from last user message if not explicitly changed
-        val effectiveAgent = if (!isAgentExplicitlySelected) {
-            val lastUserAgent = sessionMessages
-                .filterIsInstance<Message.User>()
-                .lastOrNull { it.agent != null }
-                ?.agent
-            lastUserAgent ?: selectedAgent
-        } else {
-            selectedAgent
-        }
-
-        // Keep raw state in sync so sendParts()/runShellCommand() always use the displayed value
-        if (effectiveAgent != selectedAgent && !isAgentExplicitlySelected) {
-            _selectedAgent.value = effectiveAgent to false
-        }
-
-        // Keep model StateFlows in sync with the effective model
-        if ((effectiveProviderId != selProviderId || effectiveModelId != selModelId) && !isModelExplicitlySelected) {
-            _selectedProviderId.value = effectiveProviderId
-            _selectedModelId.value = effectiveModelId
-        }
-
-        // Resolve available variants for the currently selected model.
-        var currentModel = if (effectiveProviderId != null && effectiveModelId != null) {
-            providers.find { it.id == effectiveProviderId }
-                ?.models?.get(effectiveModelId)
-        } else null
-        if (currentModel == null) {
-            val firstProvider = providers.firstOrNull()
-            val firstModel = firstProvider?.models?.values?.firstOrNull()
-            if (firstProvider != null && firstModel != null) {
-                effectiveProviderId = firstProvider.id
-                effectiveModelId = firstModel.id
-                currentModel = firstModel
+            // Resolve agent from last user message if not explicitly changed
+            val effectiveAgent = if (!isAgentExplicitlySelected) {
+                val lastUserAgent = sessionMessages
+                    .filterIsInstance<Message.User>()
+                    .lastOrNull { it.agent != null }
+                    ?.agent
+                lastUserAgent ?: selectedAgent
+            } else {
+                selectedAgent
             }
-        }
-        val availableVariants = currentModel?.variantNames?.sorted() ?: emptyList()
 
-        // Persist the resolved model to the in-memory cache
-        if (effectiveProviderId != null && effectiveModelId != null) {
-            sessionModelCache[sessionId] = effectiveProviderId to effectiveModelId
-        }
+            // Keep raw state in sync so sendParts()/runShellCommand() always use the displayed value
+            if (effectiveAgent != selectedAgent && !isAgentExplicitlySelected) {
+                _selectedAgent.value = effectiveAgent to false
+            }
 
-        // Resolve context window with fallback to provider model info
-        val session = allSessions.find { it.id == sessionId }
-        val contextWindow = tokenStats.contextWindow.let { cw ->
-            if (cw > 0) cw else session?.model?.let { sm ->
-                providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.contextWindow
-            } ?: currentModel?.contextWindow ?: 0
-        }
+            // Keep model StateFlows in sync with the effective model
+            if ((effectiveProviderId != selProviderId || effectiveModelId != selModelId) && !isModelExplicitlySelected) {
+                _selectedProviderId.value = effectiveProviderId
+                _selectedModelId.value = effectiveModelId
+            }
 
-        ModelConfigState(
-            providers = providers,
-            hasServerModelCatalog = allProviders.any { it.models.isNotEmpty() },
-            defaultModels = defaultModels,
-            selectedProviderId = effectiveProviderId,
-            selectedModelId = effectiveModelId,
-            agents = agents.filter { it.mode != "subagent" && !it.hidden },
-            selectedAgent = effectiveAgent,
-            variantNames = availableVariants,
-            selectedVariant = if (selectedVariant != null && selectedVariant in availableVariants) selectedVariant else null,
-            commands = commands,
-            contextWindow = contextWindow,
-        )
+            // Resolve available variants for the currently selected model.
+            var currentModel = if (effectiveProviderId != null && effectiveModelId != null) {
+                providers.find { it.id == effectiveProviderId }
+                    ?.models?.get(effectiveModelId)
+            } else null
+            if (currentModel == null) {
+                val firstProvider = providers.firstOrNull()
+                val firstModel = firstProvider?.models?.values?.firstOrNull()
+                if (firstProvider != null && firstModel != null) {
+                    effectiveProviderId = firstProvider.id
+                    effectiveModelId = firstModel.id
+                    currentModel = firstModel
+                }
+            }
+            val availableVariants = currentModel?.variantNames?.sorted() ?: emptyList()
+
+            // Persist the resolved model to the in-memory cache
+            if (effectiveProviderId != null && effectiveModelId != null) {
+                sessionModelCache[sid] = effectiveProviderId to effectiveModelId
+            }
+
+            // Resolve context window with fallback to provider model info
+            val session = allSessions.find { it.id == sid }
+            val contextWindow = tokenStats.contextWindow.let { cw ->
+                if (cw > 0) cw else session?.model?.let { sm ->
+                    providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.contextWindow
+                } ?: currentModel?.contextWindow ?: 0
+            }
+
+            ModelConfigState(
+                providers = providers,
+                hasServerModelCatalog = allProviders.any { it.models.isNotEmpty() },
+                defaultModels = defaultModels,
+                selectedProviderId = effectiveProviderId,
+                selectedModelId = effectiveModelId,
+                agents = agents.filter { it.mode != "subagent" && !it.hidden },
+                selectedAgent = effectiveAgent,
+                variantNames = availableVariants,
+                selectedVariant = if (selectedVariant != null && selectedVariant in availableVariants) selectedVariant else null,
+                commands = commands,
+                contextWindow = contextWindow,
+            )
+        }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -528,69 +532,71 @@ class ChatViewModel @Inject constructor(
      * Message list state — changes on every message/part/update.
      * Independent from other combines to limit recomposition scope.
      */
-    val messageListState: StateFlow<MessageListState> = combine(
-        sessionRepository.getSessionsFlow(serverId),
-        messagePaging.observeMessages(sessionId),
-        chatRepository.getAllPartsMap(),
-        _isLoading,
-        _hasOlderMessages,
-        _isLoadingOlder,
-        _toolExpandedStates,
-        _pendingMessageIds,
-    ) { args ->
-        @Suppress("UNCHECKED_CAST")
-        val allSessions = args[0] as List<Session>
-        val sessionMessages = args[1] as List<Message>
-        val allParts = args[2] as Map<String, List<Part>>
-        val loading = args[3] as Boolean
-        val hasOlderMessages = args[4] as Boolean
-        val isLoadingOlder = args[5] as Boolean
-        @Suppress("UNCHECKED_CAST")
-        val toolExpandedStates = args[6] as Map<String, Boolean>
-        @Suppress("UNCHECKED_CAST")
-        val pendingMessageIds = args[7] as Set<String>
+    val messageListState: StateFlow<MessageListState> = _sessionId.flatMapLatest { sid ->
+        combine(
+            sessionRepository.getSessionsFlow(serverId),
+            messagePaging.observeMessages(sid),
+            chatRepository.getAllPartsMap(),
+            _isLoading,
+            _hasOlderMessages,
+            _isLoadingOlder,
+            _toolExpandedStates,
+            _pendingMessageIds,
+        ) { args ->
+            @Suppress("UNCHECKED_CAST")
+            val allSessions = args[0] as List<Session>
+            val sessionMessages = args[1] as List<Message>
+            val allParts = args[2] as Map<String, List<Part>>
+            val loading = args[3] as Boolean
+            val hasOlderMessages = args[4] as Boolean
+            val isLoadingOlder = args[5] as Boolean
+            @Suppress("UNCHECKED_CAST")
+            val toolExpandedStates = args[6] as Map<String, Boolean>
+            @Suppress("UNCHECKED_CAST")
+            val pendingMessageIds = args[7] as Set<String>
 
-        val session = allSessions.find { it.id == sessionId }
-        val revertState = session?.revert
+            val session = allSessions.find { it.id == sid }
+            val revertState = session?.revert
 
-        val chatMessages = if (loading && sessionMessages.size < 3) {
-            emptyList()
-        } else {
-            val sorted = sessionMessages.sortedBy { it.time.created }
-            val visible = if (revertState != null) {
-                sorted.filter { it.id < revertState.messageId }
+            val chatMessages = if (loading && sessionMessages.size < 3) {
+                emptyList()
             } else {
-                sorted
+                val sorted = sessionMessages.sortedBy { it.time.created }
+                val visible = if (revertState != null) {
+                    sorted.filter { it.id < revertState.messageId }
+                } else {
+                    sorted
+                }
+                visible.map { msg ->
+                    ChatMessage(
+                        message = msg,
+                        parts = allParts[msg.id] ?: emptyList()
+                    )
+                }
             }
-            visible.map { msg ->
-                ChatMessage(
-                    message = msg,
-                    parts = allParts[msg.id] ?: emptyList()
-                )
+
+            val pendingAssistantIndex = chatMessages.indexOfLast {
+                it.message is Message.Assistant && it.message.time.completed == null
             }
-        }
+            val queuedMessageIds = if (pendingAssistantIndex >= 0) {
+                chatMessages.drop(pendingAssistantIndex + 1)
+                    .filter { it.isUser }
+                    .map { it.message.id }
+                    .toSet()
+            } else {
+                emptySet<String>()
+            }
 
-        val pendingAssistantIndex = chatMessages.indexOfLast {
-            it.message is Message.Assistant && it.message.time.completed == null
+            MessageListState(
+                messages = chatMessages,
+                messageCount = chatMessages.size,
+                hasOlderMessages = hasOlderMessages,
+                isLoadingOlder = isLoadingOlder,
+                toolExpandedStates = toolExpandedStates,
+                queuedMessageIds = queuedMessageIds,
+                pendingMessageIds = pendingMessageIds,
+            )
         }
-        val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-            chatMessages.drop(pendingAssistantIndex + 1)
-                .filter { it.isUser }
-                .map { it.message.id }
-                .toSet()
-        } else {
-            emptySet<String>()
-        }
-
-        MessageListState(
-            messages = chatMessages,
-            messageCount = chatMessages.size,
-            hasOlderMessages = hasOlderMessages,
-            isLoadingOlder = isLoadingOlder,
-            toolExpandedStates = toolExpandedStates,
-            queuedMessageIds = queuedMessageIds,
-            pendingMessageIds = pendingMessageIds,
-        )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -599,33 +605,36 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
+     * Includes [_sessionId] as a source so lazy-session creation triggers immediate recomputation.
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
+        _sessionId,
         sessionRepository.getSessionsFlow(serverId),
         sessionRepository.getSessionStatusesFlow(serverId),
         sessionRepository.getCurrentAgentFlow(serverId),
         sessionRepository.getCurrentModelFlow(serverId),
     ) { args ->
+        val sid = args[0] as String
         @Suppress("UNCHECKED_CAST")
-        val allSessions = args[0] as List<Session>
+        val allSessions = args[1] as List<Session>
         @Suppress("UNCHECKED_CAST")
-        val statuses = args[1] as Map<String, SessionStatus>
+        val statuses = args[2] as Map<String, SessionStatus>
         @Suppress("UNCHECKED_CAST")
-        val currentAgentMap = args[2] as Map<String, String>
+        val currentAgentMap = args[3] as Map<String, String>
         @Suppress("UNCHECKED_CAST")
-        val currentModelMap = args[3] as Map<String, Pair<String, String>>
+        val currentModelMap = args[4] as Map<String, Pair<String, String>>
 
-        val session = allSessions.find { it.id == sessionId }
+        val session = allSessions.find { it.id == sid }
 
         SessionMetaState(
             sessionTitle = session?.title ?: "",
             serverName = serverName,
-            sessionStatus = statuses[sessionId] ?: SessionStatus.Idle,
+            sessionStatus = statuses[sid] ?: SessionStatus.Idle,
             revert = session?.revert,
             sessionParentId = session?.parentId,
             sessionAgent = session?.agent,
-            currentAgentName = currentAgentMap[sessionId],
-            currentModelId = currentModelMap[sessionId]?.second,
+            currentAgentName = currentAgentMap[sid],
+            currentModelId = currentModelMap[sid]?.second,
             shareUrl = session?.share?.url,
         )
     }.stateIn(
@@ -636,25 +645,28 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Interaction state — loading, sending, error, and pending permission/question cards.
+     * Includes [_sessionId] as a source so lazy-session creation triggers immediate recomputation.
      */
     val interactionState: StateFlow<InteractionState> = combine(
+        _sessionId,
         _isLoading,
         _error,
         _isSending,
         sessionRepository.getSessionsFlow(serverId),
     ) { args ->
-        val loading = args[0] as Boolean
-        val error = args[1] as String?
-        val sending = args[2] as Boolean
+        val sid = args[0] as String
+        val loading = args[1] as Boolean
+        val error = args[2] as String?
+        val sending = args[3] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val allSessions = args[3] as List<Session>
+        val allSessions = args[4] as List<Session>
 
         InteractionState(
             isLoading = loading,
             isSending = sending,
             error = error,
-            pendingPermissions = chatRepository.getPermissionsWithChildren(sessionId, allSessions),
-            pendingQuestions = chatRepository.getQuestionsWithChildren(sessionId, allSessions),
+            pendingPermissions = chatRepository.getPermissionsWithChildren(sid, allSessions),
+            pendingQuestions = chatRepository.getQuestionsWithChildren(sid, allSessions),
         )
     }.stateIn(
         viewModelScope,
@@ -763,7 +775,8 @@ class ChatViewModel @Inject constructor(
 
         // Observe messages and update token stats tracker (computed outside combine for performance)
         viewModelScope.launch {
-            messagePaging.observeMessages(sessionId).collect { messages ->
+            _sessionId.flatMapLatest { sid -> messagePaging.observeMessages(sid) }
+                .collect { messages ->
                 val assistantMessages = messages.filterIsInstance<Message.Assistant>()
                 val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
                 val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
@@ -948,6 +961,11 @@ class ChatViewModel @Inject constructor(
      */
     fun syncSessionStatus() {
         viewModelScope.launch {
+            // Wait for loadSession() to complete so sessionDirectory is populated.
+            // Without this, REST call may use null directory and return incorrect status.
+            if (sessionId.isNotBlank()) {
+                sessionLoaded.await()
+            }
             val result = sessionRepository.fetchSessionStatuses(serverId, directory = sessionDirectory)
             result.onSuccess { statusMap ->
                 // Batch-update ALL session statuses (one REST call, all sessions)
@@ -1340,7 +1358,7 @@ class ChatViewModel @Inject constructor(
             val dir = if (directoryParam.isNotEmpty()) directoryParam else sessionDirectory
             val session = manageSessionUseCase.createSession(serverId, directory = dir)
             sessionRepository.setSessions(serverId, listOf(session))
-            sessionId = session.id
+            _sessionId.value = session.id
             sessionDirectory = session.directory.ifBlank { dir }
             if (!sessionLoaded.isCompleted) {
                 sessionLoaded.complete(Unit)
