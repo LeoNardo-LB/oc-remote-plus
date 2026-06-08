@@ -108,6 +108,31 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         }
     }
 
+    /**
+     * Merge SSE and REST versions of a message.
+     * SSE is fresher for content (streaming), but REST may have completion
+     * info that SSE hasn't delivered yet.
+     */
+    private fun mergeMessageMeta(sse: Message, rest: Message): Message {
+        // For User messages: REST is authoritative (no streaming)
+        if (sse is Message.User) return rest
+        if (sse !is Message.Assistant) return rest
+
+        // For Assistant messages:
+        // - If SSE says completed (streaming finished), trust SSE completely
+        // - If SSE says NOT completed but REST says completed, trust REST's completed time
+        //   but keep SSE's other fields (finish, tokens, cost may be fresher)
+        return if (sse.time.completed != null) {
+            sse  // SSE has final state, prefer it
+        } else if (rest.time.completed != null) {
+            // REST says completed but SSE hasn't seen it yet — merge completed time
+            sse.copy(time = sse.time.copy(completed = rest.time.completed))
+        } else {
+            // Neither has completed — prefer SSE (fresher streaming state)
+            sse
+        }
+    }
+
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
         _parts.update { current ->
             val messageParts = current[event.messageId]?.toMutableList() ?: mutableListOf()
@@ -147,11 +172,23 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
-            // Merge: keep SSE messages not in REST response (may be streaming),
-            // prefer SSE version for messages present in both (SSE is fresher).
+            // Merge strategy:
+            // - Messages present in both: prefer SSE version (fresher) unless REST has completed=true
+            //   and SSE has completed=null (edge case: SSE missed the completion event)
+            // - Messages only in SSE: preserved (may be actively streaming)
+            // - Messages only in REST: added (missed by SSE)
             val merged = (existing + newMessages.map { it.info })
                 .distinctBy { it.id }
-                .map { msg -> incomingById[msg.id]?.info ?: msg }
+                .map { msg ->
+                    val incoming = incomingById[msg.id]
+                    if (incoming != null) {
+                        val sseVersion = msg
+                        val restVersion = incoming.info
+                        mergeMessageMeta(sseVersion, restVersion)
+                    } else {
+                        msg
+                    }
+                }
                 .sortedBy { it.time.created }
             current + (sessionId to merged)
         }
