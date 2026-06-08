@@ -48,6 +48,7 @@ class EventDispatcher @Inject constructor(
     val todos: StateFlow<Map<String, List<SseEvent.TodoUpdated.Todo>>> get() = miscHandler.todos
     val vcsBranch: StateFlow<String?> get() = sessionHandler.vcsBranch
     val projectInfo: StateFlow<Project?> get() = sessionHandler.projectInfo
+    val lastUserMessageTime: StateFlow<Map<String, Long>> get() = sessionHandler.lastUserMessageTime
 
     // Session Next state
     val currentAgent: StateFlow<Map<String, String>> get() = sessionNextHandler.currentAgent
@@ -91,6 +92,11 @@ class EventDispatcher @Inject constructor(
         // flickering when the agent continues to the next tool call.
         if (event is SseEvent.CommandExecuted) {
             messageHandler.markSessionIdle(event.sessionId)
+        }
+
+        // Track user message times for stable session sort ordering.
+        if (event is SseEvent.MessageUpdated && event.info is Message.User) {
+            sessionHandler.recordUserMessage(event.info.sessionId, event.info.time.created)
         }
     }
 

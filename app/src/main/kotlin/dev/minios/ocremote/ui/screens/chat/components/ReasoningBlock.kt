@@ -33,7 +33,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -47,12 +50,28 @@ import dev.minios.ocremote.ui.screens.chat.util.halfScreenHeight
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import kotlinx.coroutines.delay
 
 @Composable
-internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleExpand: () -> Unit = {}, durationMs: Long? = null, isStreaming: Boolean = false) {
+internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleExpand: () -> Unit = {}, durationMs: Long? = null, isStreaming: Boolean = false, startTimeMs: Long? = null) {
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
     val expanded = isExpanded
+
+    // Live elapsed timer for streaming reasoning
+    val fallbackStart = remember { System.currentTimeMillis() }
+    val effectiveStart = startTimeMs ?: fallbackStart
+    val elapsedMs = remember { mutableLongStateOf(0L) }
+    LaunchedEffect(isStreaming, effectiveStart) {
+        if (isStreaming) {
+            while (true) {
+                elapsedMs.longValue = System.currentTimeMillis() - effectiveStart
+                delay(1000L)
+            }
+        } else {
+            elapsedMs.longValue = durationMs ?: 0L
+        }
+    }
 
     val accentColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
     val containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = AlphaTokens.MEDIUM)
@@ -72,9 +91,8 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
 
     val isComplete = durationMs != null && !isStreaming
     val headerText = when {
-        isStreaming && text.isBlank() -> stringResource(R.string.chat_thinking)
-        isStreaming -> stringResource(R.string.chat_thinking)
-        isComplete && durationMs != null -> stringResource(R.string.chat_thinking_complete, formatReasoningDuration(durationMs))
+        isStreaming -> stringResource(R.string.chat_thinking_in_progress, formatReasoningDuration(elapsedMs.longValue))
+        isComplete -> stringResource(R.string.chat_thinking_complete, formatReasoningDuration(durationMs!!))
         else -> stringResource(R.string.chat_status_thinking)
     }
 

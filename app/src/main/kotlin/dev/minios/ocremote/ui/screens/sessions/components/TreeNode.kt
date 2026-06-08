@@ -47,6 +47,7 @@ fun buildTreeNodes(
     expandedDirs: Set<String>,
     baseDirectory: String?,
     statuses: Map<String, SessionStatus> = emptyMap(),
+    draftSessionIds: Set<String> = emptySet(),
 ): List<TreeNode> {
     val result = mutableListOf<TreeNode>()
     val dirSessions = sortedMapOf<String, MutableList<Session>>()
@@ -96,7 +97,7 @@ fun buildTreeNodes(
             for (session in dirSessionList.sortedByDescending { it.time.updated }) {
                 result.add(TreeNode.Session(
                     id = session.id,
-                    session = SessionItem(session = session, status = statuses[session.id] ?: SessionStatus.Idle),
+                    session = SessionItem(session = session, status = statuses[session.id] ?: SessionStatus.Idle, hasDraft = session.id in draftSessionIds),
                 ))
             }
         }
@@ -106,7 +107,7 @@ fun buildTreeNodes(
     for (session in rootSessions.sortedByDescending { it.time.updated }) {
         result.add(TreeNode.Session(
             id = session.id,
-            session = SessionItem(session = session, status = statuses[session.id] ?: SessionStatus.Idle),
+            session = SessionItem(session = session, status = statuses[session.id] ?: SessionStatus.Idle, hasDraft = session.id in draftSessionIds),
         ))
     }
 

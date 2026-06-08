@@ -56,6 +56,9 @@ class DraftDataStore @Inject constructor(
         persist(map)
     }
 
+    override fun getDraftSessionIds(): Set<String> =
+        ensureLoaded().filter { !it.value.isEmpty }.keys
+
     override fun clearDraft(sessionId: String) {
         val map = ensureLoaded()
         if (map.remove(sessionId) != null) {

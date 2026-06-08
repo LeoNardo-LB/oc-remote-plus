@@ -236,6 +236,7 @@
     <string name="chat_messages_reverted">Messages reverted</string>
     <string name="chat_tap_restore">Tap to restore, or use /redo</string>
     <string name="chat_thinking">Thinking</string>
+    <string name="chat_thinking_in_progress">Thinking… %1$s</string>
     <string name="chat_reasoning">Reasoning</string>
     <string name="chat_edit_label">Edit</string>
     <string name="chat_write_label">Write</string>

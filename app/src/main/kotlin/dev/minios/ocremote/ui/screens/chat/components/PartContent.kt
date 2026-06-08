@@ -60,6 +60,8 @@ internal fun PartContent(
         }
         is Part.Reasoning -> {
             if (part.text.isNotBlank()) {
+                val isStreaming = part.time?.end == null
+                val startTimeMs = part.time?.start
                 val reasoningDuration = part.time?.let { t ->
                     t.end?.let { end -> end - t.start }
                 }
@@ -70,7 +72,9 @@ internal fun PartContent(
                     text = part.text,
                     isExpanded = toolExpandedStates[part.id] ?: expandReasoningDefault,
                     onToggleExpand = { onToggleToolExpanded(part.id, expandReasoningDefault) },
-                    durationMs = reasoningDuration
+                    durationMs = reasoningDuration,
+                    isStreaming = isStreaming,
+                    startTimeMs = startTimeMs
                 )
             }
         }

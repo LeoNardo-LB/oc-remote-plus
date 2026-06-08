@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +28,8 @@ import dev.snipme.highlights.Highlights
 import org.intellij.markdown.ast.ASTNode
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import org.intellij.markdown.MarkdownTokenTypes
+import org.intellij.markdown.ast.findChildOfType
 
 /**
  * Custom code block component replacing mikepenz's built-in showHeader.
@@ -53,6 +56,25 @@ internal fun OcCodeBlock(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val maxWidth = LocalConfiguration.current.screenWidthDp.dp
+
+    // Extract pure code text from the markdown content using AST node offsets.
+    // The `content` parameter is the entire markdown source, not just the code block.
+    // mikepenz internally does the same slicing for rendering; we replicate it for copying.
+    val codeText = remember(content, node) {
+        if (isFence && node.children.size >= 3) {
+            val language = node.findChildOfType(MarkdownTokenTypes.FENCE_LANG)
+            val start = node.children[2].startOffset
+            val minCount = if (language != null && node.children.size > 3) 3 else 2
+            val end = node.children[(node.children.size - 2).coerceAtLeast(minCount)].endOffset
+            content.subSequence(start, end).toString().replaceIndent()
+        } else if (!isFence && node.children.isNotEmpty()) {
+            val start = node.children[0].startOffset
+            val end = node.children[node.children.size - 1].endOffset
+            content.subSequence(start, end).toString().replaceIndent()
+        } else {
+            content
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -81,7 +103,7 @@ internal fun OcCodeBlock(
         // Floating copy button (top-right, always visible, fixed position)
         IconButton(
             onClick = {
-                clipboardManager.setText(AnnotatedString(content))
+                clipboardManager.setText(AnnotatedString(codeText))
                 Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
             },
             modifier = Modifier

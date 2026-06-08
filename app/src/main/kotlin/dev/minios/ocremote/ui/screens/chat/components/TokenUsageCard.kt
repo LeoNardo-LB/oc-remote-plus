@@ -52,7 +52,7 @@ fun TokenUsageCard(
                 Text(
                     text = stringResource(
                         R.string.chat_token_usage_total,
-                        inputTokens + outputTokens + reasoningTokens
+                        inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
                     ),
                     style = MaterialTheme.typography.labelMedium
                 )
@@ -67,7 +67,7 @@ fun TokenUsageCard(
 
             // Context window progress bar
             if (contextWindow > 0) {
-                val totalTokens = inputTokens + outputTokens + reasoningTokens
+                val totalTokens = inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
                 val progress = (totalTokens.toFloat() / contextWindow).coerceIn(0f, 1f)
                 LinearProgressIndicator(
                     progress = { progress },

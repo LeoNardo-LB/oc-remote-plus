@@ -44,6 +44,14 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
     private val _projectInfo = MutableStateFlow<Project?>(null)
     val projectInfo: StateFlow<Project?> = _projectInfo.asStateFlow()
 
+    /** Tracks the timestamp of the last user message per session for stable sort ordering. */
+    private val _lastUserMessageTime = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val lastUserMessageTime: StateFlow<Map<String, Long>> = _lastUserMessageTime.asStateFlow()
+
+    fun recordUserMessage(sessionId: String, time: Long) {
+        _lastUserMessageTime.update { it + (sessionId to time) }
+    }
+
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
             is SseEvent.ServerConnected -> { if (BuildConfig.DEBUG) Log.d(TAG, "Server connected"); true }
@@ -246,6 +254,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         _sessionStatuses.update { it - sessionIds }
         _sseTimestamps.update { it - sessionIds }
         _sessionDiffs.update { it - sessionIds }
+        _lastUserMessageTime.update { it - sessionIds }
     }
 
     fun clearAll() {
@@ -254,6 +263,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         _sessionStatuses.value = emptyMap()
         _sseTimestamps.value = emptyMap()
         _sessionDiffs.value = emptyMap()
+        _lastUserMessageTime.value = emptyMap()
         _vcsBranch.value = null
         _projectInfo.value = null
     }

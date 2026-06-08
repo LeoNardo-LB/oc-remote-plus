@@ -135,78 +135,79 @@ fun ChatTopBar(
             }
         },
         actions = {
-            if (sessionParentId == null) {
-                // Context progress indicator
-                val showContext = contextWindow > 0 && lastContextTokens > 0
-                if (showContext) {
-                    val percentage = Math.round(lastContextTokens.toDouble() / contextWindow * 100).toInt()
-                        .coerceIn(0, 100)
-                    val contextColor = when {
-                        percentage >= 90 -> MaterialTheme.colorScheme.error
-                        percentage >= 70 -> MaterialTheme.colorScheme.tertiary
-                        else -> MaterialTheme.colorScheme.primary
-                    }
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clickable { showContextDialog = true }
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { percentage / 100f },
-                            strokeWidth = 3.dp,
-                            color = contextColor,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Text(
-                            text = "$percentage",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = contextColor
-                        )
-                    }
+            // Context progress indicator — shown for both parent and child sessions
+            val showContext = contextWindow > 0 && lastContextTokens > 0
+            if (showContext) {
+                val percentage = Math.round(lastContextTokens.toDouble() / contextWindow * 100).toInt()
+                    .coerceIn(0, 100)
+                val contextColor = when {
+                    percentage >= 90 -> MaterialTheme.colorScheme.error
+                    percentage >= 70 -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.primary
                 }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .clickable { showContextDialog = true }
+                ) {
+                    CircularProgressIndicator(
+                        progress = { percentage / 100f },
+                        strokeWidth = 3.dp,
+                        color = contextColor,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Text(
+                        text = "$percentage",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contextColor
+                    )
+                }
+            }
 
-                // Context detail dialog
-                if (showContextDialog) {
-                    val contextParams = amoledDialogParams()
-                    BasicAlertDialog(
-                        onDismissRequest = { showContextDialog = false },
-                        properties = DialogProperties(usePlatformDefaultWidth = false),
+            // Context detail dialog — shown for both parent and child sessions
+            if (showContextDialog) {
+                val contextParams = amoledDialogParams()
+                BasicAlertDialog(
+                    onDismissRequest = { showContextDialog = false },
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(0.92f),
+                        color = contextParams.containerColor,
+                        tonalElevation = contextParams.tonalElevation,
+                        border = contextParams.border,
+                        shape = contextParams.shape,
                     ) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(0.92f),
-                            color = contextParams.containerColor,
-                            tonalElevation = contextParams.tonalElevation,
-                            border = contextParams.border,
-                            shape = contextParams.shape,
-                        ) {
-                            Column(modifier = Modifier.padding(24.dp)) {
-                                Text(
-                                    text = stringResource(R.string.chat_context_detail_title),
-                                    style = MaterialTheme.typography.titleMedium,
+                        Column(modifier = Modifier.padding(24.dp)) {
+                            Text(
+                                text = stringResource(R.string.chat_context_detail_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            TokenUsageCard(
+                                inputTokens = totalInputTokens,
+                                outputTokens = totalOutputTokens,
+                                reasoningTokens = totalReasoningTokens,
+                                cacheReadTokens = totalCacheReadTokens,
+                                cacheWriteTokens = totalCacheWriteTokens,
+                                totalCost = totalCost,
+                                contextWindow = contextWindow
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            DialogButtons(
+                                buttons = listOf(
+                                    Triple(stringResource(R.string.close), DialogButtonRole.Primary) { showContextDialog = false },
                                 )
-                                Spacer(Modifier.height(16.dp))
-                                TokenUsageCard(
-                                    inputTokens = totalInputTokens,
-                                    outputTokens = totalOutputTokens,
-                                    reasoningTokens = totalReasoningTokens,
-                                    cacheReadTokens = totalCacheReadTokens,
-                                    cacheWriteTokens = totalCacheWriteTokens,
-                                    totalCost = totalCost,
-                                    contextWindow = contextWindow
-                                )
-                                Spacer(Modifier.height(16.dp))
-                                DialogButtons(
-                                    buttons = listOf(
-                                        Triple(stringResource(R.string.close), DialogButtonRole.Primary) { showContextDialog = false },
-                                    )
-                                )
-                            }
+                            )
                         }
                     }
                 }
+            }
 
+            // Dropdown menu — parent sessions only
+            if (sessionParentId == null) {
                 Box {
                     val isAmoled = isAmoledTheme()
                     IconButton(onClick = { showMenu = true }) {

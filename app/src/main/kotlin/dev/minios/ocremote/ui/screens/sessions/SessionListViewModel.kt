@@ -18,6 +18,7 @@ import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.usecase.DeleteSessionUseCase
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
+import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.ui.screens.sessions.components.TreeNode
 import dev.minios.ocremote.ui.screens.sessions.components.buildTreeNodes
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -58,7 +59,8 @@ data class SessionListUiState(
 
 data class SessionItem(
     val session: Session,
-    val status: SessionStatus = SessionStatus.Idle
+    val status: SessionStatus = SessionStatus.Idle,
+    val hasDraft: Boolean = false
 )
 
 @HiltViewModel
@@ -67,7 +69,8 @@ class SessionListViewModel @Inject constructor(
     private val eventDispatcher: EventDispatcher,
     private val api: OpenCodeApi,
     private val manageSessionUseCase: ManageSessionUseCase,
-    private val deleteSessionUseCase: DeleteSessionUseCase
+    private val deleteSessionUseCase: DeleteSessionUseCase,
+    private val draftRepository: DraftRepository
 ) : ViewModel() {
 
     val serverUrl: String = URLDecoder.decode(
@@ -110,6 +113,7 @@ class SessionListViewModel @Inject constructor(
         eventDispatcher.sessions,
         eventDispatcher.sessionStatuses,
         eventDispatcher.serverSessions,
+        eventDispatcher.lastUserMessageTime,
         _isLoading,
         _error,
         _projects,
@@ -124,16 +128,17 @@ class SessionListViewModel @Inject constructor(
         val allSessions = values[0] as List<Session>
         val statuses = values[1] as Map<String, SessionStatus>
         val serverSessionMap = values[2] as Map<String, Set<String>>
-        val isLoading = values[3] as Boolean
-        val error = values[4] as String?
-        val projects = values[5] as List<Project>
-        val expandedPaths = values[6] as Set<String>
-        val selectedIds = values[7] as Set<String>
-        val baseDirectory = values[8] as String?
-        val isRefreshing = values[9] as Boolean
-        val lastToggledDirectory = values[10] as String?
-        val searchQuery = values[11] as String?
-        val showArchived = values[12] as Boolean
+        val lastUserMessageTime = values[3] as Map<String, Long>
+        val isLoading = values[4] as Boolean
+        val error = values[5] as String?
+        val projects = values[6] as List<Project>
+        val expandedPaths = values[7] as Set<String>
+        val selectedIds = values[8] as Set<String>
+        val baseDirectory = values[9] as String?
+        val isRefreshing = values[10] as Boolean
+        val lastToggledDirectory = values[11] as String?
+        val searchQuery = values[12] as String?
+        val showArchived = values[13] as Boolean
 
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
@@ -142,7 +147,9 @@ class SessionListViewModel @Inject constructor(
             .let { sessions ->
                 if (showArchived) sessions.filter { it.isArchived } else sessions
             }
-            .sortedByDescending { it.time.updated }
+            .sortedByDescending { session ->
+                lastUserMessageTime[session.id] ?: session.time.updated
+            }
 
         val baseFilteredSessions = if (baseDirectory != null) {
             filteredSessions.filter { session ->
@@ -164,7 +171,7 @@ class SessionListViewModel @Inject constructor(
             baseFilteredSessions
         }
 
-        val treeNodes = buildTreeNodes(searchedSessions, expandedPaths, baseDirectory, statuses)
+        val treeNodes = buildTreeNodes(searchedSessions, expandedPaths, baseDirectory, statuses, draftRepository.getDraftSessionIds())
 
         val prefillDirectory = if (lastToggledDirectory != null && lastToggledDirectory in expandedPaths)
             lastToggledDirectory

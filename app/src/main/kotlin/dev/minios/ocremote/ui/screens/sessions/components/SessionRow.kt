@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -131,6 +132,16 @@ internal fun SessionRow(
                         )
                     }
                     else -> {}
+                }
+
+                // Draft indicator
+                if (item.hasDraft) {
+                    Icon(
+                        imageVector = Icons.Outlined.EditNote,
+                        contentDescription = "草稿",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
+                    )
                 }
 
                 // Diff summary
