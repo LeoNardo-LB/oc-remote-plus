@@ -64,23 +64,72 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         _parts.update { current ->
             val messageParts = current[messageId]?.toMutableList() ?: mutableListOf()
             val idx = messageParts.indexOfFirst { it.id == event.part.id }
-            if (idx >= 0) messageParts[idx] = event.part else messageParts.add(event.part)
+            if (idx >= 0) {
+                messageParts[idx] = mergePart(messageParts[idx], event.part)
+            } else {
+                messageParts.add(event.part)
+            }
             current + (messageId to messageParts)
+        }
+    }
+
+    /**
+     * Merge Part update: for Text/Reasoning, keep the longer text content.
+     * Server may send intermediate snapshots during streaming whose text is
+     * shorter than what the client has already accumulated via deltas.
+     */
+    private fun mergePart(existing: Part, incoming: Part): Part {
+        return when {
+            existing is Part.Text && incoming is Part.Text -> {
+                if (incoming.text.length >= existing.text.length) incoming
+                else existing.copy(
+                    text = existing.text,
+                    time = incoming.time,
+                    metadata = incoming.metadata
+                )
+            }
+            existing is Part.Reasoning && incoming is Part.Reasoning -> {
+                if (incoming.text.length >= existing.text.length) incoming
+                else existing.copy(
+                    text = existing.text,
+                    time = incoming.time,
+                    metadata = incoming.metadata
+                )
+            }
+            else -> incoming
+        }
+    }
+
+    private fun mergePartsList(existingParts: List<Part>, incomingParts: List<Part>): List<Part> {
+        val existingById = existingParts.associateBy { it.id }
+        return incomingParts.map { incoming ->
+            val existing = existingById[incoming.id]
+            if (existing != null) mergePart(existing, incoming) else incoming
         }
     }
 
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
         _parts.update { current ->
-            val messageParts = current[event.messageId]?.toMutableList() ?: return@update current
+            val messageParts = current[event.messageId]?.toMutableList() ?: mutableListOf()
             val idx = messageParts.indexOfFirst { it.id == event.partId }
-            if (idx < 0) return@update current
-            val part = messageParts[idx]
-            val updated = when (part) {
-                is Part.Text -> part.copy(text = part.text + event.delta)
-                is Part.Reasoning -> part.copy(text = part.text + event.delta)
-                else -> part
+            if (idx >= 0) {
+                val part = messageParts[idx]
+                val updated = when (part) {
+                    is Part.Text -> part.copy(text = part.text + event.delta)
+                    is Part.Reasoning -> part.copy(text = part.text + event.delta)
+                    else -> part
+                }
+                messageParts[idx] = updated
+            } else {
+                // Defensive: create synthetic part when partId not found
+                val syntheticPart = Part.Text(
+                    id = event.partId,
+                    sessionId = event.sessionId,
+                    messageId = event.messageId,
+                    text = event.delta
+                )
+                messageParts.add(syntheticPart)
             }
-            messageParts[idx] = updated
             current + (event.messageId to messageParts)
         }
     }
@@ -97,7 +146,18 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
         _messages.update { it + (sessionId to newMessages.map { m -> m.info }.sortedBy { m -> m.time.created }) }
         val partsMap = newMessages.associate { it.info.id to it.parts }
-        _parts.update { it + partsMap }
+        _parts.update { current ->
+            val merged = partsMap.mapValues { (messageId, incomingParts) ->
+                val existingParts = current[messageId]
+                if (existingParts != null) {
+                    mergePartsList(existingParts, incomingParts)
+                } else {
+                    incomingParts
+                }
+            }
+            // Preserve messageIds not in REST response (may be streaming)
+            current + merged
+        }
     }
 
     fun mergeMessages(sessionId: String, newMessages: List<MessageWithParts>) {
@@ -126,7 +186,17 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             it + (sessionId to newMessages.map { m -> m.info }.sortedBy { m -> m.time.created })
         }
         val partsMap = newMessages.associate { it.info.id to it.parts }
-        _parts.update { it + partsMap }
+        _parts.update { current ->
+            val merged = partsMap.mapValues { (messageId, incomingParts) ->
+                val existingParts = current[messageId]
+                if (existingParts != null) {
+                    mergePartsList(existingParts, incomingParts)
+                } else {
+                    incomingParts
+                }
+            }
+            current + merged
+        }
     }
 
     fun clearForSession(sessionId: String) {
