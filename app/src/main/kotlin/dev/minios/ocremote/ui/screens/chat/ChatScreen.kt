@@ -502,14 +502,20 @@ fun ChatScreen(
             val msgs = messageState.messages
             // Count includes tool cards, questions, etc. — not just messages
             val items = listState.layoutInfo.totalItemsCount
-            // Fingerprint: last message's total parts text length
-            val fingerprint = if (msgs.isEmpty()) 0 else {
-                msgs.last().parts.sumOf { part ->
-                    when (part) {
-                        is Part.Text -> part.text.length
-                        is Part.Reasoning -> part.text.length
-                        else -> 0
+            // Sum text lengths of ALL incomplete (streaming) assistant messages,
+            // not just msgs.last(). This prevents losing auto-scroll tracking
+            // when a tool-call inserts a new empty assistant message.
+            val fingerprint = msgs.sumOf { msg ->
+                if (msg.message is Message.Assistant && msg.message.time.completed == null) {
+                    msg.parts.sumOf { part ->
+                        when (part) {
+                            is Part.Text -> part.text.length
+                            is Part.Reasoning -> part.text.length
+                            else -> 0
+                        }
                     }
+                } else {
+                    0
                 }
             }
             Triple(items, fingerprint, msgs.size)
