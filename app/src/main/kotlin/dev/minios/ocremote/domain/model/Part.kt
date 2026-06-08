@@ -25,7 +25,9 @@ object PartSerializer : JsonContentPolymorphicSerializer<Part>(Part::class) {
             "subtask" -> Part.Subtask.serializer()
             "compaction" -> Part.Compaction.serializer()
             "retry" -> Part.Retry.serializer()
+            "abort" -> Part.Abort.serializer()
             "agent" -> Part.Agent.serializer()
+            "session-turn" -> Part.SessionTurn.serializer()
             else -> Part.Unknown.serializer()
         }
     }

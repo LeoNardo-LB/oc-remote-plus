@@ -104,7 +104,9 @@ class MessageEventParser(private val json: Json) : SseEventParser {
                 "subtask" -> json.decodeFromJsonElement<Part.Subtask>(obj)
                 "compaction" -> json.decodeFromJsonElement<Part.Compaction>(obj)
                 "retry" -> json.decodeFromJsonElement<Part.Retry>(obj)
+                "abort" -> json.decodeFromJsonElement<Part.Abort>(obj)
                 "agent" -> json.decodeFromJsonElement<Part.Agent>(obj)
+                "session-turn" -> json.decodeFromJsonElement<Part.SessionTurn>(obj)
                 else -> {
                     Log.w(TAG, "Unknown part type: $type")
                     Part.Unknown(

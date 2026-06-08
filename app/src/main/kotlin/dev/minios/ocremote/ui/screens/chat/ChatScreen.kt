@@ -492,14 +492,17 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll: stay at bottom when messages increase OR when the last message
-    // content grows (streaming delta). reverseLayout=true needs explicit management.
+    // Auto-scroll: stay at bottom when total items increase (messages, tool cards, etc.)
+    // or when the last message content grows (streaming delta). reverseLayout=true
+    // needs explicit management.
     LaunchedEffect(Unit) {
         var lastCount = 0
         var lastFingerprint = 0
         snapshotFlow {
             val msgs = messageState.messages
-            // Fingerprint: message count + last message's total parts text length
+            // Count includes tool cards, questions, etc. — not just messages
+            val items = listState.layoutInfo.totalItemsCount
+            // Fingerprint: last message's total parts text length
             val fingerprint = if (msgs.isEmpty()) 0 else {
                 msgs.last().parts.sumOf { part ->
                     when (part) {
@@ -509,13 +512,13 @@ fun ChatScreen(
                     }
                 }
             }
-            msgs.size to fingerprint
-        }.collect { (count, fingerprint) ->
+            Triple(items, fingerprint, msgs.size)
+        }.collect { (count, fingerprint, _) ->
             if (count > lastCount && lastCount > 0 && isAtBottom) {
-                // New message appeared while user is at bottom → stay at bottom
+                // New items appeared while user is at bottom → stay at bottom
                 listState.snapToBottom()
             } else if (count == lastCount && fingerprint != lastFingerprint && fingerprint > lastFingerprint && isAtBottom) {
-                // Same message count but content grew (streaming delta) → stay at bottom
+                // Same item count but content grew (streaming delta) → stay at bottom
                 listState.snapToBottom()
             }
             lastCount = count
