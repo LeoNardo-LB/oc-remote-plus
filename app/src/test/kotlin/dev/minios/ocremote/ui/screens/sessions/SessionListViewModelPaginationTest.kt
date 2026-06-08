@@ -5,6 +5,7 @@ import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
+import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.domain.usecase.DeleteSessionUseCase
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
 import io.mockk.every
@@ -26,6 +27,7 @@ class SessionListViewModelPaginationTest {
     private val eventDispatcher: EventDispatcher = mockk(relaxed = true)
     private val manageSessionUseCase: ManageSessionUseCase = mockk()
     private val deleteSessionUseCase: DeleteSessionUseCase = mockk()
+    private val draftRepository: DraftRepository = mockk(relaxed = true)
 
     @Before
     fun setup() {
@@ -81,7 +83,8 @@ class SessionListViewModelPaginationTest {
             eventDispatcher = eventDispatcher,
             api = api,
             manageSessionUseCase = manageSessionUseCase,
-            deleteSessionUseCase = deleteSessionUseCase
+            deleteSessionUseCase = deleteSessionUseCase,
+            draftRepository = draftRepository
         )
     }
 }

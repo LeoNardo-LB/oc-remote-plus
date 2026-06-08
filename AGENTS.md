@@ -108,6 +108,74 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 - CI extracts version by grepping `versionName = "..."` — **do not change the format**
 - Tags follow `v2.0.0-beta.XX` (beta) or `v2.0.0-dev` (dev) pattern
 
+### Release & Publish
+
+**发布流程分为两种场景：**
+
+#### 场景 A：Master 分支发正式 Release
+
+从主仓库 `master` 发布正式版：
+
+```bash
+# 1. 确认在 master，工作区干净
+git checkout master && git pull origin master
+
+# 2. Bump 版本号（修改 app/build.gradle.kts 中的 versionCode 和 versionName）
+#    versionCode += 1, versionName = "2.0.0-beta.XX"
+
+# 3. 提交版本号变更（可单独 commit 或与代码合并一起）
+git add app/build.gradle.kts && git commit -m "chore: bump version to v2.0.0-beta.XX"
+
+# 4. 构建 Release APK（beta flavor 正式版，使用 release keystore）
+.\gradlew --stop
+.\gradlew :app:assembleBetaRelease
+
+# 5. 推送到 remote
+git push origin master
+
+# 6. 打 tag（格式: v2.0.0-beta.XX 或 v2.0.0-dev）
+git tag -a "v2.0.0-beta.XX" -m "v2.0.0-beta.XX — 简要说明"
+git push origin "v2.0.0-beta.XX"
+
+# 7. 创建 GitHub Release 并上传 APK
+gh release create "v2.0.0-beta.XX" \
+  "app/build/outputs/apk/beta/release/app-beta-release.apk" \
+  --title "v2.0.0-beta.XX — 标题" \
+  --notes "详细 changelog"
+```
+
+#### 场景 B：Worktree 分支推送预览版
+
+从 worktree 的非 master 分支推送预览/草稿版（不覆盖正式 Release）：
+
+```bash
+# 1. Worktree 分支 build（dev flavor，debug 签名可用）
+.\gradlew :app:assembleDevRelease
+
+# 2. 用 gh 创建 Draft Release（非正式）
+gh release create "v2.0.0-beta.XX-dev" \
+  "app/build/outputs/apk/dev/release/app-dev-release.apk" \
+  --title "v2.0.0-beta.XX-dev — worktree预览" \
+  --notes "预览版，仅供测试" \
+  --draft
+
+# 或者直接用 `--prerelease` 标记为预发布
+gh release create "v2.0.0-beta.XX-dev" \
+  ... \
+  --prerelease
+```
+
+**规则速查：**
+
+| 场景 | 分支 | Flavor | Tag | Release |
+|------|------|--------|-----|---------|
+| 正式版 | master | `assembleBetaRelease` | `v2.0.0-beta.XX` | `gh release create` + APK |
+| 预览版 | worktree | `assembleDevRelease` | `v2.0.0-beta.XX-dev` | `--draft` 或 `--prerelease` |
+
+- `gh` CLI 不走代理，直接用直连（不加 `HTTP_PROXY`）
+- APK 路径：beta → `app/build/outputs/apk/beta/release/app-beta-release.apk`；dev → `app/build/outputs/apk/dev/release/app-dev-release.apk`
+- **完整步骤顺序**：bump version → commit → build → push master → tag → push tag → `gh release create`（附 APK）
+
 ### Gradle Timeout
 执行 Gradle 命令时必须设置合理的超时时间，禁止无超时裸跑：
 - **Kotlin 编译检查**（`compileDevDebugKotlin`）: 120 秒
