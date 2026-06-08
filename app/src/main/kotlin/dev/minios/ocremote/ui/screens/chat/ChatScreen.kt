@@ -220,6 +220,7 @@ import dev.minios.ocremote.ui.screens.chat.input.ChatInputBar
 import dev.minios.ocremote.ui.screens.chat.input.ChatInputMode
 import dev.minios.ocremote.ui.screens.chat.input.SlashCommand
 import dev.minios.ocremote.ui.screens.chat.input.rememberAttachmentHandler
+import dev.minios.ocremote.domain.model.Part
 import dev.minios.ocremote.ui.screens.chat.input.buildPromptParts
 import dev.minios.ocremote.ui.screens.chat.components.MessageCard
 import dev.minios.ocremote.ui.screens.chat.components.MessageCardRole
@@ -491,18 +492,35 @@ fun ChatScreen(
         }
     }
 
-    // When message count increases (new message from send or QUEUE auto-submit),
-    // scroll to absolute bottom if user is already at/near bottom.
+    // Auto-scroll: stay at bottom when messages increase OR when the last message
+    // content grows (streaming delta). reverseLayout=true needs explicit management.
     LaunchedEffect(Unit) {
         var lastCount = 0
-        snapshotFlow { messageState.messages.size }
-            .collect { count ->
-                if (count > lastCount && lastCount > 0 && isAtBottom) {
-                    // New messages appeared while user is at bottom → stay at bottom
-                    listState.snapToBottom()
+        var lastFingerprint = 0
+        snapshotFlow {
+            val msgs = messageState.messages
+            // Fingerprint: message count + last message's total parts text length
+            val fingerprint = if (msgs.isEmpty()) 0 else {
+                msgs.last().parts.sumOf { part ->
+                    when (part) {
+                        is Part.Text -> part.text.length
+                        is Part.Reasoning -> part.text.length
+                        else -> 0
+                    }
                 }
-                lastCount = count
             }
+            msgs.size to fingerprint
+        }.collect { (count, fingerprint) ->
+            if (count > lastCount && lastCount > 0 && isAtBottom) {
+                // New message appeared while user is at bottom → stay at bottom
+                listState.snapToBottom()
+            } else if (count == lastCount && fingerprint != lastFingerprint && fingerprint > lastFingerprint && isAtBottom) {
+                // Same message count but content grew (streaming delta) → stay at bottom
+                listState.snapToBottom()
+            }
+            lastCount = count
+            lastFingerprint = fingerprint
+        }
     }
 
 
