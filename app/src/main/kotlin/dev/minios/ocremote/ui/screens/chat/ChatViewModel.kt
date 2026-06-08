@@ -255,6 +255,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private val _isLoading = MutableStateFlow(true)
+    private val _isRefreshing = MutableStateFlow(false)  // Background refresh — no UI wipe
     private val _error = MutableStateFlow<String?>(null)
     private val _isSending = MutableStateFlow(false)
     private val _allProviders = MutableStateFlow<List<ProviderCatalog>>(emptyList())
@@ -558,7 +559,7 @@ class ChatViewModel @Inject constructor(
             val session = allSessions.find { it.id == sid }
             val revertState = session?.revert
 
-            val chatMessages = if (loading && sessionMessages.size < 3) {
+            val chatMessages = if (loading && sessionMessages.isEmpty()) {
                 emptyList()
             } else {
                 val sorted = sessionMessages.sortedBy { it.time.created }
@@ -937,14 +938,32 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Refresh session data when returning from background (lock screen / app switch).
-     * Reloads messages, pending questions, and pending permissions.
+     * Uses [_isRefreshing] instead of [_isLoading] to avoid clearing the message list.
      */
     fun refreshSession() {
         viewModelScope.launch {
             loadSession()
-            loadMessages()
+            refreshMessages()
             loadPendingQuestions()
             loadPendingPermissions()
+        }
+    }
+
+    /**
+     * Refresh messages without triggering the loading-UI state.
+     * Unlike [loadMessages], this does NOT set [_isLoading] to true,
+     * so [messageListState] won't clear existing messages during the refresh.
+     */
+    private suspend fun refreshMessages() {
+        _isRefreshing.value = true
+        try {
+            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
+            chatRepository.setMessages(sessionId, messages)
+            _hasOlderMessages.value = messages.size >= currentMessageLimit
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to refresh messages", e)
+        } finally {
+            _isRefreshing.value = false
         }
     }
 
