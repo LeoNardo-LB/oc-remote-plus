@@ -47,7 +47,7 @@ internal fun EmptyServersView(
                 colors = ButtonTokens.filledColors(),
                 border = ButtonTokens.amoledBorder(),
             ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.a11y_icon_add))
+                Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.home_add_server))
             }
