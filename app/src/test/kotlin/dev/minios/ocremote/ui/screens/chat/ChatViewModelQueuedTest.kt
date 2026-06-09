@@ -240,6 +240,7 @@ class ChatViewModelQueuedTest {
             terminalRegistry = terminalRegistry,
             toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
             chatRepository = mockk<ChatRepository>(relaxed = true).also { chatRepo ->
+                every { chatRepo.getMessagesFlow(any()) } answers { eventDispatcher.messages.map { it[firstArg<String>()] ?: emptyList() } }
                 every { chatRepo.getParts(any()) } answers { eventDispatcher.parts.map { it[firstArg<String>()] ?: emptyList() } }
                 every { chatRepo.getAllPartsMap() } returns eventDispatcher.parts
                 every { chatRepo.setMessages(any(), any()) } answers { eventDispatcher.setMessages(firstArg(), secondArg()) }
@@ -257,6 +258,7 @@ class ChatViewModelQueuedTest {
                 every { sessRepo.getCurrentAgentFlow(any()) } returns eventDispatcher.currentAgent
                 every { sessRepo.getCurrentModelFlow(any()) } returns eventDispatcher.currentModel
                 every { sessRepo.setSessions(any(), any()) } answers { eventDispatcher.setSessions(firstArg(), secondArg()) }
+                coEvery { sessRepo.fetchSessionStatuses(any(), any()) } returns Result.success(emptyMap())
             },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,

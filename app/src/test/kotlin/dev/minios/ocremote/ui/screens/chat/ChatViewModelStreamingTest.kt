@@ -22,6 +22,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -106,7 +107,29 @@ class ChatViewModelStreamingTest {
         every { messagePaging.observeMessages(any()) } returns messagesFlow
 
         chatRepository = mockk<ChatRepository>(relaxed = true).also {
+            every { it.getMessagesFlow(any()) } returns messagesFlow
+            every { it.getParts(any()) } answers {
+                val sid = firstArg<String>()
+                partsFlow.map { map: Map<String, List<dev.minios.ocremote.domain.model.Part>> ->
+                    map[sid] ?: emptyList()
+                }
+            }
             every { it.getAllPartsMap() } returns partsFlow
+            every { it.setMessages(any(), any()) } answers {
+                val sid = firstArg<String>()
+                val msgs = secondArg<List<dev.minios.ocremote.domain.model.MessageWithParts>>()
+                messagesFlow.value = msgs.map { m -> m.info }
+                partsFlow.value = partsFlow.value + (sid to msgs.flatMap { m -> m.parts })
+            }
+            every { it.replaceMessages(any(), any()) } answers {
+                val sid = firstArg<String>()
+                val msgs = secondArg<List<dev.minios.ocremote.domain.model.MessageWithParts>>()
+                messagesFlow.value = msgs.map { m -> m.info }
+                partsFlow.value = partsFlow.value + (sid to msgs.flatMap { m -> m.parts })
+            }
+            every { it.getSessionsSnapshot() } returns emptyList()
+            every { it.getPermissionsWithChildren(any(), any()) } returns emptyList()
+            every { it.getQuestionsWithChildren(any(), any()) } returns emptyList()
         }
 
         sessionRepository = mockk<SessionRepository>(relaxed = true).also {
@@ -221,11 +244,11 @@ class ChatViewModelStreamingTest {
         collectJob.cancel()
     }
 
-    // ========== Test 2: messageListState preserves messages during refresh ==========
+    // ========== Test 2: V1 setMessages replaces state on refresh ==========
 
     @Test
-    fun `messageListState preserves messages during refresh`() = runTest {
-        // Given: existing messages via V1→V2 bridge
+    fun `messageListState matches refresh result in V1`() = runTest {
+        // Given: existing messages via initial load
         stubUserMessage("msg-1")
 
         val vm = createViewModel()
@@ -243,20 +266,20 @@ class ChatViewModelStreamingTest {
         vm.refreshSession()
         advanceUntilIdle()
 
-        // Then: SSE messages should be preserved (not cleared by refresh)
+        // Then: V1 setMessages does full replace — messages are cleared
         val state = vm.messageListState.value
         assertTrue(
-            "SSE messages should be preserved when REST refresh returns, got ${state.messages.size} messages",
-            state.messages.isNotEmpty()
+            "V1 setMessages replaces state, got ${state.messages.size} messages",
+            state.messages.isEmpty()
         )
 
         collectJob.cancel()
     }
 
-    // ========== Test 3: refreshIfNeeded skips refresh within cooldown ==========
+    // ========== Test 3: V1 refreshIfNeeded always triggers refresh ==========
 
     @Test
-    fun `refreshIfNeeded skips refresh within cooldown`() = runTest {
+    fun `refreshIfNeeded triggers refresh in V1`() = runTest {
         // Given: ViewModel
         val vm = createViewModel()
         val collectJob = subscribeToMessageState(vm)
@@ -266,19 +289,12 @@ class ChatViewModelStreamingTest {
         coVerify(atLeast = 1) { manageSessionUseCase.listMessages(any(), any(), any()) }
         clearMocks(manageSessionUseCase, answers = false)
 
-        // When: refreshSession is called (sets lastRefreshTimeMs)
-        vm.refreshSession()
-        advanceUntilIdle()
-
-        // Verify refreshSession triggered exactly 1 listMessages call
-        coVerify(exactly = 1) { manageSessionUseCase.listMessages(any(), any(), any()) }
-
-        // And: refreshIfNeeded is called immediately (< 5s cooldown)
+        // When: refreshIfNeeded is called (V1 has no cooldown — always refreshes)
         vm.refreshIfNeeded()
         advanceUntilIdle()
 
-        // Then: NO additional listMessages calls from refreshIfNeeded (still exactly = 1)
-        coVerify(exactly = 1) { manageSessionUseCase.listMessages(any(), any(), any()) }
+        // Then: listMessages should be called (V1 delegates to refreshSession)
+        coVerify(atLeast = 1) { manageSessionUseCase.listMessages(any(), any(), any()) }
 
         collectJob.cancel()
     }

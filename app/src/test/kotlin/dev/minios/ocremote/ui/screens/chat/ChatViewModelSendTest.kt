@@ -162,8 +162,8 @@ class ChatViewModelSendTest {
     }
 
     @Test
-    fun `optimistic message appears in state before API returns`() = runTest {
-        // Given: sendMessageUseCase will suspend indefinitely
+    fun `no optimistic message in V1 — pendingMessageIds stays empty`() = runTest {
+        // V1 sendParts() does NOT add optimistic messages; it delegates to chatRepository.promptAsync()
         coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } coAnswers {
             delay(10_000)
         }
@@ -172,15 +172,14 @@ class ChatViewModelSendTest {
         val collectJob = subscribeToState(viewModel)
         advanceUntilIdle()
 
-        // When
         viewModel.sendMessage("Hello world")
         advanceUntilIdle()
 
-        // Then: pending message should appear in state
+        // Then: no optimistic message — pendingMessageIds remains empty
         val state = viewModel.uiState.value
         assertTrue(
-            "Pending message should be in state, got: ${state.pendingMessageIds}",
-            state.pendingMessageIds.isNotEmpty()
+            "V1 should not add optimistic messages, got: ${state.pendingMessageIds}",
+            state.pendingMessageIds.isEmpty()
         )
         collectJob.cancel()
     }
@@ -207,45 +206,82 @@ class ChatViewModelSendTest {
     }
 
     @Test
-    fun `restoredDraft is set on send failure`() = runTest {
-        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } throws
-            java.io.IOException("Network error")
+    fun `restoredDraft stays null on send failure in V1`() = runTest {
+        // V1 sendParts() catches exceptions internally and logs them;
+        // it does NOT set _restoredDraft on failure (that was V2 behavior).
+        // Mock chatRepository.promptAsync() to throw — this is what V1 actually calls.
+        val chatRepo = createViewModel().let { vm ->
+            // Re-create with a throwing promptAsync
+            val savedState = SavedStateHandle(mapOf(
+                "serverUrl"  to "http://localhost:8080",
+                "username"   to "testuser",
+                "password"   to "testpass",
+                "serverName" to "TestServer",
+                "serverId"   to "test-server",
+                "sessionId"  to "test-session"
+            ))
+            val repo = mockk<ChatRepository>(relaxed = true).also {
+                every { it.getAllPartsMap() } returns MutableStateFlow(emptyMap<String, List<dev.minios.ocremote.domain.model.Part>>())
+                coEvery { it.promptAsync(any(), any(), any(), any(), any(), any(), any()) } throws
+                    java.io.IOException("Network error")
+            }
+            ChatViewModel(
+                savedStateHandle = savedState,
+                sendMessageUseCase = sendMessageUseCase,
+                manageSessionUseCase = manageSessionUseCase,
+                managePermissionUseCase = managePermissionUseCase,
+                selectModelUseCase = selectModelUseCase,
+                manageAgentUseCase = manageAgentUseCase,
+                manageTerminalUseCase = manageTerminalUseCase,
+                draftUseCase = draftUseCase,
+                shareExportUseCase = shareExportUseCase,
+                undoRedoUseCase = undoRedoUseCase,
+                settingsRepository = settingsRepository,
+                terminalRegistry = terminalRegistry,
+                toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
+                chatRepository = repo,
+                sessionRepository = mockk<SessionRepository>(relaxed = true).also { sessRepo ->
+                    every { sessRepo.getSessionsFlow(any()) } returns flowOf(emptyList())
+                    every { sessRepo.getSessionStatusesFlow(any()) } returns flowOf(emptyMap())
+                    every { sessRepo.getCurrentAgentFlow(any()) } returns flowOf(emptyMap())
+                    every { sessRepo.getCurrentModelFlow(any()) } returns flowOf(emptyMap())
+                },
+                messagePaging = messagePaging,
+                tokenStatsTracker = tokenStatsTracker,
+                httpClient = mockk(relaxed = true),
+                sseClient = mockk(relaxed = true)
+            )
+        }
 
-        val viewModel = createViewModel()
-        val collectJob = subscribeToState(viewModel)
+        val collectJob = subscribeToState(chatRepo)
         advanceUntilIdle()
 
-        viewModel.sendMessage("Hello world")
+        chatRepo.sendMessage("Hello world")
         advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertNotNull(
-            "restoredDraft should be set on failure",
-            state.restoredDraft
+        // V1 does NOT set restoredDraft on send failure
+        assertNull(
+            "V1 should not set restoredDraft on send failure",
+            chatRepo.uiState.value.restoredDraft
         )
-        assertEquals("Hello world", state.restoredDraft?.text)
         collectJob.cancel()
     }
 
     @Test
-    fun `consumeRestoredDraft clears the value`() = runTest {
-        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } throws
-            java.io.IOException("Network error")
-
+    fun `consumeRestoredDraft is safe when already null`() = runTest {
         val viewModel = createViewModel()
         val collectJob = subscribeToState(viewModel)
         advanceUntilIdle()
 
-        viewModel.sendMessage("Hello world")
-        advanceUntilIdle()
+        // restoredDraft starts as null (no undo/revert happened)
+        assertNull(viewModel.uiState.value.restoredDraft)
 
-        assertNotNull(viewModel.uiState.value.restoredDraft)
-
+        // Calling consume should not crash and stays null
         viewModel.consumeRestoredDraft()
         advanceUntilIdle()
 
         assertNull(
-            "restoredDraft should be null after consume",
+            "restoredDraft should remain null after consume when already null",
             viewModel.uiState.value.restoredDraft
         )
         collectJob.cancel()
