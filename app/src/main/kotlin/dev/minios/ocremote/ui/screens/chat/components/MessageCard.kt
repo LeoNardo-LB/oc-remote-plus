@@ -392,6 +392,7 @@ private fun MessageCardAssistant(
                     (orderedTurnMessages?.lastOrNull()?.message as? Message.Assistant)?.agent
                         ?: (currentMessage.message as? Message.Assistant)?.agent
                 } else null
+                android.util.Log.d("AgentTag", "[MessageCard] agentName=$agentName, isTurnLast=$isTurnLast, assistantMsg.agent=${(currentMessage.message as? Message.Assistant)?.agent}")
 
                 // Token/cost/duration footer — only on the last message of a turn
                 val stepFinishes = if (isTurnLast && orderedTurnMessages != null) {

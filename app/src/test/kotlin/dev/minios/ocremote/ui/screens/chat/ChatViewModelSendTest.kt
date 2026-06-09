@@ -3,6 +3,7 @@ package dev.minios.ocremote.ui.screens.chat
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
+import io.ktor.client.HttpClient
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.repository.ChatRepository
@@ -139,7 +140,8 @@ class ChatViewModelSendTest {
                 every { it.getCurrentModelFlow(any()) } returns flowOf(emptyMap())
             },
             messagePaging = messagePaging,
-            tokenStatsTracker = tokenStatsTracker
+            tokenStatsTracker = tokenStatsTracker,
+            httpClient = mockk(relaxed = true)
         )
     }
 

@@ -81,7 +81,9 @@ class MessageEventParser(private val json: Json) : SseEventParser {
         val role = obj["role"]?.jsonPrimitive?.content ?: return null
         return when (role) {
             "user" -> json.decodeFromJsonElement<Message.User>(obj)
-            "assistant" -> json.decodeFromJsonElement<Message.Assistant>(obj)
+            "assistant" -> json.decodeFromJsonElement<Message.Assistant>(obj).also {
+                Log.d("AgentTag", "[SSE] Assistant parsed: id=${it.id}, agent=${it.agent}, modelId=${it.modelId}")
+            }
             else -> {
                 Log.w(TAG, "Unknown message role: $role")
                 null
