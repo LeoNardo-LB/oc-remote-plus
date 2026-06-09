@@ -4,6 +4,7 @@ import android.util.Log
 import app.cash.turbine.test
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
 import io.ktor.client.HttpClient
+import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.model.PermissionState
@@ -227,7 +228,8 @@ class ChatViewModelPermissionTest {
             },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
-            httpClient = mockk(relaxed = true)
+            httpClient = mockk(relaxed = true),
+            sseClient = mockk(relaxed = true)
         )
     }
 

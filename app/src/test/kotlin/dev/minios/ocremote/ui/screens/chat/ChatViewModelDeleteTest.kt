@@ -3,6 +3,7 @@ package dev.minios.ocremote.ui.screens.chat
 import android.util.Log
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
 import io.ktor.client.HttpClient
+import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.repository.ChatRepository
@@ -222,7 +223,8 @@ class ChatViewModelDeleteTest {
             },
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
-            httpClient = mockk(relaxed = true)
+            httpClient = mockk(relaxed = true),
+            sseClient = mockk(relaxed = true)
         )
     }
 

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
 import io.ktor.client.HttpClient
+import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.ProvidersResponse
@@ -180,7 +181,8 @@ class ChatViewModelStreamingTest {
             sessionRepository = sessionRepository,
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
-            httpClient = mockk(relaxed = true)
+            httpClient = mockk(relaxed = true),
+            sseClient = mockk(relaxed = true)
         )
     }
 
