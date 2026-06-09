@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.Message
 import dev.minios.ocremote.domain.model.Part
+import dev.minios.ocremote.domain.model.AgentInfo
 import dev.minios.ocremote.ui.components.AmoledDefaultBorder
 import dev.minios.ocremote.ui.components.ConfirmDialog
 import dev.minios.ocremote.ui.components.ProviderIcon
@@ -48,6 +49,7 @@ import dev.minios.ocremote.ui.screens.chat.util.LocalCompactMessages
 import dev.minios.ocremote.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.minios.ocremote.ui.screens.chat.util.QueuedBadgeColor
 import dev.minios.ocremote.ui.screens.chat.util.QueuedBadgeTextColor
+import dev.minios.ocremote.ui.screens.chat.util.agentColor
 import dev.minios.ocremote.ui.screens.chat.util.formatAssistantErrorMessage
 import dev.minios.ocremote.ui.screens.chat.util.formatDuration
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
@@ -73,6 +75,7 @@ internal fun MessageCard(
     copyText: String? = null,
     isAmoled: Boolean = false,
     isTurnLast: Boolean = false,
+    agents: List<AgentInfo> = emptyList(),
 ) {
     when (role) {
         MessageCardRole.USER -> MessageCardUser(
@@ -90,6 +93,7 @@ internal fun MessageCard(
             copyText = copyText,
             isAmoled = isAmoled,
             isTurnLast = isTurnLast,
+            agents = agents,
         )
     }
 }
@@ -318,6 +322,7 @@ private fun MessageCardAssistant(
     copyText: String?,
     isAmoled: Boolean,
     isTurnLast: Boolean,
+    agents: List<AgentInfo> = emptyList(),
 ) {
     val textColor = if (isAmoled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface
 
@@ -394,9 +399,7 @@ private fun MessageCardAssistant(
                 if (stepFinishes.isNotEmpty()) {
                     val totalInput = stepFinishes.sumOf { it.tokens?.input ?: 0 }
                     val totalOutput = stepFinishes.sumOf { it.tokens?.output ?: 0 }
-                    val totalCost = stepFinishes.sumOf { it.cost ?: 0.0 }
                     val hasTokenStats = stepFinishes.any { (it.tokens?.input ?: 0) > 0 || (it.tokens?.output ?: 0) > 0 }
-                    val hasCost = stepFinishes.any { (it.cost ?: 0.0) > 0.0 }
 
                     val durationMs = if (isTurnLast && orderedTurnMessages != null) {
                         val first = orderedTurnMessages.firstOrNull()?.message
@@ -410,13 +413,18 @@ private fun MessageCardAssistant(
                         (orderedTurnMessages.lastOrNull()?.message as? Message.Assistant)?.modelId
                     } else null
 
-                    val hasFooter = hasTokenStats || (durationMs ?: 0) > 0 || !modelId.isNullOrBlank()
+                    // Extract agent name from Part.Agent in turn messages
+                    val agentName = orderedTurnMessages?.flatMap { it.parts }
+                        ?.filterIsInstance<Part.Agent>()
+                        ?.firstOrNull()?.name?.takeIf { it.isNotBlank() }
+
+                    val hasFooter = hasTokenStats || (durationMs ?: 0) > 0 || !modelId.isNullOrBlank() || !agentName.isNullOrBlank()
 
                     if (hasFooter) {
                         Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // 时间
@@ -431,32 +439,49 @@ private fun MessageCardAssistant(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                                 )
                             }
-                            if (assistantMsg?.providerId != null) {
-                                ProviderIcon(
-                                    providerId = assistantMsg.providerId,
-                                    size = 10.dp,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
-                                )
+                            // Agent name tag (styled like QUEUED badge with agent color)
+                            if (!agentName.isNullOrBlank()) {
+                                val tagColor = agentColor(agentName, agents)
+                                Surface(
+                                    shape = ShapeTokens.smallMedium,
+                                    color = tagColor.copy(alpha = AlphaTokens.FAINT)
+                                ) {
+                                    Text(
+                                        text = agentName.replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                        color = tagColor,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
-                            if (!modelId.isNullOrBlank()) {
-                                Text(
-                                    text = modelId,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            // Provider icon + model name (tight 3dp spacing, matching input bar)
+                            val hasProviderOrModel = assistantMsg?.providerId != null || !modelId.isNullOrBlank()
+                            if (hasProviderOrModel) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    if (assistantMsg?.providerId != null) {
+                                        ProviderIcon(
+                                            providerId = assistantMsg.providerId,
+                                            size = 10.dp,
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
+                                        )
+                                    }
+                                    if (!modelId.isNullOrBlank()) {
+                                        Text(
+                                            text = modelId,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
                             if (totalInput > 0 || totalOutput > 0) {
                                 Text(
                                     text = "↑$totalInput ↓$totalOutput",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
-                                )
-                            }
-                            if (totalCost > 0.0 && totalCost.isFinite()) {
-                                Text(
-                                    text = stringResource(R.string.chat_cost_format, String.format("%.4f", totalCost)),
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                                 )
@@ -482,7 +507,7 @@ private fun MessageCardAssistant(
                         Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // 时间
@@ -496,6 +521,21 @@ private fun MessageCardAssistant(
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                                 )
+                            }
+                            // Agent name tag
+                            if (!agentName.isNullOrBlank()) {
+                                val tagColor = agentColor(agentName, agents)
+                                Surface(
+                                    shape = ShapeTokens.smallMedium,
+                                    color = tagColor.copy(alpha = AlphaTokens.FAINT)
+                                ) {
+                                    Text(
+                                        text = agentName.replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                        color = tagColor,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.weight(1f))
                             CopyButton(

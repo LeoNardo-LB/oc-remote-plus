@@ -100,6 +100,7 @@ fun ChatMessageList(
     keyboardController: SoftwareKeyboardController?,
     viewModel: ChatViewModel,
     navigateToChildSession: (String) -> Unit,
+    agents: List<dev.minios.ocremote.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val turnGroups = remember(rawMessages.size) { computeTurnGroups(rawMessages) }
@@ -278,6 +279,7 @@ fun ChatMessageList(
                                     onViewSubSession = navigateToChildSession,
                                     isAmoled = isAmoled,
                                     isTurnLast = isTurnLast,
+                                    agents = agents,
                                     copyText = if (isTurnLast) {
                                         turnMessagesForMsg
                                             .flatMap { m -> m.parts.filterIsInstance<Part.Text>().map { it.text } }

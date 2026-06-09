@@ -80,8 +80,7 @@ fun ChatTopBar(
     onUnshare: () -> Unit,
     onRename: () -> Unit,
     onExport: () -> Unit,
-    currentAgentName: String? = null,
-    currentModelId: String? = null,
+
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showContextDialog by remember { mutableStateOf(false) }
@@ -117,16 +116,7 @@ fun ChatTopBar(
                         )
                     }
                 }
-                if (!currentAgentName.isNullOrBlank() || !currentModelId.isNullOrBlank()) {
-                    val agentParts = mutableListOf<String>()
-                    if (!currentAgentName.isNullOrBlank()) agentParts.add(currentAgentName)
-                    if (!currentModelId.isNullOrBlank()) agentParts.add(currentModelId)
-                    Text(
-                        text = agentParts.joinToString(" · "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MUTED)
-                    )
-                }
+
             }
         },
         navigationIcon = {

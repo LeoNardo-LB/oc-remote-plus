@@ -623,8 +623,7 @@ fun ChatScreen(
                             .ifBlank { "session" }
                         attachmentHandler.launchExport("$slug.json")
                     },
-                    currentAgentName = sessionMeta.currentAgentName,
-                    currentModelId = sessionMeta.currentModelId,
+
                 )
             }
         },
@@ -1016,6 +1015,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                agents = modelConfig.agents,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -1037,6 +1037,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                agents = modelConfig.agents,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
