@@ -47,7 +47,7 @@ companion object {
 |------|---------|
 | `User` | `id`, `text`, `files?`, `agents?`, `references?`, `time{created}` |
 | `Assistant` | `id`, `agent`, `model`, `content: List<AssistantContent>`, `snapshot?{start?,end?}`, `finish?`, `cost?`, `tokens?`, `error?`, `time{created,completed?}` |
-| `Shell` | `id`, `callId`, `command`, `output`, `time{created,completed?}` |
+| `Shell` | `id`, `callId`, `command`, `output`, `time{created,completed?}` | ShellStarted 时 `output` 初始为 `""`，ShellEnded 时填充实际值 |
 | `System` | `id`, `text`, `time{created}` |
 | `Synthetic` | `id`, `sessionId`, `text`, `time{created}` |
 | `AgentSwitched` | `id`, `agent`, `time{created}` |
@@ -85,19 +85,19 @@ GlobalEvent { directory, workspace?, payload: { type: String, properties: JsonOb
 
 ### 2.2 SseEventV2 密封类
 
-28 种事件（24 种产出消息 + 4 种被动），对齐 `sync-v2.tsx:120-421` 的 apply() switch-case
+31 种事件（25 种产出消息 + 6 种被动），对齐 `sync-v2.tsx:120-421` 的 apply() switch-case
 
-**追加类（创建新消息）：** AgentSwitched, ModelSwitched, Prompted, PromptPromoted, ContextUpdated, Synthetic, ShellStarted
+**追加类（创建新消息，7 种）：** AgentSwitched, ModelSwitched, Prompted, PromptPromoted, ContextUpdated, Synthetic, ShellStarted
 
-**更新类：** ShellEnded, StepStarted, StepEnded, StepFailed
+**更新类（修改已有消息，4 种）：** ShellEnded, StepStarted, StepEnded, StepFailed
 
-**流式 Delta（直接更新 Assistant.content）：** TextStarted/Delta/Ended, ReasoningStarted/Delta/Ended
+**流式 Delta（直接更新 Assistant.content，6 种）：** TextStarted/Delta/Ended, ReasoningStarted/Delta/Ended
 
-**工具状态机：** ToolInputStarted/Delta/Ended, ToolCalled, ToolProgress, ToolSuccess, ToolFailed
+**工具状态机（7 种）：** ToolInputStarted/Delta/Ended, ToolCalled, ToolProgress, ToolSuccess, ToolFailed
 
-**压缩：** CompactionEnded
+**压缩（1 种）：** CompactionEnded
 
-**被动（不改变状态）：** PromptAdmitted, Retried, CompactionStarted, CompactionDelta, Moved, InterruptRequested
+**被动（不改变状态，6 种）：** PromptAdmitted, Retried, CompactionStarted, CompactionDelta, Moved, InterruptRequested
 
 ### 2.3 EventParser
 
