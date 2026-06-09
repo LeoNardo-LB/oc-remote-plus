@@ -2,6 +2,7 @@ package dev.minios.ocremote.data.api.sse.parsers
 
 import dev.minios.ocremote.domain.model.SseEvent
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -722,5 +723,58 @@ class SseEventParserTest {
         val obj = buildJsonObject {}
         assertEquals("", obj.str("missing"))
         assertEquals("fallback", obj.str("missing", "fallback"))
+    }
+
+    @Test
+    fun `str handles JsonObject value by extracting message field`() {
+        val innerObj = buildJsonObject {
+            put("message", "Something went wrong")
+            put("type", "runtime")
+        }
+        val obj = buildJsonObject { put("error", innerObj) }
+        assertEquals("Something went wrong", obj.str("error"))
+    }
+
+    @Test
+    fun `str handles JsonObject without message field by toString`() {
+        val innerObj = buildJsonObject {
+            put("code", 500)
+            put("detail", "Internal")
+        }
+        val obj = buildJsonObject { put("data", innerObj) }
+        val result = obj.str("data")
+        assertTrue(result.contains("500"))
+    }
+
+    @Test
+    fun `str handles JsonArray value by toString`() {
+        val arr = kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive("a"), JsonPrimitive("b")))
+        val obj = buildJsonObject { put("items", arr) }
+        val result = obj.str("items")
+        assertTrue(result.contains("a"))
+    }
+
+    @Test
+    fun `str handles JsonNull by returning default`() {
+        val obj = buildJsonObject { put("value", JsonNull) }
+        assertEquals("", obj.str("value"))
+        assertEquals("fallback", obj.str("value", "fallback"))
+    }
+
+    @Test
+    fun `session error with JsonObject error field parses without crash`() {
+        val parser = SessionEventParser(json)
+        val errorObj = buildJsonObject {
+            put("message", "Agent crashed")
+            put("type", "fatal")
+        }
+        val props = buildJsonObject {
+            put("sessionID", "ses_123")
+            put("error", errorObj)
+        }
+        val event = parser.parse("session.error", props) as? SseEvent.SessionError
+        assertNotNull(event)
+        assertEquals("ses_123", event!!.sessionId)
+        assertEquals("Agent crashed", event.error)
     }
 }
