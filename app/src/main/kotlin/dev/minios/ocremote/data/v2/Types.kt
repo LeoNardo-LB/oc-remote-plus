@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class TimeInfo(
-    val created: Long,
+    val created: Long = 0L,
     val completed: Long? = null,
 )
 
@@ -16,9 +16,9 @@ data class SnapshotInfo(
 
 @Serializable
 data class TokenUsage(
-    val input: Long,
-    val output: Long,
-    val reasoning: Long,
+    val input: Long = 0L,
+    val output: Long = 0L,
+    val reasoning: Long = 0L,
     val cache: CacheUsage = CacheUsage(),
 )
 
@@ -27,20 +27,20 @@ data class CacheUsage(val read: Long = 0, val write: Long = 0)
 
 @Serializable
 data class ModelRef(
-    val providerID: String,
-    val modelID: String,
+    val providerID: String = "",
+    val modelID: String = "",
 )
 
 @Serializable
 data class FileAttachment(
-    val name: String,
-    val path: String,
+    val name: String = "",
+    val path: String = "",
     val type: String? = null,
 )
 
 @Serializable
 data class Prompt(
-    val text: String,
+    val text: String = "",
     val files: List<FileAttachment>? = null,
     val agents: List<String>? = null,
     val references: List<String>? = null,
@@ -48,7 +48,7 @@ data class Prompt(
 
 @Serializable
 data class TodoInfo(
-    val id: String,
-    val text: String,
+    val id: String = "",
+    val text: String = "",
     val completed: Boolean = false,
 )

@@ -75,12 +75,10 @@ class ChatViewModelPermissionTest {
 
     @After
     fun tearDown() {
-        ChatViewModel.enableV2Sse = true
     }
 
     @Before
     fun setup() {
-        ChatViewModel.enableV2Sse = false
         Dispatchers.setMain(testDispatcher)
         eventDispatcher = EventDispatcher(
             sessionHandler = SessionEventHandler(),

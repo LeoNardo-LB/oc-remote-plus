@@ -206,8 +206,10 @@ Test infrastructure:
 - Each Layer requires: compile ✅ + unit tests ✅ + enhanced tests ✅ + Maestro flows (UI) + androidTest (UI)
 
 environment:
+- opencode server port: 4096
 - opencode username: opencode
 - opencode password: save as environment variables ${OPENCODE_SERVER_PASSWORD}
+- emulator host access: use `10.0.2.2` to reach the host machine from Android emulator
 
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.**

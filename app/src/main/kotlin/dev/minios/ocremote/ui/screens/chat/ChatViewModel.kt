@@ -72,6 +72,8 @@ import dev.minios.ocremote.data.v2.ToolStatePending
 import dev.minios.ocremote.data.v2.ToolStateRunning
 import dev.minios.ocremote.data.v2.ToolStateCompleted
 import dev.minios.ocremote.data.v2.ToolStateError
+import dev.minios.ocremote.data.v2.TokenUsage
+import dev.minios.ocremote.data.v2.CacheUsage
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -995,14 +997,8 @@ class ChatViewModel @Inject constructor(
             Log.e(TAG, "V1 message fallback load failed", e)
         }
 
-        // 3. Hydrate V2 SessionState from REST (skip if V2 disabled = test mode)
-        if (!enableV2Sse) {
-            val v2Messages = v1Messages.toV2SessionMessages()
-            _sessionState.update { it.copy(
-                messages = v2Messages,
-                isInitialized = true,
-            )}
-        } else try {
+        // 3. Hydrate V2 SessionState from REST
+        try {
             val response = v2Sdk.messages(sessionId)
             _sessionState.update { it.copy(
                 messages = response.data,
@@ -1031,7 +1027,6 @@ class ChatViewModel @Inject constructor(
      * and reduce them into SessionState.
      */
     private fun startSseSubscription() {
-        if (!enableV2Sse) return
         sseJob?.cancel()
         sseJob = viewModelScope.launch {
             v2Sdk.events()
@@ -1679,10 +1674,10 @@ class ChatViewModel @Inject constructor(
                     text = text,
                     delivery = "steer",
                 )
-                if (BuildConfig.DEBUG) Log.d(TAG, "V2 sent prompt to session $currentSessionId")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to send message via V2 SDK", e)
+                Log.e(TAG, "Failed to send message", e)
             }
         }
     }
@@ -1746,7 +1741,7 @@ class ChatViewModel @Inject constructor(
                 sseJob?.cancel()
                 sseJob = null
                 v2Sdk.abort(sessionId)
-                if (BuildConfig.DEBUG) Log.d(TAG, "V2 aborted session $sessionId")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
                 sessionRepository.updateSessionStatus(sessionId, SessionStatus.Idle)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
@@ -2238,14 +2233,6 @@ class ChatViewModel @Inject constructor(
     }
 
     companion object {
-        /**
-         * V2 SSE/API toggle.
-         * Set to false to use V1 SSE path (stable) while keeping V2 code for future activation.
-         * Set to true only when the OpenCode server sends session.next.* events.
-         */
-        @VisibleForTesting
-        var enableV2Sse: Boolean = false
-
         /**
          * In-memory cache mapping sessionId → (providerId, modelId).
          * Survives session switching (ViewModel recreation) but clears on app restart (process death).
