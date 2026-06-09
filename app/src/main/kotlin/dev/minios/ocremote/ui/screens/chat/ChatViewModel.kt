@@ -2238,9 +2238,13 @@ class ChatViewModel @Inject constructor(
     }
 
     companion object {
-        /** Set to false in unit tests to skip V2 SSE/API calls that would trigger mock HttpClient. */
+        /**
+         * V2 SSE/API toggle.
+         * Set to false to use V1 SSE path (stable) while keeping V2 code for future activation.
+         * Set to true only when the OpenCode server sends session.next.* events.
+         */
         @VisibleForTesting
-        var enableV2Sse: Boolean = true
+        var enableV2Sse: Boolean = false
 
         /**
          * In-memory cache mapping sessionId → (providerId, modelId).
