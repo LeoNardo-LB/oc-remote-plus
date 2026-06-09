@@ -28,65 +28,18 @@ import dev.minios.ocremote.domain.repository.SessionRepository
 import dev.minios.ocremote.domain.repository.SettingsRepository
 import dev.minios.ocremote.domain.tracker.TokenStatsTracker
 import dev.minios.ocremote.domain.usecase.*
-import dev.minios.ocremote.data.v2.EventReducer
-import dev.minios.ocremote.data.v2.OpenCodeV2Sdk
-import dev.minios.ocremote.data.v2.OpenCodeV2SdkImpl
 import dev.minios.ocremote.data.api.SseClient
-import dev.minios.ocremote.data.v2.SessionState
-import dev.minios.ocremote.data.v2.UserMessage
-import dev.minios.ocremote.data.v2.AssistantMessage
-import dev.minios.ocremote.data.v2.AssistantText
-import dev.minios.ocremote.data.v2.AssistantReasoning
-import dev.minios.ocremote.data.v2.AssistantTool
-import dev.minios.ocremote.data.v2.SseEventV2
-import dev.minios.ocremote.data.v2.isBusy
-import dev.minios.ocremote.data.v2.ModelRef
-import dev.minios.ocremote.data.v2.SessionMessage
-import dev.minios.ocremote.data.v2.AgentSwitchedEvent
-import dev.minios.ocremote.data.v2.ModelSwitchedEvent
-import dev.minios.ocremote.data.v2.PromptedEvent
-import dev.minios.ocremote.data.v2.PromptPromotedEvent
-import dev.minios.ocremote.data.v2.ContextUpdatedEvent
-import dev.minios.ocremote.data.v2.SyntheticEvent
-import dev.minios.ocremote.data.v2.ShellStartedEvent
-import dev.minios.ocremote.data.v2.ShellEndedEvent
-import dev.minios.ocremote.data.v2.StepStartedEvent
-import dev.minios.ocremote.data.v2.StepEndedEvent
-import dev.minios.ocremote.data.v2.StepFailedEvent
-import dev.minios.ocremote.data.v2.TextStartedEvent
-import dev.minios.ocremote.data.v2.TextDeltaEvent
-import dev.minios.ocremote.data.v2.TextEndedEvent
-import dev.minios.ocremote.data.v2.ReasoningStartedEvent
-import dev.minios.ocremote.data.v2.ReasoningDeltaEvent
-import dev.minios.ocremote.data.v2.ReasoningEndedEvent
-import dev.minios.ocremote.data.v2.ToolInputStartedEvent
-import dev.minios.ocremote.data.v2.ToolInputDeltaEvent
-import dev.minios.ocremote.data.v2.ToolInputEndedEvent
-import dev.minios.ocremote.data.v2.ToolCalledEvent
-import dev.minios.ocremote.data.v2.ToolProgressEvent
-import dev.minios.ocremote.data.v2.ToolSuccessEvent
-import dev.minios.ocremote.data.v2.ToolFailedEvent
-import dev.minios.ocremote.data.v2.CompactionEndedEvent
-import dev.minios.ocremote.data.v2.TimeInfo as V2TimeInfo
-import dev.minios.ocremote.data.v2.ToolStatePending
-import dev.minios.ocremote.data.v2.ToolStateRunning
-import dev.minios.ocremote.data.v2.ToolStateCompleted
-import dev.minios.ocremote.data.v2.ToolStateError
-import dev.minios.ocremote.data.v2.TokenUsage
-import dev.minios.ocremote.data.v2.CacheUsage
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -273,29 +226,14 @@ class ChatViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val messagePaging: MessagePaginationUseCase,
     private val tokenStatsTracker: TokenStatsTracker,
-    private val httpClient: HttpClient,
+    private val httpClient: io.ktor.client.HttpClient,
     private val sseClient: SseClient,
 ) : ViewModel() {
 
-    // ============ V2 Event Sourcing ============
-    private val _sessionState = MutableStateFlow(SessionState.EMPTY)
-    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+    // ============ V1 Message State ============
+    private val _messagesList = MutableStateFlow<List<Message>>(emptyList())
+    private val _partsList = MutableStateFlow<List<Part>>(emptyList())
     private var sseJob: Job? = null
-    private val authHeader: String? by lazy {
-        val pwd = password
-        if (pwd.isNotEmpty()) {
-            val credentials = "$username:$pwd"
-            "Basic ${java.util.Base64.getEncoder().encodeToString(credentials.toByteArray())}"
-        } else null
-    }
-    private val v2Sdk: OpenCodeV2Sdk by lazy {
-        OpenCodeV2SdkImpl(
-            httpClient = httpClient,
-            baseUrl = serverUrl,
-            rawSseEvents = sseClient.rawSseEventFlow,
-            authHeader = authHeader,
-        )
-    }
 
     /** Expose chatRepository for ChatMessageList composable (tool progress, step progress, compaction state). */
     val chatRepositoryExposed: ChatRepository get() = chatRepository
@@ -588,196 +526,20 @@ class ChatViewModel @Inject constructor(
     // ============ Split State Flows (independent combines for fine-grained recomposition) ============
 
     /**
-     * Message list state — derived from V2 SessionState.
-     * Maps V2 SessionMessages to V1 ChatMessages for UI compatibility.
+     * Message list state — derived from V1 chatRepository flows.
+     * Combines messages, parts, and tool expand states.
      */
     val messageListState: StateFlow<MessageListState> = combine(
-        _sessionState,
+        _messagesList,
+        _partsList,
         _toolExpandedStates,
-    ) { state, toolExpandedStates ->
-        val chatMessages = state.messages.reversed().mapNotNull { msg ->
-            val message: Message? = when (msg) {
-                is dev.minios.ocremote.data.v2.UserMessage -> Message.User(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                )
-                is dev.minios.ocremote.data.v2.AssistantMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = msg.agent,
-                    providerId = msg.model.providerID,
-                    modelId = msg.model.modelID,
-                    cost = msg.cost,
-                    tokens = msg.tokens?.let { t ->
-                        Message.Assistant.Tokens(
-                            input = t.input.toInt(),
-                            output = t.output.toInt(),
-                            reasoning = t.reasoning.toInt(),
-                            cache = Message.Assistant.Tokens.Cache(
-                                read = t.cache.read.toInt(),
-                                write = t.cache.write.toInt(),
-                            )
-                        )
-                    },
-                    finish = msg.finish,
-                    error = msg.error?.let { errText ->
-                        Message.Assistant.ErrorInfo(name = errText)
-                    },
-                )
-                // Map V2 system message types to displayable Assistant messages
-                is dev.minios.ocremote.data.v2.SystemMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = "system",
-                    providerId = "",
-                    modelId = "",
-                    finish = "system",
-                )
-                is dev.minios.ocremote.data.v2.ShellMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = "shell",
-                    providerId = "",
-                    modelId = "",
-                    finish = "shell",
-                )
-                is dev.minios.ocremote.data.v2.SyntheticMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = "synthetic",
-                    providerId = "",
-                    modelId = "",
-                    finish = "synthetic",
-                )
-                is dev.minios.ocremote.data.v2.AgentSwitchedMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = "system",
-                    providerId = "",
-                    modelId = "",
-                    finish = "agent-switched",
-                )
-                is dev.minios.ocremote.data.v2.ModelSwitchedMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = "system",
-                    providerId = "",
-                    modelId = "",
-                    finish = "model-switched",
-                )
-                is dev.minios.ocremote.data.v2.CompactionMessage -> Message.Assistant(
-                    id = msg.id,
-                    sessionId = msg.sessionId,
-                    time = TimeInfo(msg.time.created, msg.time.completed),
-                    parentId = "",
-                    agent = "system",
-                    providerId = "",
-                    modelId = "",
-                    finish = "compaction",
-                )
-                else -> null
-            }
-            if (message == null) return@mapNotNull null
+    ) { messages, parts, toolExpandedStates ->
+        val grouped = parts.groupBy { it.messageId }
 
-            val parts: List<Part> = when (msg) {
-                is dev.minios.ocremote.data.v2.AssistantMessage -> msg.content.map { content ->
-                    when (content) {
-                        is dev.minios.ocremote.data.v2.AssistantText -> Part.Text(
-                            id = content.id,
-                            sessionId = msg.sessionId,
-                            messageId = msg.id,
-                            text = content.text,
-                        )
-                        is dev.minios.ocremote.data.v2.AssistantReasoning -> Part.Reasoning(
-                            id = content.id,
-                            sessionId = msg.sessionId,
-                            messageId = msg.id,
-                            text = content.text,
-                        )
-                        is dev.minios.ocremote.data.v2.AssistantTool -> Part.Tool(
-                            id = content.id,
-                            sessionId = msg.sessionId,
-                            messageId = msg.id,
-                            callId = content.id,
-                            tool = content.name,
-                            state = convertToolState(content.state),
-                        )
-                    }
-                }
-                is dev.minios.ocremote.data.v2.UserMessage -> listOfNotNull(
-                    if (msg.text.isNotBlank()) Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = msg.text,
-                    ) else null,
-                )
-                // Map V2 system message types to displayable text parts
-                is dev.minios.ocremote.data.v2.SystemMessage -> listOf(
-                    Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = "[System] ${msg.text}",
-                    )
-                )
-                is dev.minios.ocremote.data.v2.ShellMessage -> listOf(
-                    Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = "[Shell] \$ ${msg.command}\n${msg.output}",
-                    )
-                )
-                is dev.minios.ocremote.data.v2.SyntheticMessage -> listOf(
-                    Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = "[Synthetic] ${msg.text}",
-                    )
-                )
-                is dev.minios.ocremote.data.v2.AgentSwitchedMessage -> listOf(
-                    Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = "[Agent switched] ${msg.agent}",
-                    )
-                )
-                is dev.minios.ocremote.data.v2.ModelSwitchedMessage -> listOf(
-                    Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = "[Model switched] ${msg.model.providerID}/${msg.model.modelID}",
-                    )
-                )
-                is dev.minios.ocremote.data.v2.CompactionMessage -> listOf(
-                    Part.Text(
-                        id = msg.id + "-text",
-                        sessionId = msg.sessionId,
-                        messageId = msg.id,
-                        text = "[Compaction] ${msg.reason}",
-                    )
-                )
-                else -> emptyList()
-            }
-            ChatMessage(message = message, parts = parts)
-        }
+        val chatMessages = messages.map { msg ->
+            val msgParts = grouped[msg.id] ?: emptyList()
+            ChatMessage(message = msg, parts = msgParts)
+        }.reversed()
 
         val pendingAssistantIndex = chatMessages.indexOfLast {
             it.message is Message.Assistant && it.message.time.completed == null
@@ -788,21 +550,16 @@ class ChatViewModel @Inject constructor(
                 .map { it.message.id }
                 .toSet()
         } else {
-            emptySet<String>()
+            emptySet()
         }
 
         MessageListState(
             messages = chatMessages,
             messageCount = chatMessages.size,
-            hasOlderMessages = state.hasOlderMessages,
-            isLoadingOlder = state.isLoadingOlder,
+            hasOlderMessages = false,
+            isLoadingOlder = false,
             toolExpandedStates = toolExpandedStates,
             queuedMessageIds = queuedMessageIds,
-            pendingMessageIds = state.messages
-                .filterIsInstance<AssistantMessage>()
-                .filter { it.time.completed == null }
-                .map { it.id }
-                .toSet(),
         )
     }.stateIn(
         viewModelScope,
@@ -851,19 +608,21 @@ class ChatViewModel @Inject constructor(
     )
 
     /**
-     * Interaction state — loading, sending, error derived from V2 SessionState,
+     * Interaction state — loading, sending, error derived from V1 sources,
      * pending permission/question cards from V1 chatRepository.
      */
     val interactionState: StateFlow<InteractionState> = combine(
-        _sessionState,
+        _messagesList,
+        sessionRepository.getSessionStatusesFlow(serverId),
         sessionRepository.getSessionsFlow(serverId),
-    ) { state, allSessions ->
-        val errorMsg = state.messages
-            .filterIsInstance<AssistantMessage>()
-            .firstOrNull { it.error != null }?.error
+    ) { messages, statuses, allSessions ->
+        val status = statuses[sessionId] ?: SessionStatus.Idle
+        val errorMsg = messages
+            .filterIsInstance<Message.Assistant>()
+            .firstOrNull { it.error != null }?.error?.name
         InteractionState(
-            isLoading = !state.isInitialized,
-            isSending = state.isBusy,
+            isLoading = messages.isEmpty() && sessionId.isNotEmpty(),
+            isSending = status is SessionStatus.Busy || status is SessionStatus.Retry,
             error = errorMsg,
             pendingPermissions = chatRepository.getPermissionsWithChildren(sessionId, allSessions),
             pendingQuestions = chatRepository.getQuestionsWithChildren(sessionId, allSessions),
@@ -973,19 +732,19 @@ class ChatViewModel @Inject constructor(
         // Reset token stats from previous session (TokenStatsTracker is @Singleton, shared across sessions)
         tokenStatsTracker.reset()
 
-        // Observe V2 SessionState and update token stats tracker
+        // Observe V1 messages and update token stats tracker
         viewModelScope.launch {
-            _sessionState.collect { state ->
-                val assistantMessages = state.messages.filterIsInstance<AssistantMessage>()
+            _messagesList.collect { messages ->
+                val assistantMessages = messages.filterIsInstance<Message.Assistant>()
                 val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
-                val totalInputTokens = assistantMessages.sumOf { (it.tokens?.input ?: 0L).toInt() }
-                val totalOutputTokens = assistantMessages.sumOf { (it.tokens?.output ?: 0L).toInt() }
-                val totalReasoningTokens = assistantMessages.sumOf { (it.tokens?.reasoning ?: 0L).toInt() }
-                val totalCacheReadTokens = assistantMessages.sumOf { (it.tokens?.cache?.read ?: 0L).toInt() }
-                val totalCacheWriteTokens = assistantMessages.sumOf { (it.tokens?.cache?.write ?: 0L).toInt() }
-                val lastAssistantWithTokens = assistantMessages.lastOrNull { (it.tokens?.output ?: 0L) > 0L }
+                val totalInputTokens = assistantMessages.sumOf { it.tokens?.input ?: 0 }
+                val totalOutputTokens = assistantMessages.sumOf { it.tokens?.output ?: 0 }
+                val totalReasoningTokens = assistantMessages.sumOf { it.tokens?.reasoning ?: 0 }
+                val totalCacheReadTokens = assistantMessages.sumOf { it.tokens?.cache?.read ?: 0 }
+                val totalCacheWriteTokens = assistantMessages.sumOf { it.tokens?.cache?.write ?: 0 }
+                val lastAssistantWithTokens = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
                 val lastContextTokens = lastAssistantWithTokens?.tokens?.let { t ->
-                    (t.input + t.output + t.reasoning + t.cache.read + t.cache.write).toInt()
+                    t.input + t.output + t.reasoning + t.cache.read + t.cache.write
                 } ?: 0
                 tokenStatsTracker.update {
                     copy(
@@ -1066,7 +825,6 @@ class ChatViewModel @Inject constructor(
             if (directoryParam.isNotEmpty()) {
                 sessionDirectory = directoryParam
             }
-            _sessionState.update { it.copy(isInitialized = true) }
             if (!sessionLoaded.isCompleted) {
                 sessionLoaded.complete(Unit)
             }
@@ -1077,12 +835,11 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Load session via V2 SDK: hydrate SessionState from REST, then subscribe to SSE events.
-     * Also loads V1 session info for sessionDirectory and sessionRepository.
+     * Load session info and messages via V1 API, then observe SSE-driven flows.
      */
     private suspend fun loadSession() {
         try {
-            // 1. Load V1 session info for directory / session metadata
+            // 1. Load session info for directory / session metadata
             val session = manageSessionUseCase.getSession(serverId, sessionId)
             if (session.directory.isNotBlank()) {
                 sessionDirectory = session.directory
@@ -1097,115 +854,39 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // 2. Load V1 messages as fallback source
-        var v1Messages: List<MessageWithParts> = emptyList()
+        // 2. Load messages via V1 API
         try {
-            v1Messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
-            chatRepository.setMessages(sessionId, v1Messages)
-            if (BuildConfig.DEBUG) Log.d(TAG, "V1 loaded ${v1Messages.size} messages as fallback source")
+            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
+            chatRepository.setMessages(sessionId, messages)
+            if (BuildConfig.DEBUG) Log.d(TAG, "V1 loaded ${messages.size} messages for session $sessionId")
         } catch (e: Exception) {
-            Log.e(TAG, "V1 message fallback load failed", e)
+            Log.e(TAG, "Failed to load messages", e)
         }
 
-        // 3. Hydrate V2 SessionState from REST
-        try {
-            val response = v2Sdk.messages(sessionId)
-            val v2Messages = response.data
-            
-            // Check if V2 messages are mostly system messages (indicating incomplete history)
-            // System message types: AgentSwitched, ModelSwitched, System, Shell, Synthetic, Compaction
-            val userOrAssistantCount = v2Messages.count { it is UserMessage || it is AssistantMessage }
-            val systemMessageCount = v2Messages.size - userOrAssistantCount
-            
-            // If V2 returns mostly system messages or very few user/assistant messages,
-            // fall back to V1 which has complete conversation history
-            val shouldFallbackToV1 = v1Messages.isNotEmpty() && (
-                userOrAssistantCount < 3 || // Less than 3 actual conversation messages
-                (v2Messages.size > 0 && systemMessageCount.toDouble() / v2Messages.size > 0.8) // >80% system messages
-            )
-            
-            if (shouldFallbackToV1) {
-                Log.w(TAG, "V2 hydration returned mostly system messages (user/assistant: $userOrAssistantCount, system: $systemMessageCount), falling back to V1 (${v1Messages.size} messages)")
-                val fallbackMessages = v1Messages.toV2SessionMessages()
-                _sessionState.update { it.copy(
-                    messages = fallbackMessages,
-                    hasOlderMessages = true, // V1 doesn't provide cursor, assume more available
-                    isInitialized = true,
-                )}
-            } else {
-                _sessionState.update { it.copy(
-                    messages = v2Messages,
-                    hasOlderMessages = response.nextCursor != null,
-                    isInitialized = true,
-                )}
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "V2 hydrated ${v2Messages.size} messages for session $sessionId (hasOlder=${response.nextCursor != null}, user/assistant: $userOrAssistantCount)")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "V2 hydration failed, falling back to V1 messages", e)
-            val v2Messages = v1Messages.toV2SessionMessages()
-            _sessionState.update { it.copy(
-                messages = v2Messages,
-                isInitialized = true,
-            )}
-        }
-
-        // 4. Start SSE subscription
-        runCatching { startSseSubscription() }
-            .onFailure { Log.e(TAG, "Failed to start SSE subscription", it) }
+        // 3. Start observing chatRepository flows (driven by SSE EventDispatcher)
+        runCatching { startObservingMessages() }
+            .onFailure { Log.e(TAG, "Failed to start observing messages", it) }
     }
 
     /**
-     * Subscribe to V2 SSE events, filter by current sessionId,
-     * and reduce them into SessionState.
+     * Observe V1 chatRepository flows (driven by SSE EventDispatcher).
+     * Messages and parts are updated automatically as SSE events arrive.
      */
-    private fun startSseSubscription() {
+    private fun startObservingMessages() {
         sseJob?.cancel()
         sseJob = viewModelScope.launch {
-            v2Sdk.events()
-                .catch { e ->
-                    Log.e(TAG, "SSE subscription terminated with error", e)
-                }
-                .collect { event ->
-                    val eventSessionId = when (event) {
-                        is AgentSwitchedEvent -> event.sessionID
-                        is ModelSwitchedEvent -> event.sessionID
-                        is PromptedEvent -> event.sessionID
-                        is PromptPromotedEvent -> event.sessionID
-                        is ContextUpdatedEvent -> event.sessionID
-                        is SyntheticEvent -> event.sessionID
-                        is ShellStartedEvent -> event.sessionID
-                        is ShellEndedEvent -> event.sessionID
-                        is StepStartedEvent -> event.sessionID
-                        is StepEndedEvent -> event.sessionID
-                        is StepFailedEvent -> event.sessionID
-                        is TextStartedEvent -> event.sessionID
-                        is TextDeltaEvent -> event.sessionID
-                        is TextEndedEvent -> event.sessionID
-                        is ReasoningStartedEvent -> event.sessionID
-                        is ReasoningDeltaEvent -> event.sessionID
-                        is ReasoningEndedEvent -> event.sessionID
-                        is ToolInputStartedEvent -> event.sessionID
-                        is ToolInputDeltaEvent -> event.sessionID
-                        is ToolInputEndedEvent -> event.sessionID
-                        is ToolCalledEvent -> event.sessionID
-                        is ToolProgressEvent -> event.sessionID
-                        is ToolSuccessEvent -> event.sessionID
-                        is ToolFailedEvent -> event.sessionID
-                        is CompactionEndedEvent -> event.sessionID
-                        else -> null
-                    }
-                    if (eventSessionId == null || eventSessionId == sessionId) {
-                        _sessionState.update { state -> EventReducer.reduce(state, event) }
-                    }
-                }
+            combine(
+                chatRepository.getMessagesFlow(sessionId),
+                chatRepository.getParts(sessionId),
+            ) { messages, parts ->
+                _messagesList.value = messages
+                _partsList.value = parts
+            }.collect { }
         }
     }
 
     /**
      * Load messages via V1 API for modelConfigState resolution (model/agent from history).
-     * V2 SessionState is populated by [loadSession] — this is only for V1 compat.
      */
     fun loadMessages() {
         viewModelScope.launch {
@@ -1213,71 +894,16 @@ class ChatViewModel @Inject constructor(
                 val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
                 chatRepository.setMessages(sessionId, messages)
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "V1 loaded ${messages.size} messages for modelConfigState resolution")
+                    Log.d(TAG, "Loaded ${messages.size} messages for modelConfigState resolution")
                 }
             } catch (e: Throwable) {
-                Log.e(TAG, "Failed to load messages for V1 compat", e)
+                Log.e(TAG, "Failed to load messages", e)
             }
         }
     }
 
     /**
-     * Convert V1 MessageWithParts to V2 SessionMessage for fallback when V2 API fails.
-     */
-    private fun List<MessageWithParts>.toV2SessionMessages(): List<SessionMessage> {
-        return mapNotNull { mwp ->
-            val time = V2TimeInfo(
-                created = mwp.info.time.created,
-                completed = mwp.info.time.completed,
-            )
-            when (val msg = mwp.info) {
-                is Message.User -> {
-                    val text = mwp.parts.filterIsInstance<Part.Text>().joinToString("\n") { it.text }
-                    if (text.isBlank()) null else UserMessage(
-                        id = msg.id,
-                        sessionId = msg.sessionId,
-                        text = text,
-                        time = time,
-                    )
-                }
-                is Message.Assistant -> {
-                    val content = mwp.parts.mapNotNull { part ->
-                        when (part) {
-                            is Part.Text -> AssistantText(id = part.id, text = part.text)
-                            is Part.Reasoning -> AssistantReasoning(id = part.id, text = part.text)
-                            is Part.Tool -> AssistantTool(
-                                id = part.id,
-                                name = part.tool,
-                                state = when (val ts = part.state) {
-                                    is ToolState.Pending -> ToolStatePending(input = ts.raw ?: ts.input.toString())
-                                    is ToolState.Running -> ToolStateRunning(input = ts.input.toString())
-                                    is ToolState.Completed -> ToolStateCompleted(input = ts.input.toString(), result = ts.output)
-                                    is ToolState.Error -> ToolStateError(input = ts.input.toString(), error = ts.error)
-                                },
-                            )
-                            else -> null
-                        }
-                    }
-                    if (content.isEmpty()) null else AssistantMessage(
-                        id = msg.id,
-                        sessionId = msg.sessionId,
-                        agent = msg.agent ?: "",
-                        model = ModelRef(
-                            providerID = msg.providerId ?: "",
-                            modelID = msg.modelId ?: "",
-                        ),
-                        content = content,
-                        cost = msg.cost,
-                        finish = msg.finish,
-                        time = time,
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * Refresh session data — re-hydrates V2 SessionState from REST.
+     * Refresh session data — reloads messages and session status from REST.
      */
     fun refreshSession() {
         viewModelScope.launch {
@@ -1294,52 +920,15 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Re-hydrate V2 SessionState from REST with V1 fallback.
+     * Refresh messages via V1 API.
      */
     private suspend fun refreshMessages() {
-        // Load V1 messages as fallback source
-        var v1Messages: List<MessageWithParts> = emptyList()
         try {
-            v1Messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
+            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
+            chatRepository.setMessages(sessionId, messages)
+            if (BuildConfig.DEBUG) Log.d(TAG, "Refreshed ${messages.size} messages")
         } catch (e: Exception) {
-            Log.e(TAG, "V1 message load failed for refresh", e)
-        }
-
-        try {
-            val response = v2Sdk.messages(sessionId)
-            val v2Messages = response.data
-            
-            // Check if V2 messages are mostly system messages (indicating incomplete history)
-            val userOrAssistantCount = v2Messages.count { it is UserMessage || it is AssistantMessage }
-            val systemMessageCount = v2Messages.size - userOrAssistantCount
-            
-            val shouldFallbackToV1 = v1Messages.isNotEmpty() && (
-                userOrAssistantCount < 3 ||
-                (v2Messages.size > 0 && systemMessageCount.toDouble() / v2Messages.size > 0.8)
-            )
-            
-            if (shouldFallbackToV1) {
-                Log.w(TAG, "V2 refresh returned mostly system messages (user/assistant: $userOrAssistantCount, system: $systemMessageCount), falling back to V1 (${v1Messages.size} messages)")
-                val fallbackMessages = v1Messages.toV2SessionMessages()
-                _sessionState.update { it.copy(
-                    messages = fallbackMessages,
-                    hasOlderMessages = true,
-                )}
-            } else {
-                _sessionState.update { it.copy(
-                    messages = v2Messages,
-                    hasOlderMessages = response.nextCursor != null,
-                )}
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "V2 refreshed ${v2Messages.size} messages for session $sessionId (hasOlder=${response.nextCursor != null}, user/assistant: $userOrAssistantCount)")
-                }
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "V2 refresh failed, falling back to V1 messages", e)
-            val v2Messages = v1Messages.toV2SessionMessages()
-            _sessionState.update { it.copy(
-                messages = v2Messages,
-            )}
+            Log.e(TAG, "Failed to refresh messages", e)
         }
     }
 
@@ -1409,28 +998,10 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Load older messages via V2 cursor-based pagination.
-     * Prepends older messages to the existing SessionState.
+     * V1 has no cursor-based pagination. No-op.
      */
     fun loadOlderMessages() {
-        viewModelScope.launch {
-            _sessionState.update { it.copy(isLoadingOlder = true) }
-            try {
-                val oldestCursor = _sessionState.value.messages.lastOrNull()?.id
-                val response = v2Sdk.messages(sessionId, cursor = oldestCursor)
-                _sessionState.update { it.copy(
-                    messages = it.messages + response.data,
-                    hasOlderMessages = response.nextCursor != null,
-                    isLoadingOlder = false,
-                )}
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "V2 loaded older: ${response.data.size} messages (hasOlder=${response.nextCursor != null})")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "V2 failed to load older messages", e)
-                _sessionState.update { it.copy(isLoadingOlder = false) }
-            }
-        }
+        if (BuildConfig.DEBUG) Log.d(TAG, "loadOlderMessages: no-op (V1 has no cursor pagination)")
     }
 
     /**
@@ -1825,25 +1396,13 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val currentSessionId = ensureSession()
-                val text = parts.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("\n")
-
-                // Optimistic: add local UserMessage to SessionState immediately
-                val optimisticId = "pending-${java.util.UUID.randomUUID()}"
-                val optimisticMsg = UserMessage(
-                    id = optimisticId,
+                chatRepository.promptAsync(
+                    serverId = serverId,
                     sessionId = currentSessionId,
-                    text = text,
-                    time = V2TimeInfo(created = System.currentTimeMillis()),
+                    parts = parts,
+                    directory = sessionDirectory,
                 )
-                _sessionState.update { it.copy(messages = listOf(optimisticMsg) + it.messages) }
-
-                // Send via V2 SDK
-                v2Sdk.prompt(
-                    sessionID = currentSessionId,
-                    text = text,
-                    delivery = "steer",
-                )
-                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId via V1")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
@@ -1909,7 +1468,7 @@ class ChatViewModel @Inject constructor(
             try {
                 sseJob?.cancel()
                 sseJob = null
-                v2Sdk.abort(sessionId)
+                sessionRepository.abort(serverId, sessionId, sessionDirectory)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
                 sessionRepository.updateSessionStatus(sessionId, SessionStatus.Idle)
             } catch (e: Exception) {
@@ -2409,31 +1968,6 @@ class ChatViewModel @Inject constructor(
         private val sessionModelCache = mutableMapOf<String, Pair<String, String>>()
 
         const val REFRESH_COOLDOWN_MS = 5_000L  // Skip refresh if last one was < 5s ago
-
-        /**
-         * Convert V2 ToolState → V1 ToolState for UI compatibility.
-         * V2 uses String input; V1 uses Map<String, JsonElement>.
-         * The raw input string is preserved in Pending.raw for display.
-         */
-        private fun convertToolState(v2State: dev.minios.ocremote.data.v2.ToolState): ToolState {
-            return when (v2State) {
-                is ToolStatePending -> ToolState.Pending(
-                    input = emptyMap(),
-                    raw = v2State.input,
-                )
-                is ToolStateRunning -> ToolState.Running(
-                    input = emptyMap(),
-                )
-                is ToolStateCompleted -> ToolState.Completed(
-                    input = emptyMap(),
-                    output = v2State.result ?: "",
-                )
-                is ToolStateError -> ToolState.Error(
-                    input = emptyMap(),
-                    error = v2State.error ?: "",
-                )
-            }
-        }
     }
 }
 
