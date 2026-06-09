@@ -387,6 +387,14 @@ private fun MessageCardAssistant(
                     }
                 }
 
+                // Extract agent name from Part.Agent in turn messages (independent of StepFinish)
+                val agentName = if (isTurnLast) {
+                    val allParts = orderedTurnMessages?.flatMap { it.parts }
+                        ?: currentMessage.parts
+                    allParts.filterIsInstance<Part.Agent>()
+                        .firstOrNull()?.name?.takeIf { it.isNotBlank() }
+                } else null
+
                 // Token/cost/duration footer — only on the last message of a turn
                 val stepFinishes = if (isTurnLast && orderedTurnMessages != null) {
                     orderedTurnMessages.flatMap { msg ->
@@ -412,11 +420,6 @@ private fun MessageCardAssistant(
                     val modelId = if (isTurnLast && orderedTurnMessages != null) {
                         (orderedTurnMessages.lastOrNull()?.message as? Message.Assistant)?.modelId
                     } else null
-
-                    // Extract agent name from Part.Agent in turn messages
-                    val agentName = orderedTurnMessages?.flatMap { it.parts }
-                        ?.filterIsInstance<Part.Agent>()
-                        ?.firstOrNull()?.name?.takeIf { it.isNotBlank() }
 
                     val hasFooter = hasTokenStats || (durationMs ?: 0) > 0 || !modelId.isNullOrBlank() || !agentName.isNullOrBlank()
 
@@ -546,6 +549,49 @@ private fun MessageCardAssistant(
                     }
 
 
+                }
+
+                // Fallback footer: no StepFinish but still show Agent Tag + time
+                if (stepFinishes.isEmpty() && isTurnLast && !agentName.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 时间
+                        assistantMsg?.time?.created?.let { createdMs ->
+                            val timeText = remember(createdMs) {
+                                SimpleDateFormat("HH:mm", Locale.getDefault())
+                                    .format(Date(createdMs))
+                            }
+                            Text(
+                                text = timeText,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
+                            )
+                        }
+                        // Agent name tag
+                        val tagColor = agentColor(agentName, agents)
+                        Surface(
+                            shape = ShapeTokens.smallMedium,
+                            color = tagColor.copy(alpha = AlphaTokens.FAINT)
+                        ) {
+                            Text(
+                                text = agentName.replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = tagColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (copyText != null) {
+                            CopyButton(
+                                text = copyText,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Error display
