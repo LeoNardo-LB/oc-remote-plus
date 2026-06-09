@@ -387,13 +387,12 @@ private fun MessageCardAssistant(
                     }
                 }
 
-                // Extract agent name from Part.Agent in turn messages (independent of StepFinish)
+                // Extract agent name from Message.Assistant.agent field (not Part.Agent)
                 val agentName = if (isTurnLast) {
-                    val allParts = orderedTurnMessages?.flatMap { it.parts }
-                        ?: currentMessage.parts
-                    allParts.filterIsInstance<Part.Agent>()
-                        .firstOrNull()?.name?.takeIf { it.isNotBlank() }
+                    (orderedTurnMessages?.lastOrNull()?.message as? Message.Assistant)?.agent
+                        ?: (currentMessage.message as? Message.Assistant)?.agent
                 } else null
+                android.util.Log.d("AgentTag", "[MessageCard] agentName=$agentName, isTurnLast=$isTurnLast, assistantMsg.agent=${(currentMessage.message as? Message.Assistant)?.agent}")
 
                 // Token/cost/duration footer — only on the last message of a turn
                 val stepFinishes = if (isTurnLast && orderedTurnMessages != null) {
