@@ -10,7 +10,11 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.ClosedReadChannelException
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.*
@@ -83,6 +87,20 @@ class SseClient @Inject constructor(
         ?: throw IllegalStateException("SessionNextEventParser not found in parser list")
 
     /**
+     * Raw SSE JSON strings from the active global event connection.
+     * V2 pipeline consumes this to avoid a duplicate HTTP connection.
+     * Emitted before V1 parsing — consumers see every non-heartbeat data frame.
+     */
+    val rawSseEvents: MutableSharedFlow<String> = MutableSharedFlow(
+        replay = 0,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
+    /** Read-only access for external consumers (V2 pipeline). */
+    val rawSseEventFlow: SharedFlow<String> = rawSseEvents.asSharedFlow()
+
+    /**
      * Connect to the global event stream.
      * Returns a Flow that emits SSE events.
      * The flow does NOT auto-reconnect internally — callers should handle
@@ -138,6 +156,8 @@ class SseClient @Inject constructor(
                     val data = buildStringFromBytes(buffer)
                     if (data.isNotEmpty()) {
                         try {
+                            // Emit raw JSON for V2 pipeline (before V1 parsing)
+                            rawSseEvents.tryEmit(data)
                             val event = parseEvent(data)
                             if (event != null) {
                                 eventCount++
