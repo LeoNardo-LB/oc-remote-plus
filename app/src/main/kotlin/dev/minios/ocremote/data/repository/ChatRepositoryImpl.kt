@@ -55,7 +55,9 @@ class ChatRepositoryImpl @Inject constructor(
             }
 
     override fun getParts(sessionId: String): Flow<List<Part>> =
-        eventDispatcher.parts.map { it[sessionId] ?: emptyList() }
+        eventDispatcher.parts.map { partsByMessageId ->
+            partsByMessageId.values.flatten().filter { it.sessionId == sessionId }
+        }
             .catch { e ->
                 Log.e("ChatRepository", "Error in getParts", e)
                 emit(emptyList())
