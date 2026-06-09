@@ -1347,6 +1347,7 @@ class ChatViewModel @Inject constructor(
      * Ensures a session exists before sending messages.
      * If sessionId is empty (new session), creates one via API.
      * Thread-safe via Mutex to prevent duplicate creation.
+     * After creation, starts observing SSE-driven flows so messages appear.
      */
     private suspend fun ensureSession(): String {
         if (sessionId.isNotEmpty()) return sessionId
@@ -1361,6 +1362,11 @@ class ChatViewModel @Inject constructor(
             if (!sessionLoaded.isCompleted) {
                 sessionLoaded.complete(Unit)
             }
+            // Start observing SSE-driven message/part flows for the new session.
+            // Without this, SSE events arrive at EventDispatcher but ChatViewModel
+            // never collects them — messages stay invisible.
+            runCatching { startObservingMessages() }
+                .onFailure { Log.e(TAG, "Failed to start observing after session creation", it) }
             sessionId
         }
     }
@@ -1396,6 +1402,25 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val currentSessionId = ensureSession()
+                val promptText = parts.firstOrNull { it.type == "text" }?.text ?: ""
+                // Optimistic insert: show user message immediately before SSE confirmation
+                if (promptText.isNotBlank()) {
+                    val optimisticUser = Message.User(
+                        id = "pending-${System.currentTimeMillis()}",
+                        sessionId = currentSessionId,
+                        time = TimeInfo(System.currentTimeMillis()),
+                        summary = Message.User.UserSummary(title = promptText),
+                    )
+                    val optimisticPart = Part.Text(
+                        id = "pending-part-${System.currentTimeMillis()}",
+                        sessionId = currentSessionId,
+                        messageId = optimisticUser.id,
+                        text = promptText,
+                    )
+                    chatRepository.setMessages(currentSessionId, listOf(
+                        MessageWithParts(info = optimisticUser, parts = listOf(optimisticPart))
+                    ))
+                }
                 chatRepository.promptAsync(
                     serverId = serverId,
                     sessionId = currentSessionId,
