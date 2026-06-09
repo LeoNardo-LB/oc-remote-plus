@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 private const val TAG = "V2-SseConn"
+private const val LOG_INTERVAL = 100
 
 /**
  * Consumes raw SSE JSON strings (from V1's SharedFlow) and parses them
@@ -24,11 +25,19 @@ class SseConnectionManager(
      * The [rawEventsFlow] is expected to be V1's [SseClient.rawSseEventFlow].
      */
     fun connect(): Flow<SseEventV2> = flow {
+        var eventCount = 0
+        var parseNullCount = 0
         rawEventsFlow.collect { data ->
             try {
+                eventCount++
                 val event = parser.parse(data)
                 if (event != null && !deduplicator.isDuplicate(event)) {
                     emit(event)
+                } else if (event == null) {
+                    parseNullCount++
+                    if (parseNullCount % LOG_INTERVAL == 0) {
+                        Log.d(TAG, "$parseNullCount/$eventCount events parsed null (V1 format, expected)")
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e

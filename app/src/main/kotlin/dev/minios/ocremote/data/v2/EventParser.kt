@@ -1,8 +1,10 @@
 package dev.minios.ocremote.data.v2
 
+import android.util.Log
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 
 object EventParser {
     private val json = Json {
@@ -14,10 +16,20 @@ object EventParser {
     fun parse(raw: String): SseEventV2? {
         return try {
             val global = json.decodeFromString<GlobalEvent>(raw)
-            val type = global.payload.type
-            val props = global.payload.properties
-            parse(type, props)
+            val payload = global.payload
+            when (payload.type) {
+                "sync" -> {
+                    val syncEvent = payload.syncEvent ?: return null
+                    val eventType = syncEvent["type"]?.jsonPrimitive?.content ?: return null
+                    parse(eventType, syncEvent)
+                }
+                else -> {
+                    val props = payload.properties ?: return null
+                    parse(payload.type, props)
+                }
+            }
         } catch (e: Exception) {
+            Log.w("EventParser", "Outer parse error: ${e.message}")
             null
         }
     }
@@ -59,6 +71,7 @@ object EventParser {
                 else -> null
             }
         } catch (e: Exception) {
+            Log.w("EventParser", "V2 parse error for event type '$type': ${e.message}")
             null
         }
     }

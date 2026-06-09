@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class GlobalEvent(
     val directory: String,
+    val project: String? = null,
     val workspace: String? = null,
     val payload: SseEventPayload,
 )
@@ -15,7 +16,8 @@ data class GlobalEvent(
 @Serializable
 data class SseEventPayload(
     val type: String,
-    val properties: JsonObject,
+    val properties: JsonObject? = null,
+    val syncEvent: JsonObject? = null,
 )
 
 // Base sealed interface for all V2 events
@@ -31,6 +33,7 @@ sealed interface SseEventV2
 data class AgentSwitchedEvent(
     val sessionID: String,
     val agent: String,
+    @SerialName("messageID")
     val id: String,
 ) : SseEventV2
 
@@ -39,6 +42,7 @@ data class AgentSwitchedEvent(
 data class ModelSwitchedEvent(
     val sessionID: String,
     val model: ModelRef,
+    @SerialName("messageID")
     val id: String,
 ) : SseEventV2
 
@@ -46,6 +50,7 @@ data class ModelSwitchedEvent(
 @SerialName("session.next.prompted")
 data class PromptedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val prompt: Prompt,
 ) : SseEventV2
@@ -54,6 +59,7 @@ data class PromptedEvent(
 @SerialName("session.next.prompt.promoted")
 data class PromptPromotedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val prompt: Prompt,
 ) : SseEventV2
@@ -63,6 +69,7 @@ data class PromptPromotedEvent(
 data class ContextUpdatedEvent(
     val sessionID: String,
     val text: String,
+    @SerialName("messageID")
     val id: String,
 ) : SseEventV2
 
@@ -70,6 +77,7 @@ data class ContextUpdatedEvent(
 @SerialName("session.next.synthetic")
 data class SyntheticEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val text: String,
 ) : SseEventV2
@@ -78,6 +86,7 @@ data class SyntheticEvent(
 @SerialName("session.next.shell.started")
 data class ShellStartedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val callID: String,
     val command: String,
@@ -91,6 +100,7 @@ data class ShellStartedEvent(
 @SerialName("session.next.shell.ended")
 data class ShellEndedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val callID: String,
     val output: String,
@@ -100,6 +110,7 @@ data class ShellEndedEvent(
 @SerialName("session.next.step.started")
 data class StepStartedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val agent: String,
     val model: ModelRef,
@@ -109,6 +120,7 @@ data class StepStartedEvent(
 @SerialName("session.next.step.ended")
 data class StepEndedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val finish: String,
     val cost: Double,
@@ -119,6 +131,7 @@ data class StepEndedEvent(
 @SerialName("session.next.step.failed")
 data class StepFailedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val error: String,
 ) : SseEventV2
@@ -131,7 +144,9 @@ data class StepFailedEvent(
 @SerialName("session.next.text.started")
 data class TextStartedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -139,7 +154,9 @@ data class TextStartedEvent(
 @SerialName("session.next.text.delta")
 data class TextDeltaEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
     val delta: String,
 ) : SseEventV2
@@ -148,7 +165,9 @@ data class TextDeltaEvent(
 @SerialName("session.next.text.ended")
 data class TextEndedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -156,7 +175,9 @@ data class TextEndedEvent(
 @SerialName("session.next.reasoning.started")
 data class ReasoningStartedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -164,7 +185,9 @@ data class ReasoningStartedEvent(
 @SerialName("session.next.reasoning.delta")
 data class ReasoningDeltaEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
     val delta: String,
 ) : SseEventV2
@@ -173,7 +196,9 @@ data class ReasoningDeltaEvent(
 @SerialName("session.next.reasoning.ended")
 data class ReasoningEndedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -185,7 +210,9 @@ data class ReasoningEndedEvent(
 @SerialName("session.next.tool.input.started")
 data class ToolInputStartedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -193,7 +220,9 @@ data class ToolInputStartedEvent(
 @SerialName("session.next.tool.input.delta")
 data class ToolInputDeltaEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
     val delta: String,
 ) : SseEventV2
@@ -202,7 +231,9 @@ data class ToolInputDeltaEvent(
 @SerialName("session.next.tool.input.ended")
 data class ToolInputEndedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -210,7 +241,9 @@ data class ToolInputEndedEvent(
 @SerialName("session.next.tool.called")
 data class ToolCalledEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
     val name: String,
     val input: String,
@@ -220,7 +253,9 @@ data class ToolCalledEvent(
 @SerialName("session.next.tool.progress")
 data class ToolProgressEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
 ) : SseEventV2
 
@@ -228,7 +263,9 @@ data class ToolProgressEvent(
 @SerialName("session.next.tool.success")
 data class ToolSuccessEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
     val outputPaths: List<String>? = null,
     val result: String? = null,
@@ -238,7 +275,9 @@ data class ToolSuccessEvent(
 @SerialName("session.next.tool.failed")
 data class ToolFailedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
+    @SerialName("partID")
     val stepID: String,
     val error: String,
 ) : SseEventV2
@@ -251,6 +290,7 @@ data class ToolFailedEvent(
 @SerialName("session.next.compaction.ended")
 data class CompactionEndedEvent(
     val sessionID: String,
+    @SerialName("messageID")
     val id: String,
     val reason: String,
     val summary: String,
