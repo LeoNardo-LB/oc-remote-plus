@@ -597,12 +597,12 @@ class ChatViewModel @Inject constructor(
     ) { state, toolExpandedStates ->
         val chatMessages = state.messages.reversed().mapNotNull { msg ->
             val message: Message? = when (msg) {
-                is UserMessage -> Message.User(
+                is dev.minios.ocremote.data.v2.UserMessage -> Message.User(
                     id = msg.id,
                     sessionId = msg.sessionId,
                     time = TimeInfo(msg.time.created, msg.time.completed),
                 )
-                is AssistantMessage -> Message.Assistant(
+                is dev.minios.ocremote.data.v2.AssistantMessage -> Message.Assistant(
                     id = msg.id,
                     sessionId = msg.sessionId,
                     time = TimeInfo(msg.time.created, msg.time.completed),
@@ -627,26 +627,87 @@ class ChatViewModel @Inject constructor(
                         Message.Assistant.ErrorInfo(name = errText)
                     },
                 )
+                // Map V2 system message types to displayable Assistant messages
+                is dev.minios.ocremote.data.v2.SystemMessage -> Message.Assistant(
+                    id = msg.id,
+                    sessionId = msg.sessionId,
+                    time = TimeInfo(msg.time.created, msg.time.completed),
+                    parentId = "",
+                    agent = "system",
+                    providerId = "",
+                    modelId = "",
+                    finish = "system",
+                )
+                is dev.minios.ocremote.data.v2.ShellMessage -> Message.Assistant(
+                    id = msg.id,
+                    sessionId = msg.sessionId,
+                    time = TimeInfo(msg.time.created, msg.time.completed),
+                    parentId = "",
+                    agent = "shell",
+                    providerId = "",
+                    modelId = "",
+                    finish = "shell",
+                )
+                is dev.minios.ocremote.data.v2.SyntheticMessage -> Message.Assistant(
+                    id = msg.id,
+                    sessionId = msg.sessionId,
+                    time = TimeInfo(msg.time.created, msg.time.completed),
+                    parentId = "",
+                    agent = "synthetic",
+                    providerId = "",
+                    modelId = "",
+                    finish = "synthetic",
+                )
+                is dev.minios.ocremote.data.v2.AgentSwitchedMessage -> Message.Assistant(
+                    id = msg.id,
+                    sessionId = msg.sessionId,
+                    time = TimeInfo(msg.time.created, msg.time.completed),
+                    parentId = "",
+                    agent = "system",
+                    providerId = "",
+                    modelId = "",
+                    finish = "agent-switched",
+                )
+                is dev.minios.ocremote.data.v2.ModelSwitchedMessage -> Message.Assistant(
+                    id = msg.id,
+                    sessionId = msg.sessionId,
+                    time = TimeInfo(msg.time.created, msg.time.completed),
+                    parentId = "",
+                    agent = "system",
+                    providerId = "",
+                    modelId = "",
+                    finish = "model-switched",
+                )
+                is dev.minios.ocremote.data.v2.CompactionMessage -> Message.Assistant(
+                    id = msg.id,
+                    sessionId = msg.sessionId,
+                    time = TimeInfo(msg.time.created, msg.time.completed),
+                    parentId = "",
+                    agent = "system",
+                    providerId = "",
+                    modelId = "",
+                    finish = "compaction",
+                )
                 else -> null
             }
             if (message == null) return@mapNotNull null
 
             val parts: List<Part> = when (msg) {
-                is AssistantMessage -> msg.content.map { content ->
+                is dev.minios.ocremote.data.v2.AssistantMessage -> msg.content.map { content ->
                     when (content) {
-                        is AssistantText -> Part.Text(
+                        is dev.minios.ocremote.data.v2.AssistantText -> Part.Text(
                             id = content.id,
                             sessionId = msg.sessionId,
                             messageId = msg.id,
                             text = content.text,
                         )
-                        is AssistantReasoning -> Part.Reasoning(
+                        is dev.minios.ocremote.data.v2.AssistantReasoning -> Part.Reasoning(
                             id = content.id,
                             sessionId = msg.sessionId,
                             messageId = msg.id,
                             text = content.text,
                         )
-                        is AssistantTool -> Part.Tool(
+                        is dev.minios.ocremote.data.v2.AssistantTool -> Part.Tool(
                             id = content.id,
                             sessionId = msg.sessionId,
                             messageId = msg.id,
@@ -656,13 +717,62 @@ class ChatViewModel @Inject constructor(
                         )
                     }
                 }
-                is UserMessage -> listOfNotNull(
+                is dev.minios.ocremote.data.v2.UserMessage -> listOfNotNull(
                     if (msg.text.isNotBlank()) Part.Text(
                         id = msg.id + "-text",
                         sessionId = msg.sessionId,
                         messageId = msg.id,
                         text = msg.text,
                     ) else null,
+                )
+                // Map V2 system message types to displayable text parts
+                is dev.minios.ocremote.data.v2.SystemMessage -> listOf(
+                    Part.Text(
+                        id = msg.id + "-text",
+                        sessionId = msg.sessionId,
+                        messageId = msg.id,
+                        text = "[System] ${msg.text}",
+                    )
+                )
+                is dev.minios.ocremote.data.v2.ShellMessage -> listOf(
+                    Part.Text(
+                        id = msg.id + "-text",
+                        sessionId = msg.sessionId,
+                        messageId = msg.id,
+                        text = "[Shell] \$ ${msg.command}\n${msg.output}",
+                    )
+                )
+                is dev.minios.ocremote.data.v2.SyntheticMessage -> listOf(
+                    Part.Text(
+                        id = msg.id + "-text",
+                        sessionId = msg.sessionId,
+                        messageId = msg.id,
+                        text = "[Synthetic] ${msg.text}",
+                    )
+                )
+                is dev.minios.ocremote.data.v2.AgentSwitchedMessage -> listOf(
+                    Part.Text(
+                        id = msg.id + "-text",
+                        sessionId = msg.sessionId,
+                        messageId = msg.id,
+                        text = "[Agent switched] ${msg.agent}",
+                    )
+                )
+                is dev.minios.ocremote.data.v2.ModelSwitchedMessage -> listOf(
+                    Part.Text(
+                        id = msg.id + "-text",
+                        sessionId = msg.sessionId,
+                        messageId = msg.id,
+                        text = "[Model switched] ${msg.model.providerID}/${msg.model.modelID}",
+                    )
+                )
+                is dev.minios.ocremote.data.v2.CompactionMessage -> listOf(
+                    Part.Text(
+                        id = msg.id + "-text",
+                        sessionId = msg.sessionId,
+                        messageId = msg.id,
+                        text = "[Compaction] ${msg.reason}",
+                    )
                 )
                 else -> emptyList()
             }
