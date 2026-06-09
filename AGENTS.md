@@ -104,8 +104,13 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 - CI uses GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_ALIAS`, `KEYSTORE_PASSWORD`)
 
 ### Version Management
-- `versionName` and `versionCode` in `app/build.gradle.kts`
-- CI extracts version by grepping `versionName = "..."` — **do not change the format**
+- **Single source of truth**: `version.properties` at project root
+  ```properties
+  VERSION_CODE=373
+  VERSION_NAME=2.0.0-beta.173
+  ```
+- `app/build.gradle.kts` reads from `version.properties` — never hardcode version there
+- CI extracts version by grepping `version.properties` — **do not change the format**
 - Tags follow `v2.0.0-beta.XX` (beta) or `v2.0.0-dev` (dev) pattern
 
 ### Release & Publish
@@ -120,11 +125,11 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 # 1. 确认在 master，工作区干净
 git checkout master && git pull origin master
 
-# 2. Bump 版本号（修改 app/build.gradle.kts 中的 versionCode 和 versionName）
-#    versionCode += 1, versionName = "2.0.0-beta.XX"
+# 2. Bump 版本号（修改 version.properties 中的 VERSION_CODE 和 VERSION_NAME）
+#    VERSION_CODE += 1, VERSION_NAME = "2.0.0-beta.XX"
 
 # 3. 提交版本号变更（可单独 commit 或与代码合并一起）
-git add app/build.gradle.kts && git commit -m "chore: bump version to v2.0.0-beta.XX"
+git add version.properties && git commit -m "chore: bump version to v2.0.0-beta.XX"
 
 # 4. 构建 Release APK（beta flavor 正式版，使用 release keystore）
 .\gradlew --stop

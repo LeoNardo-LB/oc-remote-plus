@@ -1,6 +1,12 @@
 import java.io.FileInputStream
 import java.util.Properties
 
+// Single source of truth for version — read from version.properties
+val versionPropsFile = rootProject.file("version.properties")
+val versionProps = Properties().apply { load(FileInputStream(versionPropsFile)) }
+val vCode = (versionProps["VERSION_CODE"] as String).toInt()
+val vName = versionProps["VERSION_NAME"] as String
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -17,8 +23,8 @@ android {
         applicationId = "dev.minios.ocremote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 373
-        versionName = "2.0.0-beta.173"
+        versionCode = vCode
+        versionName = vName
 
         testInstrumentationRunner = "dev.minios.ocremote.HiltTestRunner"
         vectorDrawables {
