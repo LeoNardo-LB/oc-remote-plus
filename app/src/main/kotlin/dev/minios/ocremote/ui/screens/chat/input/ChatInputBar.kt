@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,12 +57,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -464,31 +466,41 @@ internal fun ChatInputBar(
                         )
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    BasicTextField(
-                        value = textFieldValue,
-                        onValueChange = onTextFieldValueChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 24.dp),
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontFamily = if (isShellMode) FontFamily.Monospace else FontFamily.Default
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                        maxLines = 5,
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        visualTransformation = visualTransformation,
-                        decorationBox = { innerTextField ->
-                            if (text.isEmpty()) {
-                                Text(
-                                    text = placeholder,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                                )
+                    // Fixed min-height box: ensures consistent height regardless of
+                    // BasicTextField's internal measurement difference between empty (cursor)
+                    // and non-empty (text line) states. Always renders placeholder to keep
+                    // measurement baseline stable.
+                    Box(modifier = Modifier.defaultMinSize(minHeight = with(LocalDensity.current) {
+                        MaterialTheme.typography.bodyLarge.lineHeight.toDp()
+                    })) {
+                        BasicTextField(
+                            value = textFieldValue,
+                            onValueChange = onTextFieldValueChange,
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontFamily = if (isShellMode) FontFamily.Monospace else FontFamily.Default
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                            maxLines = 5,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            visualTransformation = visualTransformation,
+                            decorationBox = { innerTextField ->
+                                // Always render placeholder to maintain stable measurement.
+                                // Alpha controls visibility without affecting layout.
+                                Box {
+                                    Text(
+                                        text = placeholder,
+                                        modifier = Modifier.alpha(if (text.isEmpty()) 1f else 0f),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
+                                    )
+                                    innerTextField()
+                                }
                             }
-                            innerTextField()
-                        }
-                    )
+                        )
+                    }
                 }
 
                 // Send / Stop button — tap to send or stop, long-press toggles shell mode
