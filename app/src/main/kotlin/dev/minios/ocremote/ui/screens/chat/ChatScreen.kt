@@ -523,7 +523,6 @@ fun ChatScreen(
                         totalReasoningTokens = tokenStats.totalReasoningTokens,
                         totalCacheReadTokens = tokenStats.totalCacheReadTokens,
                         totalCacheWriteTokens = tokenStats.totalCacheWriteTokens,
-                        totalTokens = tokenStats.allTokens,
                         totalCost = tokenStats.totalCost,
                         sessionParentId = sessionMeta.sessionParentId,
                         shareUrl = sessionMeta.shareUrl,

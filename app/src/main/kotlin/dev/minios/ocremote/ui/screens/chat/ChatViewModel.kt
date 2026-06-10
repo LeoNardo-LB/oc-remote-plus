@@ -816,37 +816,29 @@ class ChatViewModel @Inject constructor(
         // Reset token stats from previous session (TokenStatsTracker is @Singleton, shared across sessions)
         tokenStatsTracker.reset()
 
-        // Observe messages + session tokens and update token stats tracker
-        // Token values use session-level cumulative tokens from SSE session.updated events.
-        // Falls back to summing all assistant messages' tokens if session.tokens is unavailable.
-        // Cost remains cumulative across all API calls (summed from individual messages).
+        // Observe messages and update token stats tracker.
+        // Token values use the LAST assistant message's tokens (represents current context size).
+        // Cost is cumulative across all API calls.
         viewModelScope.launch {
-            combine(
-                _messagesList,
-                sessionRepository.getSessionsFlow(serverId),
-            ) { messages, sessions ->
-                val currentSession = sessions.find { it.id == sessionId }
-                val sessionTokens = currentSession?.tokens
-
+            _messagesList.collect { messages ->
                 val assistantMessages = messages.filterIsInstance<Message.Assistant>()
 
-                // Cost is cumulative across all API calls (session.cost not used — summed from messages)
+                // Cost is cumulative across all API calls
                 val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
 
-                // Token usage: prefer session-level cumulative tokens, fallback to per-message sum
-                val totalInputTokens = if (sessionTokens != null) sessionTokens.input
-                    else assistantMessages.sumOf { it.tokens?.input ?: 0 }
-                val totalOutputTokens = if (sessionTokens != null) sessionTokens.output
-                    else assistantMessages.sumOf { it.tokens?.output ?: 0 }
-                val totalReasoningTokens = if (sessionTokens != null) sessionTokens.reasoning
-                    else assistantMessages.sumOf { it.tokens?.reasoning ?: 0 }
-                val totalCacheReadTokens = if (sessionTokens != null) sessionTokens.cache.read
-                    else assistantMessages.sumOf { it.tokens?.cache?.read ?: 0 }
-                val totalCacheWriteTokens = if (sessionTokens != null) sessionTokens.cache.write
-                    else assistantMessages.sumOf { it.tokens?.cache?.write ?: 0 }
+                // Token usage = last call's values (not cumulative, matches OpenCode behavior)
+                val lastWithTokens = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
+                val lastTokens = lastWithTokens?.tokens
+                val totalInputTokens = lastTokens?.input ?: 0
+                val totalOutputTokens = lastTokens?.output ?: 0
+                val totalReasoningTokens = lastTokens?.reasoning ?: 0
+                val totalCacheReadTokens = lastTokens?.cache?.read ?: 0
+                val totalCacheWriteTokens = lastTokens?.cache?.write ?: 0
 
-                // Context tokens for the circular progress indicator (input only — output/reasoning don't consume context window)
-                val lastContextTokens = totalInputTokens + totalCacheReadTokens + totalCacheWriteTokens
+                // Context tokens for the circular progress indicator
+                val lastContextTokens = lastTokens?.let { t ->
+                    t.input + t.output + t.reasoning + t.cache.read + t.cache.write
+                } ?: 0
 
                 tokenStatsTracker.update {
                     copy(
@@ -859,7 +851,7 @@ class ChatViewModel @Inject constructor(
                         lastContextTokens = lastContextTokens,
                     )
                 }
-            }.collect {}
+            }
         }
 
         // Restore draft from disk
