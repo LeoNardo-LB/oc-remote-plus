@@ -169,7 +169,6 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     // ============ Batch Operations ============
 
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        val incomingMessageIds = newMessages.map { it.info.id }.toSet()
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
@@ -203,13 +202,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                     incomingParts
                 }
             }
-            // Only clean up parts belonging to THIS session — never touch other sessions' parts.
-            val survivingMessageIds = (_messages.value[sessionId] ?: emptyList()).map { it.id }.toSet()
-            val prevSessionMessageIds = previousMessageIdsFor(sessionId)
-            val staleKeys = prevSessionMessageIds.filter { messageId ->
-                messageId !in survivingMessageIds && messageId !in incomingMessageIds
-            }
-            (current + merged) - staleKeys.toSet()
+            current + merged
         }
     }
 
@@ -238,7 +231,6 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
      * the window between REST snapshot and new SSE connection establishment.
      */
     fun replaceMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        val incomingMessageIds = newMessages.map { it.info.id }.toSet()
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
@@ -258,24 +250,9 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                     incomingParts
                 }
             }
-            // Only clean up parts belonging to THIS session — never touch other sessions' parts.
-            val survivingMessageIds = (_messages.value[sessionId] ?: emptyList()).map { it.id }.toSet()
-            val prevSessionMessageIds = previousMessageIdsFor(sessionId)
-            val staleKeys = prevSessionMessageIds.filter { messageId ->
-                messageId !in survivingMessageIds && messageId !in incomingMessageIds
-            }
-            (current + merged) - staleKeys.toSet()
+            current + merged
         }
     }
-
-    /**
-     * Collect all message IDs that were previously associated with [sessionId].
-     * Derived from the current _messages snapshot for that session, which represents
-     * the full set of message IDs we may need to clean up.
-     * This ensures stale-key cleanup is scoped to the target session only.
-     */
-    private fun previousMessageIdsFor(sessionId: String): Set<String> =
-        _messages.value[sessionId]?.map { it.id }?.toSet() ?: emptySet()
 
     fun clearForSession(sessionId: String) {
         val messageIds = _messages.value[sessionId]?.map { it.id }?.toSet() ?: emptySet()
