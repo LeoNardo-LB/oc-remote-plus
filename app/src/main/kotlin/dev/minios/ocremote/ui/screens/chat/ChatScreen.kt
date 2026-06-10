@@ -139,6 +139,7 @@ import dev.minios.ocremote.domain.model.CommandInfo
 import dev.minios.ocremote.domain.model.ModelCatalog
 import dev.minios.ocremote.domain.model.ProviderCatalog
 import dev.minios.ocremote.MainActivity
+import dev.minios.ocremote.ui.theme.AppMotion
 import dev.minios.ocremote.ui.theme.CodeTypography
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -513,85 +514,97 @@ fun ChatScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (!isTerminalMode) {
-                ChatTopBar(
-                    sessionTitle = sessionMeta.sessionTitle,
-                    messageCount = messageState.messageCount,
-                    totalInputTokens = tokenStats.totalInputTokens,
-                    totalOutputTokens = tokenStats.totalOutputTokens,
-                    totalReasoningTokens = tokenStats.totalReasoningTokens,
-                    totalCacheReadTokens = tokenStats.totalCacheReadTokens,
-                    totalCacheWriteTokens = tokenStats.totalCacheWriteTokens,
-                    totalCost = tokenStats.totalCost,
-                    sessionParentId = sessionMeta.sessionParentId,
-                    shareUrl = sessionMeta.shareUrl,
-                    contextWindow = modelConfig.contextWindow,
-                    lastContextTokens = tokenStats.lastContextTokens,
-                    onNavigateBack = onNavigateBack,
-                    onTerminalMode = { isTerminalMode = true },
-                    onOpenInWebView = onOpenInWebView,
-                    onNewSession = {
-                        onNavigateToSession("")  // Empty sessionId = lazy creation
-                    },
-                    onForkSession = {
-                        viewModel.forkSession { session ->
-                            if (session != null) {
-                                onNavigateToSession(session.id)
-                            } else {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_fork_failed))
-                                }
-                            }
-                        }
-                    },
-                    onCompactSession = {
-                        viewModel.compactSession { ok ->
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar(
-                                    if (ok) context.getString(R.string.chat_session_compacted) else context.getString(R.string.chat_session_compact_failed)
-                                )
-                            }
-                        }
-                    },
-                    onReviewChanges = {
-                        viewModel.executeCommand("review") { ok ->
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar(
-                                    if (ok) context.getString(R.string.chat_command_executed, "review") else context.getString(R.string.chat_command_failed, "review")
-                                )
-                            }
-                        }
-                    },
-                    onShare = {
-                        viewModel.shareSession { url ->
-                            coroutineScope.launch {
-                                if (url != null) {
-                                    clipboardManager.setText(AnnotatedString(url))
-                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_share_url_copied))
+                Column {
+                    ChatTopBar(
+                        sessionTitle = sessionMeta.sessionTitle,
+                        messageCount = messageState.messageCount,
+                        totalInputTokens = tokenStats.totalInputTokens,
+                        totalOutputTokens = tokenStats.totalOutputTokens,
+                        totalReasoningTokens = tokenStats.totalReasoningTokens,
+                        totalCacheReadTokens = tokenStats.totalCacheReadTokens,
+                        totalCacheWriteTokens = tokenStats.totalCacheWriteTokens,
+                        totalTokens = tokenStats.allTokens,
+                        totalCost = tokenStats.totalCost,
+                        sessionParentId = sessionMeta.sessionParentId,
+                        shareUrl = sessionMeta.shareUrl,
+                        contextWindow = modelConfig.contextWindow,
+                        lastContextTokens = tokenStats.lastContextTokens,
+                        onNavigateBack = onNavigateBack,
+                        onTerminalMode = { isTerminalMode = true },
+                        onOpenInWebView = onOpenInWebView,
+                        onNewSession = {
+                            onNavigateToSession("")  // Empty sessionId = lazy creation
+                        },
+                        onForkSession = {
+                            viewModel.forkSession { session ->
+                                if (session != null) {
+                                    onNavigateToSession(session.id)
                                 } else {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_share_failed))
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_fork_failed))
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onUnshare = {
-                        viewModel.unshareSession { ok ->
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar(
-                                    if (ok) context.getString(R.string.chat_session_unshared) else context.getString(R.string.chat_session_unshare_failed)
-                                )
+                        },
+                        onCompactSession = {
+                            viewModel.compactSession { ok ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (ok) context.getString(R.string.chat_session_compacted) else context.getString(R.string.chat_session_compact_failed)
+                                    )
+                                }
                             }
-                        }
-                    },
-                    onRename = { showRenameDialog = true },
-                    onExport = {
-                        val slug = sessionMeta.sessionTitle
-                            .take(30)
-                            .replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                            .ifBlank { "session" }
-                        attachmentHandler.launchExport("$slug.json")
-                    },
+                        },
+                        onReviewChanges = {
+                            viewModel.executeCommand("review") { ok ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (ok) context.getString(R.string.chat_command_executed, "review") else context.getString(R.string.chat_command_failed, "review")
+                                    )
+                                }
+                            }
+                        },
+                        onShare = {
+                            viewModel.shareSession { url ->
+                                coroutineScope.launch {
+                                    if (url != null) {
+                                        clipboardManager.setText(AnnotatedString(url))
+                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_share_url_copied))
+                                    } else {
+                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_share_failed))
+                                    }
+                                }
+                            }
+                        },
+                        onUnshare = {
+                            viewModel.unshareSession { ok ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (ok) context.getString(R.string.chat_session_unshared) else context.getString(R.string.chat_session_unshare_failed)
+                                    )
+                                }
+                            }
+                        },
+                        onRename = { showRenameDialog = true },
+                        onExport = {
+                            val slug = sessionMeta.sessionTitle
+                                .take(30)
+                                .replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                                .ifBlank { "session" }
+                            attachmentHandler.launchExport("$slug.json")
+                        },
 
-                )
+                    )
+                    // Indeterminate progress bar under the top bar when busy
+                    val isBusy = sessionMeta.sessionStatus is SessionStatus.Busy || sessionMeta.sessionStatus is SessionStatus.Retry
+                    AnimatedVisibility(
+                        visible = isBusy,
+                        enter = fadeIn(animationSpec = tween(AppMotion.SHORT)),
+                        exit = fadeOut(animationSpec = tween(AppMotion.SHORT))
+                    ) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
             }
         },
         bottomBar = {

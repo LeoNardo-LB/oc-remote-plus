@@ -111,7 +111,12 @@ data class TokenStatsState(
     val totalCacheWriteTokens: Int = 0,
     val contextWindow: Int = 0,
     val lastContextTokens: Int = 0,
-)
+) {
+    /** All tokens consumed: input + output + reasoning + cacheRead + cacheWrite */
+    val allTokens: Int
+        get() = totalInputTokens + totalOutputTokens + totalReasoningTokens +
+            totalCacheReadTokens + totalCacheWriteTokens
+}
 
 /**
  * Split state: model/agent configuration and resolved selections.
@@ -811,29 +816,37 @@ class ChatViewModel @Inject constructor(
         // Reset token stats from previous session (TokenStatsTracker is @Singleton, shared across sessions)
         tokenStatsTracker.reset()
 
-        // Observe V1 messages and update token stats tracker
-        // Token values use last call's data (session-level, matches OpenCode behavior)
-        // Cost remains cumulative across all API calls
+        // Observe messages + session tokens and update token stats tracker
+        // Token values use session-level cumulative tokens from SSE session.updated events.
+        // Falls back to summing all assistant messages' tokens if session.tokens is unavailable.
+        // Cost remains cumulative across all API calls (summed from individual messages).
         viewModelScope.launch {
-            _messagesList.collect { messages ->
+            combine(
+                _messagesList,
+                sessionRepository.getSessionsFlow(serverId),
+            ) { messages, sessions ->
+                val currentSession = sessions.find { it.id == sessionId }
+                val sessionTokens = currentSession?.tokens
+
                 val assistantMessages = messages.filterIsInstance<Message.Assistant>()
 
-                // Cost is cumulative across all API calls
+                // Cost is cumulative across all API calls (session.cost not used — summed from messages)
                 val totalCost = assistantMessages.sumOf { it.cost ?: 0.0 }
 
-                // Token usage = last call's values (not cumulative, matches OpenCode behavior)
-                val lastWithTokens = assistantMessages.lastOrNull { (it.tokens?.output ?: 0) > 0 }
-                val lastTokens = lastWithTokens?.tokens
-                val totalInputTokens = lastTokens?.input ?: 0
-                val totalOutputTokens = lastTokens?.output ?: 0
-                val totalReasoningTokens = lastTokens?.reasoning ?: 0
-                val totalCacheReadTokens = lastTokens?.cache?.read ?: 0
-                val totalCacheWriteTokens = lastTokens?.cache?.write ?: 0
+                // Token usage: prefer session-level cumulative tokens, fallback to per-message sum
+                val totalInputTokens = if (sessionTokens != null) sessionTokens.input
+                    else assistantMessages.sumOf { it.tokens?.input ?: 0 }
+                val totalOutputTokens = if (sessionTokens != null) sessionTokens.output
+                    else assistantMessages.sumOf { it.tokens?.output ?: 0 }
+                val totalReasoningTokens = if (sessionTokens != null) sessionTokens.reasoning
+                    else assistantMessages.sumOf { it.tokens?.reasoning ?: 0 }
+                val totalCacheReadTokens = if (sessionTokens != null) sessionTokens.cache.read
+                    else assistantMessages.sumOf { it.tokens?.cache?.read ?: 0 }
+                val totalCacheWriteTokens = if (sessionTokens != null) sessionTokens.cache.write
+                    else assistantMessages.sumOf { it.tokens?.cache?.write ?: 0 }
 
-                // Context tokens for the circular progress indicator
-                val lastContextTokens = lastTokens?.let { t ->
-                    t.input + t.output + t.reasoning + t.cache.read + t.cache.write
-                } ?: 0
+                // Context tokens for the circular progress indicator (input only — output/reasoning don't consume context window)
+                val lastContextTokens = totalInputTokens + totalCacheReadTokens + totalCacheWriteTokens
 
                 tokenStatsTracker.update {
                     copy(
@@ -846,7 +859,7 @@ class ChatViewModel @Inject constructor(
                         lastContextTokens = lastContextTokens,
                     )
                 }
-            }
+            }.collect {}
         }
 
         // Restore draft from disk
@@ -1555,6 +1568,11 @@ class ChatViewModel @Inject constructor(
                         modelId = _selectedModelId.value!!
                     )
                 } else null
+
+                // Clear revert state before sending. The server consumes the revert
+                // when processing the new prompt but may not send a session.updated
+                // SSE event to notify the client, leaving the message list filter stuck.
+                chatRepository.clearRevert(currentSessionId)
 
                 sendMessageUseCase.sendPrompt(
                     serverId = serverId,

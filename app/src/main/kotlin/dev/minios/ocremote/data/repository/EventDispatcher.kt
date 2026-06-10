@@ -108,6 +108,9 @@ class EventDispatcher @Inject constructor(
     fun updateSessionStatus(sessionId: String, status: SessionStatus) =
         sessionHandler.updateSessionStatus(sessionId, status)
 
+    fun clearRevert(sessionId: String) =
+        sessionHandler.clearRevert(sessionId)
+
     fun setMessages(sessionId: String, messages: List<MessageWithParts>) =
         messageHandler.setMessages(sessionId, messages)
 

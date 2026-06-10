@@ -30,7 +30,9 @@ fun TokenUsageCard(
     reasoningTokens: Int,
     cacheReadTokens: Int,
     cacheWriteTokens: Int,
+    totalTokens: Int,
     totalCost: Double,
+    contextTokens: Int = 0,
     contextWindow: Int,
     modifier: Modifier = Modifier
 ) {
@@ -52,7 +54,7 @@ fun TokenUsageCard(
                 Text(
                     text = stringResource(
                         R.string.chat_token_usage_total,
-                        inputTokens + outputTokens + reasoningTokens
+                        totalTokens
                     ),
                     style = MaterialTheme.typography.labelMedium
                 )
@@ -67,8 +69,7 @@ fun TokenUsageCard(
 
             // Context window progress bar
             if (contextWindow > 0) {
-                val totalTokens = inputTokens + outputTokens + reasoningTokens
-                val progress = (totalTokens.toFloat() / contextWindow).coerceIn(0f, 1f)
+                val progress = (contextTokens.toFloat() / contextWindow).coerceIn(0f, 1f)
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
@@ -76,7 +77,7 @@ fun TokenUsageCard(
                         .height(4.dp),
                 )
                 Text(
-                    text = stringResource(R.string.chat_token_context_usage, totalTokens, contextWindow),
+                    text = stringResource(R.string.chat_token_context_usage, contextTokens, contextWindow),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                 )

@@ -7,7 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -91,7 +91,7 @@ import dev.minios.ocremote.ui.components.ProviderIcon
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.RevertedDraftPayload
 import dev.minios.ocremote.ui.screens.chat.components.BreathingCircleIndicator
-import androidx.compose.material3.LinearProgressIndicator
+
 import dev.minios.ocremote.ui.screens.chat.dialog.ImagePreviewDialog
 import dev.minios.ocremote.ui.screens.chat.util.ImageAttachment
 import dev.minios.ocremote.ui.screens.chat.util.agentColor
@@ -102,7 +102,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.AppMotion
+
 
 /**
  * Slash command definition for the suggestion popup.
@@ -346,15 +346,6 @@ internal fun ChatInputBar(
                 results = fileSearchResults,
                 onFileSelected = onFileSelected
             )
-        }
-
-        // Status: indeterminate progress bar when busy
-        AnimatedVisibility(
-            visible = isBusy,
-            enter = fadeIn(animationSpec = tween(AppMotion.SHORT)),
-            exit = fadeOut(animationSpec = tween(AppMotion.SHORT))
-        ) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
         Column(

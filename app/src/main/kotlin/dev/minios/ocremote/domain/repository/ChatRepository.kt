@@ -239,6 +239,13 @@ interface ChatRepository {
     fun replaceMessages(sessionId: String, messages: List<MessageWithParts>)
 
     /**
+     * Clear the revert state for a session.
+     * Called when the user sends a new message after revert — the server
+     * consumes the revert but may not notify the client via SSE.
+     */
+    fun clearRevert(sessionId: String)
+
+    /**
      * Remove a permission card by ID (optimistic removal after reply).
      */
     fun removePermission(permissionId: String)

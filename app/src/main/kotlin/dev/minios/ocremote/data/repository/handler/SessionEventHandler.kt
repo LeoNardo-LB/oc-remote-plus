@@ -257,6 +257,25 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         _lastUserMessageTime.update { it - sessionIds }
     }
 
+    /**
+     * Clear the revert state for a session.
+     * Called when the user sends a new message after revert — the server
+     * consumes the revert but may not send a `session.updated` SSE event
+     * to notify the client. This ensures the message list filter stops
+     * hiding new messages.
+     */
+    fun clearRevert(sessionId: String) {
+        _sessions.update { current ->
+            val idx = current.indexOfFirst { it.id == sessionId }
+            if (idx >= 0 && current[idx].revert != null) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Clearing revert for session $sessionId")
+                current.toMutableList().apply { set(idx, current[idx].copy(revert = null)) }
+            } else {
+                current
+            }
+        }
+    }
+
     fun clearAll() {
         _serverSessions.value = emptyMap()
         _sessions.value = emptyList()

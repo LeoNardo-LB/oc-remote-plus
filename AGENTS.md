@@ -87,6 +87,20 @@ di/                Hilt modules (NetworkModule, DomainModule)
 - DI uses **KSP** (not kapt) for Hilt annotation processing.
 - Terminal uses WebSocket transport for PTY streams; SSE for events.
 
+## OpenCode Server API Reference
+
+完整接口文档见 [`docs/opencode-api-reference.md`](docs/opencode-api-reference.md)。
+
+涵盖 62 个 REST/WebSocket 端点 + 52 种 SSE 事件类型，包括：
+- Session / Message / Permission / Question 的 CRUD 与操作接口
+- Provider / Auth / Config 配置接口
+- PTY 终端（WebSocket）、File / Find 文件操作接口
+- SSE 事件体系（含 22 种 `session.next.*` 细粒度事件）
+- 所有数据模型的完整 JSON Schema
+- Token / Context Usage 的语义说明和推荐计算方式
+
+**开发新功能或调试接口问题时，务必先查阅此文档。**
+
 ## Critical Constraints
 
 ### ChatScreen.kt Editing Protocol
