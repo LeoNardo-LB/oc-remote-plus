@@ -262,7 +262,10 @@ fun ChatScreen(
     startInTerminalMode: Boolean = false,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
+    // 观察 messageListState + recomposeTick，确保每次数据更新都 recompose
     val messageState by viewModel.messageListState.collectAsStateWithLifecycle()
+    val _tick by viewModel.recomposeTick.collectAsStateWithLifecycle()
+
     val sessionMeta by viewModel.sessionMetaState.collectAsStateWithLifecycle()
     val interaction by viewModel.interactionState.collectAsStateWithLifecycle()
     val tokenStats by viewModel.tokenStatsState.collectAsStateWithLifecycle()

@@ -65,6 +65,7 @@ data class MessageListState(
     val toolExpandedStates: Map<String, Boolean> = emptyMap(),
     val queuedMessageIds: Set<String> = emptySet(),
     val pendingMessageIds: Set<String> = emptySet(),
+    val version: Long = 0L,
 )
 
 /**
@@ -527,43 +528,55 @@ class ChatViewModel @Inject constructor(
      * Message list state — derived from V1 chatRepository flows.
      * Combines messages, parts, and tool expand states.
      */
-    val messageListState: StateFlow<MessageListState> = combine(
-        _messagesList,
-        _partsList,
-        _toolExpandedStates,
-    ) { messages, parts, toolExpandedStates ->
-        val grouped = parts.groupBy { it.messageId }
+    val messageListState: StateFlow<MessageListState> get() = _messageListState
+    private val _messageListState = MutableStateFlow(MessageListState())
+    private var _mlsVersion = 0L
+    /** 每次 messageListState 更新时递增，强制 Compose recomposition */
+    val recomposeTick: StateFlow<Long> get() = _recomposeTick
+    private val _recomposeTick = MutableStateFlow(0L)
 
-        val chatMessages = messages.map { msg ->
-            val msgParts = grouped[msg.id] ?: emptyList()
-            ChatMessage(message = msg, parts = msgParts)
-        }.reversed()
+    init {
+        // 订阅 _messagesList + _partsList + _toolExpandedStates，输出 messageListState
+        viewModelScope.launch {
+            combine(
+                _messagesList,
+                _partsList,
+                _toolExpandedStates,
+            ) { messages, parts, toolExpandedStates ->
+                val grouped = parts.groupBy { it.messageId }
 
-        val pendingAssistantIndex = chatMessages.indexOfLast {
-            it.message is Message.Assistant && it.message.time.completed == null
+                val chatMessages = messages.map { msg ->
+                    val msgParts = grouped[msg.id] ?: emptyList()
+                    ChatMessage(message = msg, parts = msgParts)
+                }.reversed()
+
+                val pendingAssistantIndex = chatMessages.indexOfLast {
+                    it.message is Message.Assistant && it.message.time.completed == null
+                }
+                val queuedMessageIds = if (pendingAssistantIndex >= 0) {
+                    chatMessages.take(pendingAssistantIndex)
+                        .filter { it.isUser }
+                        .map { it.message.id }
+                        .toSet()
+                } else {
+                    emptySet()
+                }
+
+                MessageListState(
+                    messages = chatMessages,
+                    messageCount = chatMessages.size,
+                    hasOlderMessages = false,
+                    isLoadingOlder = false,
+                    toolExpandedStates = toolExpandedStates,
+                    queuedMessageIds = queuedMessageIds,
+                )
+            }.collect { state ->
+                _mlsVersion++
+                _messageListState.value = state.copy(version = _mlsVersion)
+                _recomposeTick.value = _mlsVersion
+            }
         }
-        val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-            chatMessages.take(pendingAssistantIndex)
-                .filter { it.isUser }
-                .map { it.message.id }
-                .toSet()
-        } else {
-            emptySet()
-        }
-
-        MessageListState(
-            messages = chatMessages,
-            messageCount = chatMessages.size,
-            hasOlderMessages = false,
-            isLoadingOlder = false,
-            toolExpandedStates = toolExpandedStates,
-            queuedMessageIds = queuedMessageIds,
-        )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        MessageListState()
-    )
+    }
 
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
@@ -876,16 +889,7 @@ class ChatViewModel @Inject constructor(
                 chatRepository.getMessagesFlow(sessionId),
                 chatRepository.getParts(sessionId),
             ) { messages, parts ->
-                val grouped = parts.groupBy { it.messageId }
-                // 过滤掉还没有 parts 的 assistant 消息：
-                // MessageUpdated 可能先于 MessagePartUpdated 到达，此时 assistant 消息存在但没有内容，
-                // 导致 UI 上看起来回复没出现。等第一个 part 到达后自然会显示。
-                val visibleMessages = messages.filter { msg ->
-                    msg is Message.User || (msg is Message.Assistant && grouped[msg.id]?.isNotEmpty() == true)
-                }
-                val missingParts = messages.size - visibleMessages.size
-                Log.d(TAG, "[sseJob] msgs=${messages.size} visible=${visibleMessages.size} parts=${parts.size} active=${sseJob?.isActive} filtered=$missingParts")
-                _messagesList.value = visibleMessages
+                _messagesList.value = messages
                 _partsList.value = parts
             }.collect { }
         }
@@ -1439,6 +1443,11 @@ class ChatViewModel @Inject constructor(
                 )
                 if (result.isSuccess) {
                     Log.i(TAG, "[SEND] promptAsync succeeded for session $currentSessionId")
+                    // 延迟 REST 刷新：组件可能没实时刷新，隔5秒把完整回复拉到 ViewModel 里
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(5_000)
+                        refreshMessages()
+                    }
                 } else {
                     Log.e(TAG, "[SEND] promptAsync FAILED for session $currentSessionId: ${result.exceptionOrNull()?.message}")
                 }
