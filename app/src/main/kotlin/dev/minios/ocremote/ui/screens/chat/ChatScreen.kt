@@ -947,7 +947,9 @@ fun ChatScreen(
                      val messageSpacing = if (LocalCompactMessages.current) 2.dp else 8.dp
 
                         // Use raw messages directly — each Message is one LazyColumn item.
-                        val rawMessages = messageState.messages
+                        // V1 messageListState returns oldest-first; reverse to newest-first
+                        // for ChatMessageList's reverseLayout (index 0 = newest at bottom).
+                        val rawMessages = messageState.messages.reversed()
 
                         // Filter: keep user messages + first assistant in each turn group
                        // to avoid zero-height items creating blank gaps from spacedBy
