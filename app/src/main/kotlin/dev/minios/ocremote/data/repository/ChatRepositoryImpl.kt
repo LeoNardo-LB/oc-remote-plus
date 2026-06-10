@@ -84,6 +84,12 @@ class ChatRepositoryImpl @Inject constructor(
                 emit(emptyList())
             }
 
+    override fun getAllQuestionsFlow(): Flow<Map<String, List<SseEvent.QuestionAsked>>> =
+        eventDispatcher.questions
+
+    override fun getAllPermissionsFlow(): Flow<Map<String, List<SseEvent.PermissionAsked>>> =
+        eventDispatcher.permissions
+
     // ============ EventDispatcher Flow Exposure ============
 
     override fun getActiveToolProgress(serverId: String): Flow<List<ToolProgressInfo>?> =

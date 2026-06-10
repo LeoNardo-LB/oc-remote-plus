@@ -690,6 +690,8 @@ class ChatViewModel @Inject constructor(
         _error,
         _isSending,
         sessionRepository.getSessionsFlow(serverId),
+        chatRepository.getAllQuestionsFlow(),
+        chatRepository.getAllPermissionsFlow(),
     ) { args ->
         val sid = args[0] as String
         val loading = args[1] as Boolean

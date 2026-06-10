@@ -95,7 +95,7 @@ fun ChatTopBar(
                     overflow = TextOverflow.Ellipsis
                 )
                 // Subtitle: message count, total tokens (all types), and cost
-                val totalTokens = totalInputTokens + totalOutputTokens + totalReasoningTokens + totalCacheReadTokens + totalCacheWriteTokens
+                val totalTokens = totalInputTokens + totalOutputTokens + totalReasoningTokens
                 val hasStats = messageCount > 0 || totalTokens > 0 || totalCost > 0
                 if (hasStats) {
                     val parts = mutableListOf<String>()

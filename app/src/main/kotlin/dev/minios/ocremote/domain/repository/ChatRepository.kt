@@ -51,6 +51,18 @@ interface ChatRepository {
      */
     fun getQuestionsFlow(sessionId: String): Flow<List<QuestionState>>
 
+    /**
+     * Observe the raw questions map (sessionId → list) for all sessions.
+     * Used by combines that need to reactively recompute when questions change.
+     */
+    fun getAllQuestionsFlow(): Flow<Map<String, List<SseEvent.QuestionAsked>>>
+
+    /**
+     * Observe the raw permissions map (sessionId → list) for all sessions.
+     * Used by combines that need to reactively recompute when permissions change.
+     */
+    fun getAllPermissionsFlow(): Flow<Map<String, List<SseEvent.PermissionAsked>>>
+
     // ============ EventDispatcher Flow Exposure ============
 
     /**
