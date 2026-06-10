@@ -352,6 +352,9 @@ class ChatViewModel @Inject constructor(
     /** Saved scroll position for restoring after sub-session navigation. */
     var savedMessageId by mutableStateOf<String?>(null)
         private set
+    /** Raw LazyColumn index at save time — used for direct restoration without index arithmetic. */
+    var savedLazyIndex by mutableStateOf(0)
+        private set
     var savedScrollOffset by mutableStateOf(0)
         private set
 
@@ -365,8 +368,8 @@ class ChatViewModel @Inject constructor(
     var scrollRestoreVersion by mutableStateOf(0)
         private set
 
-    fun saveScrollPosition(messageId: String?, offset: Int) {
-        savedMessageId = messageId
+    fun saveScrollPosition(lazyIndex: Int, offset: Int) {
+        savedLazyIndex = lazyIndex
         savedScrollOffset = offset
         scrollRestoreVersion++
     }
@@ -568,6 +571,10 @@ class ChatViewModel @Inject constructor(
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
      * Includes [_sessionId] as a source so lazy-session creation triggers immediate recomputation.
+     * Also includes [_messagesList] to detect incomplete assistant messages — if the last
+     * assistant message is still streaming (time.completed == null), the session is Busy
+     * regardless of SSE/REST status. This follows OpenCode WebUI's approach of deriving
+     * session busy/idle from message completion state, not just server status events.
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
         _sessionId,
@@ -575,6 +582,7 @@ class ChatViewModel @Inject constructor(
         sessionRepository.getSessionStatusesFlow(serverId),
         sessionRepository.getCurrentAgentFlow(serverId),
         sessionRepository.getCurrentModelFlow(serverId),
+        _messagesList,
     ) { args ->
         val sid = args[0] as String
         @Suppress("UNCHECKED_CAST")
@@ -585,13 +593,27 @@ class ChatViewModel @Inject constructor(
         val currentAgentMap = args[3] as Map<String, String>
         @Suppress("UNCHECKED_CAST")
         val currentModelMap = args[4] as Map<String, Pair<String, String>>
+        @Suppress("UNCHECKED_CAST")
+        val messages = args[5] as List<Message>
 
         val session = allSessions.find { it.id == sid }
+        val sseStatus = statuses[sid] ?: SessionStatus.Idle
+
+        // If the last assistant message is still streaming (incomplete), force Busy.
+        // This prevents status flickering when the server sends SessionIdle between
+        // tool calls/agent dispatches but the session is not truly done.
+        val lastAssistant = messages.filterIsInstance<Message.Assistant>().lastOrNull()
+        val hasIncompleteMessage = lastAssistant != null && lastAssistant.time.completed == null
+        val effectiveStatus = if (hasIncompleteMessage && sseStatus is SessionStatus.Idle) {
+            SessionStatus.Busy
+        } else {
+            sseStatus
+        }
 
         SessionMetaState(
             sessionTitle = session?.title ?: "",
             serverName = serverName,
-            sessionStatus = statuses[sid] ?: SessionStatus.Idle,
+            sessionStatus = effectiveStatus,
             revert = session?.revert,
             sessionParentId = session?.parentId,
             sessionAgent = session?.agent,

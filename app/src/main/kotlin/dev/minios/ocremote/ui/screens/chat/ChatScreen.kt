@@ -312,62 +312,27 @@ fun ChatScreen(
     }
 
     // Restore scroll position when returning from sub-session navigation.
-    // Using LaunchedEffect(scrollRestoreVersion) instead of rememberLazyListState(initial...)
-    // because `remember` caches the initial state and ignores new values on recomposition,
-    // causing unreliable restoration when the composable is recomposed (not recreated).
+    // Saves raw LazyColumn index, no fragile index arithmetic needed.
     LaunchedEffect(viewModel.scrollRestoreVersion) {
         val version = viewModel.scrollRestoreVersion
         Log.w("CHAT_DEBUG", "[scrollRestore] LaunchedEffect fired: version=$version msgs=${messageState.messages.size}")
         if (version > 0) {
-            val savedId = viewModel.savedMessageId
-            if (savedId != null) {
-                // Reconstruct displayItems filtering to find the target's LazyColumn index.
-                // With reverseLayout=true + displayItems.reversed(), the adapter index differs.
-                val msgs = messageState.messages
-                var displayIndex = -1
-                var count = 0
-                for (i in msgs.indices) {
-                    val msg = msgs[i]
-                    val include = when {
-                        msg.isUser -> true
-                        msg.isAssistant -> {
-                            val next = msgs.getOrNull(i + 1)
-                            next?.isAssistant != true
-                        }
-                        else -> false
-                    }
-                    if (include) {
-                        if (msg.message.id == savedId) {
-                            displayIndex = count
-                            break
-                        }
-                        count++
-                    }
-                }
-                if (displayIndex >= 0) {
-                    // displayItems is reversed for reverseLayout; convert original index to reversed index.
-                    val totalCount = count // total matched items (approximate; recount for accuracy)
-                    // Recount total displayItems to compute reversed index
-                    var totalDisplay = 0
-                    for (i in msgs.indices) {
-                        val m = msgs[i]
-                        val inc = when {
-                            m.isUser -> true
-                            m.isAssistant -> msgs.getOrNull(i + 1)?.isAssistant != true
-                            else -> false
-                        }
-                        if (inc) totalDisplay++
-                    }
-                    val reversedIndex = totalDisplay - 1 - displayIndex
-                    // Account for auxiliary items declared before messages in reverseLayout
-                    val auxOffset = interaction.pendingQuestions.size + interaction.pendingPermissions.size + (if (sessionMeta.revert != null) 1 else 0)
-                    listState.scrollToItem(reversedIndex + auxOffset, viewModel.savedScrollOffset)
-                    Log.w("CHAT_DEBUG", "[scrollRestore] restored to reversedIndex=$reversedIndex auxOffset=$auxOffset")
-                } else {
-                    // Fallback: scroll to item 0 (newest, at bottom in reverseLayout)
-                    listState.scrollToItem(0)
-                    Log.w("CHAT_DEBUG", "[scrollRestore] fallback scrollToItem(0)")
-                }
+            // Wait for messages to be loaded — restoration before load is useless
+            var retries = 0
+            while (messageState.messages.isEmpty() && retries < 20) {
+                delay(50L)
+                retries++
+            }
+            // Restore using raw LazyColumn index (saved at navigation time)
+            if (messageState.messages.isNotEmpty()) {
+                val savedIdx = viewModel.savedLazyIndex
+                val totalItems = listState.layoutInfo.totalItemsCount
+                // Clamp to valid range (items may have been added/removed during navigation)
+                val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
+                listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
+                Log.w("CHAT_DEBUG", "[scrollRestore] restored to index=$targetIdx (saved=$savedIdx, total=$totalItems)")
+            } else {
+                Log.w("CHAT_DEBUG", "[scrollRestore] messages still empty after wait, skipping")
             }
         } else {
             // First entry (scrollRestoreVersion == 0): reverseLayout=true anchors at bottom,
@@ -376,17 +341,13 @@ fun ChatScreen(
         }
     }
 
-    // Wrapper that saves scroll position before navigating to a sub-session
+    // Wrapper that saves scroll position before navigating to a sub-session.
+    // Saves raw LazyColumn index + offset for direct restoration (no index arithmetic).
     val navigateToChildSessionWithSave: (String) -> Unit = { childSessionId ->
-        val firstMessageKey = listState.layoutInfo.visibleItemsInfo
-            .firstOrNull {
-                val key = (it.key as? String) ?: ""
-                !key.startsWith("question_") &&
-                !key.startsWith("perm_") &&
-                key != "revert_banner"
-            }
-            ?.key as? String
-        viewModel.saveScrollPosition(firstMessageKey, listState.firstVisibleItemScrollOffset)
+        viewModel.saveScrollPosition(
+            lazyIndex = listState.firstVisibleItemIndex,
+            offset = listState.firstVisibleItemScrollOffset
+        )
         onNavigateToChildSession(childSessionId)
     }
 

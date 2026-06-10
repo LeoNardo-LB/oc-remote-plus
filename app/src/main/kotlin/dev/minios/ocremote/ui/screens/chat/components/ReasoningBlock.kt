@@ -65,8 +65,9 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
     LaunchedEffect(isStreaming, effectiveStart) {
         if (isStreaming) {
             while (true) {
-                elapsedMs.longValue = System.currentTimeMillis() - effectiveStart
-                delay(1000L)
+                // Clamp to 0 minimum — server clock skew can make this negative
+                elapsedMs.longValue = (System.currentTimeMillis() - effectiveStart).coerceAtLeast(0L)
+                delay(200L)
             }
         } else {
             elapsedMs.longValue = durationMs ?: 0L
@@ -92,7 +93,7 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
     val isComplete = durationMs != null && !isStreaming
     val headerText = when {
         isStreaming -> stringResource(R.string.chat_thinking_in_progress, formatReasoningDuration(elapsedMs.longValue))
-        isComplete -> stringResource(R.string.chat_thinking_complete, formatReasoningDuration(durationMs!!))
+        isComplete -> stringResource(R.string.chat_thinking_complete, formatReasoningDuration(durationMs))
         else -> stringResource(R.string.chat_status_thinking)
     }
 
@@ -196,5 +197,10 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
 private fun formatReasoningDuration(ms: Long): String = when {
     ms < 1000 -> "${ms}ms"
     ms < 60_000 -> "${"%.1f".format(ms / 1000.0)}s"
-    else -> "${"%.1f".format(ms / 60_000.0)}m"
+    else -> {
+        val totalSec = ms / 1000
+        val m = totalSec / 60
+        val s = totalSec % 60
+        if (s == 0L) "${m}m" else "${m}m ${s}s"
+    }
 }
