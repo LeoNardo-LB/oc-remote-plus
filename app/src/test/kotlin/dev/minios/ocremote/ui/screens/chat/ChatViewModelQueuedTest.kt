@@ -388,8 +388,9 @@ class ChatViewModelQueuedTest {
 
     @Test
     fun queuedMessageIds_usesLastPendingAssistant() = runTest {
-        // reversed() makes newest-first; indexOfLast finds the OLDEST pending assistant (a1 at index 3)
-        // take(3) = [u2, a2, u1], user messages = {"u1", "u2"}
+        // V1 uses indexOfLast on sorted (oldest-first) list: finds a2 (newest pending assistant).
+        // Sorted: [a1(1500), u1(2000), a2(2500), u2(3000)]
+        // indexOfLast → a2 at index 2; drop(3) → [u2]; queued = {"u2"}
         stubMessages(
             createAssistantMessageWithText("a1", completed = null, created = 1500L),
             createUserMessageWithText("u1", created = 2000L),
@@ -401,7 +402,7 @@ class ChatViewModelQueuedTest {
         val collectJob = subscribeToState(vm)
         advanceUntilIdle()
 
-        assertEquals(setOf("u1", "u2"), vm.uiState.value.queuedMessageIds)
+        assertEquals(setOf("u2"), vm.uiState.value.queuedMessageIds)
         collectJob.cancel()
     }
 

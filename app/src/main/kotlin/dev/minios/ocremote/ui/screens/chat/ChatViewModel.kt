@@ -91,6 +91,7 @@ data class SessionMetaState(
 @Immutable
 data class InteractionState(
     val isLoading: Boolean = true,
+    val isSending: Boolean = false,
     val error: String? = null,
     val pendingPermissions: List<SseEvent.PermissionAsked> = emptyList(),
     val pendingQuestions: List<SseEvent.QuestionAsked> = emptyList(),
@@ -228,6 +229,14 @@ class ChatViewModel @Inject constructor(
     private val sseClient: SseClient,
 ) : ViewModel() {
 
+    // ============ Loading & Error State ============
+    private val _isLoading = MutableStateFlow(true)
+    private val _isRefreshing = MutableStateFlow(false)  // Background refresh — no UI wipe
+    /** Timestamp of last successful refresh. Used to skip unnecessary ON_RESUME refreshes. */
+    private var lastRefreshTimeMs: Long = 0L
+    private val _error = MutableStateFlow<String?>(null)
+    private val _isSending = MutableStateFlow(false)
+
     // ============ V1 Message State ============
     private val _messagesList = MutableStateFlow<List<Message>>(emptyList())
     private val _partsList = MutableStateFlow<List<Part>>(emptyList())
@@ -333,6 +342,9 @@ class ChatViewModel @Inject constructor(
 
     // ============ Optimistic Send ============
 
+    /** Locally-generated IDs for optimistic messages. Used to distinguish from server-confirmed. */
+    private val _pendingMessageIds = MutableStateFlow<Set<String>>(emptySet())
+
     /** Draft restored after a failed send. UI consumes once and sets back to null. */
     private val _restoredDraft = MutableStateFlow<RevertedDraftPayload?>(null)
 
@@ -347,6 +359,14 @@ class ChatViewModel @Inject constructor(
     fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean {
         return _toolExpandedStates.value[toolId] ?: autoExpand
     }
+
+    // ============ Pagination ============
+    /** Number of messages to load per page. Doubles each "load older" click. */
+    private var currentMessageLimit = 20
+    /** Whether there are more messages on the server beyond the current limit. */
+    private val _hasOlderMessages = MutableStateFlow(false)
+    /** Whether a "load older" request is in flight. */
+    private val _isLoadingOlder = MutableStateFlow(false)
 
     // ============ Scroll Position Save/Restore ============
     /** Saved scroll position for restoring after sub-session navigation. */
@@ -530,38 +550,71 @@ class ChatViewModel @Inject constructor(
      * Message list state — derived from V1 chatRepository flows.
      * Combines messages, parts, and tool expand states.
      */
-    val messageListState: StateFlow<MessageListState> = combine(
-        _messagesList,
-        _partsList,
-        _toolExpandedStates,
-    ) { messages, parts, toolExpandedStates ->
-        val grouped = parts.groupBy { it.messageId }
+    val messageListState: StateFlow<MessageListState> = _sessionId.flatMapLatest { sid ->
+        combine(
+            sessionRepository.getSessionsFlow(serverId),
+            messagePaging.observeMessages(sid),
+            chatRepository.getAllPartsMap(),
+            _isLoading,
+            _hasOlderMessages,
+            _isLoadingOlder,
+            _toolExpandedStates,
+            _pendingMessageIds,
+        ) { args ->
+            @Suppress("UNCHECKED_CAST")
+            val allSessions = args[0] as List<Session>
+            val sessionMessages = args[1] as List<Message>
+            val allParts = args[2] as Map<String, List<Part>>
+            val loading = args[3] as Boolean
+            val hasOlderMessages = args[4] as Boolean
+            val isLoadingOlder = args[5] as Boolean
+            @Suppress("UNCHECKED_CAST")
+            val toolExpandedStates = args[6] as Map<String, Boolean>
+            @Suppress("UNCHECKED_CAST")
+            val pendingMessageIds = args[7] as Set<String>
 
-        val chatMessages = messages.map { msg ->
-            val msgParts = grouped[msg.id] ?: emptyList()
-            ChatMessage(message = msg, parts = msgParts)
-        }.reversed()
+            val session = allSessions.find { it.id == sid }
+            val revertState = session?.revert
 
-        val pendingAssistantIndex = chatMessages.indexOfLast {
-            it.message is Message.Assistant && it.message.time.completed == null
+            val chatMessages = if (loading && sessionMessages.isEmpty()) {
+                emptyList()
+            } else {
+                val sorted = sessionMessages.sortedBy { it.time.created }
+                val visible = if (revertState != null) {
+                    sorted.filter { it.id < revertState.messageId }
+                } else {
+                    sorted
+                }
+                visible.map { msg ->
+                    ChatMessage(
+                        message = msg,
+                        parts = allParts[msg.id] ?: emptyList()
+                    )
+                }
+            }
+
+            val pendingAssistantIndex = chatMessages.indexOfLast {
+                it.message is Message.Assistant && it.message.time.completed == null
+            }
+            val queuedMessageIds = if (pendingAssistantIndex >= 0) {
+                chatMessages.drop(pendingAssistantIndex + 1)
+                    .filter { it.isUser }
+                    .map { it.message.id }
+                    .toSet()
+            } else {
+                emptySet<String>()
+            }
+
+            MessageListState(
+                messages = chatMessages,
+                messageCount = chatMessages.size,
+                hasOlderMessages = hasOlderMessages,
+                isLoadingOlder = isLoadingOlder,
+                toolExpandedStates = toolExpandedStates,
+                queuedMessageIds = queuedMessageIds,
+                pendingMessageIds = pendingMessageIds,
+            )
         }
-        val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-            chatMessages.take(pendingAssistantIndex)
-                .filter { it.isUser }
-                .map { it.message.id }
-                .toSet()
-        } else {
-            emptySet()
-        }
-
-        MessageListState(
-            messages = chatMessages,
-            messageCount = chatMessages.size,
-            hasOlderMessages = false,
-            isLoadingOlder = false,
-            toolExpandedStates = toolExpandedStates,
-            queuedMessageIds = queuedMessageIds,
-        )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -632,20 +685,25 @@ class ChatViewModel @Inject constructor(
      * pending permission/question cards from V1 chatRepository.
      */
     val interactionState: StateFlow<InteractionState> = combine(
-        _messagesList,
-        sessionRepository.getSessionStatusesFlow(serverId),
+        _sessionId,
+        _isLoading,
+        _error,
+        _isSending,
         sessionRepository.getSessionsFlow(serverId),
-    ) { messages, statuses, allSessions ->
-        val status = statuses[sessionId] ?: SessionStatus.Idle
-        // Only check the last Assistant message's error — historical errors
-        // (e.g. a previously aborted message) should not block the input bar.
-        val lastAssistant = messages.filterIsInstance<Message.Assistant>().lastOrNull()
-        val errorMsg = lastAssistant?.error?.name
+    ) { args ->
+        val sid = args[0] as String
+        val loading = args[1] as Boolean
+        val error = args[2] as String?
+        val sending = args[3] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val allSessions = args[4] as List<Session>
+
         InteractionState(
-            isLoading = messages.isEmpty() && sessionId.isNotEmpty(),
-            error = errorMsg,
-            pendingPermissions = chatRepository.getPermissionsWithChildren(sessionId, allSessions),
-            pendingQuestions = chatRepository.getQuestionsWithChildren(sessionId, allSessions),
+            isLoading = loading,
+            isSending = sending,
+            error = error,
+            pendingPermissions = chatRepository.getPermissionsWithChildren(sid, allSessions),
+            pendingQuestions = chatRepository.getQuestionsWithChildren(sid, allSessions),
         )
     }.stateIn(
         viewModelScope,
@@ -918,14 +976,35 @@ class ChatViewModel @Inject constructor(
      */
     fun loadMessages() {
         viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
             try {
-                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
+                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
                 chatRepository.setMessages(sessionId, messages)
+                _hasOlderMessages.value = messages.size >= currentMessageLimit
+
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Loaded ${messages.size} messages for modelConfigState resolution")
+                    Log.d(TAG, "Loaded ${messages.size} messages for session $sessionId (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "Failed to load messages", e)
+                if (e is OutOfMemoryError || (e.cause is OutOfMemoryError)) {
+                    Log.w(TAG, "OOM loading messages, retrying with smaller limit")
+                    currentMessageLimit = (currentMessageLimit / 2).coerceAtLeast(10)
+                    try {
+                        val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
+                        chatRepository.mergeMessages(sessionId, messages)
+                        _hasOlderMessages.value = messages.size >= currentMessageLimit
+                        if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
+                    } catch (retryEx: Throwable) {
+                        Log.e(TAG, "Retry also failed", retryEx)
+                        _error.value = retryEx.message ?: "Failed to load messages"
+                    }
+                } else {
+                    _error.value = e.message ?: "Failed to load messages"
+                }
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -947,13 +1026,9 @@ class ChatViewModel @Inject constructor(
      * Does NOT restart sseJob to avoid scroll position reset and data flickering.
      */
     fun refreshIfNeeded() {
-        Log.i(TAG, "[RESUME] refreshIfNeeded called, sseJob active=${sseJob?.isActive}")
-        viewModelScope.launch {
-            // Lightweight: sync status only, don't restart sseJob
-            refreshMessages()
-            syncSessionStatus()
-            loadPendingQuestions()
-            loadPendingPermissions()
+        val elapsed = System.currentTimeMillis() - lastRefreshTimeMs
+        if (elapsed >= REFRESH_COOLDOWN_MS) {
+            refreshSession()
         }
     }
 
@@ -961,12 +1036,15 @@ class ChatViewModel @Inject constructor(
      * Refresh messages via V1 API.
      */
     private suspend fun refreshMessages() {
+        _isRefreshing.value = true
         try {
-            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
+            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
             chatRepository.setMessages(sessionId, messages)
-            if (BuildConfig.DEBUG) Log.d(TAG, "Refreshed ${messages.size} messages")
-        } catch (e: Exception) {
+            _hasOlderMessages.value = messages.size >= currentMessageLimit
+        } catch (e: Throwable) {
             Log.e(TAG, "Failed to refresh messages", e)
+        } finally {
+            _isRefreshing.value = false
         }
     }
 
@@ -1033,13 +1111,29 @@ class ChatViewModel @Inject constructor(
         // 4. Load pending items
         loadPendingQuestions()
         loadPendingPermissions()
+
+        lastRefreshTimeMs = System.currentTimeMillis()
     }
 
-    /**
-     * V1 has no cursor-based pagination. No-op.
-     */
     fun loadOlderMessages() {
-        if (BuildConfig.DEBUG) Log.d(TAG, "loadOlderMessages: no-op (V1 has no cursor pagination)")
+        viewModelScope.launch {
+            _isLoadingOlder.value = true
+            currentMessageLimit = currentMessageLimit * 2
+            try {
+                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
+                chatRepository.mergeMessages(sessionId, messages)
+                _hasOlderMessages.value = messages.size >= currentMessageLimit
+
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Loaded older: ${messages.size} messages (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load older messages", e)
+                currentMessageLimit = currentMessageLimit / 2
+            } finally {
+                _isLoadingOlder.value = false
+            }
+        }
     }
 
     /**
@@ -1437,36 +1531,41 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun sendParts(parts: List<PromptPart>) {
+        val pendingId = "pending-${java.util.UUID.randomUUID()}"
+        _pendingMessageIds.update { it + pendingId }
         viewModelScope.launch {
+            _isSending.value = true
             try {
                 val currentSessionId = ensureSession()
+                val model = if (_selectedProviderId.value != null && _selectedModelId.value != null) {
+                    ModelSelection(
+                        providerId = _selectedProviderId.value!!,
+                        modelId = _selectedModelId.value!!
+                    )
+                } else null
 
-                // 从当前 UI 状态构建 model/agent/variant，确保用户切换后生效
-                val modelSelection = _selectedProviderId.value?.let { providerId ->
-                    _selectedModelId.value?.let { modelId ->
-                        ModelSelection(providerId = providerId, modelId = modelId)
-                    }
-                }
-                val (agentName, _) = _selectedAgent.value
-                val variant = _selectedVariant.value
-
-                val result = chatRepository.promptAsync(
+                sendMessageUseCase.sendPrompt(
                     serverId = serverId,
                     sessionId = currentSessionId,
                     parts = parts,
-                    model = modelSelection,
-                    agent = agentName,
-                    variant = variant,
-                    directory = sessionDirectory,
+                    model = model,
+                    agent = modelConfigState.value.selectedAgent,
+                    variant = _selectedVariant.value,
+                    directory = sessionDirectory
                 )
-                if (result.isSuccess) {
-                    Log.i(TAG, "[SEND] promptAsync succeeded for session $currentSessionId")
-                } else {
-                    Log.e(TAG, "[SEND] promptAsync FAILED for session $currentSessionId: ${result.exceptionOrNull()?.message}")
-                }
+                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
-                Log.e(TAG, "[SEND] sendParts exception: ${e.message}", e)
+                Log.e(TAG, "Failed to send message", e)
+                _pendingMessageIds.update { it - pendingId }
+                // Restore draft from the failed send
+                val failedText = parts.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("\n")
+                if (failedText.isNotBlank()) {
+                    _restoredDraft.value = RevertedDraftPayload(text = failedText)
+                }
+                _error.value = e.message ?: "Failed to send message"
+            } finally {
+                _isSending.value = false
             }
         }
     }

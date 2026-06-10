@@ -162,8 +162,9 @@ class ChatViewModelSendTest {
     }
 
     @Test
-    fun `no optimistic message in V1 — pendingMessageIds stays empty`() = runTest {
-        // V1 sendParts() does NOT add optimistic messages; it delegates to chatRepository.promptAsync()
+    fun `pendingMessageIds contains entry while sending in V1`() = runTest {
+        // V1 sendParts() adds a pendingId to _pendingMessageIds while the send is in-flight.
+        // sendMessageUseCase.sendPrompt is mocked to delay(10_000), so the pendingId stays.
         coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } coAnswers {
             delay(10_000)
         }
@@ -175,11 +176,15 @@ class ChatViewModelSendTest {
         viewModel.sendMessage("Hello world")
         advanceUntilIdle()
 
-        // Then: no optimistic message — pendingMessageIds remains empty
+        // V1 adds a pending ID while sending — it stays while sendPrompt is in-flight
         val state = viewModel.uiState.value
-        assertTrue(
-            "V1 should not add optimistic messages, got: ${state.pendingMessageIds}",
+        assertFalse(
+            "V1 should add a pending ID while send is in-flight",
             state.pendingMessageIds.isEmpty()
+        )
+        assertEquals(1, state.pendingMessageIds.size)
+        assertTrue(
+            state.pendingMessageIds.first().startsWith("pending-")
         )
         collectJob.cancel()
     }
@@ -206,63 +211,27 @@ class ChatViewModelSendTest {
     }
 
     @Test
-    fun `restoredDraft stays null on send failure in V1`() = runTest {
-        // V1 sendParts() catches exceptions internally and logs them;
-        // it does NOT set _restoredDraft on failure (that was V2 behavior).
-        // Mock chatRepository.promptAsync() to throw — this is what V1 actually calls.
-        val chatRepo = createViewModel().let { vm ->
-            // Re-create with a throwing promptAsync
-            val savedState = SavedStateHandle(mapOf(
-                "serverUrl"  to "http://localhost:8080",
-                "username"   to "testuser",
-                "password"   to "testpass",
-                "serverName" to "TestServer",
-                "serverId"   to "test-server",
-                "sessionId"  to "test-session"
-            ))
-            val repo = mockk<ChatRepository>(relaxed = true).also {
-                every { it.getAllPartsMap() } returns MutableStateFlow(emptyMap<String, List<dev.minios.ocremote.domain.model.Part>>())
-                coEvery { it.promptAsync(any(), any(), any(), any(), any(), any(), any()) } throws
-                    java.io.IOException("Network error")
-            }
-            ChatViewModel(
-                savedStateHandle = savedState,
-                sendMessageUseCase = sendMessageUseCase,
-                manageSessionUseCase = manageSessionUseCase,
-                managePermissionUseCase = managePermissionUseCase,
-                selectModelUseCase = selectModelUseCase,
-                manageAgentUseCase = manageAgentUseCase,
-                manageTerminalUseCase = manageTerminalUseCase,
-                draftUseCase = draftUseCase,
-                shareExportUseCase = shareExportUseCase,
-                undoRedoUseCase = undoRedoUseCase,
-                settingsRepository = settingsRepository,
-                terminalRegistry = terminalRegistry,
-                toolCardResolver = dev.minios.ocremote.ui.screens.chat.tools.DefaultToolCardResolver(),
-                chatRepository = repo,
-                sessionRepository = mockk<SessionRepository>(relaxed = true).also { sessRepo ->
-                    every { sessRepo.getSessionsFlow(any()) } returns flowOf(emptyList())
-                    every { sessRepo.getSessionStatusesFlow(any()) } returns flowOf(emptyMap())
-                    every { sessRepo.getCurrentAgentFlow(any()) } returns flowOf(emptyMap())
-                    every { sessRepo.getCurrentModelFlow(any()) } returns flowOf(emptyMap())
-                },
-                messagePaging = messagePaging,
-                tokenStatsTracker = tokenStatsTracker,
-                httpClient = mockk(relaxed = true),
-                sseClient = mockk(relaxed = true)
-            )
-        }
+    fun `restoredDraft is set on send failure in V1`() = runTest {
+        // V1 sendParts() catches exceptions and restores draft to _restoredDraft.
+        // Mock sendMessageUseCase.sendPrompt() to throw — this is what V1 calls.
+        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } throws
+            java.io.IOException("Network error")
 
-        val collectJob = subscribeToState(chatRepo)
+        val viewModel = createViewModel()
+        val collectJob = subscribeToState(viewModel)
         advanceUntilIdle()
 
-        chatRepo.sendMessage("Hello world")
+        viewModel.sendMessage("Hello world")
         advanceUntilIdle()
 
-        // V1 does NOT set restoredDraft on send failure
-        assertNull(
-            "V1 should not set restoredDraft on send failure",
-            chatRepo.uiState.value.restoredDraft
+        // V1 sets restoredDraft on send failure so the user can retry
+        assertNotNull(
+            "V1 should set restoredDraft on send failure",
+            viewModel.uiState.value.restoredDraft
+        )
+        assertEquals(
+            "Hello world",
+            viewModel.uiState.value.restoredDraft?.text
         )
         collectJob.cancel()
     }

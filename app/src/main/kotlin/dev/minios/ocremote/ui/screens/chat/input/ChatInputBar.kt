@@ -102,7 +102,6 @@ import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.ui.theme.AppMotion
 
 /**
@@ -244,7 +243,8 @@ internal fun ChatInputBar(
     textFieldValue: TextFieldValue,
     onTextFieldValueChange: (TextFieldValue) -> Unit,
     onSend: () -> Unit,
-    sessionStatus: SessionStatus = SessionStatus.Idle,
+    isSending: Boolean,
+    isBusy: Boolean = false,
     messages: List<ChatMessage> = emptyList(),
     attachments: List<ImageAttachment> = emptyList(),
     onAttach: () -> Unit = {},
@@ -279,7 +279,6 @@ internal fun ChatInputBar(
     }
     val isAmoled = isAmoledTheme()
     val isShellMode = inputMode == ChatInputMode.SHELL
-    val isBusy = sessionStatus is SessionStatus.Busy || sessionStatus is SessionStatus.Retry
     // Rotate placeholder hint every 4 seconds
     val hintIndex = remember { mutableIntStateOf(0) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -295,7 +294,7 @@ internal fun ChatInputBar(
     }
 
     val text = textFieldValue.text
-    val canSend = (text.isNotBlank() || attachments.isNotEmpty()) && (!isShellMode || !isBusy)
+    val canSend = (text.isNotBlank() || attachments.isNotEmpty()) && !isSending && (!isShellMode || !isBusy)
 
     // Build merged slash commands: client commands + server commands + skills (deduplicated)
     val clientCmds = clientCommands()
@@ -513,7 +512,7 @@ internal fun ChatInputBar(
                         .background(
                             if (showStop) {
                                 MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.SELECTED)
-                            } else if (isShellMode && !isBusy) {
+                            } else if (isShellMode && !isSending) {
                                 MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.FAINT)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.FAINT)
@@ -526,7 +525,7 @@ internal fun ChatInputBar(
                                     color = MaterialTheme.colorScheme.error.copy(alpha = AlphaTokens.MEDIUM),
                                     shape = ShapeTokens.largeMedium,
                                 )
-                            } else if (isShellMode && !isBusy) {
+                            } else if (isShellMode && !isSending) {
                                 Modifier.border(
                                     width = if (isAmoled) 1.2.dp else 1.dp,
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = if (isAmoled) AlphaTokens.AMOLED else AlphaTokens.HIGH),
@@ -571,6 +570,11 @@ internal fun ChatInputBar(
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.error
                         )
+                    } else if (isSending) {
+                        BreathingCircleIndicator(
+                            size = 20.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     } else {
                         Icon(
                             Icons.AutoMirrored.Filled.Send,
@@ -582,7 +586,7 @@ internal fun ChatInputBar(
                             modifier = Modifier.size(20.dp),
                             tint = if (canSend) {
                                 MaterialTheme.colorScheme.primary
-                            } else if (isShellMode && isAmoled && !isBusy) {
+                            } else if (isShellMode && isAmoled && !isSending) {
                                 MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MUTED)
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.FAINT)
