@@ -260,10 +260,11 @@ fun ChatMessageList(
                         }
                     }
 
-                    // Chat messages: displayItems.reversed() so newest is at index 0 (bottom in reverseLayout).
+                    // Chat messages: displayItems is already newest-first (descending).
+                    // reverseLayout=true renders index 0 (newest) at the bottom.
                     // Visual result: oldest at top, newest at bottom.
                     itemsIndexed(
-                        displayItems.reversed(),
+                        displayItems,
                         key = { _, item -> item.second.message.id },
                         contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
                     ) { _, (rawIndex, msg) ->

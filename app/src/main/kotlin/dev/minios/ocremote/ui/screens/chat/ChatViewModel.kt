@@ -1402,25 +1402,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val currentSessionId = ensureSession()
-                val promptText = parts.firstOrNull { it.type == "text" }?.text ?: ""
-                // Optimistic insert: show user message immediately before SSE confirmation
-                if (promptText.isNotBlank()) {
-                    val optimisticUser = Message.User(
-                        id = "pending-${System.currentTimeMillis()}",
-                        sessionId = currentSessionId,
-                        time = TimeInfo(System.currentTimeMillis()),
-                        summary = Message.User.UserSummary(title = promptText),
-                    )
-                    val optimisticPart = Part.Text(
-                        id = "pending-part-${System.currentTimeMillis()}",
-                        sessionId = currentSessionId,
-                        messageId = optimisticUser.id,
-                        text = promptText,
-                    )
-                    chatRepository.setMessages(currentSessionId, listOf(
-                        MessageWithParts(info = optimisticUser, parts = listOf(optimisticPart))
-                    ))
-                }
                 chatRepository.promptAsync(
                     serverId = serverId,
                     sessionId = currentSessionId,
