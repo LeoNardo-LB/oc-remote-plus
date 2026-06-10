@@ -876,7 +876,16 @@ class ChatViewModel @Inject constructor(
                 chatRepository.getMessagesFlow(sessionId),
                 chatRepository.getParts(sessionId),
             ) { messages, parts ->
-                _messagesList.value = messages
+                val grouped = parts.groupBy { it.messageId }
+                // 过滤掉还没有 parts 的 assistant 消息：
+                // MessageUpdated 可能先于 MessagePartUpdated 到达，此时 assistant 消息存在但没有内容，
+                // 导致 UI 上看起来回复没出现。等第一个 part 到达后自然会显示。
+                val visibleMessages = messages.filter { msg ->
+                    msg is Message.User || (msg is Message.Assistant && grouped[msg.id]?.isNotEmpty() == true)
+                }
+                val missingParts = messages.size - visibleMessages.size
+                Log.d(TAG, "[sseJob] msgs=${messages.size} visible=${visibleMessages.size} parts=${parts.size} active=${sseJob?.isActive} filtered=$missingParts")
+                _messagesList.value = visibleMessages
                 _partsList.value = parts
             }.collect { }
         }
@@ -916,6 +925,7 @@ class ChatViewModel @Inject constructor(
      * Does NOT restart sseJob to avoid scroll position reset and data flickering.
      */
     fun refreshIfNeeded() {
+        Log.i(TAG, "[RESUME] refreshIfNeeded called, sseJob active=${sseJob?.isActive}")
         viewModelScope.launch {
             // Lightweight: sync status only, don't restart sseJob
             refreshMessages()
@@ -1408,16 +1418,33 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val currentSessionId = ensureSession()
-                chatRepository.promptAsync(
+
+                // 从当前 UI 状态构建 model/agent/variant，确保用户切换后生效
+                val modelSelection = _selectedProviderId.value?.let { providerId ->
+                    _selectedModelId.value?.let { modelId ->
+                        ModelSelection(providerId = providerId, modelId = modelId)
+                    }
+                }
+                val (agentName, _) = _selectedAgent.value
+                val variant = _selectedVariant.value
+
+                val result = chatRepository.promptAsync(
                     serverId = serverId,
                     sessionId = currentSessionId,
                     parts = parts,
+                    model = modelSelection,
+                    agent = agentName,
+                    variant = variant,
                     directory = sessionDirectory,
                 )
-                if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId via V1")
+                if (result.isSuccess) {
+                    Log.i(TAG, "[SEND] promptAsync succeeded for session $currentSessionId")
+                } else {
+                    Log.e(TAG, "[SEND] promptAsync FAILED for session $currentSessionId: ${result.exceptionOrNull()?.message}")
+                }
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to send message", e)
+                Log.e(TAG, "[SEND] sendParts exception: ${e.message}", e)
             }
         }
     }

@@ -15,10 +15,6 @@ import javax.inject.Singleton
 @Singleton
 class MessageEventHandler @Inject constructor() : SseEventHandler {
 
-    companion object {
-        private const val TAG = "MessageEventHandler"
-    }
-
     private val _messages = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
     val messages: StateFlow<Map<String, List<Message>>> = _messages.asStateFlow()
 
