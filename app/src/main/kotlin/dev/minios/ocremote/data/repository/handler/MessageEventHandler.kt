@@ -1,5 +1,6 @@
 package dev.minios.ocremote.data.repository.handler
 
+import android.util.Log
 import dev.minios.ocremote.domain.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,10 @@ import javax.inject.Singleton
  */
 @Singleton
 class MessageEventHandler @Inject constructor() : SseEventHandler {
+
+    private companion object {
+        const val TAG = "MsgEventHandler"
+    }
 
     private val _messages = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
     val messages: StateFlow<Map<String, List<Message>>> = _messages.asStateFlow()
@@ -57,13 +62,55 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
 
     private fun handleMessagePartUpdated(event: SseEvent.MessagePartUpdated) {
         val messageId = event.part.messageId
+        val partId = event.part.id
+        val thread = Thread.currentThread().id
         _parts.update { current ->
             val messageParts = current[messageId]?.toMutableList() ?: mutableListOf()
-            val idx = messageParts.indexOfFirst { it.id == event.part.id }
+            val idx = messageParts.indexOfFirst { it.id == partId }
             if (idx >= 0) {
-                messageParts[idx] = mergePart(messageParts[idx], event.part)
+                val old = messageParts[idx]
+                val merged = mergePart(old, event.part)
+                // Diagnostic: log text changes for Text/Reasoning parts
+                if (old is Part.Text && event.part is Part.Text) {
+                    val oldLen = old.text.length
+                    val newLen = (merged as Part.Text).text.length
+                    val incLen = event.part.text.length
+                    if (newLen != incLen) {
+                        Log.w(TAG, "[PartUpdated] t=$thread msg=$messageId part=$partId " +
+                            "old=$oldLen inc=$incLen merged=$newLen " +
+                            "(kept SSE text, discarded REST snapshot)")
+                    }
+                }
+                messageParts[idx] = merged
             } else {
-                messageParts.add(event.part)
+                // PartUpdated arriving before any PartDelta — if text is non-empty,
+                // strip it to prevent duplication when SSE deltas append later.
+                // SSE deltas are incremental and will re-accumulate from "".
+                // If no deltas arrive (stream already ended), REST sync will fill in
+                // the final text via mergePart (SSE text empty → take REST).
+                val partToAdd = when (event.part) {
+                    is Part.Text -> {
+                        if (event.part.text.isNotEmpty()) {
+                            Log.w(TAG, "[PartUpdated] t=$thread msg=$messageId part=$partId " +
+                                "stripping non-empty text=${event.part.text.length}, " +
+                                "will be re-accumulated by SSE deltas or REST sync")
+                            event.part.copy(text = "")
+                        } else {
+                            event.part
+                        }
+                    }
+                    is Part.Reasoning -> {
+                        if (event.part.text.isNotEmpty()) {
+                            Log.w(TAG, "[PartUpdated] t=$thread msg=$messageId part=$partId " +
+                                "stripping non-empty reasoning text=${event.part.text.length}")
+                            event.part.copy(text = "")
+                        } else {
+                            event.part
+                        }
+                    }
+                    else -> event.part
+                }
+                messageParts.add(partToAdd)
             }
             current + (messageId to messageParts)
         }
@@ -131,13 +178,38 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
+        val thread = Thread.currentThread().id
         _parts.update { current ->
             val messageParts = current[event.messageId]?.toMutableList() ?: mutableListOf()
             val idx = messageParts.indexOfFirst { it.id == event.partId }
             if (idx >= 0) {
                 val part = messageParts[idx]
                 val updated = when (part) {
-                    is Part.Text -> part.copy(text = part.text + event.delta)
+                    is Part.Text -> {
+                        val newText = part.text + event.delta
+                        // === DUPLICATION DETECTION ===
+                        // Check if delta is already present at the end of existing text
+                        if (part.text.isNotEmpty() && part.text.length >= event.delta.length
+                            && part.text.endsWith(event.delta)) {
+                            Log.e(TAG, "[DUPE] t=$thread msg=${event.messageId.take(8)} " +
+                                "part=${event.partId.take(8)} DELTA \"$event.delta\" " +
+                                "already at END of existing text len=${part.text.length}!")
+                        }
+                        // Check if the resulting text has the delta duplicated
+                        if (event.delta.isNotEmpty() && newText.length >= event.delta.length * 2) {
+                            val tail = newText.takeLast(event.delta.length * 2)
+                            val half = event.delta.length
+                            if (tail.take(half) == tail.takeLast(half)) {
+                                Log.e(TAG, "[DUPE] t=$thread msg=${event.messageId.take(8)} " +
+                                    "part=${event.partId.take(8)} RESULT text has duplicated " +
+                                    "suffix len=$half: \"${tail.take(30)}\"")
+                            }
+                        }
+                        Log.d(TAG, "[PartDelta] t=$thread msg=${event.messageId.take(8)} " +
+                            "part=${event.partId.take(8)} \"${part.text.length}\"+\"${event.delta.length}\"" +
+                            "=\"${newText.length}\" delta=\"${event.delta.take(30)}\"")
+                        part.copy(text = newText)
+                    }
                     is Part.Reasoning -> part.copy(text = part.text + event.delta)
                     else -> part
                 }
@@ -150,6 +222,8 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                     messageId = event.messageId,
                     text = event.delta
                 )
+                Log.w(TAG, "[PartDelta] t=$thread SYNTHETIC msg=${event.messageId.take(8)} " +
+                    "part=${event.partId.take(8)} text=\"${event.delta.take(30)}\"")
                 messageParts.add(syntheticPart)
             }
             current + (event.messageId to messageParts)
@@ -166,6 +240,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     // ============ Batch Operations ============
 
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
+        val thread = Thread.currentThread().id
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
@@ -194,6 +269,17 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             val merged = partsMap.mapValues { (messageId, incomingParts) ->
                 val existingParts = current[messageId]
                 if (existingParts != null) {
+                    // Diagnostic: check for text length regression after merge
+                    for (inc in incomingParts) {
+                        if (inc is Part.Text) {
+                            val ex = existingParts.find { it.id == inc.id }
+                            if (ex is Part.Text && ex.text.length > inc.text.length) {
+                                Log.w(TAG, "[setMessages] t=$thread msg=${messageId.take(8)} " +
+                                    "part=${inc.id.take(8)} SSE=${ex.text.length} > REST=${inc.text.length} " +
+                                    "→ keeping SSE text")
+                            }
+                        }
+                    }
                     mergePartsList(existingParts, incomingParts)
                 } else {
                     incomingParts
@@ -228,6 +314,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
      * the window between REST snapshot and new SSE connection establishment.
      */
     fun replaceMessages(sessionId: String, newMessages: List<MessageWithParts>) {
+        val thread = Thread.currentThread().id
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
@@ -242,6 +329,17 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             val merged = partsMap.mapValues { (messageId, incomingParts) ->
                 val existingParts = current[messageId]
                 if (existingParts != null) {
+                    // Diagnostic: check for text length regression after merge
+                    for (inc in incomingParts) {
+                        if (inc is Part.Text) {
+                            val ex = existingParts.find { it.id == inc.id }
+                            if (ex is Part.Text && ex.text.length > inc.text.length) {
+                                Log.w(TAG, "[replaceMessages] t=$thread msg=${messageId.take(8)} " +
+                                    "part=${inc.id.take(8)} SSE=${ex.text.length} > REST=${inc.text.length} " +
+                                    "→ keeping SSE text")
+                            }
+                        }
+                    }
                     mergePartsList(existingParts, incomingParts)
                 } else {
                     incomingParts

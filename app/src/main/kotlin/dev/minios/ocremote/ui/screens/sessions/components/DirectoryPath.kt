@@ -35,7 +35,7 @@ data class DirectoryPath private constructor(
     val isRoot: Boolean
         get() = when {
             isDrivesRoot -> true
-            isWindows -> isDriveRoot
+            // Drive roots (C:\, D:\) can go up to the drives list, so they are NOT root.
             else -> rawPath == "/"
         }
 
