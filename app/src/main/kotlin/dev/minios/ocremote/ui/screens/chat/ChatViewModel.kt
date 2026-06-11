@@ -657,19 +657,16 @@ class ChatViewModel @Inject constructor(
         val session = allSessions.find { it.id == sid }
         val sseStatus = statuses[sid] ?: SessionStatus.Idle
 
-        // If any assistant message is still streaming (incomplete), force Busy.
-        // This prevents status flickering when the server sends SessionIdle between
-        // tool calls/agent dispatches but the session is not truly done.
-        // Uses raw (unfiltered) messages to catch newly-created messages that
-        // don't have parts yet.
-        val hasIncompleteMessage = messages
-            .filterIsInstance<Message.Assistant>()
-            .any { it.time.completed == null }
-        val effectiveStatus = if (hasIncompleteMessage && sseStatus is SessionStatus.Idle) {
-            SessionStatus.Busy
-        } else {
-            sseStatus
-        }
+        // Trust server-side session status as the authoritative busy/idle indicator.
+        // OpenCode's busy state is a pure in-memory runtime concept (AgentCoordinator),
+        // not derived from message completion fields. The server's GET /session/status
+        // API reflects the true state — if the server says idle after restart, it IS idle.
+        //
+        // Premature-idle protection (preventing status flickering during tool-call gaps)
+        // is handled at the EventDispatcher layer (isPrematureIdle in EventDispatcher.kt),
+        // which blocks idle SSE events when the session has incomplete messages.
+        // No additional override is needed here.
+        val effectiveStatus = sseStatus
 
         SessionMetaState(
             sessionTitle = session?.title ?: "",
@@ -1658,7 +1655,8 @@ class ChatViewModel @Inject constructor(
                 sseJob = null
                 sessionRepository.abort(serverId, sessionId, sessionDirectory)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
-                sessionRepository.updateSessionStatus(sessionId, SessionStatus.Idle)
+                // Mark all incomplete messages as completed so UI reflects idle immediately
+                sessionRepository.markSessionIdleProtected(sessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
