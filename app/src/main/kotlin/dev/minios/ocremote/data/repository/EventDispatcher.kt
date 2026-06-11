@@ -240,9 +240,12 @@ class EventDispatcher @Inject constructor(
     // ============ State Correction ============
 
     /**
-     * Force-mark all streaming messages in a session as completed.
-     * Used when REST fallback detects the server reports "idle" but
-     * the UI may still show "thinking" due to missed SSE events.
+     * Force-mark all streaming messages in a session as completed AND set Idle.
+     * Used only for explicit terminal actions: abort, or entering a session
+     * where the server confirms idle but local data has stale incomplete messages.
+     * Do NOT call from periodic REST polling — that would break premature-idle
+     * protection (hasIncompleteAssistant would become false, allowing SSE idle
+     * events through during tool-call gaps, causing status flickering).
      */
     fun markSessionIdle(sessionId: String) {
         messageHandler.markSessionIdle(sessionId)
@@ -250,12 +253,11 @@ class EventDispatcher @Inject constructor(
     }
 
     /**
-     * Like [markSessionIdle] but uses SSE-freshness protection on the status update.
-     * Won't set Idle if SSE recently (within 5s) updated the status to Busy/Retry.
-     * Message completion still proceeds regardless.
+     * Update session status to Idle with SSE-freshness protection.
+     * Does NOT modify messages — premature-idle protection must remain intact.
+     * Used by periodic REST polling when server confirms a session is idle.
      */
     fun markSessionIdleProtected(sessionId: String) {
-        messageHandler.markSessionIdle(sessionId)
         sessionHandler.updateSessionStatusProtected(sessionId, SessionStatus.Idle)
     }
 }

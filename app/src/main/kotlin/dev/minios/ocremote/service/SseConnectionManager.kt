@@ -330,7 +330,9 @@ class SseConnectionManager @Inject constructor(
                 }
                 eventDispatcher.syncAllSessionStatuses(statusMap)
 
-                // Only mark truly idle sessions with message completion fix (protected)
+                // Mark idle sessions with SSE-freshness protection (status only, no message fix).
+                // syncAllSessionStatuses already prevents downgrade for sessions with
+                // incomplete assistant messages (hasIncompleteAssistant check).
                 for ((sessionId, status) in statusMap) {
                     if (status is SessionStatus.Idle) {
                         eventDispatcher.markSessionIdleProtected(sessionId)

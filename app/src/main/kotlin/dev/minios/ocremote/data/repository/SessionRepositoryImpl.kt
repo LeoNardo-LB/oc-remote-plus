@@ -235,6 +235,10 @@ class SessionRepositoryImpl @Inject constructor(
         eventDispatcher.markSessionIdleProtected(sessionId)
     }
 
+    override fun markSessionIdle(sessionId: String) {
+        eventDispatcher.markSessionIdle(sessionId)
+    }
+
     // ============ Session Status Sync ============
 
     override suspend fun fetchSessionStatuses(serverId: String, directory: String?): Result<Map<String, SessionStatus>> = runCatching {

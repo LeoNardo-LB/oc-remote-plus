@@ -1098,6 +1098,9 @@ class ChatViewModel @Inject constructor(
                 val currentStatus = statusMap[sessionId]
                 if (currentStatus is SessionStatus.Idle) {
                     sessionRepository.markSessionIdleProtected(sessionId)
+                    // If server says idle but local messages are incomplete (server restart),
+                    // fix the messages so the UI shows the correct state.
+                    fixIncompleteMessagesIfIdle(sessionId)
                 }
             }
         }
@@ -1125,6 +1128,7 @@ class ChatViewModel @Inject constructor(
             val currentStatus = statusMap[sessionId]
             if (currentStatus is SessionStatus.Idle) {
                 sessionRepository.markSessionIdleProtected(sessionId)
+                fixIncompleteMessagesIfIdle(sessionId)
             }
         }
 
@@ -1133,6 +1137,22 @@ class ChatViewModel @Inject constructor(
         loadPendingPermissions()
 
         lastRefreshTimeMs = System.currentTimeMillis()
+    }
+
+    /**
+     * Fix messages with time.completed == null when the server confirms the session is idle.
+     * This handles the server-restart scenario: after restart, all sessions are idle in-memory,
+     * but the database preserves interrupted messages with finished_at = NULL.
+     * We must NOT call this during periodic polling — only on explicit user actions
+     * (entering session, aborting) to avoid breaking premature-idle protection.
+     */
+    private fun fixIncompleteMessagesIfIdle(sid: String) {
+        val messages = _rawMessagesList.value
+        val hasIncomplete = messages.any { it is Message.Assistant && it.time.completed == null }
+        if (hasIncomplete) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "Fixing incomplete messages for session $sid (server confirmed idle)")
+            sessionRepository.markSessionIdle(sid)
+        }
     }
 
     fun loadOlderMessages() {
