@@ -1675,8 +1675,13 @@ class ChatViewModel @Inject constructor(
                 sseJob = null
                 sessionRepository.abort(serverId, sessionId, sessionDirectory)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
-                // Mark all incomplete messages as completed so UI reflects idle immediately
-                sessionRepository.markSessionIdleProtected(sessionId)
+                // Force-complete messages AND set Idle — abort is a terminal action.
+                // Must use markSessionIdle (not Protected) because:
+                // 1. SSE stream is cancelled above, server's idle event won't reach us
+                // 2. markSessionIdleProtected is blocked by SSE freshness window (5s)
+                // 3. markSessionIdleProtected doesn't complete messages, so premature-idle
+                //    protection would block any future idle events
+                sessionRepository.markSessionIdle(sessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
