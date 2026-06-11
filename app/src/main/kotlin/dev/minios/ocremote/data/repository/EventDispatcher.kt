@@ -69,6 +69,23 @@ class EventDispatcher @Inject constructor(
      * - CommandExecuted: resets session status to Idle
      */
     fun processEvent(event: SseEvent, serverId: String) {
+        // ============ Premature Idle Protection ============
+        // Intercept session.idle / session.status(idle) when the session still has
+        // incomplete assistant messages (time.completed == null). The server sends
+        // idle events between tool calls / agent dispatches, but the conversation
+        // is not truly done. Blocking these prevents status flickering in both
+        // ChatScreen and SessionListScreen.
+        if (isPrematureIdle(event)) {
+            // Still dispatch to other handlers (messages, permissions, etc.)
+            // but skip sessionHandler to preserve Busy status.
+            messageHandler.handle(event, serverId)
+            permissionHandler.handle(event, serverId)
+            questionHandler.handle(event, serverId)
+            miscHandler.handle(event, serverId)
+            sessionNextHandler.handle(event, serverId)
+            return
+        }
+
         sessionHandler.handle(event, serverId)
         messageHandler.handle(event, serverId)
         permissionHandler.handle(event, serverId)
@@ -100,6 +117,39 @@ class EventDispatcher @Inject constructor(
         }
     }
 
+    /**
+     * Check if a session idle/status(idle) SSE event is premature — i.e. the session
+     * still has assistant messages with time.completed == null, meaning the AI is
+     * still actively generating content.
+     */
+    private fun isPrematureIdle(event: SseEvent): Boolean {
+        val sessionId: String
+        val isIdle: Boolean
+        when (event) {
+            is SseEvent.SessionIdle -> {
+                sessionId = event.sessionId
+                isIdle = true
+            }
+            is SseEvent.SessionStatus -> {
+                sessionId = event.sessionId
+                isIdle = event.status is SessionStatus.Idle
+            }
+            else -> return false
+        }
+        if (!isIdle) return false
+        return hasIncompleteAssistant(sessionId)
+    }
+
+    /**
+     * Check if a session has any assistant messages still streaming (time.completed == null).
+     */
+    private fun hasIncompleteAssistant(sessionId: String): Boolean {
+        return messageHandler.messages.value[sessionId]
+            .orEmpty()
+            .filterIsInstance<Message.Assistant>()
+            .any { it.time.completed == null }
+    }
+
     // ============ Delegated Operations ============
 
     fun setSessions(serverId: String, sessions: List<Session>) =
@@ -120,8 +170,23 @@ class EventDispatcher @Inject constructor(
     fun replaceMessages(sessionId: String, messages: List<MessageWithParts>) =
         messageHandler.replaceMessages(sessionId, messages)
 
-    fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>) =
-        sessionHandler.updateAllSessionStatuses(statuses)
+    fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>) {
+        // Filter out Idle downgrades for sessions with incomplete assistant messages.
+        // REST polling may report idle during tool-call gaps, but the conversation
+        // is still active if messages are streaming.
+        val protectedStatuses = statuses.mapValues { (sessionId, status) ->
+            if (status is SessionStatus.Idle && hasIncompleteAssistant(sessionId)) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Protecting session $sessionId from REST Idle (has incomplete messages)")
+                }
+                // Keep current status instead of downgrading
+                sessionHandler.sessionStatuses.value[sessionId] ?: status
+            } else {
+                status
+            }
+        }
+        sessionHandler.updateAllSessionStatuses(protectedStatuses)
+    }
 
     fun removePermission(permissionId: String) =
         permissionHandler.removePermission(permissionId)

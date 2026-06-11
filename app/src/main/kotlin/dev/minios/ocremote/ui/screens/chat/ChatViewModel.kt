@@ -239,6 +239,9 @@ class ChatViewModel @Inject constructor(
 
     // ============ V1 Message State ============
     private val _messagesList = MutableStateFlow<List<Message>>(emptyList())
+    /** Raw (unfiltered) messages — used for hasIncompleteMessage check to avoid
+     *  the window where a new assistant message has no parts yet. */
+    private val _rawMessagesList = MutableStateFlow<List<Message>>(emptyList())
     private val _partsList = MutableStateFlow<List<Part>>(emptyList())
     private var sseJob: Job? = null
 
@@ -624,10 +627,12 @@ class ChatViewModel @Inject constructor(
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
      * Includes [_sessionId] as a source so lazy-session creation triggers immediate recomputation.
-     * Also includes [_messagesList] to detect incomplete assistant messages — if the last
+     * Also includes [_rawMessagesList] to detect incomplete assistant messages — if any
      * assistant message is still streaming (time.completed == null), the session is Busy
-     * regardless of SSE/REST status. This follows OpenCode WebUI's approach of deriving
-     * session busy/idle from message completion state, not just server status events.
+     * regardless of SSE/REST status. Uses raw (unfiltered) messages to avoid the window
+     * where a new assistant message has no parts yet and would be excluded from the
+     * filtered list. This follows OpenCode WebUI's approach of deriving session
+     * busy/idle from message completion state, not just server status events.
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
         _sessionId,
@@ -635,7 +640,7 @@ class ChatViewModel @Inject constructor(
         sessionRepository.getSessionStatusesFlow(serverId),
         sessionRepository.getCurrentAgentFlow(serverId),
         sessionRepository.getCurrentModelFlow(serverId),
-        _messagesList,
+        _rawMessagesList,
     ) { args ->
         val sid = args[0] as String
         @Suppress("UNCHECKED_CAST")
@@ -652,11 +657,14 @@ class ChatViewModel @Inject constructor(
         val session = allSessions.find { it.id == sid }
         val sseStatus = statuses[sid] ?: SessionStatus.Idle
 
-        // If the last assistant message is still streaming (incomplete), force Busy.
+        // If any assistant message is still streaming (incomplete), force Busy.
         // This prevents status flickering when the server sends SessionIdle between
         // tool calls/agent dispatches but the session is not truly done.
-        val lastAssistant = messages.filterIsInstance<Message.Assistant>().lastOrNull()
-        val hasIncompleteMessage = lastAssistant != null && lastAssistant.time.completed == null
+        // Uses raw (unfiltered) messages to catch newly-created messages that
+        // don't have parts yet.
+        val hasIncompleteMessage = messages
+            .filterIsInstance<Message.Assistant>()
+            .any { it.time.completed == null }
         val effectiveStatus = if (hasIncompleteMessage && sseStatus is SessionStatus.Idle) {
             SessionStatus.Busy
         } else {
@@ -979,6 +987,7 @@ class ChatViewModel @Inject constructor(
                 }
                 val missingParts = messages.size - visibleMessages.size
                 Log.d(TAG, "[sseJob] msgs=${messages.size} visible=${visibleMessages.size} parts=${parts.size} active=${sseJob?.isActive} filtered=$missingParts")
+                _rawMessagesList.value = messages
                 _messagesList.value = visibleMessages
                 _partsList.value = parts
             }.collect { }
