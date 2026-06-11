@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.Job
+
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -96,7 +96,6 @@ class SessionListViewModel @Inject constructor(
     )
 
     private val conn = ServerConnection.from(serverUrl, username, password.ifEmpty { null })
-    private var globalPollingJob: Job? = null
 
     private val _error = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(true)
@@ -231,10 +230,8 @@ class SessionListViewModel @Inject constructor(
                     }
                     if (BuildConfig.DEBUG) Log.d(TAG, "Total: loaded $totalSessions sessions across ${projects.size} projects for server $serverId")
                 }
-                // Sync session statuses from server
+                // Sync session statuses from server (one-time, no polling)
                 syncSessionStatusesFromServer()
-                // Start global polling after initial sync
-                startGlobalPolling()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load sessions", e)
                 _error.value = e.message ?: "Failed to load sessions"
@@ -398,32 +395,6 @@ class SessionListViewModel @Inject constructor(
             if (normalized in paths) paths - normalized
             else paths + normalized
         }
-    }
-
-    /**
-     * Start global polling for ALL session statuses (no directory filter).
-     * Replaces per-directory polling to prevent cross-directory status conflicts.
-     */
-    private fun startGlobalPolling() {
-        globalPollingJob?.cancel()
-        if (BuildConfig.DEBUG) Log.d(TAG, "Start global session status polling")
-        globalPollingJob = viewModelScope.launch {
-            while (isActive) {
-                syncSessionStatuses(directory = null)
-                delay(5000L)
-            }
-        }
-    }
-
-    private fun stopGlobalPolling() {
-        if (BuildConfig.DEBUG) Log.d(TAG, "Stop global session status polling")
-        globalPollingJob?.cancel()
-        globalPollingJob = null
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        globalPollingJob?.cancel()
     }
 
     fun setBaseDirectory(directory: String?) {
