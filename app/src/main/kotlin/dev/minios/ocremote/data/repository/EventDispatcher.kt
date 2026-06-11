@@ -245,6 +245,7 @@ class EventDispatcher @Inject constructor(
      * the UI may still show "thinking" due to missed SSE events.
      */
     fun markSessionIdle(sessionId: String) {
+        messageHandler.markSessionIdle(sessionId)
         sessionHandler.updateSessionStatus(sessionId, SessionStatus.Idle)
     }
 
@@ -254,6 +255,7 @@ class EventDispatcher @Inject constructor(
      * Message completion still proceeds regardless.
      */
     fun markSessionIdleProtected(sessionId: String) {
+        messageHandler.markSessionIdle(sessionId)
         sessionHandler.updateSessionStatusProtected(sessionId, SessionStatus.Idle)
     }
 }

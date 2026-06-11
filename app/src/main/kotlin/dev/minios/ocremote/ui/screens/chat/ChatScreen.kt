@@ -303,14 +303,7 @@ fun ChatScreen(
     // regardless of isAtBottom state (which can flicker during layout reshuffles).
     var forceFollowUntil by remember { mutableLongStateOf(0L) }
 
-    // Debug: log isAtBottom changes
-    LaunchedEffect(Unit) {
-        Log.w("CHAT_DEBUG", "=== ChatScreen LaunchedEffect(Unit) started === viewModel=${viewModel.sessionId} scrollVersion=${viewModel.scrollRestoreVersion}")
-        snapshotFlow { isAtBottom }
-            .collect { bottom ->
-                Log.w("CHAT_DEBUG", "[isAtBottom] changed to=$bottom items=${listState.layoutInfo.totalItemsCount} canBackward=${listState.canScrollBackward}")
-            }
-    }
+
 
     // Restore scroll position when returning from sub-session navigation.
     // Saves raw LazyColumn index, no fragile index arithmetic needed.
@@ -961,18 +954,22 @@ fun ChatScreen(
                         // Use raw messages directly — each Message is one LazyColumn item.
                         // V1 messageListState returns oldest-first; reverse to newest-first
                         // for ChatMessageList's reverseLayout (index 0 = newest at bottom).
-                        val rawMessages = messageState.messages.reversed()
+                        val rawMessages = remember(messageState.messages) {
+                            messageState.messages.reversed()
+                        }
 
                         // Filter: keep user messages + first assistant in each turn group
                        // to avoid zero-height items creating blank gaps from spacedBy
-                       val displayItems = rawMessages.mapIndexedNotNull { index, msg ->
-                           when {
-                               msg.isUser -> index to msg
-                               msg.isAssistant -> {
-                                   val nextMsg = rawMessages.getOrNull(index + 1)
-                                   if (nextMsg?.isAssistant != true) index to msg else null
+                       val displayItems = remember(rawMessages) {
+                           rawMessages.mapIndexedNotNull { index, msg ->
+                               when {
+                                   msg.isUser -> index to msg
+                                   msg.isAssistant -> {
+                                       val nextMsg = rawMessages.getOrNull(index + 1)
+                                       if (nextMsg?.isAssistant != true) index to msg else null
+                                   }
+                                   else -> null
                                }
-                               else -> null
                            }
                        }
 
