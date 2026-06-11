@@ -144,9 +144,10 @@ internal fun OpenProjectDialog(
                 ) {
                     // Back arrow - navigate up or to drive list on Windows
                     val dirPath = currentDir ?: "/"
-                    val normalizedPath = dirPath.trimEnd('/')
                     val isWindowsDrivesRoot = currentDir == SessionListViewModel.WINDOWS_DRIVES_ROOT
-                    val isAtDriveRoot = normalizedPath.matches(Regex("[A-Za-z]:/?"))
+                    val isBackslashPath = dirPath.contains('\\')
+                    val normalizedPath = if (isBackslashPath) dirPath.trimEnd('\\') else dirPath.trimEnd('/')
+                    val isAtDriveRoot = normalizedPath.matches(Regex("[A-Za-z]:[/\\\\]?"))
                     val isAtRoot = isWindowsDrivesRoot || normalizedPath.isEmpty() || normalizedPath == "/"
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -158,7 +159,9 @@ internal fun OpenProjectDialog(
                                     if (isAtDriveRoot && viewModel.isWindowsServer) {
                                         currentDir = SessionListViewModel.WINDOWS_DRIVES_ROOT
                                     } else {
-                                        val parent = java.io.File(normalizedPath).parent
+                                        val sep = if (isBackslashPath) '\\' else '/'
+                                        val lastSep = normalizedPath.lastIndexOf(sep)
+                                        val parent = if (lastSep > 0) normalizedPath.substring(0, lastSep) else null
                                         currentDir = parent ?: if (viewModel.isWindowsServer) {
                                             SessionListViewModel.WINDOWS_DRIVES_ROOT
                                         } else {
