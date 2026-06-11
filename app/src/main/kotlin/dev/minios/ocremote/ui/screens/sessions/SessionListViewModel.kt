@@ -511,24 +511,24 @@ class SessionListViewModel @Inject constructor(
     /** Get the server's home directory. Delegates to cached getServerPaths(). */
     suspend fun getHomeDirectory(): String = getServerPaths().home.ifBlank { "/" }
 
-    /** List available Windows drives by probing common drive letters. */
-    suspend fun listWindowsDrives(): List<FileNode> {
-        val drives = mutableListOf<FileNode>()
-        for (letter in 'C'..'Z') {
-            val drivePath = "$letter:\\"
-            try {
-                api.listDirectory(conn, path = "", directory = drivePath)
-                drives.add(FileNode(
-                    name = "$letter:",
-                    path = drivePath,
-                    type = "directory",
-                    absolute = drivePath,
-                ))
-            } catch (_: Exception) {
-                // Drive doesn't exist or not accessible
+    /** List available Windows drives by probing drive letters in parallel. */
+    suspend fun listWindowsDrives(): List<FileNode> = coroutineScope {
+        ('C'..'Z').map { letter ->
+            async {
+                val drivePath = "$letter:\\"
+                try {
+                    api.listDirectory(conn, path = "", directory = drivePath)
+                    FileNode(
+                        name = "$letter:",
+                        path = drivePath,
+                        type = "directory",
+                        absolute = drivePath,
+                    )
+                } catch (_: Exception) {
+                    null
+                }
             }
-        }
-        return drives
+        }.awaitAll().filterNotNull()
     }
 
     /** List directories in a given path on the server. */

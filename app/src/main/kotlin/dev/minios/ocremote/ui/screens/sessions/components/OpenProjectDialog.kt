@@ -94,10 +94,17 @@ internal fun OpenProjectDialog(
 
     // Load server paths and then list currentDir whenever it changes.
     LaunchedEffect(Unit) {
-        val paths = viewModel.getServerPaths()
-        homeDir = paths.home
-        if (currentDir == null) {
-            currentDir = initialDirectory ?: if (viewModel.isWindowsServer) SessionListViewModel.WINDOWS_DRIVES_ROOT else "/"
+        try {
+            val paths = viewModel.getServerPaths()
+            homeDir = paths.home
+            if (currentDir == null) {
+                currentDir = initialDirectory ?: if (viewModel.isWindowsServer) SessionListViewModel.WINDOWS_DRIVES_ROOT else "/"
+            }
+        } catch (_: Exception) {
+            // Fallback: set a reasonable default so isLoading doesn't hang
+            if (currentDir == null) {
+                currentDir = initialDirectory ?: "/"
+            }
         }
     }
 
@@ -106,10 +113,14 @@ internal fun OpenProjectDialog(
         snapshotFlow { currentDir }.collectLatest { dir ->
             if (dir == null) return@collectLatest
             isLoading = true
-            directories = if (dir == SessionListViewModel.WINDOWS_DRIVES_ROOT) {
-                viewModel.listWindowsDrives()
-            } else {
-                viewModel.listDirectories(dir)
+            try {
+                directories = if (dir == SessionListViewModel.WINDOWS_DRIVES_ROOT) {
+                    viewModel.listWindowsDrives()
+                } else {
+                    viewModel.listDirectories(dir)
+                }
+            } catch (_: Exception) {
+                directories = emptyList()
             }
             isLoading = false
         }
