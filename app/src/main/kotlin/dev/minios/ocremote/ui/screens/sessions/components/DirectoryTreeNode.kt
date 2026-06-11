@@ -121,6 +121,8 @@ internal fun DirectoryTreeNode(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
                     )
+                }
+            }
         }
         IconButton(
             onClick = { onNewSession(node.path) },
@@ -132,8 +134,6 @@ internal fun DirectoryTreeNode(
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
             )
-        }
-    }
         }
     }
 

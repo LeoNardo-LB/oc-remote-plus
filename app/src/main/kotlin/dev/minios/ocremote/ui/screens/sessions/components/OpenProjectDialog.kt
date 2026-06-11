@@ -97,7 +97,7 @@ internal fun OpenProjectDialog(
         val paths = viewModel.getServerPaths()
         homeDir = paths.home
         if (currentDir == null) {
-            currentDir = initialDirectory ?: if (viewModel.isWindowsServer) paths.home else "/"
+            currentDir = initialDirectory ?: if (viewModel.isWindowsServer) SessionListViewModel.WINDOWS_DRIVES_ROOT else "/"
         }
     }
 
