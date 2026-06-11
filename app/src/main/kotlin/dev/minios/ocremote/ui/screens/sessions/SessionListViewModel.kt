@@ -517,13 +517,17 @@ class SessionListViewModel @Inject constructor(
             async {
                 val drivePath = "$letter:\\"
                 try {
-                    api.listDirectory(conn, path = "", directory = drivePath)
-                    FileNode(
-                        name = "$letter:",
-                        path = drivePath,
-                        type = "directory",
-                        absolute = drivePath,
-                    )
+                    val response = api.probeDirectory(conn, drivePath)
+                    if (response) {
+                        FileNode(
+                            name = "$letter:",
+                            path = drivePath,
+                            type = "directory",
+                            absolute = drivePath,
+                        )
+                    } else {
+                        null
+                    }
                 } catch (_: Exception) {
                     null
                 }

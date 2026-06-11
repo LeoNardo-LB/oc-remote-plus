@@ -1,5 +1,6 @@
 package dev.minios.ocremote.ui.screens.sessions.components
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -37,14 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.minios.ocremote.R
 import dev.minios.ocremote.data.dto.response.FileNode
-import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.ui.components.amoledDialogParams
 import dev.minios.ocremote.ui.components.amoledOutlinedTextFieldColors
 import dev.minios.ocremote.ui.components.DialogButtons
@@ -58,12 +57,14 @@ import kotlinx.coroutines.launch
 /**
  * Directory browser dialog for opening a project.
  * Standard file-system browser with tap-to-navigate into subdirectories.
+ *
+ * Uses [DirectoryPath] for all path operations — no raw string slicing.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun OpenProjectDialog(
     viewModel: SessionListViewModel,
-    projects: List<Project>,
+    projects: List<dev.minios.ocremote.domain.model.Project>,
     initialDirectory: String? = null,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
@@ -76,7 +77,9 @@ internal fun OpenProjectDialog(
     }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var currentDir by remember { mutableStateOf<String?>(null) }
+
+    // ── State ────────────────────────────────────────────────────────
+    var currentPath by remember { mutableStateOf<DirectoryPath?>(null) }
     var homeDir by remember { mutableStateOf<String?>(null) }
     var directories by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -85,39 +88,34 @@ internal fun OpenProjectDialog(
     var isCreatingFolder by remember { mutableStateOf(false) }
     var createFolderError by remember { mutableStateOf<String?>(null) }
 
-    /** Shorten an absolute path by replacing home prefix with ~ */
-    fun tildeReplace(path: String): String {
-        if (path == SessionListViewModel.WINDOWS_DRIVES_ROOT) return path
-        val home = homeDir ?: return path
-        return if (path.startsWith(home)) "~" + path.removePrefix(home) else path
-    }
-
-    // Load server paths and then list currentDir whenever it changes.
+    // ── Init: load server paths ──────────────────────────────────────
     LaunchedEffect(Unit) {
         try {
             val paths = viewModel.getServerPaths()
             homeDir = paths.home
-            if (currentDir == null) {
-                currentDir = initialDirectory ?: if (viewModel.isWindowsServer) SessionListViewModel.WINDOWS_DRIVES_ROOT else "/"
+            if (currentPath == null) {
+                currentPath = initialDirectory?.let { DirectoryPath.forPath(it) }
+                    ?: if (viewModel.isWindowsServer) DirectoryPath.windowsDrivesRoot
+                    else DirectoryPath.unixRoot
             }
         } catch (_: Exception) {
-            // Fallback: set a reasonable default so isLoading doesn't hang
-            if (currentDir == null) {
-                currentDir = initialDirectory ?: "/"
+            if (currentPath == null) {
+                currentPath = initialDirectory?.let { DirectoryPath.forPath(it) }
+                    ?: DirectoryPath.unixRoot
             }
         }
     }
 
-    // React to currentDir changes via snapshotFlow
+    // ── React to path changes ────────────────────────────────────────
     LaunchedEffect(Unit) {
-        snapshotFlow { currentDir }.collectLatest { dir ->
-            if (dir == null) return@collectLatest
+        snapshotFlow { currentPath }.collectLatest { path ->
+            if (path == null) return@collectLatest
             isLoading = true
             try {
-                directories = if (dir == SessionListViewModel.WINDOWS_DRIVES_ROOT) {
+                directories = if (path.isDrivesRoot) {
                     viewModel.listWindowsDrives()
                 } else {
-                    viewModel.listDirectories(dir)
+                    viewModel.listDirectories(path.rawPath)
                 }
             } catch (_: Exception) {
                 directories = emptyList()
@@ -128,6 +126,7 @@ internal fun OpenProjectDialog(
 
     val params = amoledDialogParams()
 
+    // ── Dialog ───────────────────────────────────────────────────────
     BasicAlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -146,50 +145,34 @@ internal fun OpenProjectDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Path bar
+                // ── Path bar ─────────────────────────────────────────
+                val path = currentPath
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Back arrow - navigate up or to drive list on Windows
-                    val dirPath = currentDir ?: "/"
-                    val isWindowsDrivesRoot = currentDir == SessionListViewModel.WINDOWS_DRIVES_ROOT
-                    val isBackslashPath = dirPath.contains('\\')
-                    val normalizedPath = if (isBackslashPath) dirPath.trimEnd('\\') else dirPath.trimEnd('/')
-                    val isAtDriveRoot = normalizedPath.matches(Regex("[A-Za-z]:[/\\\\]?"))
-                    val isAtRoot = isWindowsDrivesRoot || normalizedPath.isEmpty() || normalizedPath == "/"
+                    val canGoBack = path != null && !path.isRoot
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
                         modifier = Modifier
                             .size(16.dp)
                             .then(
-                                if (!isAtRoot) Modifier.clickable {
-                                    if (isAtDriveRoot && viewModel.isWindowsServer) {
-                                        currentDir = SessionListViewModel.WINDOWS_DRIVES_ROOT
-                                    } else {
-                                        val sep = if (isBackslashPath) '\\' else '/'
-                                        val lastSep = normalizedPath.lastIndexOf(sep)
-                                        val parent = if (lastSep > 0) normalizedPath.substring(0, lastSep) else null
-                                        currentDir = parent ?: if (viewModel.isWindowsServer) {
-                                            SessionListViewModel.WINDOWS_DRIVES_ROOT
-                                        } else {
-                                            "/"
-                                        }
-                                    }
+                                if (canGoBack) Modifier.clickable {
+                                    currentPath = path.parent() ?: currentPath
                                 } else Modifier
                             ),
-                        tint = if (isAtRoot) {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                        } else {
+                        tint = if (canGoBack) {
                             MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                         },
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isWindowsDrivesRoot) "Drives" else tildeReplace(currentDir ?: "/"),
+                        text = path?.display(homeDir) ?: "/",
                         modifier = Modifier
                             .weight(1f)
                             .horizontalScroll(rememberScrollState()),
@@ -199,7 +182,7 @@ internal fun OpenProjectDialog(
                     )
                 }
 
-                // Directory list
+                // ── Directory list ───────────────────────────────────
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -230,13 +213,20 @@ internal fun OpenProjectDialog(
                         }
                         else -> {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                items(directories, key = { it.name }) { node ->
-                                    val absPath = node.absolute
-                                        ?: "${currentDir?.trimEnd('/')}/${node.name}"
+                                items(
+                                    items = directories,
+                                    key = { it.absolute ?: it.path }
+                                ) { node ->
+                                    // Use absolute path from server (always correct),
+                                    // fall back to DirectoryPath.child() for safety.
+                                    val targetPath = node.absolute?.let { DirectoryPath.forPath(it) }
+                                        ?: currentPath?.child(node.name)
+                                        ?: DirectoryPath.forPath(node.name)
+
                                     DirectoryRow(
                                         displayPath = node.name,
-                                        onClick = { currentDir = absPath },
-                                        onNavigate = { currentDir = absPath },
+                                        onClick = { currentPath = targetPath },
+                                        onNavigate = { currentPath = targetPath },
                                     )
                                 }
                             }
@@ -251,7 +241,7 @@ internal fun OpenProjectDialog(
                             stringResource(R.string.sessions_create_session),
                             DialogButtonRole.Primary,
                         ) {
-                            currentDir?.let { onSelect(it) }
+                            currentPath?.let { onSelect(it.rawPath) }
                         },
                         Triple(
                             stringResource(R.string.sessions_create_folder),
@@ -267,7 +257,7 @@ internal fun OpenProjectDialog(
         }
     }
 
-    // Create folder dialog
+    // ── Create folder dialog ─────────────────────────────────────────
     if (showCreateFolderDialog) {
         val createFolderParams = amoledDialogParams()
         BasicAlertDialog(
@@ -322,7 +312,7 @@ internal fun OpenProjectDialog(
                                 stringResource(R.string.sessions_create_folder_create),
                                 DialogButtonRole.Primary,
                             ) {
-                                val parent = currentDir ?: homeDir ?: "/"
+                                val parent = currentPath?.rawPath ?: homeDir ?: "/"
                                 val name = newFolderName.trim()
                                 if (name.isBlank()) {
                                     createFolderError = context.getString(R.string.sessions_create_folder_invalid_name)
@@ -337,14 +327,17 @@ internal fun OpenProjectDialog(
                                         showCreateFolderDialog = false
                                         newFolderName = ""
                                         createFolderError = null
-                                        currentDir = parent
-                                        directories = viewModel.listDirectories(parent)
+                                        // Force reload the current directory
+                                        val reloadPath = currentPath
+                                        currentPath = null
+                                        currentPath = reloadPath
                                         Toast
                                             .makeText(
                                                 context,
                                                 context.getString(
                                                     R.string.sessions_create_folder_success,
-                                                    tildeReplace(createdPath)
+                                                    DirectoryPath.forPath(createdPath)
+                                                        .display(homeDir)
                                                 ),
                                                 Toast.LENGTH_SHORT,
                                             )

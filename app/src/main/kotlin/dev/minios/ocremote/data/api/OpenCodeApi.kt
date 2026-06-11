@@ -976,12 +976,29 @@ class OpenCodeApi @Inject constructor(
         }.body()
     }
 
+    /**
+     * Probe whether a directory exists and is accessible on the server.
+     * Returns true only if the server responds with HTTP 2xx.
+     */
+    suspend fun probeDirectory(conn: ServerConnection, directory: String): Boolean {
+        val response = httpClient.get("${conn.baseUrl}/file") {
+            conn.authHeader?.let { header("Authorization", it) }
+            directoryHeader(directory)
+            parameter("path", "")
+        }
+        return response.status.isSuccess()
+    }
+
     suspend fun listDirectory(conn: ServerConnection, path: String = "", directory: String? = null): List<FileNode> {
-        return httpClient.get("${conn.baseUrl}/file") {
+        val response = httpClient.get("${conn.baseUrl}/file") {
             conn.authHeader?.let { header("Authorization", it) }
             directoryHeader(directory)
             parameter("path", path)
-        }.body()
+        }
+        if (!response.status.isSuccess()) {
+            return emptyList()
+        }
+        return response.body()
     }
 
     // ============ Session Status ============
