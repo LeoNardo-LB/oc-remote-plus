@@ -171,20 +171,35 @@ class EventDispatcher @Inject constructor(
         messageHandler.replaceMessages(sessionId, messages)
 
     fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>) {
-        // Filter out Idle downgrades for sessions with incomplete assistant messages.
-        // REST polling may report idle during tool-call gaps, but the conversation
-        // is still active if messages are streaming.
-        val protectedStatuses = statuses.mapValues { (sessionId, status) ->
+        val protectedStatuses = statuses.toMutableMap()
+
+        // 1. Filter out explicit Idle downgrades for sessions with incomplete assistant messages.
+        //    REST may report idle during tool-call gaps, but the conversation
+        //    is still active if messages are streaming.
+        for ((sessionId, status) in statuses) {
             if (status is SessionStatus.Idle && hasIncompleteAssistant(sessionId)) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "Protecting session $sessionId from REST Idle (has incomplete messages)")
                 }
-                // Keep current status instead of downgrading
-                sessionHandler.sessionStatuses.value[sessionId] ?: status
-            } else {
-                status
+                protectedStatuses[sessionId] = sessionHandler.sessionStatuses.value[sessionId] ?: status
             }
         }
+
+        // 2. Protect busy sessions that are ABSENT from REST response.
+        //    Server deletes idle sessions from its status map, so absence ≠ confirmed idle.
+        //    A session running a long tool call (minutes) won't appear in REST,
+        //    but its incomplete assistant message proves it's still active.
+        val currentStatuses = sessionHandler.sessionStatuses.value
+        for ((sessionId, currentStatus) in currentStatuses) {
+            if (currentStatus !is SessionStatus.Idle && sessionId !in statuses && hasIncompleteAssistant(sessionId)) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Protecting absent session $sessionId from REST Idle (has incomplete messages, was ${currentStatus::class.simpleName})")
+                }
+                // Keep current busy status — don't let "absent from REST" downgrade it
+                protectedStatuses[sessionId] = currentStatus
+            }
+        }
+
         sessionHandler.updateAllSessionStatuses(protectedStatuses)
     }
 
