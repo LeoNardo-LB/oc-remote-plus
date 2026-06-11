@@ -183,7 +183,8 @@ fun ChatTopBar(
                                 cacheReadTokens = totalCacheReadTokens,
                                 cacheWriteTokens = totalCacheWriteTokens,
                                 totalCost = totalCost,
-                                contextWindow = contextWindow
+                                contextWindow = contextWindow,
+                                contextTokens = lastContextTokens
                             )
                             Spacer(Modifier.height(16.dp))
                             DialogButtons(

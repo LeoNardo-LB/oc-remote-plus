@@ -16,12 +16,7 @@ class TokenStatsTracker @Inject constructor() {
         val totalCacheWriteTokens: Int = 0,
         val contextWindow: Int = 0,
         val lastContextTokens: Int = 0,
-    ) {
-        /** All tokens consumed: input + output + reasoning + cacheRead + cacheWrite */
-        val allTokens: Int
-            get() = totalInputTokens + totalOutputTokens + totalReasoningTokens +
-                totalCacheReadTokens + totalCacheWriteTokens
-    }
+    )
 
     private val _stats = MutableStateFlow(TokenStats())
     val stats: StateFlow<TokenStats> = _stats

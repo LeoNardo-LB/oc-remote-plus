@@ -111,12 +111,7 @@ data class TokenStatsState(
     val totalCacheWriteTokens: Int = 0,
     val contextWindow: Int = 0,
     val lastContextTokens: Int = 0,
-) {
-    /** All tokens consumed: input + output + reasoning + cacheRead + cacheWrite */
-    val allTokens: Int
-        get() = totalInputTokens + totalOutputTokens + totalReasoningTokens +
-            totalCacheReadTokens + totalCacheWriteTokens
-}
+)
 
 /**
  * Split state: model/agent configuration and resolved selections.
