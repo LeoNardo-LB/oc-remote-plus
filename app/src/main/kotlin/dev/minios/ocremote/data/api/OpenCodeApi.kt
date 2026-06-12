@@ -949,6 +949,26 @@ class OpenCodeApi @Inject constructor(
         return response.status.isSuccess()
     }
 
+    // ============ MCP ============
+
+    suspend fun getMcpStatus(conn: ServerConnection): Map<String, McpStatusEntry> {
+        return httpClient.get("${conn.baseUrl}/mcp") {
+            conn.authHeader?.let { header("Authorization", it) }
+        }.body()
+    }
+
+    suspend fun connectMcpServer(conn: ServerConnection, name: String): Boolean {
+        return httpClient.post("${conn.baseUrl}/mcp/$name/connect") {
+            conn.authHeader?.let { header("Authorization", it) }
+        }.body()
+    }
+
+    suspend fun disconnectMcpServer(conn: ServerConnection, name: String): Boolean {
+        return httpClient.post("${conn.baseUrl}/mcp/$name/disconnect") {
+            conn.authHeader?.let { header("Authorization", it) }
+        }.body()
+    }
+
     // ============ Files ============
 
     suspend fun searchText(conn: ServerConnection, pattern: String): List<SearchMatch> {
