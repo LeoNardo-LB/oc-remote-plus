@@ -9,5 +9,6 @@ data class ServerConfigResponse(
     @SerialName("enabled_providers") val enabledProviders: List<String>? = null,
     val model: String? = null,
     @SerialName("small_model") val smallModel: String? = null,
-    @SerialName("default_agent") val defaultAgent: String? = null
+    @SerialName("default_agent") val defaultAgent: String? = null,
+    val mcp: Map<String, McpServerConfig>? = null
 )
