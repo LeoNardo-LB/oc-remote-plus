@@ -6,6 +6,7 @@ import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.repository.DraftRepository
+import dev.minios.ocremote.domain.repository.McpRepository
 import dev.minios.ocremote.domain.usecase.DeleteSessionUseCase
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
 import io.mockk.every
@@ -83,7 +84,8 @@ class SessionListViewModelPaginationTest {
             api = api,
             manageSessionUseCase = manageSessionUseCase,
             deleteSessionUseCase = deleteSessionUseCase,
-            draftRepository = mockk(relaxed = true)
+            draftRepository = mockk(relaxed = true),
+            mcpRepository = mockk(relaxed = true)
         )
     }
 }
