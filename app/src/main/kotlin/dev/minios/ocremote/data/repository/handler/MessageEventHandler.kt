@@ -23,6 +23,14 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     private val _messages = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
     val messages: StateFlow<Map<String, List<Message>>> = _messages.asStateFlow()
 
+    /**
+     * Tracks partIds that have received at least one SSE delta.
+     * Used to determine whether a new PartUpdated's text should be stripped:
+     * if we've seen deltas for this partId, it's an assistant streaming part,
+     * and the PartUpdated text is a full snapshot that would duplicate with deltas.
+     */
+    private val deltaTrackedPartIds = mutableSetOf<String>()
+
     private val _parts = MutableStateFlow<Map<String, List<Part>>>(emptyMap())
     val parts: StateFlow<Map<String, List<Part>>> = _parts.asStateFlow()
 
@@ -89,15 +97,13 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 messageParts[idx] = merged
             } else {
                 // New part arriving — decide whether to strip text.
-                // For ASSISTANT messages: strip non-empty text to prevent duplication when
-                // SSE deltas append later (the PartUpdated is a full snapshot that overlaps
-                // with incremental deltas). Deltas will re-accumulate from "", or REST sync
-                // will fill in the final text via mergePart.
-                // For USER messages: keep text as-is. User message parts arrive once as a
-                // complete snapshot — there are no subsequent deltas to recover the text.
-                val isAssistantPart = _messages.value.values.flatten()
-                    .any { it.id == messageId && it is Message.Assistant }
-                val partToAdd = if (isAssistantPart) {
+                // If this partId has received SSE deltas (tracked in deltaTrackedPartIds),
+                // it's a streaming assistant part — strip the full snapshot text to prevent
+                // duplication. Deltas have already accumulated the correct text.
+                // If no deltas seen, it's likely a user message part or a non-streaming part
+                // (e.g. tool call result) — keep text as-is.
+                val isStreamingPart = partId in deltaTrackedPartIds
+                val partToAdd = if (isStreamingPart) {
                     when (event.part) {
                         is Part.Text -> {
                             if (event.part.text.isNotEmpty()) {
@@ -191,6 +197,8 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
+        // Track this partId as having received deltas (for PartUpdated stripping logic)
+        deltaTrackedPartIds.add(event.partId)
         val thread = Thread.currentThread().id
         _parts.update { current ->
             val messageParts = current[event.messageId]?.toMutableList() ?: mutableListOf()
@@ -379,6 +387,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     fun clearAll() {
         _messages.value = emptyMap()
         _parts.value = emptyMap()
+        deltaTrackedPartIds.clear()
     }
 
     /**
