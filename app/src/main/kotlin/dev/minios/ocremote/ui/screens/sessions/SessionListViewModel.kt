@@ -17,9 +17,11 @@ import dev.minios.ocremote.data.repository.EventDispatcher
 import dev.minios.ocremote.domain.model.Project
 import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.domain.model.SessionStatus
+import dev.minios.ocremote.domain.model.McpServerStatus
+import dev.minios.ocremote.domain.repository.DraftRepository
+import dev.minios.ocremote.domain.repository.McpRepository
 import dev.minios.ocremote.domain.usecase.DeleteSessionUseCase
 import dev.minios.ocremote.domain.usecase.ManageSessionUseCase
-import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.ui.screens.sessions.components.TreeNode
 import dev.minios.ocremote.ui.screens.sessions.components.buildTreeNodes
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -71,7 +73,8 @@ class SessionListViewModel @Inject constructor(
     private val api: OpenCodeApi,
     private val manageSessionUseCase: ManageSessionUseCase,
     private val deleteSessionUseCase: DeleteSessionUseCase,
-    private val draftRepository: DraftRepository
+    private val draftRepository: DraftRepository,
+    private val mcpRepository: McpRepository
 ) : ViewModel() {
 
     companion object {
@@ -97,6 +100,8 @@ class SessionListViewModel @Inject constructor(
 
     private val conn = ServerConnection.from(serverUrl, username, password.ifEmpty { null })
 
+    init { mcpRepository.setConnection(conn) }
+
     private val _error = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(true)
     private val _projects = MutableStateFlow<List<Project>>(emptyList())
@@ -110,6 +115,18 @@ class SessionListViewModel @Inject constructor(
     private val _hasMorePages = MutableStateFlow(true)
     private val _isLoadingMore = MutableStateFlow(false)
     private val _showArchived = MutableStateFlow(false)
+
+    private val _mcpServers = MutableStateFlow<List<McpServerStatus>>(emptyList())
+    val mcpServers: StateFlow<List<McpServerStatus>> = _mcpServers.asStateFlow()
+
+    private val _mcpLoading = MutableStateFlow<String?>(null)
+    val mcpLoading: StateFlow<String?> = _mcpLoading.asStateFlow()
+
+    private val _mcpInitialLoading = MutableStateFlow(false)
+    val mcpInitialLoading: StateFlow<Boolean> = _mcpInitialLoading.asStateFlow()
+
+    private val _mcpError = MutableSharedFlow<String>()
+    val mcpError: SharedFlow<String> = _mcpError.asSharedFlow()
 
     val showArchived: Boolean get() = _showArchived.value
 
@@ -623,6 +640,37 @@ class SessionListViewModel @Inject constructor(
             true
         } catch (_: Exception) {
             false
+        }
+    }
+
+    fun loadMcpServers() {
+        viewModelScope.launch {
+            _mcpInitialLoading.value = true
+            mcpRepository.getMcpServers()
+                .onSuccess { _mcpServers.value = it }
+                .onFailure {
+                    _mcpError.emit(it.message ?: "Failed to load MCP servers")
+                }
+            _mcpInitialLoading.value = false
+        }
+    }
+
+    fun toggleMcpServer(name: String) {
+        if (_mcpLoading.value == name) return
+        val server = _mcpServers.value.find { it.name == name } ?: return
+        val connect = server.status != "connected"
+        _mcpLoading.value = name
+
+        viewModelScope.launch {
+            mcpRepository.toggleMcpServer(name, connect)
+                .onSuccess {
+                    mcpRepository.getMcpServers()
+                        .onSuccess { _mcpServers.value = it }
+                }
+                .onFailure {
+                    _mcpError.emit("Failed to ${if (connect) "connect" else "disconnect"} $name")
+                }
+            _mcpLoading.value = null
         }
     }
 }
