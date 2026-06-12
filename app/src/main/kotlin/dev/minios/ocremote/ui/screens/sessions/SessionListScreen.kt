@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,16 +89,12 @@ import dev.minios.ocremote.ui.screens.sessions.components.isAmoledTheme
 import dev.minios.ocremote.ui.screens.sessions.components.OpenProjectDialog
 import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.runtime.snapshotFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,7 +121,7 @@ fun SessionListScreen(
     var showOpenProject by remember { mutableStateOf(false) }
     var showBaseDirDialog by remember { mutableStateOf(false) }
 
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     // Preload MCP servers on screen entry — no loading delay when user swipes
     // to the MCP tab. Also caches error handling for the entire lifetime.
@@ -217,7 +214,7 @@ fun SessionListScreen(
             )
         },
         floatingActionButton = {
-            AnimatedVisibility(visible = pagerState.currentPage == 0) {
+            AnimatedVisibility(visible = selectedTab == 0) {
                 FloatingActionButton(
                     onClick = { showOpenProject = true },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -249,10 +246,8 @@ fun SessionListScreen(
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = pagerState.currentPage == 0,
-                    onClick = {
-                        scope.launch { pagerState.scrollToPage(0) }
-                    },
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
                     icon = {
                         Icon(
                             Icons.AutoMirrored.Filled.List,
@@ -268,10 +263,8 @@ fun SessionListScreen(
                     }
                 )
                 NavigationBarItem(
-                    selected = pagerState.currentPage == 1,
-                    onClick = {
-                        scope.launch { pagerState.animateScrollToPage(1) }
-                    },
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
                     icon = {
                         Icon(
                             Icons.Default.Settings,
@@ -289,11 +282,8 @@ fun SessionListScreen(
             }
         }
     ) { padding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.padding(padding)
-        ) { page ->
-            when (page) {
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            when (selectedTab) {
                 0 -> {
                     PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
@@ -308,7 +298,7 @@ fun SessionListScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
             ) {
-                AnimatedVisibility(visible = pagerState.currentPage == 0) {
+            AnimatedVisibility(visible = selectedTab == 0) {
                     OutlinedTextField(
                     value = searchInput,
                     onValueChange = { newQuery ->
