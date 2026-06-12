@@ -618,26 +618,17 @@ fun ChatScreen(
                     ChatInputBar(
                         textFieldValue = inputText,
                         onTextFieldValueChange = { newValue ->
-                            // Strip rich-text styles from paste: always use plain text
-                            val plainValue = if (newValue.composition != null || newValue.annotatedString.spanStyles.isNotEmpty()) {
-                                TextFieldValue(
-                                    text = newValue.text,
-                                    selection = newValue.selection
-                                )
-                            } else {
-                                newValue
-                            }
                             val wasEmpty = inputText.text.isEmpty()
-                            val shouldAutoShell = !isShellMode && plainValue.text.startsWith("!")
+                            val shouldAutoShell = !isShellMode && newValue.text.startsWith("!")
                             val normalizedValue = if (shouldAutoShell) {
-                                val stripped = plainValue.text.drop(1).trimStart()
-                                val newCursor = (plainValue.selection.start - 1).coerceAtLeast(0)
+                                val stripped = newValue.text.drop(1).trimStart()
+                                val newCursor = (newValue.selection.start - 1).coerceAtLeast(0)
                                 TextFieldValue(
                                     text = stripped,
                                     selection = TextRange(newCursor.coerceAtMost(stripped.length))
                                 )
                             } else {
-                                plainValue
+                                newValue
                             }
 
                             if (shouldAutoShell) {

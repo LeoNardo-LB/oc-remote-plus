@@ -26,6 +26,9 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     private val _parts = MutableStateFlow<Map<String, List<Part>>>(emptyMap())
     val parts: StateFlow<Map<String, List<Part>>> = _parts.asStateFlow()
 
+    /** Set of assistant message IDs for fast O(1) lookup in PartUpdated handler. */
+    private val assistantMessageIds = mutableSetOf<String>()
+
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
             is SseEvent.MessageUpdated -> { handleMessageUpdated(event); true }
@@ -55,6 +58,9 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 "${if (isUpdate) "UPDATE" else "NEW"} total=$total")
             current + (sessionId to sessionMessages)
         }
+        if (event.info is Message.Assistant) {
+            assistantMessageIds.add(event.info.id)
+        }
     }
 
     private fun handleMessageRemoved(event: SseEvent.MessageRemoved) {
@@ -63,6 +69,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             if (sessionMessages != null) current + (event.sessionId to sessionMessages) else current
         }
         _parts.update { it - event.messageId }
+        assistantMessageIds.remove(event.messageId)
     }
 
     private fun handleMessagePartUpdated(event: SseEvent.MessagePartUpdated) {
@@ -89,15 +96,10 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 messageParts[idx] = merged
             } else {
                 // New part arriving — strip text for assistant messages.
-                // Assistant Text/Reasoning parts are always followed by SSE deltas
-                // (the PartUpdated snapshot would overlap with delta content).
-                // User message parts: keep text as-is (no deltas follow).
-                //
-                // _messages.value is safe to read here because the server always
-                // sends message.updated before message.part.updated for the same
-                // message, and events are processed sequentially.
-                val isAssistantPart = _messages.value.values.flatten()
-                    .any { it.id == messageId && it is Message.Assistant }
+                // Uses assistantMessageIds set (populated by handleMessageUpdated
+                // and REST sync) for O(1) lookup. More reliable than StateFlow
+                // snapshot reads which may miss recently created messages.
+                val isAssistantPart = messageId in assistantMessageIds
                 val partToAdd = if (isAssistantPart) {
                     when (event.part) {
                         is Part.Text -> {
@@ -276,6 +278,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 .sortedBy { it.time.created }
             current + (sessionId to merged)
         }
+        newMessages.forEach { if (it.info is Message.Assistant) assistantMessageIds.add(it.info.id) }
         val partsMap = newMessages.associate { it.info.id to it.parts }
         _parts.update { current ->
             val merged = partsMap.mapValues { (messageId, incomingParts) ->
@@ -308,6 +311,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             val existingById = existing.associateBy { it.id }
             current + (sessionId to incoming.map { newMsg -> existingById[newMsg.id] ?: newMsg })
         }
+        newMessages.forEach { if (it.info is Message.Assistant) assistantMessageIds.add(it.info.id) }
         _parts.update { currentParts ->
             val existingKeys = currentParts.keys
             val newParts = newMessages
@@ -336,6 +340,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 .sortedBy { it.time.created }
             current + (sessionId to merged)
         }
+        newMessages.forEach { if (it.info is Message.Assistant) assistantMessageIds.add(it.info.id) }
         val partsMap = newMessages.associate { it.info.id to it.parts }
         _parts.update { current ->
             val merged = partsMap.mapValues { (messageId, incomingParts) ->
@@ -365,6 +370,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         val messageIds = _messages.value[sessionId]?.map { it.id }?.toSet() ?: emptySet()
         _messages.update { it - sessionId }
         _parts.update { it - messageIds }
+        assistantMessageIds.removeAll(messageIds)
     }
 
     fun clearForServer(sessionIds: Set<String>) {
@@ -373,11 +379,13 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             .map { it.id }.toSet()
         _messages.update { it - sessionIds }
         _parts.update { it - messageIds }
+        assistantMessageIds.removeAll(messageIds)
     }
 
     fun clearAll() {
         _messages.value = emptyMap()
         _parts.value = emptyMap()
+        assistantMessageIds.clear()
     }
 
     /**
