@@ -23,14 +23,6 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     private val _messages = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
     val messages: StateFlow<Map<String, List<Message>>> = _messages.asStateFlow()
 
-    /**
-     * Tracks partIds that have received at least one SSE delta.
-     * Used to determine whether a new PartUpdated's text should be stripped:
-     * if we've seen deltas for this partId, it's an assistant streaming part,
-     * and the PartUpdated text is a full snapshot that would duplicate with deltas.
-     */
-    private val deltaTrackedPartIds = mutableSetOf<String>()
-
     private val _parts = MutableStateFlow<Map<String, List<Part>>>(emptyMap())
     val parts: StateFlow<Map<String, List<Part>>> = _parts.asStateFlow()
 
@@ -96,14 +88,17 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 }
                 messageParts[idx] = merged
             } else {
-                // New part arriving — decide whether to strip text.
-                // If this partId has received SSE deltas (tracked in deltaTrackedPartIds),
-                // it's a streaming assistant part — strip the full snapshot text to prevent
-                // duplication. Deltas have already accumulated the correct text.
-                // If no deltas seen, it's likely a user message part or a non-streaming part
-                // (e.g. tool call result) — keep text as-is.
-                val isStreamingPart = partId in deltaTrackedPartIds
-                val partToAdd = if (isStreamingPart) {
+                // New part arriving — strip text for assistant messages.
+                // Assistant Text/Reasoning parts are always followed by SSE deltas
+                // (the PartUpdated snapshot would overlap with delta content).
+                // User message parts: keep text as-is (no deltas follow).
+                //
+                // _messages.value is safe to read here because the server always
+                // sends message.updated before message.part.updated for the same
+                // message, and events are processed sequentially.
+                val isAssistantPart = _messages.value.values.flatten()
+                    .any { it.id == messageId && it is Message.Assistant }
+                val partToAdd = if (isAssistantPart) {
                     when (event.part) {
                         is Part.Text -> {
                             if (event.part.text.isNotEmpty()) {
@@ -197,8 +192,6 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
-        // Track this partId as having received deltas (for PartUpdated stripping logic)
-        deltaTrackedPartIds.add(event.partId)
         val thread = Thread.currentThread().id
         _parts.update { current ->
             val messageParts = current[event.messageId]?.toMutableList() ?: mutableListOf()
@@ -207,25 +200,23 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                 val part = messageParts[idx]
                 val updated = when (part) {
                     is Part.Text -> {
+                        // === DELTA DEDUPLICATION: skip if already present ===
+                        // The server may send a delta that is already a suffix of
+                        // the existing text (e.g. sends the full accumulated text
+                        // as a delta instead of just the new characters). This is
+                        // a known server-side race condition (opencode#26924) where
+                        // message.part.delta can arrive before message.part.updated,
+                        // causing the delta content to overlap with the snapshot.
+                        // Rather than tracking external state, we simply skip
+                        // deltas whose content is already present — this is the
+                        // canonical deduplication pattern for streaming protocols.
+                        if (part.text.endsWith(event.delta)) {
+                            Log.w(TAG, "[PartDelta] t=$thread msg=${event.messageId.take(8)} " +
+                                "part=${event.partId.take(8)} SKIP: delta \"${event.delta.take(30)}\" " +
+                                "already at end of text len=${part.text.length}")
+                            return@update current
+                        }
                         val newText = part.text + event.delta
-                        // === DUPLICATION DETECTION ===
-                        // Check if delta is already present at the end of existing text
-                        if (part.text.isNotEmpty() && part.text.length >= event.delta.length
-                            && part.text.endsWith(event.delta)) {
-                            Log.e(TAG, "[DUPE] t=$thread msg=${event.messageId.take(8)} " +
-                                "part=${event.partId.take(8)} DELTA \"$event.delta\" " +
-                                "already at END of existing text len=${part.text.length}!")
-                        }
-                        // Check if the resulting text has the delta duplicated
-                        if (event.delta.isNotEmpty() && newText.length >= event.delta.length * 2) {
-                            val tail = newText.takeLast(event.delta.length * 2)
-                            val half = event.delta.length
-                            if (tail.take(half) == tail.takeLast(half)) {
-                                Log.e(TAG, "[DUPE] t=$thread msg=${event.messageId.take(8)} " +
-                                    "part=${event.partId.take(8)} RESULT text has duplicated " +
-                                    "suffix len=$half: \"${tail.take(30)}\"")
-                            }
-                        }
                         Log.d(TAG, "[PartDelta] t=$thread msg=${event.messageId.take(8)} " +
                             "part=${event.partId.take(8)} \"${part.text.length}\"+\"${event.delta.length}\"" +
                             "=\"${newText.length}\" delta=\"${event.delta.take(30)}\"")
@@ -387,7 +378,6 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     fun clearAll() {
         _messages.value = emptyMap()
         _parts.value = emptyMap()
-        deltaTrackedPartIds.clear()
     }
 
     /**
