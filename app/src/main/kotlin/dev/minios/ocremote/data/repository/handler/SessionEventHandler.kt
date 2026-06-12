@@ -163,41 +163,22 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     /**
      * Batch-update session statuses from REST data.
-     * Protective: won't downgrade Busy/Retry to Idle if SSE updated the status
-     * within [SSE_FRESH_THRESHOLD_MS] milliseconds ago.
+     * REST is the authoritative source — always overwrites local state.
+     * SSE freshness protection is NOT applied here because REST directly
+     * queries the server's in-memory status, which is the ground truth.
      *
-     * Also handles the case where the server deletes idle sessions from its status map:
-     * if a session is Busy/Retry in our local state but absent from REST response
-     * (meaning the server confirmed it idle and removed it), we set it to Idle
-     * after SSE-freshness protection expires.
+     * Sessions absent from REST response are NOT touched here — the caller
+     * (EventDispatcher.syncAllSessionStatuses) handles that logic.
      */
     fun updateAllSessionStatuses(statuses: Map<String, SessionStatus>) {
-        val now = System.currentTimeMillis()
-        val timestamps = _sseTimestamps.value
         _sessionStatuses.update { current ->
             val merged = current.toMutableMap()
-            // Update sessions that REST reported
             for ((sessionId, newStatus) in statuses) {
-                val existing = current[sessionId]
-                if (shouldOverwrite(existing, newStatus, timestamps[sessionId], now)) {
-                    merged[sessionId] = newStatus
-                }
-            }
-            // Clear Busy/Retry sessions absent from REST response — server deletes idle
-            // sessions from its status map, so their absence means "confirmed idle".
-            for ((sessionId, existing) in current) {
-                if (sessionId !in statuses && existing !is SessionStatus.Idle) {
-                    if (shouldOverwrite(existing, SessionStatus.Idle, timestamps[sessionId], now)) {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "Session $sessionId absent from REST, marking Idle (was ${existing::class.simpleName})")
-                        }
-                        merged[sessionId] = SessionStatus.Idle
-                    }
-                }
+                merged[sessionId] = newStatus
             }
             merged.toMap()
         }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Batch updated ${statuses.size} session statuses (protected)")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Batch updated ${statuses.size} session statuses")
     }
 
     /**

@@ -227,16 +227,6 @@ internal fun buildPromptParts(
     return parts
 }
 
-/** Rotating placeholder hints for the input bar, similar to the WebUI prompt input. */
-private val placeholderHintResIds = listOf(
-    R.string.chat_hint_ask,
-    R.string.chat_hint_fix,
-    R.string.chat_hint_refactor,
-    R.string.chat_hint_tests,
-    R.string.chat_hint_explain,
-    R.string.chat_hint_help,
-)
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ChatInputBar(
@@ -279,20 +269,6 @@ internal fun ChatInputBar(
     }
     val isAmoled = isAmoledTheme()
     val isShellMode = inputMode == ChatInputMode.SHELL
-    // Rotate placeholder hint every 4 seconds
-    val hintIndex = remember { mutableIntStateOf(0) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(4000)
-            hintIndex.intValue = (hintIndex.intValue + 1) % placeholderHintResIds.size
-        }
-    }
-    val placeholder = if (isShellMode) {
-        stringResource(R.string.chat_shell_placeholder)
-    } else {
-        stringResource(placeholderHintResIds[hintIndex.intValue])
-    }
-
     val text = textFieldValue.text
     val canSend = (text.isNotBlank() || attachments.isNotEmpty()) && !isSending && (!isShellMode || !isBusy)
 
@@ -478,15 +454,7 @@ internal fun ChatInputBar(
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             visualTransformation = visualTransformation,
                             decorationBox = { innerTextField ->
-                                // Always render placeholder to maintain stable measurement.
-                                // Alpha controls visibility without affecting layout.
                                 Box {
-                                    Text(
-                                        text = placeholder,
-                                        modifier = Modifier.alpha(if (text.isEmpty()) 1f else 0f),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                                    )
                                     innerTextField()
                                 }
                             }

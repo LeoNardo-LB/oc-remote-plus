@@ -170,37 +170,52 @@ class EventDispatcher @Inject constructor(
     fun replaceMessages(sessionId: String, messages: List<MessageWithParts>) =
         messageHandler.replaceMessages(sessionId, messages)
 
+    /**
+     * Batch-update session statuses from REST data.
+     *
+     * Trusts REST as the authoritative source: if REST says a session is idle,
+     * it IS idle. The server's in-memory status (`AgentCoordinator`) is the
+     * ground truth, and REST queries it directly. SSE idle events may be
+     * premature (tool-call gaps), but REST idle is never premature.
+     *
+     * When REST confirms idle for a session that was locally Busy, also
+     * force-complete any incomplete assistant messages — this handles the
+     * case where SSE completion events were lost (network glitch, reordering).
+     */
     fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>) {
-        val protectedStatuses = statuses.toMutableMap()
-
-        // 1. Filter out explicit Idle downgrades for sessions with incomplete assistant messages.
-        //    REST may report idle during tool-call gaps, but the conversation
-        //    is still active if messages are streaming.
+        // Fix incomplete messages for sessions confirmed idle by REST
         for ((sessionId, status) in statuses) {
             if (status is SessionStatus.Idle && hasIncompleteAssistant(sessionId)) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Protecting session $sessionId from REST Idle (has incomplete messages)")
+                    Log.d(TAG, "REST confirmed idle for $sessionId with incomplete messages — fixing")
                 }
-                protectedStatuses[sessionId] = sessionHandler.sessionStatuses.value[sessionId] ?: status
+                messageHandler.markSessionIdle(sessionId)
             }
         }
 
-        // 2. Protect busy sessions that are ABSENT from REST response.
-        //    Server deletes idle sessions from its status map, so absence ≠ confirmed idle.
-        //    A session running a long tool call (minutes) won't appear in REST,
-        //    but its incomplete assistant message proves it's still active.
+        // Also handle sessions absent from REST response.
+        // Server deletes idle sessions from its status map, so absence means idle.
+        // Only force-fix if there are no incomplete messages (otherwise SSE may still be streaming).
         val currentStatuses = sessionHandler.sessionStatuses.value
+        val mergedStatuses = statuses.toMutableMap()
         for ((sessionId, currentStatus) in currentStatuses) {
-            if (currentStatus !is SessionStatus.Idle && sessionId !in statuses && hasIncompleteAssistant(sessionId)) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Protecting absent session $sessionId from REST Idle (has incomplete messages, was ${currentStatus::class.simpleName})")
+            if (currentStatus !is SessionStatus.Idle && sessionId !in statuses) {
+                if (hasIncompleteAssistant(sessionId)) {
+                    // Incomplete messages — SSE may still be active. Keep current status.
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Protecting absent session $sessionId (has incomplete messages, was ${currentStatus::class.simpleName})")
+                    }
+                    mergedStatuses[sessionId] = currentStatus
+                } else {
+                    // No incomplete messages and absent from REST — confirmed idle
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Session $sessionId absent from REST, no incomplete messages — marking Idle")
+                    }
                 }
-                // Keep current busy status — don't let "absent from REST" downgrade it
-                protectedStatuses[sessionId] = currentStatus
             }
         }
 
-        sessionHandler.updateAllSessionStatuses(protectedStatuses)
+        sessionHandler.updateAllSessionStatuses(mergedStatuses)
     }
 
     fun removePermission(permissionId: String) =

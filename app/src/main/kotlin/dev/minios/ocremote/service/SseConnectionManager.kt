@@ -29,6 +29,7 @@ private const val RECONNECT_BASE_DELAY_MS = 1_000L
 private const val RECONNECT_MAX_DELAY_MS = 30_000L
 private const val RECONNECT_BACKOFF_FACTOR = 2.0
 private const val COOLDOWN_CHECK_INTERVAL_MS = 30_000L
+private const val STATUS_SYNC_INTERVAL_MS = 30_000L
 
 /**
  * Per-server connection state.
@@ -202,10 +203,14 @@ class SseConnectionManager @Inject constructor(
                 }
 
                 try {
+                    // Periodic status sync: correct stale Busy states from lost SSE events
+                    var statusSyncJob: Job? = null
+
                     sseClient.connectToGlobalEvents(conn)
                         .catch { error ->
                             Log.e(TAG, "[${server.displayName}] SSE stream error", error)
                             updateServerConnected(server.id, false)
+                            statusSyncJob?.cancel()
                             tracker.recordTimeout()
                             throw error
                         }
@@ -213,6 +218,9 @@ class SseConnectionManager @Inject constructor(
                             if (connections[server.id]?.isConnected != true) {
                                 updateServerConnected(server.id, true)
                                 attempt = 0
+                                // Start periodic REST status sync to catch lost SSE idle events
+                                statusSyncJob?.cancel()
+                                statusSyncJob = launchPeriodicStatusSync(server, conn)
                             }
                             tracker.recordSuccess()
                             // Dispatch to EventDispatcher for state updates
@@ -354,6 +362,26 @@ class SseConnectionManager @Inject constructor(
         } else {
             _connectedServerIds.update { it - serverId }
             _connectingServerIds.update { it + serverId }
+        }
+    }
+
+    /**
+     * Launch a coroutine that periodically syncs session statuses from REST API.
+     * This is a safety net for lost SSE idle events — if the server finishes a session
+     * but the SSE `session.idle` event is lost (network glitch, TCP buffer, etc.),
+     * the local status would remain Busy forever. This periodic REST check corrects that.
+     * The coroutine is cancelled when the SSE stream disconnects (parent job lifecycle).
+     */
+    private fun launchPeriodicStatusSync(server: ServerConfig, conn: ServerConnection): Job {
+        return scope.launch {
+            while (isActive) {
+                delay(STATUS_SYNC_INTERVAL_MS)
+                try {
+                    syncSessionStatuses(conn)
+                } catch (e: Exception) {
+                    Log.w(TAG, "[${server.displayName}] Periodic status sync failed: ${e.message}")
+                }
+            }
         }
     }
 
