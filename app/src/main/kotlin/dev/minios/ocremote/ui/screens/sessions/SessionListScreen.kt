@@ -91,6 +91,13 @@ import dev.minios.ocremote.ui.theme.ShapeTokens
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.runtime.snapshotFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +123,23 @@ fun SessionListScreen(
     var deleteSessionTitle by remember { mutableStateOf("") }
     var showOpenProject by remember { mutableStateOf(false) }
     var showBaseDirDialog by remember { mutableStateOf(false) }
+
+    val pagerState = rememberPagerState(pageCount = { 2 })
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }
+            .collect { page ->
+                if (page == 1) {
+                    viewModel.loadMcpServers()
+                }
+            }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.mcpError.collect { errorMessage ->
+            snackbarHostState.showSnackbar(errorMessage)
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -193,7 +217,8 @@ fun SessionListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            AnimatedVisibility(visible = pagerState.currentPage == 0) {
+                FloatingActionButton(
                     onClick = { showOpenProject = true },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = if (isAmoled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
@@ -219,14 +244,43 @@ fun SessionListScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = stringResource(R.string.sessions_new))
                 }
+            }
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = pagerState.currentPage == 0,
+                    onClick = {
+                        if (!pagerState.isScrollInProgress) {
+                            scope.launch { pagerState.animateScrollToPage(0) }
+                        }
+                    },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
+                    label = { Text("Sessions") }
+                )
+                NavigationBarItem(
+                    selected = pagerState.currentPage == 1,
+                    onClick = {
+                        if (!pagerState.isScrollInProgress) {
+                            scope.launch { pagerState.animateScrollToPage(1) }
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    label = { Text("Settings") }
+                )
+            }
         }
     ) { padding ->
-        PullToRefreshBox(
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.padding(padding)
+        ) { page ->
+            when (page) {
+                0 -> {
+                    PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = { viewModel.refreshSessions() },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier = Modifier.fillMaxSize()
         ) {
             // Search bar — always visible, independent of list state
             var searchInput by rememberSaveable { mutableStateOf("") }
@@ -236,7 +290,8 @@ fun SessionListScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
             ) {
-                OutlinedTextField(
+                AnimatedVisibility(visible = pagerState.currentPage == 0) {
+                    OutlinedTextField(
                     value = searchInput,
                     onValueChange = { newQuery ->
                         searchInput = newQuery
@@ -271,7 +326,8 @@ fun SessionListScreen(
                     } else {
                         OutlinedTextFieldDefaults.colors()
                     }
-                )
+                    )
+                }
 
                 when {
                     uiState.isLoading && uiState.treeNodes.isEmpty() && uiState.searchQuery.isNullOrBlank() -> {
@@ -409,6 +465,17 @@ fun SessionListScreen(
                     }
                 }
             }
+            }
+        }
+                }
+                1 -> {
+                    ServerSettingsContent(
+                        mcpServers = viewModel.mcpServers.collectAsStateWithLifecycle().value,
+                        mcpLoading = viewModel.mcpLoading.collectAsStateWithLifecycle().value,
+                        mcpInitialLoading = viewModel.mcpInitialLoading.collectAsStateWithLifecycle().value,
+                        onToggleMcp = viewModel::toggleMcpServer,
+                    )
+                }
             }
         }
     }
