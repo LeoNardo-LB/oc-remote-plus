@@ -152,11 +152,12 @@ data class McpServerStatus(
     val name: String,
     val type: String,         // "local" | "remote"
     val status: String,       // 5-state
-    val enabled: Boolean,     // from config
     val command: List<String>? = null,  // local type
     val url: String? = null,            // remote type
 )
 ```
+
+> 注：不包含 `enabled` 字段。UI 层直接依据 `status` 判断 Switch 状态（connected=开，其他=关），Toggle 操作也基于 status。config 中的 enabled 仅用于初始加载时决定是否显示，但运行时以 status 为准。
 
 **新增接口**: `domain/repository/McpRepository.kt`
 
@@ -173,17 +174,26 @@ interface McpRepository {
 
 ```kotlin
 @Serializable
-data class McpStatusResponse(
-    // Map<String, McpStatusEntry> — GET /mcp 返回
-)
-
-@Serializable
 data class McpStatusEntry(
-    val status: String
+    val status: String  // connected | disabled | failed | needs_auth | needs_client_registration
 )
 ```
 
-Config 层面：现有 `ServerConfigResponse` 需扩展 `mcp` 字段（`Map<String, McpServerConfig>`）。
+Config 层面：现有 `ServerConfigResponse` 需扩展 `mcp` 字段：
+
+```kotlin
+@Serializable
+data class McpServerConfig(
+    val type: String? = null,
+    val command: List<String>? = null,
+    val enabled: Boolean = true,
+    val url: String? = null,
+    val environment: Map<String, String>? = null,
+    val headers: Map<String, String>? = null
+)
+```
+
+GET /mcp 直接解析为 `Map<String, McpStatusEntry>`，不需要 McpStatusResponse 包装类。
 
 **扩展 API**: `data/api/OpenCodeApi.kt`
 
@@ -195,8 +205,13 @@ suspend fun disconnectMcpServer(name: String): Boolean
 
 **新增实现**: `data/repository/McpRepositoryImpl.kt`
 
+- 构造函数：`class McpRepositoryImpl @Inject constructor(private val api: OpenCodeApi)`
 - 合并 `GET /mcp` (status) + `GET /config` (config) → `List<McpServerStatus>`
 - `toggleMcpServer` 调 `connect`/`disconnect` API
+
+**DI 注册**: `di/DomainModule.kt`
+
+- 新增 `@Binds abstract fun bindMcpRepository(impl: McpRepositoryImpl): McpRepository`
 
 ### ViewModel
 
@@ -221,11 +236,22 @@ suspend fun disconnectMcpServer(name: String): Boolean
 **新增**: `ui/screens/sessions/ServerSettingsContent.kt`
 - Page 1 内容，LazyColumn + SectionHeader + McpServerRow 列表
 
+## Dependencies
+
+需要新增的 Gradle 依赖：
+
+```kotlin
+// HorizontalPager 位于此包中
+implementation("androidx.compose.foundation:foundation")
+```
+
+> 注：项目通过 Compose BOM 管理版本，无需指定具体版本号。
+
 ## Material 3 Components
 
 - `NavigationBar` + `NavigationBarItem` — 底部导航栏
 - `Switch` — MCP 启停开关
-- `HorizontalPager` — 页面切换（支持滑动）
+- `HorizontalPager`（`androidx.compose.foundation.pager`）— 页面切换（支持滑动）
 
 ## Key Decisions
 
@@ -234,21 +260,61 @@ suspend fun disconnectMcpServer(name: String): Boolean
 3. **不新建 ViewModel** — MCP 数据属于当前服务器连接，与 SessionList 共享上下文
 4. **`POST /mcp/:name/connect|disconnect`** — 与 OpenCode 官方一致，运行时操作
 5. **Toggle 后 `GET /mcp` 刷新** — 与 Web UI/TUI 一致，不依赖 SSE
-6. **不处理 `needs_auth`** — TUI 也不处理，Android 端暂不实现 OAuth
+6. **不处理 `needs_auth` / `needs_client_registration`** — TUI 也不处理，Android 端暂不实现 OAuth 及客户端注册流程。这两种状态下 Switch 显示为 disabled（不可操作），副标题显示黄色指示灯
 7. **不做乐观更新** — 等 POST 完成后 GET 真实状态
+8. **`GET /config` 获取 MCP 元信息** — 合并 status + config 为 `McpServerStatus`，一次进入 Page 1 时加载
+
+## Error Handling & Edge Cases
+
+### 网络错误
+- POST connect/disconnect 失败时：Switch 回弹到原位 + Snackbar 显示错误信息
+- 超时：使用 Ktor 默认超时配置
+- 并发防护：`toggleMcpServer` 方法入口 `if (mcpLoading.value == name) return`，Switch 在 loading 时 disabled
+
+### 服务器不支持 MCP API
+- GET /mcp 返回 404 时：NavigationBar 仍显示 2 个 Tab，Page 1 显示 "This server does not support MCP management" 提示文本
+
+### 空列表
+- GET /mcp 返回空 Map 时：SectionHeader 下显示 "No MCP servers configured" 空状态提示
+
+### 连接断开
+- SSE 连接断开时保持上次已知 MCP 状态；重新连接后自动刷新 MCP 列表
+
+## Acceptance Criteria
+
+### 导航栏
+- [ ] SessionListScreen 底部显示 NavigationBar，包含 2 个 Tab（Sessions、Settings）
+- [ ] 点击 Tab 或左右滑动可切换页面，NavigationBar 选中状态同步
+- [ ] 切换到 Settings Tab 时搜索栏和 FAB 平滑消失；切回 Sessions 时恢复
+- [ ] 进入 Chat 等子页面后 NavigationBar 消失
+
+### MCP 列表
+- [ ] 进入 Settings Tab 时加载 MCP 服务器列表，每个显示名称、类型、状态指示灯、Switch
+- [ ] 状态指示灯正确反映 5 种状态（绿=connected、灰=disabled、红=failed、黄=needs_auth/needs_client_registration）
+- [ ] needs_auth 和 needs_client_registration 状态下 Switch disabled
+- [ ] 无 MCP 服务器时显示空状态提示
+
+### MCP Toggle
+- [ ] 点击 Switch 切换 connected → disabled（POST disconnect）或 disabled/failed → connected（POST connect）
+- [ ] Toggle 过程中 Switch disabled，其他 MCP 服务器不受影响
+- [ ] Toggle 成功后列表刷新为最新状态
+- [ ] Toggle 失败时 Switch 回弹 + Snackbar 提示错误
+- [ ] 编译通过：`.\gradlew :app:compileDevDebugKotlin`
 
 ## Files to Modify/Create
 
 ### Modify
-- `app/src/main/kotlin/.../ui/screens/sessions/SessionListScreen.kt` — 添加 NavigationBar + HorizontalPager
-- `app/src/main/kotlin/.../ui/screens/sessions/SessionListViewModel.kt` — 添加 MCP 状态和操作
-- `app/src/main/kotlin/.../data/api/OpenCodeApi.kt` — 添加 MCP API 方法
-- `app/src/main/kotlin/.../data/dto/response/ConfigResponses.kt` — 扩展 mcp 配置字段
+- `app/build.gradle.kts` — 添加 `compose-foundation` 依赖
+- `app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListScreen.kt` — 添加 NavigationBar + HorizontalPager
+- `app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/SessionListViewModel.kt` — 添加 MCP 状态和操作
+- `app/src/main/kotlin/dev/minios/ocremote/data/api/OpenCodeApi.kt` — 添加 MCP API 方法
+- `app/src/main/kotlin/dev/minios/ocremote/data/dto/response/ConfigResponses.kt` — 扩展 mcp 配置字段
+- `app/src/main/kotlin/dev/minios/ocremote/di/DomainModule.kt` — 添加 McpRepository @Binds 绑定
 
 ### Create
-- `app/src/main/kotlin/.../domain/model/McpServerStatus.kt`
-- `app/src/main/kotlin/.../domain/repository/McpRepository.kt`
-- `app/src/main/kotlin/.../data/dto/response/McpResponses.kt`
-- `app/src/main/kotlin/.../data/repository/McpRepositoryImpl.kt`
-- `app/src/main/kotlin/.../ui/screens/sessions/ServerSettingsContent.kt`
-- `app/src/main/kotlin/.../ui/screens/sessions/components/McpServerRow.kt`
+- `app/src/main/kotlin/dev/minios/ocremote/domain/model/McpServerStatus.kt`
+- `app/src/main/kotlin/dev/minios/ocremote/domain/repository/McpRepository.kt`
+- `app/src/main/kotlin/dev/minios/ocremote/data/dto/response/McpResponses.kt`
+- `app/src/main/kotlin/dev/minios/ocremote/data/repository/McpRepositoryImpl.kt`
+- `app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/ServerSettingsContent.kt`
+- `app/src/main/kotlin/dev/minios/ocremote/ui/screens/sessions/components/McpServerRow.kt`
