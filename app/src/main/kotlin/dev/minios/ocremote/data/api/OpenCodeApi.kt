@@ -1031,7 +1031,7 @@ class OpenCodeApi @Inject constructor(
     }
 
     private fun HttpRequestBuilder.directoryHeader(directory: String?) {
-        directory?.let { header("x-opencode-directory", it) }
+        directory?.let { header("x-opencode-directory", URLEncoder.encode(it, "UTF-8")) }
     }
 }
 
