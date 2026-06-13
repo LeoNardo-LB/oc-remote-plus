@@ -124,6 +124,7 @@ fun SessionListScreen(
     var showBaseDirDialog by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(pageCount = { 2 })
+    val currentViewMode by viewModel.viewMode.collectAsStateWithLifecycle()
 
     // Preload MCP servers on screen entry — no loading delay when user swipes
     // to the MCP tab. Also caches error handling for the entire lifetime.
@@ -175,7 +176,6 @@ fun SessionListScreen(
                 },
                 actions = {
                     // View mode toggle: Folders ↔ Recent
-                    val currentViewMode by viewModel.viewMode.collectAsStateWithLifecycle()
                     TextButton(onClick = { viewModel.toggleViewMode() }) {
                         Text(
                             text = if (currentViewMode == SessionViewMode.FOLDER)
@@ -411,8 +411,10 @@ fun SessionListScreen(
                                     )
                                 }
                                 is TreeNode.Session -> {
+                                    val isRecentMode = currentViewMode == SessionViewMode.RECENT
                                     SessionRow(
                                         item = node.session,
+                                        showDirectory = isRecentMode,
                                         onClick = {
                                             onNavigateToChat(node.id, false)
                                         },

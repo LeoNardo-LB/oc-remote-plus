@@ -116,7 +116,7 @@ class SessionListViewModel @Inject constructor(
     private val _currentCursor = MutableStateFlow<String?>(null)
     private val _hasMorePages = MutableStateFlow(true)
     private val _isLoadingMore = MutableStateFlow(false)
-    private val _viewMode = MutableStateFlow(SessionViewMode.FOLDER)
+    private val _viewMode = MutableStateFlow(SessionViewMode.RECENT)
     val viewMode: StateFlow<SessionViewMode> = _viewMode.asStateFlow()
 
     private val _mcpServers = MutableStateFlow<List<McpServerStatus>>(emptyList())

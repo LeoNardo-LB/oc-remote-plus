@@ -64,6 +64,7 @@ internal fun SessionRow(
     onDelete: () -> Unit,
     onCopyId: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    showDirectory: Boolean = false,
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
     val addColor = DiffAdded
@@ -104,6 +105,20 @@ internal fun SessionRow(
                 softWrap = false,
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
             )
+
+            // Directory subtitle (shown in Recent mode)
+            if (showDirectory) {
+                val dir = item.session.directory.replace('\\', '/').trimEnd('/')
+                val lastSegment = dir.substringAfterLast('/')
+                Text(
+                    text = if (lastSegment.isNotEmpty()) lastSegment else dir,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
+                    softWrap = false,
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                )
+            }
+
             Spacer(modifier = Modifier.height(1.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
