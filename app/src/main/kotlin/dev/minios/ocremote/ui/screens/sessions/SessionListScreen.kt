@@ -151,10 +151,11 @@ fun SessionListScreen(
                             text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
                             style = MaterialTheme.typography.titleMedium,
                         )
-                        AnimatedVisibility(visible = uiState.baseDirectory != null) {
+                        val baseDir = uiState.baseDirectory
+                        if (baseDir != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = (uiState.baseDirectory ?: "").replace('\\', '/').trimEnd('/'),
+                                    text = baseDir.replace('\\', '/').trimEnd('/'),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -175,15 +176,17 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
-                    // View mode toggle: Folders ↔ Recent
-                    TextButton(onClick = { viewModel.toggleViewMode() }) {
-                        Text(
-                            text = if (currentViewMode == SessionViewMode.FOLDER)
-                                stringResource(R.string.sessions_view_folders)
-                            else
-                                stringResource(R.string.sessions_view_recent),
-                            style = MaterialTheme.typography.labelMedium
-                        )
+                    // View mode toggle: only show on sessions page (page 0)
+                    if (pagerState.currentPage == 0) {
+                        TextButton(onClick = { viewModel.toggleViewMode() }) {
+                            Text(
+                                text = if (currentViewMode == SessionViewMode.FOLDER)
+                                    stringResource(R.string.sessions_view_folders)
+                                else
+                                    stringResource(R.string.sessions_view_recent),
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
                     }
                 },
             )
@@ -284,7 +287,6 @@ fun SessionListScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
             ) {
-            AnimatedVisibility(visible = pagerState.currentPage == 0) {
                     OutlinedTextField(
                     value = searchInput,
                     onValueChange = { newQuery ->
@@ -321,7 +323,6 @@ fun SessionListScreen(
                         OutlinedTextFieldDefaults.colors()
                     }
                     )
-                }
 
                 when {
                     uiState.isLoading && uiState.treeNodes.isEmpty() && uiState.searchQuery.isNullOrBlank() -> {
