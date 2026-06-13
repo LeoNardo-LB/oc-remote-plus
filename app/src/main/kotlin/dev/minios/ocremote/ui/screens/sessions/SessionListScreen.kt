@@ -175,9 +175,10 @@ fun SessionListScreen(
                 },
                 actions = {
                     // View mode toggle: Folders ↔ Recent
+                    val currentViewMode by viewModel.viewMode.collectAsStateWithLifecycle()
                     TextButton(onClick = { viewModel.toggleViewMode() }) {
                         Text(
-                            text = if (viewModel.viewMode == SessionViewMode.FOLDER)
+                            text = if (currentViewMode == SessionViewMode.FOLDER)
                                 stringResource(R.string.sessions_view_folders)
                             else
                                 stringResource(R.string.sessions_view_recent),

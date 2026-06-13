@@ -117,6 +117,7 @@ class SessionListViewModel @Inject constructor(
     private val _hasMorePages = MutableStateFlow(true)
     private val _isLoadingMore = MutableStateFlow(false)
     private val _viewMode = MutableStateFlow(SessionViewMode.FOLDER)
+    val viewMode: StateFlow<SessionViewMode> = _viewMode.asStateFlow()
 
     private val _mcpServers = MutableStateFlow<List<McpServerStatus>>(emptyList())
     val mcpServers: StateFlow<List<McpServerStatus>> = _mcpServers.asStateFlow()
@@ -129,8 +130,6 @@ class SessionListViewModel @Inject constructor(
 
     private val _mcpError = MutableSharedFlow<String>()
     val mcpError: SharedFlow<String> = _mcpError.asSharedFlow()
-
-    val viewMode: SessionViewMode get() = _viewMode.value
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
