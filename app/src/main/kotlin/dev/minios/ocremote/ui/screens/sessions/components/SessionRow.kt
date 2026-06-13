@@ -80,7 +80,7 @@ internal fun SessionRow(
                 onClick = onClick,
                 onLongClick = { showDetailsDialog = true },
             )
-            .padding(start = 28.dp, end = 8.dp)
+            .padding(start = if (showDirectory) 12.dp else 28.dp, end = 8.dp)
             .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
