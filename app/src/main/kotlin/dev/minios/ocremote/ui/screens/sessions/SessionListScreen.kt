@@ -91,6 +91,10 @@ import dev.minios.ocremote.ui.theme.AlphaTokens
 import dev.minios.ocremote.ui.theme.ShapeTokens
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.NavigationBar
@@ -121,7 +125,7 @@ fun SessionListScreen(
     var showOpenProject by remember { mutableStateOf(false) }
     var showBaseDirDialog by remember { mutableStateOf(false) }
 
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(pageCount = { 2 })
 
     // Preload MCP servers on screen entry — no loading delay when user swipes
     // to the MCP tab. Also caches error handling for the entire lifetime.
@@ -214,7 +218,7 @@ fun SessionListScreen(
             )
         },
         floatingActionButton = {
-            AnimatedVisibility(visible = selectedTab == 0) {
+            AnimatedVisibility(visible = pagerState.currentPage == 0) {
                 FloatingActionButton(
                     onClick = { showOpenProject = true },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -246,8 +250,10 @@ fun SessionListScreen(
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    selected = pagerState.currentPage == 0,
+                    onClick = {
+                        scope.launch { pagerState.scrollToPage(0) }
+                    },
                     icon = {
                         Icon(
                             Icons.AutoMirrored.Filled.List,
@@ -263,8 +269,10 @@ fun SessionListScreen(
                     }
                 )
                 NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    selected = pagerState.currentPage == 1,
+                    onClick = {
+                        scope.launch { pagerState.scrollToPage(1) }
+                    },
                     icon = {
                         Icon(
                             Icons.Default.Settings,
@@ -274,7 +282,7 @@ fun SessionListScreen(
                     },
                     label = {
                         Text(
-                            stringResource(R.string.nav_tab_mcp),
+                            stringResource(R.string.settings_title),
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -282,8 +290,15 @@ fun SessionListScreen(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            when (selectedTab) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.padding(padding),
+            flingBehavior = PagerDefaults.flingBehavior(
+                state = pagerState,
+                pagerSnapDistance = PagerSnapDistance.atMost(0)
+            ),
+        ) { page ->
+            when (page) {
                 0 -> {
                     PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
@@ -298,7 +313,7 @@ fun SessionListScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
             ) {
-            AnimatedVisibility(visible = selectedTab == 0) {
+            AnimatedVisibility(visible = pagerState.currentPage == 0) {
                     OutlinedTextField(
                     value = searchInput,
                     onValueChange = { newQuery ->

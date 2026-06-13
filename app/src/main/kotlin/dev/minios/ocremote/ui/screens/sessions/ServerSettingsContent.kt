@@ -1,14 +1,29 @@
 package dev.minios.ocremote.ui.screens.sessions
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -16,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.McpServerStatus
 import dev.minios.ocremote.ui.screens.sessions.components.McpServerRow
+import dev.minios.ocremote.ui.theme.AlphaTokens
 
 @Composable
 fun ServerSettingsContent(
@@ -25,55 +41,86 @@ fun ServerSettingsContent(
     modifier: Modifier = Modifier,
     onToggleMcp: (name: String) -> Unit = {},
 ) {
+    var mcpExpanded by remember { mutableStateOf(false) }
+
     LazyColumn(modifier = modifier.fillMaxSize()) {
+        // Section: MCP Servers
         item {
-            Text(
-                text = stringResource(R.string.mcp_servers_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { mcpExpanded = !mcpExpanded }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.mcp_servers_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = if (mcpExpanded) Icons.Default.KeyboardArrowDown
+                                  else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        item {
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT)
             )
         }
 
-        when {
-            mcpInitialLoading && mcpServers.isEmpty() -> {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+        item {
+            AnimatedVisibility(visible = mcpExpanded) {
+                LazyColumn {
+                when {
+                    mcpInitialLoading && mcpServers.isEmpty() -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                            }
+                        }
+                    }
+                    mcpServers.isEmpty() -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.mcp_no_servers),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        items(count = mcpServers.size, key = { mcpServers[it].name }) { index ->
+                            val server = mcpServers[index]
+                            McpServerRow(
+                                server = server,
+                                isLoading = mcpLoading == server.name,
+                                onToggle = { onToggleMcp(server.name) }
+                            )
+                        }
                     }
                 }
             }
-            mcpServers.isEmpty() -> {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.mcp_no_servers),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            else -> {
-                items(count = mcpServers.size, key = { mcpServers[it].name }) { index ->
-                    val server = mcpServers[index]
-                    McpServerRow(
-                        server = server,
-                        isLoading = mcpLoading == server.name,
-                        onToggle = { onToggleMcp(server.name) }
-                    )
-                }
-            }
+        }
         }
     }
 }
