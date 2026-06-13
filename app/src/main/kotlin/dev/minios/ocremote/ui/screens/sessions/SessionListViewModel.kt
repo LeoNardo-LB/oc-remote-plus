@@ -70,7 +70,7 @@ data class SessionItem(
 
 @HiltViewModel
 class SessionListViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val eventDispatcher: EventDispatcher,
     private val api: OpenCodeApi,
     private val manageSessionUseCase: ManageSessionUseCase,
@@ -116,7 +116,11 @@ class SessionListViewModel @Inject constructor(
     private val _currentCursor = MutableStateFlow<String?>(null)
     private val _hasMorePages = MutableStateFlow(true)
     private val _isLoadingMore = MutableStateFlow(false)
-    private val _viewMode = MutableStateFlow(SessionViewMode.RECENT)
+    private val _viewMode = MutableStateFlow(
+        savedStateHandle.get<String>("viewMode")?.let {
+            runCatching { SessionViewMode.valueOf(it) }.getOrNull()
+        } ?: SessionViewMode.RECENT
+    )
     val viewMode: StateFlow<SessionViewMode> = _viewMode.asStateFlow()
 
     private val _mcpServers = MutableStateFlow<List<McpServerStatus>>(emptyList())
@@ -488,6 +492,7 @@ class SessionListViewModel @Inject constructor(
 
     fun toggleViewMode() {
         _viewMode.value = if (_viewMode.value == SessionViewMode.FOLDER) SessionViewMode.RECENT else SessionViewMode.FOLDER
+        savedStateHandle["viewMode"] = _viewMode.value.name
     }
 
     /**
