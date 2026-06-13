@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,7 +63,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.filled.Search
 import dev.minios.ocremote.ui.components.amoledOutlinedTextFieldColors
@@ -146,29 +146,10 @@ fun SessionListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column(modifier = Modifier.clickable { showBaseDirDialog = true }) {
-                        Text(
-                            text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        val baseDir = uiState.baseDirectory
-                        if (baseDir != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = baseDir.replace('\\', '/').trimEnd('/'),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = stringResource(R.string.a11y_icon_navigate_forward),
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = uiState.serverName.ifEmpty { stringResource(R.string.sessions_title) },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -176,50 +157,52 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
-                    // View mode toggle: only show on sessions page (page 0)
+                    // Overflow menu: only on sessions page (page 0)
                     if (pagerState.currentPage == 0) {
-                        TextButton(onClick = { viewModel.toggleViewMode() }) {
-                            Text(
-                                text = if (currentViewMode == SessionViewMode.FOLDER)
-                                    stringResource(R.string.sessions_view_folders)
-                                else
-                                    stringResource(R.string.sessions_view_recent),
-                                style = MaterialTheme.typography.labelMedium
-                            )
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.a11y_icon_more_options),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.sessions_view_recent)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        if (currentViewMode != SessionViewMode.RECENT) {
+                                            viewModel.toggleViewMode()
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.sessions_view_folders)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        if (currentViewMode != SessionViewMode.FOLDER) {
+                                            viewModel.toggleViewMode()
+                                        }
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.sessions_new)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showOpenProject = true
+                                    }
+                                )
+                            }
                         }
                     }
                 },
             )
-        },
-        floatingActionButton = {
-            AnimatedVisibility(visible = pagerState.currentPage == 0) {
-                FloatingActionButton(
-                    onClick = { showOpenProject = true },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (isAmoled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
-                    elevation = if (isAmoled) {
-                        FloatingActionButtonDefaults.elevation(
-                            defaultElevation = 0.dp,
-                            pressedElevation = 0.dp,
-                            focusedElevation = 0.dp,
-                            hoveredElevation = 0.dp
-                        )
-                    } else {
-                        FloatingActionButtonDefaults.elevation()
-                    },
-                    modifier = if (isAmoled) {
-                        Modifier.border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM),
-                            shape = FloatingActionButtonDefaults.shape
-                        )
-                    } else {
-                        Modifier
-                    }
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.sessions_new))
-                }
-            }
         },
         bottomBar = {
             NavigationBar(

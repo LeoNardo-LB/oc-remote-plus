@@ -109,9 +109,8 @@ internal fun SessionRow(
             // Directory subtitle (shown in Recent mode)
             if (showDirectory) {
                 val dir = item.session.directory.replace('\\', '/').trimEnd('/')
-                val lastSegment = dir.substringAfterLast('/')
                 Text(
-                    text = if (lastSegment.isNotEmpty()) lastSegment else dir,
+                    text = dir,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED),
                     softWrap = false,
