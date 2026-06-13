@@ -222,7 +222,9 @@ fun SessionListScreen(
             }
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                modifier = Modifier.height(56.dp),
+            ) {
                 NavigationBarItem(
                     selected = pagerState.currentPage == 0,
                     onClick = {
