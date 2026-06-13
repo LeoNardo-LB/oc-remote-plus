@@ -623,8 +623,8 @@
     <string name="a11y_icon_remove_from_list">リストから削除</string>
     <string name="a11y_icon_scroll_to_top">上にスクロール</string>
     <string name="a11y_icon_hide_keyboard">キーボード非表示</string>
-    <string name="sessions_filter_all">すべて</string>
-    <string name="sessions_filter_archived">アーカイブ</string>
+    <string name="sessions_view_folders">フォルダ</string>
+    <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">検索をクリア</string>
     <string name="terminal_new_tab">新規</string>
     <string name="terminal_keyboard">キーボード</string>

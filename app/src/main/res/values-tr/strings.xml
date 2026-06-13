@@ -623,8 +623,8 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Listeden kaldır</string>
     <string name="a11y_icon_scroll_to_top">Üste kaydır</string>
     <string name="a11y_icon_hide_keyboard">Klavyeyi gizle</string>
-    <string name="sessions_filter_all">Tümü</string>
-    <string name="sessions_filter_archived">Arşiv</string>
+    <string name="sessions_view_folders">Klasörler</string>
+    <string name="sessions_view_recent">Son</string>
     <string name="sessions_clear_search">Aramayı temizle</string>
     <string name="terminal_new_tab">Yeni</string>
     <string name="terminal_keyboard">Klavye</string>

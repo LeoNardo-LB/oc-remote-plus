@@ -623,8 +623,8 @@
     <string name="a11y_icon_remove_from_list">목록에서 제거</string>
     <string name="a11y_icon_scroll_to_top">위로 스크롤</string>
     <string name="a11y_icon_hide_keyboard">키보드 숨기기</string>
-    <string name="sessions_filter_all">전체</string>
-    <string name="sessions_filter_archived">아카이브</string>
+    <string name="sessions_view_folders">폴더</string>
+    <string name="sessions_view_recent">최근</string>
     <string name="sessions_clear_search">검색 지우기</string>
     <string name="terminal_new_tab">새 탭</string>
     <string name="terminal_keyboard">키보드</string>

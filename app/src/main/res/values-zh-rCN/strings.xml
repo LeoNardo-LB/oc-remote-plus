@@ -626,8 +626,8 @@
     <string name="a11y_icon_remove_from_list">从列表中移除</string>
     <string name="a11y_icon_scroll_to_top">滚动到顶部</string>
     <string name="a11y_icon_hide_keyboard">隐藏键盘</string>
-    <string name="sessions_filter_all">全部</string>
-    <string name="sessions_filter_archived">已归档</string>
+    <string name="sessions_view_folders">文件夹</string>
+    <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">清除搜索</string>
     <string name="terminal_new_tab">新建</string>
     <string name="terminal_keyboard">键盘</string>

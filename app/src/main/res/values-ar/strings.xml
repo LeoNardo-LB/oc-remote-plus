@@ -623,8 +623,8 @@
     <string name="a11y_icon_remove_from_list">إزالة من القائمة</string>
     <string name="a11y_icon_scroll_to_top">التمرير للأعلى</string>
     <string name="a11y_icon_hide_keyboard">إخفاء لوحة المفاتيح</string>
-    <string name="sessions_filter_all">الكل</string>
-    <string name="sessions_filter_archived">مأرشف</string>
+    <string name="sessions_view_folders">المجلدات</string>
+    <string name="sessions_view_recent">الأحدث</string>
     <string name="sessions_clear_search">مسح البحث</string>
     <string name="terminal_new_tab">جديد</string>
     <string name="terminal_keyboard">لوحة المفاتيح</string>

@@ -624,8 +624,8 @@
     <string name="a11y_icon_remove_from_list">Удалить из списка</string>
     <string name="a11y_icon_scroll_to_top">Прокрутить наверх</string>
     <string name="a11y_icon_hide_keyboard">Скрыть клавиатуру</string>
-    <string name="sessions_filter_all">Все</string>
-    <string name="sessions_filter_archived">Архив</string>
+    <string name="sessions_view_folders">Папки</string>
+    <string name="sessions_view_recent">Недавние</string>
     <string name="sessions_clear_search">Очистить поиск</string>
     <string name="terminal_new_tab">Новая</string>
     <string name="terminal_keyboard">Клавиатура</string>

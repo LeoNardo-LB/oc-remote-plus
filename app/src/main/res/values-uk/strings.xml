@@ -623,8 +623,8 @@
     <string name="a11y_icon_remove_from_list">Видалити зі списку</string>
     <string name="a11y_icon_scroll_to_top">Прокрутити вгору</string>
     <string name="a11y_icon_hide_keyboard">Приховати клавіатуру</string>
-    <string name="sessions_filter_all">Всі</string>
-    <string name="sessions_filter_archived">Архів</string>
+    <string name="sessions_view_folders">Папки</string>
+    <string name="sessions_view_recent">Нещодавні</string>
     <string name="sessions_clear_search">Очистити пошук</string>
     <string name="terminal_new_tab">Нова</string>
     <string name="terminal_keyboard">Клавіатура</string>

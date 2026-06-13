@@ -629,8 +629,8 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Hapus dari daftar</string>
     <string name="a11y_icon_scroll_to_top">Gulir ke atas</string>
     <string name="a11y_icon_hide_keyboard">Sembunyikan keyboard</string>
-    <string name="sessions_filter_all">Semua</string>
-    <string name="sessions_filter_archived">Diarsipkan</string>
+    <string name="sessions_view_folders">Folder</string>
+    <string name="sessions_view_recent">Terbaru</string>
     <string name="sessions_clear_search">Hapus pencarian</string>
     <string name="terminal_new_tab">Baru</string>
     <string name="terminal_keyboard">Keyboard</string>
