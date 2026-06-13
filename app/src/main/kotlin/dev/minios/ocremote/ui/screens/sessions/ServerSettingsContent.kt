@@ -1,8 +1,11 @@
 package dev.minios.ocremote.ui.screens.sessions
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +47,7 @@ fun ServerSettingsContent(
     var mcpExpanded by remember { mutableStateOf(false) }
 
     LazyColumn(modifier = modifier.fillMaxSize()) {
-        // Section: MCP Servers
+        // Section header: MCP Servers
         item {
             Row(
                 modifier = Modifier
@@ -76,27 +79,29 @@ fun ServerSettingsContent(
             )
         }
 
+        // Expandable MCP content — use Column, NOT nested LazyColumn
         item {
-            AnimatedVisibility(visible = mcpExpanded) {
-                LazyColumn {
-                when {
-                    mcpInitialLoading && mcpServers.isEmpty() -> {
-                        item {
+            AnimatedVisibility(
+                visible = mcpExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    when {
+                        mcpInitialLoading && mcpServers.isEmpty() -> {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .fillMaxWidth()
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.size(32.dp))
                             }
                         }
-                    }
-                    mcpServers.isEmpty() -> {
-                        item {
+                        mcpServers.isEmpty() -> {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .fillMaxWidth()
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -107,20 +112,18 @@ fun ServerSettingsContent(
                                 )
                             }
                         }
-                    }
-                    else -> {
-                        items(count = mcpServers.size, key = { mcpServers[it].name }) { index ->
-                            val server = mcpServers[index]
-                            McpServerRow(
-                                server = server,
-                                isLoading = mcpLoading == server.name,
-                                onToggle = { onToggleMcp(server.name) }
-                            )
+                        else -> {
+                            mcpServers.forEach { server ->
+                                McpServerRow(
+                                    server = server,
+                                    isLoading = mcpLoading == server.name,
+                                    onToggle = { onToggleMcp(server.name) }
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
         }
     }
 }
