@@ -46,6 +46,8 @@ import javax.inject.Inject
 
 private const val TAG = "SessionListViewModel"
 
+enum class SessionViewMode { FOLDER, RECENT }
+
 data class SessionListUiState(
     val treeNodes: List<TreeNode> = emptyList(),
     val serverName: String = "",
@@ -114,7 +116,7 @@ class SessionListViewModel @Inject constructor(
     private val _currentCursor = MutableStateFlow<String?>(null)
     private val _hasMorePages = MutableStateFlow(true)
     private val _isLoadingMore = MutableStateFlow(false)
-    private val _showArchived = MutableStateFlow(false)
+    private val _viewMode = MutableStateFlow(SessionViewMode.FOLDER)
 
     private val _mcpServers = MutableStateFlow<List<McpServerStatus>>(emptyList())
     val mcpServers: StateFlow<List<McpServerStatus>> = _mcpServers.asStateFlow()
@@ -128,7 +130,7 @@ class SessionListViewModel @Inject constructor(
     private val _mcpError = MutableSharedFlow<String>()
     val mcpError: SharedFlow<String> = _mcpError.asSharedFlow()
 
-    val showArchived: Boolean get() = _showArchived.value
+    val viewMode: SessionViewMode get() = _viewMode.value
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
@@ -145,7 +147,7 @@ class SessionListViewModel @Inject constructor(
         _isRefreshing,
         _lastToggledDirectory,
         _searchQuery,
-        _showArchived
+        _viewMode
     ) { values ->
         val allSessions = values[0] as List<Session>
         val statuses = values[1] as Map<String, SessionStatus>
@@ -160,15 +162,12 @@ class SessionListViewModel @Inject constructor(
         val isRefreshing = values[10] as Boolean
         val lastToggledDirectory = values[11] as String?
         val searchQuery = values[12] as String?
-        val showArchived = values[13] as Boolean
+        val viewMode = values[13] as SessionViewMode
 
         val serverSessionIds = serverSessionMap[serverId].orEmpty()
 
         val filteredSessions = allSessions
             .filter { it.id in serverSessionIds && it.parentId == null }
-            .let { sessions ->
-                if (showArchived) sessions.filter { it.isArchived } else sessions
-            }
             .sortedByDescending { session ->
                 lastUserMessageTime[session.id] ?: session.time.updated
             }
@@ -193,7 +192,21 @@ class SessionListViewModel @Inject constructor(
             baseFilteredSessions
         }
 
-        val treeNodes = buildTreeNodes(searchedSessions, expandedPaths, baseDirectory, statuses, draftRepository.getDraftSessionIds())
+        val treeNodes = if (viewMode == SessionViewMode.RECENT) {
+            // Recent mode: flat list of sessions sorted by update time, no directory grouping
+            searchedSessions.map { session ->
+                TreeNode.Session(
+                    id = session.id,
+                    session = SessionItem(
+                        session = session,
+                        status = statuses[session.id] ?: SessionStatus.Idle,
+                        hasDraft = session.id in draftRepository.getDraftSessionIds()
+                    )
+                )
+            }
+        } else {
+            buildTreeNodes(searchedSessions, expandedPaths, baseDirectory, statuses, draftRepository.getDraftSessionIds())
+        }
 
         val prefillDirectory = if (lastToggledDirectory != null && lastToggledDirectory in expandedPaths)
             lastToggledDirectory
@@ -474,9 +487,8 @@ class SessionListViewModel @Inject constructor(
         }
     }
 
-    fun toggleArchivedFilter() {
-        _showArchived.value = !_showArchived.value
-        loadSessions()
+    fun toggleViewMode() {
+        _viewMode.value = if (_viewMode.value == SessionViewMode.FOLDER) SessionViewMode.RECENT else SessionViewMode.FOLDER
     }
 
     /**

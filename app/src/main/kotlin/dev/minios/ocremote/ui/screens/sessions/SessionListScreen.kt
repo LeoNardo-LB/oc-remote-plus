@@ -65,8 +65,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.filled.Search
@@ -176,43 +174,15 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
-                    // All/Archived dropdown toggle — right-aligned in top bar
-                    var filterExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        TextButton(onClick = { filterExpanded = true }) {
-                            Text(
-                                text = if (viewModel.showArchived) "Archived" else "All",
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                contentDescription = stringResource(R.string.a11y_icon_navigate_forward),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = filterExpanded,
-                            onDismissRequest = { filterExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.sessions_filter_all)) },
-                                onClick = {
-                                    filterExpanded = false
-                                    if (viewModel.showArchived) {
-                                        viewModel.toggleArchivedFilter()
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.sessions_filter_archived)) },
-                                onClick = {
-                                    filterExpanded = false
-                                    if (!viewModel.showArchived) {
-                                        viewModel.toggleArchivedFilter()
-                                    }
-                                }
-                            )
-                        }
+                    // View mode toggle: Folders ↔ Recent
+                    TextButton(onClick = { viewModel.toggleViewMode() }) {
+                        Text(
+                            text = if (viewModel.viewMode == SessionViewMode.FOLDER)
+                                stringResource(R.string.sessions_view_folders)
+                            else
+                                stringResource(R.string.sessions_view_recent),
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
                 },
             )

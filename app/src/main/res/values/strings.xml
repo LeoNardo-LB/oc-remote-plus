@@ -667,9 +667,9 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_scroll_to_top">Scroll to top</string>
     <string name="a11y_icon_hide_keyboard">Hide keyboard</string>
 
-    <!-- Session List filter tabs -->
-    <string name="sessions_filter_all">All</string>
-    <string name="sessions_filter_archived">Archived</string>
+    <!-- Session List view mode toggle -->
+    <string name="sessions_view_folders">Folders</string>
+    <string name="sessions_view_recent">Recent</string>
     <string name="sessions_clear_search">Clear search</string>
 
     <!-- Terminal tabs -->
