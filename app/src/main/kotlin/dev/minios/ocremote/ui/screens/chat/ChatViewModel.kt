@@ -18,6 +18,7 @@ import dev.minios.ocremote.domain.model.ModelSelection
 import dev.minios.ocremote.domain.model.PromptPart
 import dev.minios.ocremote.domain.model.ProviderCatalog
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
+import dev.minios.ocremote.data.repository.SessionStatusManager
 import dev.minios.ocremote.ui.navigation.routes.ChatNav
 import dev.minios.ocremote.ui.screens.chat.tools.ToolCardResolver
 import dev.minios.ocremote.domain.model.Draft
@@ -227,6 +228,7 @@ class ChatViewModel @Inject constructor(
     private val tokenStatsTracker: TokenStatsTracker,
     private val httpClient: io.ktor.client.HttpClient,
     private val sseClient: SseClient,
+    private val sessionStatusManager: SessionStatusManager,
 ) : ViewModel() {
 
     // ============ Loading & Error State ============
@@ -272,6 +274,7 @@ class ChatViewModel @Inject constructor(
     val sessionId: String get() = _sessionId.value
 
     init {
+        sessionStatusManager.setServerId(serverId)
     }
 
     private val _allProviders = MutableStateFlow<List<ProviderCatalog>>(emptyList())
@@ -563,6 +566,7 @@ class ChatViewModel @Inject constructor(
             _isLoadingOlder,
             _toolExpandedStates,
             _pendingMessageIds,
+            sessionStatusManager.statusFlow,
         ) { args ->
             @Suppress("UNCHECKED_CAST")
             val allSessions = args[0] as List<Session>
@@ -575,39 +579,56 @@ class ChatViewModel @Inject constructor(
             val toolExpandedStates = args[6] as Map<String, Boolean>
             @Suppress("UNCHECKED_CAST")
             val pendingMessageIds = args[7] as Set<String>
+            @Suppress("UNCHECKED_CAST")
+            val statuses = args[8] as Map<String, SessionStatus>
 
             val session = allSessions.find { it.id == sid }
             val revertState = session?.revert
 
-            val chatMessages = if (loading && sessionMessages.isEmpty()) {
+            val visible: List<Message> = if (loading && sessionMessages.isEmpty()) {
                 emptyList()
             } else {
                 val sorted = sessionMessages.sortedBy { it.time.created }
-                val visible = if (revertState != null) {
+                if (revertState != null) {
                     Log.w(TAG, "[messageListState] REVERT active: sid=${sid.take(12)} revertMsg=${revertState.messageId.take(12)} sorted=${sorted.size}")
                     sorted.filter { it.id < revertState.messageId }
                 } else {
                     sorted
                 }
-                visible.map { msg ->
+            }
+
+            // P5-1: queuedMessageIds derived from FSM status — Idle forces clear.
+            // Computed on the full visible list (before P5-3 filtering) so pending
+            // assistant detection is not affected by empty-parts filtering.
+            val fsmStatus = statuses[sid] ?: SessionStatus.Idle
+            val queuedMessageIds: Set<String> = if (fsmStatus is SessionStatus.Idle) {
+                emptySet()
+            } else {
+                val pendingAssistantIndex = visible.indexOfLast {
+                    it is Message.Assistant && it.time.completed == null
+                }
+                if (pendingAssistantIndex >= 0) {
+                    visible.drop(pendingAssistantIndex + 1)
+                        .filterIsInstance<Message.User>()
+                        .map { it.id }
+                        .toSet()
+                } else {
+                    emptySet()
+                }
+            }
+
+            // P5-3: filter out assistant messages with no parts to prevent
+            // empty bubble flash (MessageUpdated arrives before MessagePartUpdated).
+            val chatMessages = visible
+                .filter { msg ->
+                    msg is Message.User || (msg is Message.Assistant && allParts[msg.id]?.isNotEmpty() == true)
+                }
+                .map { msg ->
                     ChatMessage(
                         message = msg,
                         parts = allParts[msg.id] ?: emptyList()
                     )
                 }
-            }
-
-            val pendingAssistantIndex = chatMessages.indexOfLast {
-                it.message is Message.Assistant && it.message.time.completed == null
-            }
-            val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-                chatMessages.drop(pendingAssistantIndex + 1)
-                    .filter { it.isUser }
-                    .map { it.message.id }
-                    .toSet()
-            } else {
-                emptySet<String>()
-            }
 
             MessageListState(
                 messages = chatMessages,
@@ -628,20 +649,15 @@ class ChatViewModel @Inject constructor(
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
      * Includes [_sessionId] as a source so lazy-session creation triggers immediate recomputation.
-     * Also includes [_rawMessagesList] to detect incomplete assistant messages — if any
-     * assistant message is still streaming (time.completed == null), the session is Busy
-     * regardless of SSE/REST status. Uses raw (unfiltered) messages to avoid the window
-     * where a new assistant message has no parts yet and would be excluded from the
-     * filtered list. This follows OpenCode WebUI's approach of deriving session
-     * busy/idle from message completion state, not just server status events.
+     * Session status is sourced from [SessionStatusManager.statusFlow] (FSM-driven),
+     * the single source of truth for busy/idle/activity state.
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
         _sessionId,
         sessionRepository.getSessionsFlow(serverId),
-        sessionRepository.getSessionStatusesFlow(serverId),
+        sessionStatusManager.statusFlow,
         sessionRepository.getCurrentAgentFlow(serverId),
         sessionRepository.getCurrentModelFlow(serverId),
-        _rawMessagesList,
     ) { args ->
         val sid = args[0] as String
         @Suppress("UNCHECKED_CAST")
@@ -652,27 +668,14 @@ class ChatViewModel @Inject constructor(
         val currentAgentMap = args[3] as Map<String, String>
         @Suppress("UNCHECKED_CAST")
         val currentModelMap = args[4] as Map<String, Pair<String, String>>
-        @Suppress("UNCHECKED_CAST")
-        val messages = args[5] as List<Message>
 
         val session = allSessions.find { it.id == sid }
-        val sseStatus = statuses[sid] ?: SessionStatus.Idle
-
-        // Trust server-side session status as the authoritative busy/idle indicator.
-        // OpenCode's busy state is a pure in-memory runtime concept (AgentCoordinator),
-        // not derived from message completion fields. The server's GET /session/status
-        // API reflects the true state — if the server says idle after restart, it IS idle.
-        //
-        // Premature-idle protection (preventing status flickering during tool-call gaps)
-        // is handled at the EventDispatcher layer (isPrematureIdle in EventDispatcher.kt),
-        // which blocks idle SSE events when the session has incomplete messages.
-        // No additional override is needed here.
-        val effectiveStatus = sseStatus
+        val sessionStatus = statuses[sid] ?: SessionStatus.Idle
 
         SessionMetaState(
             sessionTitle = session?.title ?: "",
             serverName = serverName,
-            sessionStatus = effectiveStatus,
+            sessionStatus = sessionStatus,
             revert = session?.revert,
             sessionParentId = session?.parentId,
             sessionAgent = session?.agent,
@@ -1578,10 +1581,14 @@ class ChatViewModel @Inject constructor(
             _isSending.value = true
             try {
                 val currentSessionId = ensureSession()
-                val model = if (_selectedProviderId.value != null && _selectedModelId.value != null) {
+                sessionStatusManager.onSendParts(currentSessionId)
+                // P5-5: read from modelConfigState (resolved effective value) instead of
+                // raw _selectedProviderId which may be null on new session's first send.
+                val modelCfg = modelConfigState.value
+                val model = if (modelCfg.selectedProviderId != null && modelCfg.selectedModelId != null) {
                     ModelSelection(
-                        providerId = _selectedProviderId.value!!,
-                        modelId = _selectedModelId.value!!
+                        providerId = modelCfg.selectedProviderId!!,
+                        modelId = modelCfg.selectedModelId!!
                     )
                 } else null
 
@@ -1599,6 +1606,8 @@ class ChatViewModel @Inject constructor(
                     variant = _selectedVariant.value,
                     directory = sessionDirectory
                 )
+                // P5-4: clear pendingId on success path (was only cleared in catch block).
+                _pendingMessageIds.update { it - pendingId }
                 if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
@@ -1670,6 +1679,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun abortSession() {
+        sessionStatusManager.onAbort(sessionId)
         viewModelScope.launch {
             try {
                 sseJob?.cancel()
@@ -1683,6 +1693,8 @@ class ChatViewModel @Inject constructor(
                 // 3. markSessionIdleProtected doesn't complete messages, so premature-idle
                 //    protection would block any future idle events
                 sessionRepository.markSessionIdle(sessionId)
+                // P5-2: restart sseJob to avoid _rawMessagesList freeze.
+                runCatching { startObservingMessages() }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
@@ -2074,10 +2086,12 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             try {
-                val model = if (_selectedProviderId.value != null && _selectedModelId.value != null) {
+                // P5-5: read from modelConfigState for consistency with sendParts.
+                val modelCfg = modelConfigState.value
+                val model = if (modelCfg.selectedProviderId != null && modelCfg.selectedModelId != null) {
                     ModelSelection(
-                        providerId = _selectedProviderId.value!!,
-                        modelId = _selectedModelId.value!!
+                        providerId = modelCfg.selectedProviderId!!,
+                        modelId = modelCfg.selectedModelId!!
                     )
                 } else null
                 val ok = manageTerminalUseCase.runShellCommand(

@@ -3,6 +3,7 @@ package dev.minios.ocremote.data.repository
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.model.SseEvent
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
@@ -33,7 +34,8 @@ class EventDispatcherTest {
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
             miscHandler = miscHandler,
-            sessionNextHandler = sessionNextHandler
+            sessionNextHandler = sessionNextHandler,
+            sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
         )
     }
 

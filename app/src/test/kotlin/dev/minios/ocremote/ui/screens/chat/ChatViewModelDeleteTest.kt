@@ -9,6 +9,7 @@ import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.domain.repository.ChatRepository
 import dev.minios.ocremote.domain.repository.DraftRepository
 import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.data.repository.SessionStatusManager
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.model.MessageWithParts
 import dev.minios.ocremote.domain.model.Session
@@ -56,6 +57,7 @@ class ChatViewModelDeleteTest {
     private lateinit var undoRedoUseCase: UndoRedoUseCase
     private lateinit var messagePaging: MessagePaginationUseCase
     private val tokenStatsTracker = TokenStatsTracker()
+    private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
 
     private val testSessionId = "session-123"
     private val testServerId = "server-1"
@@ -73,8 +75,10 @@ class ChatViewModelDeleteTest {
             permissionHandler = PermissionEventHandler(),
             questionHandler = QuestionEventHandler(),
             miscHandler = MiscEventHandler(),
-            sessionNextHandler = SessionNextEventHandler()
+            sessionNextHandler = SessionNextEventHandler(),
+            sessionStatusManager = sessionStatusManager
         )
+        every { sessionStatusManager.statusFlow } returns eventDispatcher.sessionStatuses
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
@@ -222,7 +226,8 @@ class ChatViewModelDeleteTest {
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
             httpClient = mockk(relaxed = true),
-            sseClient = mockk(relaxed = true)
+            sseClient = mockk(relaxed = true),
+            sessionStatusManager = sessionStatusManager
         )
     }
 

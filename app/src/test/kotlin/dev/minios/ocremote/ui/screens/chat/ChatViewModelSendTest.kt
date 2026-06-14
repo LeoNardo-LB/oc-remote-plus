@@ -3,6 +3,7 @@ package dev.minios.ocremote.ui.screens.chat
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
+import dev.minios.ocremote.data.repository.SessionStatusManager
 import io.ktor.client.HttpClient
 import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.domain.model.AppSettings
@@ -49,6 +50,7 @@ class ChatViewModelSendTest {
     private val undoRedoUseCase: UndoRedoUseCase = mockk(relaxed = true)
     private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
     private val tokenStatsTracker = TokenStatsTracker()
+    private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
 
     @After
     fun tearDown() {
@@ -121,6 +123,7 @@ class ChatViewModelSendTest {
             "serverId"   to "test-server",
             "sessionId"  to "test-session"
         ))
+        every { sessionStatusManager.statusFlow } returns MutableStateFlow(emptyMap())
         return ChatViewModel(
             savedStateHandle = savedState,
             sendMessageUseCase = sendMessageUseCase,
@@ -147,7 +150,8 @@ class ChatViewModelSendTest {
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
             httpClient = mockk(relaxed = true),
-            sseClient = mockk(relaxed = true)
+            sseClient = mockk(relaxed = true),
+            sessionStatusManager = sessionStatusManager
         )
     }
 
@@ -162,12 +166,9 @@ class ChatViewModelSendTest {
     }
 
     @Test
-    fun `pendingMessageIds contains entry while sending in V1`() = runTest {
-        // V1 sendParts() adds a pendingId to _pendingMessageIds while the send is in-flight.
-        // sendMessageUseCase.sendPrompt is mocked to delay(10_000), so the pendingId stays.
-        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } coAnswers {
-            delay(10_000)
-        }
+    fun `pendingMessageIds cleared after successful send in V1`() = runTest {
+        // P5-4: sendParts clears pendingId on success path (was only cleared in catch).
+        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } returns Unit
 
         val viewModel = createViewModel()
         val collectJob = subscribeToState(viewModel)
@@ -176,15 +177,11 @@ class ChatViewModelSendTest {
         viewModel.sendMessage("Hello world")
         advanceUntilIdle()
 
-        // V1 adds a pending ID while sending — it stays while sendPrompt is in-flight
+        // After successful send, pendingId is cleared (P5-4 fix)
         val state = viewModel.uiState.value
-        assertFalse(
-            "V1 should add a pending ID while send is in-flight",
-            state.pendingMessageIds.isEmpty()
-        )
-        assertEquals(1, state.pendingMessageIds.size)
         assertTrue(
-            state.pendingMessageIds.first().startsWith("pending-")
+            "Pending message should be cleared after successful send, got: ${state.pendingMessageIds}",
+            state.pendingMessageIds.isEmpty()
         )
         collectJob.cancel()
     }

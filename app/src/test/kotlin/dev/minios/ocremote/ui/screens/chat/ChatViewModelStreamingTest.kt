@@ -3,6 +3,7 @@ package dev.minios.ocremote.ui.screens.chat
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.minios.ocremote.data.repository.ServerTerminalRegistry
+import dev.minios.ocremote.data.repository.SessionStatusManager
 import io.ktor.client.HttpClient
 import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.domain.model.AppSettings
@@ -52,6 +53,7 @@ class ChatViewModelStreamingTest {
     private val undoRedoUseCase: UndoRedoUseCase = mockk(relaxed = true)
     private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
     private val tokenStatsTracker = TokenStatsTracker()
+    private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
 
     private val messagesFlow = MutableStateFlow<List<Message>>(emptyList())
     private val partsFlow = MutableStateFlow<Map<String, List<dev.minios.ocremote.domain.model.Part>>>(emptyMap())
@@ -139,6 +141,7 @@ class ChatViewModelStreamingTest {
             every { it.getCurrentModelFlow(any()) } returns flowOf(emptyMap())
             coEvery { it.fetchSessionStatuses(any(), any()) } returns Result.success(emptyMap())
         }
+        every { sessionStatusManager.statusFlow } returns MutableStateFlow(emptyMap())
     }
 
     @After
@@ -203,7 +206,8 @@ class ChatViewModelStreamingTest {
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
             httpClient = mockk(relaxed = true),
-            sseClient = mockk(relaxed = true)
+            sseClient = mockk(relaxed = true),
+            sessionStatusManager = sessionStatusManager
         )
     }
 

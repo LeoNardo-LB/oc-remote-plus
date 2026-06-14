@@ -42,7 +42,8 @@ class ChatRepositoryImplTest {
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
             miscHandler = miscHandler,
-            sessionNextHandler = SessionNextEventHandler()
+            sessionNextHandler = SessionNextEventHandler(),
+            sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
         )
         repo = ChatRepositoryImpl(api, eventDispatcher, serverRepo, permissionAutoApprover)
     }

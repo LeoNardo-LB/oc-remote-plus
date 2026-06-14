@@ -7,6 +7,7 @@ import dev.minios.ocremote.data.api.SseClient
 import dev.minios.ocremote.domain.model.AppSettings
 import dev.minios.ocremote.domain.model.ProvidersResponse
 import dev.minios.ocremote.data.repository.EventDispatcher
+import dev.minios.ocremote.data.repository.SessionStatusManager
 import dev.minios.ocremote.data.repository.handler.*
 import dev.minios.ocremote.domain.model.*
 import dev.minios.ocremote.domain.repository.ChatRepository
@@ -70,10 +71,17 @@ class ChatViewModelQueuedTest {
     private val undoRedoUseCase: UndoRedoUseCase = mockk(relaxed = true)
     private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
     private val tokenStatsTracker = TokenStatsTracker()
+    private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
 
     private val testSessionId = "test-session-1"
     private val testServerId = "test-server-1"
     private val testDirectory = "/home/test"
+
+    // P5-1: queuedMessageIds now derives from FSM status (Idle forces clear).
+    // Tests that verify queued logic need the session to be Busy.
+    private val testStatusFlow = MutableStateFlow<Map<String, SessionStatus>>(
+        mapOf(testSessionId to SessionStatus.Busy)
+    )
 
     @After
     fun tearDown() {
@@ -88,8 +96,10 @@ class ChatViewModelQueuedTest {
             permissionHandler = PermissionEventHandler(),
             questionHandler = QuestionEventHandler(),
             miscHandler = MiscEventHandler(),
-            sessionNextHandler = SessionNextEventHandler()
+            sessionNextHandler = SessionNextEventHandler(),
+            sessionStatusManager = sessionStatusManager
         )
+        every { sessionStatusManager.statusFlow } returns testStatusFlow
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
@@ -263,7 +273,8 @@ class ChatViewModelQueuedTest {
             messagePaging = messagePaging,
             tokenStatsTracker = tokenStatsTracker,
             httpClient = mockk(relaxed = true),
-            sseClient = mockk(relaxed = true)
+            sseClient = mockk(relaxed = true),
+            sessionStatusManager = sessionStatusManager
         )
     }
 
