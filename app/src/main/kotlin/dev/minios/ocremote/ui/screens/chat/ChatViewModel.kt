@@ -566,6 +566,7 @@ class ChatViewModel @Inject constructor(
             _isLoadingOlder,
             _toolExpandedStates,
             _pendingMessageIds,
+            sessionStatusManager.statusFlow,
         ) { args ->
             @Suppress("UNCHECKED_CAST")
             val allSessions = args[0] as List<Session>
@@ -578,39 +579,56 @@ class ChatViewModel @Inject constructor(
             val toolExpandedStates = args[6] as Map<String, Boolean>
             @Suppress("UNCHECKED_CAST")
             val pendingMessageIds = args[7] as Set<String>
+            @Suppress("UNCHECKED_CAST")
+            val statuses = args[8] as Map<String, SessionStatus>
 
             val session = allSessions.find { it.id == sid }
             val revertState = session?.revert
 
-            val chatMessages = if (loading && sessionMessages.isEmpty()) {
+            val visible: List<Message> = if (loading && sessionMessages.isEmpty()) {
                 emptyList()
             } else {
                 val sorted = sessionMessages.sortedBy { it.time.created }
-                val visible = if (revertState != null) {
+                if (revertState != null) {
                     Log.w(TAG, "[messageListState] REVERT active: sid=${sid.take(12)} revertMsg=${revertState.messageId.take(12)} sorted=${sorted.size}")
                     sorted.filter { it.id < revertState.messageId }
                 } else {
                     sorted
                 }
-                visible.map { msg ->
+            }
+
+            // P5-1: queuedMessageIds derived from FSM status — Idle forces clear.
+            // Computed on the full visible list (before P5-3 filtering) so pending
+            // assistant detection is not affected by empty-parts filtering.
+            val fsmStatus = statuses[sid] ?: SessionStatus.Idle
+            val queuedMessageIds: Set<String> = if (fsmStatus is SessionStatus.Idle) {
+                emptySet()
+            } else {
+                val pendingAssistantIndex = visible.indexOfLast {
+                    it is Message.Assistant && it.time.completed == null
+                }
+                if (pendingAssistantIndex >= 0) {
+                    visible.drop(pendingAssistantIndex + 1)
+                        .filterIsInstance<Message.User>()
+                        .map { it.id }
+                        .toSet()
+                } else {
+                    emptySet()
+                }
+            }
+
+            // P5-3: filter out assistant messages with no parts to prevent
+            // empty bubble flash (MessageUpdated arrives before MessagePartUpdated).
+            val chatMessages = visible
+                .filter { msg ->
+                    msg is Message.User || (msg is Message.Assistant && allParts[msg.id]?.isNotEmpty() == true)
+                }
+                .map { msg ->
                     ChatMessage(
                         message = msg,
                         parts = allParts[msg.id] ?: emptyList()
                     )
                 }
-            }
-
-            val pendingAssistantIndex = chatMessages.indexOfLast {
-                it.message is Message.Assistant && it.message.time.completed == null
-            }
-            val queuedMessageIds = if (pendingAssistantIndex >= 0) {
-                chatMessages.drop(pendingAssistantIndex + 1)
-                    .filter { it.isUser }
-                    .map { it.message.id }
-                    .toSet()
-            } else {
-                emptySet<String>()
-            }
 
             MessageListState(
                 messages = chatMessages,
@@ -1564,10 +1582,13 @@ class ChatViewModel @Inject constructor(
             try {
                 val currentSessionId = ensureSession()
                 sessionStatusManager.onSendParts(currentSessionId)
-                val model = if (_selectedProviderId.value != null && _selectedModelId.value != null) {
+                // P5-5: read from modelConfigState (resolved effective value) instead of
+                // raw _selectedProviderId which may be null on new session's first send.
+                val modelCfg = modelConfigState.value
+                val model = if (modelCfg.selectedProviderId != null && modelCfg.selectedModelId != null) {
                     ModelSelection(
-                        providerId = _selectedProviderId.value!!,
-                        modelId = _selectedModelId.value!!
+                        providerId = modelCfg.selectedProviderId!!,
+                        modelId = modelCfg.selectedModelId!!
                     )
                 } else null
 
@@ -1585,6 +1606,8 @@ class ChatViewModel @Inject constructor(
                     variant = _selectedVariant.value,
                     directory = sessionDirectory
                 )
+                // P5-4: clear pendingId on success path (was only cleared in catch block).
+                _pendingMessageIds.update { it - pendingId }
                 if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
@@ -1670,6 +1693,8 @@ class ChatViewModel @Inject constructor(
                 // 3. markSessionIdleProtected doesn't complete messages, so premature-idle
                 //    protection would block any future idle events
                 sessionRepository.markSessionIdle(sessionId)
+                // P5-2: restart sseJob to avoid _rawMessagesList freeze.
+                runCatching { startObservingMessages() }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
@@ -2061,10 +2086,12 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             try {
-                val model = if (_selectedProviderId.value != null && _selectedModelId.value != null) {
+                // P5-5: read from modelConfigState for consistency with sendParts.
+                val modelCfg = modelConfigState.value
+                val model = if (modelCfg.selectedProviderId != null && modelCfg.selectedModelId != null) {
                     ModelSelection(
-                        providerId = _selectedProviderId.value!!,
-                        modelId = _selectedModelId.value!!
+                        providerId = modelCfg.selectedProviderId!!,
+                        modelId = modelCfg.selectedModelId!!
                     )
                 } else null
                 val ok = manageTerminalUseCase.runShellCommand(

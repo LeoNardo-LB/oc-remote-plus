@@ -166,12 +166,9 @@ class ChatViewModelSendTest {
     }
 
     @Test
-    fun `pendingMessageIds contains entry while sending in V1`() = runTest {
-        // V1 sendParts() adds a pendingId to _pendingMessageIds while the send is in-flight.
-        // sendMessageUseCase.sendPrompt is mocked to delay(10_000), so the pendingId stays.
-        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } coAnswers {
-            delay(10_000)
-        }
+    fun `pendingMessageIds cleared after successful send in V1`() = runTest {
+        // P5-4: sendParts clears pendingId on success path (was only cleared in catch).
+        coEvery { sendMessageUseCase.sendPrompt(any(), any(), any(), any(), any(), any(), any()) } returns Unit
 
         val viewModel = createViewModel()
         val collectJob = subscribeToState(viewModel)
@@ -180,15 +177,11 @@ class ChatViewModelSendTest {
         viewModel.sendMessage("Hello world")
         advanceUntilIdle()
 
-        // V1 adds a pending ID while sending — it stays while sendPrompt is in-flight
+        // After successful send, pendingId is cleared (P5-4 fix)
         val state = viewModel.uiState.value
-        assertFalse(
-            "V1 should add a pending ID while send is in-flight",
-            state.pendingMessageIds.isEmpty()
-        )
-        assertEquals(1, state.pendingMessageIds.size)
         assertTrue(
-            state.pendingMessageIds.first().startsWith("pending-")
+            "Pending message should be cleared after successful send, got: ${state.pendingMessageIds}",
+            state.pendingMessageIds.isEmpty()
         )
         collectJob.cancel()
     }

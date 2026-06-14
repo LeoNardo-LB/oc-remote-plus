@@ -77,6 +77,12 @@ class ChatViewModelQueuedTest {
     private val testServerId = "test-server-1"
     private val testDirectory = "/home/test"
 
+    // P5-1: queuedMessageIds now derives from FSM status (Idle forces clear).
+    // Tests that verify queued logic need the session to be Busy.
+    private val testStatusFlow = MutableStateFlow<Map<String, SessionStatus>>(
+        mapOf(testSessionId to SessionStatus.Busy)
+    )
+
     @After
     fun tearDown() {
     }
@@ -93,7 +99,7 @@ class ChatViewModelQueuedTest {
             sessionNextHandler = SessionNextEventHandler(),
             sessionStatusManager = sessionStatusManager
         )
-        every { sessionStatusManager.statusFlow } returns eventDispatcher.sessionStatuses
+        every { sessionStatusManager.statusFlow } returns testStatusFlow
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
