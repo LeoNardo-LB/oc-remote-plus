@@ -36,6 +36,16 @@ class EventDispatcher @Inject constructor(
     private val sessionNextHandler: SessionNextEventHandler,
     private val sessionStatusManager: SessionStatusManager
 ) {
+    init {
+        // L5 cross-validation: SessionStatusManager checks if Idle sessions have
+        // incomplete assistant messages (time.completed == null), which indicates
+        // a missed SSE event. The callback is set here because SessionStatusManager
+        // cannot inject EventDispatcher (constructor simplified to avoid circular deps).
+        sessionStatusManager.incompleteAssistantChecker = { sessionId ->
+            hasIncompleteAssistant(sessionId)
+        }
+    }
+
     // ============ Public State (read-only) ============
 
     val serverSessions: StateFlow<Map<String, Set<String>>> get() = sessionHandler.serverSessions
@@ -70,24 +80,6 @@ class EventDispatcher @Inject constructor(
      * - CommandExecuted: resets session status to Idle
      */
     fun processEvent(event: SseEvent, serverId: String) {
-        // ============ Premature Idle Protection ============
-        // Intercept session.idle / session.status(idle) when the session still has
-        // incomplete assistant messages (time.completed == null). The server sends
-        // idle events between tool calls / agent dispatches, but the conversation
-        // is not truly done. Blocking these prevents status flickering in both
-        // ChatScreen and SessionListScreen.
-        if (isPrematureIdle(event)) {
-            // Still dispatch to other handlers (messages, permissions, etc.)
-            // but skip sessionHandler to preserve Busy status.
-            messageHandler.handle(event, serverId)
-            permissionHandler.handle(event, serverId)
-            questionHandler.handle(event, serverId)
-            miscHandler.handle(event, serverId)
-            sessionNextHandler.handle(event, serverId)
-            forwardToStatusManager(event)
-            return
-        }
-
         sessionHandler.handle(event, serverId)
         messageHandler.handle(event, serverId)
         permissionHandler.handle(event, serverId)
@@ -121,30 +113,8 @@ class EventDispatcher @Inject constructor(
     }
 
     /**
-     * Check if a session idle/status(idle) SSE event is premature — i.e. the session
-     * still has assistant messages with time.completed == null, meaning the AI is
-     * still actively generating content.
-     */
-    private fun isPrematureIdle(event: SseEvent): Boolean {
-        val sessionId: String
-        val isIdle: Boolean
-        when (event) {
-            is SseEvent.SessionIdle -> {
-                sessionId = event.sessionId
-                isIdle = true
-            }
-            is SseEvent.SessionStatus -> {
-                sessionId = event.sessionId
-                isIdle = event.status is SessionStatus.Idle
-            }
-            else -> return false
-        }
-        if (!isIdle) return false
-        return hasIncompleteAssistant(sessionId)
-    }
-
-    /**
      * Check if a session has any assistant messages still streaming (time.completed == null).
+     * Used by REST sync logic and L5 cross-validation checker.
      */
     private fun hasIncompleteAssistant(sessionId: String): Boolean {
         return messageHandler.messages.value[sessionId]
@@ -245,8 +215,7 @@ class EventDispatcher @Inject constructor(
      *
      * Trusts REST as the authoritative source: if REST says a session is idle,
      * it IS idle. The server's in-memory status (`AgentCoordinator`) is the
-     * ground truth, and REST queries it directly. SSE idle events may be
-     * premature (tool-call gaps), but REST idle is never premature.
+     * ground truth, and REST queries it directly.
      *
      * When REST confirms idle for a session that was locally Busy, also
      * force-complete any incomplete assistant messages — this handles the
@@ -343,9 +312,6 @@ class EventDispatcher @Inject constructor(
      * Force-mark all streaming messages in a session as completed AND set Idle.
      * Used only for explicit terminal actions: abort, or entering a session
      * where the server confirms idle but local data has stale incomplete messages.
-     * Do NOT call from periodic REST polling — that would break premature-idle
-     * protection (hasIncompleteAssistant would become false, allowing SSE idle
-     * events through during tool-call gaps, causing status flickering).
      */
     fun markSessionIdle(sessionId: String) {
         messageHandler.markSessionIdle(sessionId)
@@ -354,7 +320,7 @@ class EventDispatcher @Inject constructor(
 
     /**
      * Update session status to Idle with SSE-freshness protection.
-     * Does NOT modify messages — premature-idle protection must remain intact.
+     * Does NOT modify messages.
      * Used by periodic REST polling when server confirms a session is idle.
      */
     fun markSessionIdleProtected(sessionId: String) {

@@ -57,6 +57,13 @@ class SessionStatusManager @Inject constructor(
 
     private var stalenessJob: Job? = null
 
+    /**
+     * L5 cross-validation checker — set by EventDispatcher.
+     * Returns true if the session has assistant messages with time.completed == null
+     * (indicates a missed SSE completion event).
+     */
+    var incompleteAssistantChecker: ((String) -> Boolean)? = null
+
     init {
         startStalenessGuard()
     }
@@ -143,10 +150,19 @@ class SessionStatusManager @Inject constructor(
     private fun checkStaleness() {
         val now = System.currentTimeMillis()
         _fsmStates.value.forEach { (sessionId, state) ->
+            // L2: Busy but stale — no SSE events for too long
             if (state.core is SessionStatus.Busy) {
                 val staleFor = now - state.lastEventAt
                 if (staleFor > STALENESS_THRESHOLD_MS) {
-                    Log.w(TAG, "[$sessionId] stale for ${staleFor}ms, triggering REST validation")
+                    Log.w(TAG, "[$sessionId] L2 stale for ${staleFor}ms, triggering REST validation")
+                    triggerRestValidation(sessionId)
+                }
+            }
+            // L5: Idle but has incomplete assistant messages — missed SSE completion
+            if (state.core is SessionStatus.Idle) {
+                val hasIncomplete = incompleteAssistantChecker?.invoke(sessionId) ?: false
+                if (hasIncomplete) {
+                    Log.w(TAG, "[$sessionId] L5 inconsistency: Idle but has incomplete assistant, triggering REST validation")
                     triggerRestValidation(sessionId)
                 }
             }
