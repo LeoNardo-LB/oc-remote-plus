@@ -1902,6 +1902,19 @@ class ChatViewModel @Inject constructor(
     fun revertMessage(messageId: String, revertedText: String? = null, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
+                // Halt: if session is busy (AI generating), abort first before reverting.
+                // Same pattern as OpenCode WebUI: halt(sessionID).then(() => revert(input))
+                val currentStatus = sessionStatusManager.statusFlow.value[sessionId]
+                if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Revert: halting busy session $sessionId")
+                    sessionStatusManager.onAbort(sessionId)
+                    sseJob?.cancel()
+                    sseJob = null
+                    runCatching { sessionRepository.abort(serverId, sessionId, sessionDirectory) }
+                    sessionRepository.markSessionIdle(sessionId)
+                    runCatching { startObservingMessages() }
+                }
+
                 undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
                 val targetMessage = messageListState.value.messages
