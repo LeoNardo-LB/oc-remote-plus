@@ -274,6 +274,7 @@ class ChatViewModel @Inject constructor(
     val sessionId: String get() = _sessionId.value
 
     init {
+        sessionStatusManager.setServerId(serverId)
     }
 
     private val _allProviders = MutableStateFlow<List<ProviderCatalog>>(emptyList())

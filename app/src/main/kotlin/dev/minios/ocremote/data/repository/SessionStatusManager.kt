@@ -10,6 +10,7 @@ import dev.minios.ocremote.domain.model.SessionNextEvent
 import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.model.SessionStatusFSM
 import dev.minios.ocremote.domain.model.SseEvent
+import dev.minios.ocremote.domain.repository.SessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 private const val TAG = "SessionStatusManager"
@@ -41,7 +43,8 @@ private const val STALENESS_THRESHOLD_MS = 15_000L
  */
 @Singleton
 class SessionStatusManager @Inject constructor(
-    @ApplicationScope private val appScope: CoroutineScope
+    @ApplicationScope private val appScope: CoroutineScope,
+    private val sessionRepositoryProvider: Provider<SessionRepository>
 ) {
     private val _fsmStates = MutableStateFlow<Map<String, SessionFSMState>>(emptyMap())
 
@@ -64,11 +67,19 @@ class SessionStatusManager @Inject constructor(
      */
     var incompleteAssistantChecker: ((String) -> Boolean)? = null
 
+    /** Current server ID — set by ChatViewModel so REST validation can query the correct server. */
+    @Volatile
+    private var currentServerId: String? = null
+
     init {
         startStalenessGuard()
     }
 
     // ============ Event Entry Points ============
+
+    fun setServerId(serverId: String) {
+        currentServerId = serverId
+    }
 
     fun onSendParts(sessionId: String) {
         applyTransition(sessionId, FsmEvent.ClientSendParts)
@@ -169,9 +180,25 @@ class SessionStatusManager @Inject constructor(
         }
     }
 
-    // ============ L3: REST Validation (P1 skeleton — P4 will implement) ============
+    // ============ L3: REST Validation ============
 
     private fun triggerRestValidation(sessionId: String) {
-        Log.w(TAG, "[$sessionId] REST validation triggered (P1 skeleton — P4 will implement)")
+        val sid = currentServerId ?: return
+        appScope.launch {
+            try {
+                val result = sessionRepositoryProvider.get().fetchSessionStatuses(sid, directory = null)
+                result.onSuccess { statuses ->
+                    val serverStatus = statuses[sessionId]
+                    if (serverStatus != null) {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "[$sessionId] L3 REST validation: server says ${serverStatus::class.simpleName}")
+                        }
+                        onRestValidation(sessionId, serverStatus)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "[$sessionId] L3 REST validation failed: ${e.message}")
+            }
+        }
     }
 }
