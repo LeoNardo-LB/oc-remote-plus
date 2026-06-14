@@ -182,6 +182,7 @@ import dev.minios.ocremote.ui.screens.chat.util.formatTokenCount
 import dev.minios.ocremote.ui.screens.chat.util.formatAssistantErrorMessage
 import dev.minios.ocremote.ui.screens.chat.util.formatDuration
 import dev.minios.ocremote.ui.screens.chat.util.resolveUserCommandLabel
+import dev.minios.ocremote.ui.screens.chat.util.ScrollPositionChecker
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
 import dev.minios.ocremote.ui.screens.chat.util.LocalChatFontSize
@@ -299,12 +300,12 @@ fun ChatScreen(
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
-            if (info.totalItemsCount == 0) true
-            else {
-                info.visibleItemsInfo.firstOrNull()?.let {
-                    it.index == 0 && it.offset <= 64
-                } ?: false
-            }
+            val first = info.visibleItemsInfo.firstOrNull()
+            ScrollPositionChecker.isAtBottom(
+                firstVisibleIndex = first?.index ?: -1,
+                firstVisibleOffset = first?.offset ?: 0,
+                totalItemsCount = info.totalItemsCount
+            )
         }
     }
 
