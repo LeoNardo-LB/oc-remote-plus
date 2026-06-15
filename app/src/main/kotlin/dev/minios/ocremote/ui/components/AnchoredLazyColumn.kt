@@ -548,7 +548,6 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     }
 
     // --- 8. 过滤 padding 区域内的 items（确定真正的 firstVisibleItem）---
-    val visibleItemsScrollOffset = -currentFirstItemScrollOffset
     var firstItem = visibleItems.first()
     if (beforeContentPadding > 0 || spacing < 0) {
         for (i in visibleItems.indices) {
@@ -577,6 +576,10 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
             }
         }
     }
+
+    // visibleItemsScrollOffset 必须在 Step 8.5 之后计算，
+    // 这样 scroll anchoring 补偿在同一帧的 placement 中生效（零延迟）。
+    val visibleItemsScrollOffset = -currentFirstItemScrollOffset
 
     // --- 9. 记录 sizes（用纯 height，不含 spacing）---
     val newSizes = HashMap<Any, Int>(visibleItems.size)
