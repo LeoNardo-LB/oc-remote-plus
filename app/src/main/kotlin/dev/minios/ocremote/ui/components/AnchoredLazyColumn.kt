@@ -524,26 +524,45 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
         index++
     }
 
-    // --- 7. Scroll-back（内容不足时填补视口）---
+    // --- 7. Scroll-back（确保最后一个可见 item 不超出视窗）---
     val preScrollBackScrollDelta = scrollDelta
-    if (currentMainAxisOffset < maxOffset) {
-        val toScrollBack = maxOffset - currentMainAxisOffset
-        currentFirstItemScrollOffset -= toScrollBack
-        currentMainAxisOffset += toScrollBack
-        while (currentFirstItemScrollOffset < beforeContentPadding &&
-            currentFirstItemIndex > 0
-        ) {
-            val previousIndex = currentFirstItemIndex - 1
-            val measuredItem = getAndMeasure(previousIndex)
-            visibleItems.add(0, measuredItem)
-            currentFirstItemScrollOffset += measuredItem.mainAxisSizeWithSpacings
-            currentFirstItemIndex = previousIndex
-        }
-        scrollDelta += toScrollBack
-        if (currentFirstItemScrollOffset < 0) {
-            scrollDelta += currentFirstItemScrollOffset
-            currentMainAxisOffset += currentFirstItemScrollOffset
-            currentFirstItemScrollOffset = 0
+    if (currentMainAxisOffset < maxOffset && visibleItems.isNotEmpty()) {
+        if (reverseLayout) {
+            // reverseLayout: 回退量 = 最后一个 item 超出视窗底部的像素
+            // 不用整个视窗空隙（那会把用户的 scroll position 拉回太多）
+            val sumBeforeLast = if (visibleItems.size > 1) {
+                var sum = 0
+                for (i in 0 until visibleItems.size - 1) {
+                    sum += visibleItems[i].mainAxisSizeWithSpacings
+                }
+                sum
+            } else 0
+            val maxOffsetForScroll = sumBeforeLast + beforeContentPadding
+            val toScrollBack = (currentFirstItemScrollOffset - maxOffsetForScroll).coerceAtLeast(0)
+            if (toScrollBack > 0) {
+                currentFirstItemScrollOffset -= toScrollBack
+                currentMainAxisOffset += toScrollBack
+                scrollDelta += toScrollBack
+            }
+        } else {
+            val toScrollBack = maxOffset - currentMainAxisOffset
+            currentFirstItemScrollOffset -= toScrollBack
+            currentMainAxisOffset += toScrollBack
+            while (currentFirstItemScrollOffset < beforeContentPadding &&
+                currentFirstItemIndex > 0
+            ) {
+                val previousIndex = currentFirstItemIndex - 1
+                val measuredItem = getAndMeasure(previousIndex)
+                visibleItems.add(0, measuredItem)
+                currentFirstItemScrollOffset += measuredItem.mainAxisSizeWithSpacings
+                currentFirstItemIndex = previousIndex
+            }
+            scrollDelta += toScrollBack
+            if (currentFirstItemScrollOffset < 0) {
+                scrollDelta += currentFirstItemScrollOffset
+                currentMainAxisOffset += currentFirstItemScrollOffset
+                currentFirstItemScrollOffset = 0
+            }
         }
     }
 
@@ -620,48 +639,20 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     // Fix: placement 用实际 content 区域高度，不是 mainAxisLayoutSize
     // 否则当 contentHeight > viewport 时，items 会被定位到视口外 → 黑屏
     val effectiveContentHeight = layoutHeight - topPadding - bottomPadding
-    val hasSpareSpace = contentHeight < minOf(effectiveContentHeight, maxOffset)
 
     return layout(layoutWidth, layoutHeight) {
-        if (hasSpareSpace) {
-            // 内容不足以填满视口：用 arrangement 从顶部排列
-            // 对应标准 calculateItemsOffsets 的 hasSpareSpace 分支
-            val itemsCount = visibleItems.size
-            // 简化 arrangement：spacedBy(spacing) 等价于 Top + spacing
-            val sizes = IntArray(itemsCount) { visibleItems[it].height }
-            val offsets = IntArray(itemsCount) { 0 }
-            // 手动 arrange(Top)：累积 offset
-            var acc = 0
-            for (i in 0 until itemsCount) {
-                offsets[i] = acc
-                acc += sizes[i] + spacing
-            }
-            // reverseLayout: 内部 index 反转 + offset 反转
-            val ordered = if (reverseLayout) visibleItems.reversed() else visibleItems
-            val orderedOffsets = if (reverseLayout) offsets.reversedArray() else offsets
-            var yCursor = topPadding
-            for (i in ordered.indices) {
-                val item = ordered[i]
-                var placeableY = yCursor
-                for (placeable in item.placeables) {
-                    placeable.placeRelative(startPadding, placeableY)
-                    placeableY += placeable.height
+        // 统一 placement：正常 placement 在所有场景下都正确
+        // reverseLayout 下内容不足时，items 从底部排列，空隙在顶部（由 position 自然决定）
+        for (vi in visibleItems) {
+            var placeableY = vi.offset
+            for (placeable in vi.placeables) {
+                var y = placeableY
+                if (reverseLayout) {
+                    y = effectiveContentHeight - y - placeable.height
                 }
-                yCursor += item.height + spacing
-            }
-        } else {
-            // 正常 placement：用 position() 设置的内部 offset
-            for (vi in visibleItems) {
-                var placeableY = vi.offset
-                for (placeable in vi.placeables) {
-                    var y = placeableY
-                    if (reverseLayout) {
-                        y = effectiveContentHeight - y - placeable.height
-                    }
-                    y += topPadding
-                    placeable.placeRelative(startPadding, y)
-                    placeableY += placeable.height
-                }
+                y += topPadding
+                placeable.placeRelative(startPadding, y)
+                placeableY += placeable.height
             }
         }
     }
