@@ -239,15 +239,21 @@ fun AnchoredLazyColumn(
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(0.dp),
     content: AnchoredLazyListScope.() -> Unit
 ) {
-    // 1. 构建 item 列表。content 作为 key —— 调用方应传稳定 lambda。
-    val items = remember(content) { AnchoredLazyListScope().apply(content).items }
+    // 1. 每次 recompose 重新收集 items（不 remember：content lambda 捕获了变化的
+    //    displayItems 等变量，每次都是新引用，remember(content) 必然失效）。
+    val scope = AnchoredLazyListScope().apply(content)
 
-    // 2. item provider（稳定实例，items 变化时重建）。
-    val itemProvider = remember(items) { AnchoredItemProvider(items) }
+    // 2. itemProvider 实例保持 stable（remember 无 key）。
+    //    关键：LazyLayout 检测到 provider 实例变化时会清除内部 composition cache，
+    //    导致所有可见 item 从头 compose → 闪屏。
+    //    通过 mutable property 更新 items，provider 实例不变 → cache 保留 →
+    //    LazyLayout 通过 key 匹配复用 composition slot，只有内容真正变化的 item 才 recompose。
+    val itemProvider = remember { AnchoredItemProvider() }
+    itemProvider.updateItems(scope.items)
 
-    // 3. measure policy。捕获 itemProvider 与配置参数；任一变化时重建。
+    // 3. measure policy 不依赖 itemProvider 实例变化（它通过 provider 方法读取最新数据）。
     val measurePolicy: LazyLayoutMeasurePolicy =
-        remember(state, contentPadding, reverseLayout, verticalArrangement, isAtBottom, itemProvider) {
+        remember(state, contentPadding, reverseLayout, verticalArrangement, isAtBottom) {
             anchoredMeasurePolicy(
                 state = state,
                 itemProvider = itemProvider,
@@ -283,9 +289,13 @@ fun AnchoredLazyColumn(
 // =====================================================================================
 
 @OptIn(ExperimentalFoundationApi::class)
-private class AnchoredItemProvider(
-    private val items: List<AnchoredItem>
-) : LazyLayoutItemProvider {
+private class AnchoredItemProvider : LazyLayoutItemProvider {
+
+    private var items: List<AnchoredItem> = emptyList()
+
+    fun updateItems(newItems: List<AnchoredItem>) {
+        items = newItems
+    }
 
     override val itemCount: Int get() = items.size
 
