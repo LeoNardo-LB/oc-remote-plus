@@ -149,11 +149,6 @@ fun ChatMessageList(
                     reverseLayout = true,
                     verticalArrangement = Arrangement.spacedBy(messageSpacing)
                 ) {
-                    // Sentinel: 高度 0 的空 item，作为 scroll anchoring 锚点。
-                    // SSE 流式输出时最新消息增长，但 sentinel (index 0) 高度不变
-                    // → firstVisibleItemIndex 稳定 → 视窗不跳动。
-                    item(key = "sentinel") { }
-
                     // reverseLayout=true: items declared first render at the BOTTOM.
                     // Visual order (top→bottom): oldest msgs → newest msgs → revert → pending.
                     // Declaration order is bottom-up: pending (bottom) → messages (top).
