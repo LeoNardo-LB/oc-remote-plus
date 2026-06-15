@@ -37,8 +37,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import dev.minios.ocremote.ui.components.AnchoredLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -287,7 +286,7 @@ fun ChatScreen(
             inputText = TextFieldValue(payload.text, TextRange(payload.text.length))
         }
     }
-    val listState = rememberLazyListState()
+    val listState = remember { AnchoredLazyListState() }
 
     // Whether auto-scroll should follow new content.
     var autoScrollEnabled by remember { mutableStateOf(true) }
@@ -295,12 +294,8 @@ fun ChatScreen(
     // True when the very bottom of the list is visible (50px tolerance)
     val isAtBottom by remember {
         derivedStateOf {
-            val info = listState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
-            val totalItems = info.totalItemsCount
-            if (lastVisible.index < totalItems - 1) return@derivedStateOf false
-            val itemBottom = lastVisible.offset + lastVisible.size
-            itemBottom <= info.viewportEndOffset + 50
+            listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset < 100
         }
     }
 
@@ -313,74 +308,37 @@ fun ChatScreen(
         }
     }
 
-    // Auto-follow: unified scroll management via snapshotFlow.
-    // - New items (new message / initial load): scrollToItem + overflow (hard jump, low frequency)
-    // - Content growth (SSE streaming): scrollBy incremental (smooth, no visual jumps)
-    LaunchedEffect(Unit) {
-        var prevItemCount = 0
-        var prevBottom = 0
-        snapshotFlow { listState.layoutInfo }
-            .collect { info ->
-                if (!autoScrollEnabled) {
-                    prevItemCount = 0
-                    prevBottom = 0
-                    return@collect
-                }
-                val currentItemCount = info.totalItemsCount
-                val lastItem = info.visibleItemsInfo.lastOrNull()
-                if (currentItemCount != prevItemCount) {
-                    // New items arrived — jump to bottom
-                    prevItemCount = currentItemCount
-                    if (currentItemCount > 0) {
-                        listState.scrollToItem(currentItemCount - 1)
-                        val li = listState.layoutInfo
-                        val liLast = li.visibleItemsInfo.lastOrNull()
-                        if (liLast != null) {
-                            val overflow = (liLast.offset + liLast.size - li.viewportEndOffset).coerceAtLeast(0)
-                            if (overflow > 0) {
-                                listState.scroll { scrollBy(overflow.toFloat()) }
-                            }
-                        }
-                    }
-                    prevBottom = 0
-                } else if (lastItem != null) {
-                    val currentBottom = lastItem.offset + lastItem.size
-                    if (currentBottom > prevBottom && prevBottom > 0) {
-                        // Same items, content grew — follow incrementally
-                        listState.scroll { scrollBy((currentBottom - prevBottom).toFloat()) }
-                    }
-                    prevBottom = currentBottom
-                }
-            }
+    // reverseLayout=true: item 0 = newest at bottom.
+    // New content naturally appears at bottom — no scroll needed for streaming.
+    // Only scroll when NEW messages arrive (messageCount changes).
+    val messageCount = messageState.messages.size
+    LaunchedEffect(messageCount) {
+        if (messageCount > 0 && autoScrollEnabled) {
+            listState.scrollToItem(0)
+        }
     }
 
     // Restore scroll position when returning from sub-session navigation.
-    // Saves raw LazyColumn index, no fragile index arithmetic needed.
     LaunchedEffect(viewModel.scrollRestoreVersion) {
         val version = viewModel.scrollRestoreVersion
-        Log.w("CHAT_DEBUG", "[scrollRestore] LaunchedEffect fired: version=$version msgs=${messageState.messages.size}")
         if (version > 0) {
-            // Wait for messages to be loaded — restoration before load is useless
             var retries = 0
             while (messageState.messages.isEmpty() && retries < 20) {
                 delay(50L)
                 retries++
             }
-            // Restore using raw LazyColumn index (saved at navigation time)
             if (messageState.messages.isNotEmpty()) {
                 val savedIdx = viewModel.savedLazyIndex
-                val totalItems = listState.layoutInfo.totalItemsCount
-                // Clamp to valid range (items may have been added/removed during navigation)
+                val totalItems = listState.totalItemsCount
                 val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
                 listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
-                Log.w("CHAT_DEBUG", "[scrollRestore] restored to index=$targetIdx (saved=$savedIdx, total=$totalItems)")
-            } else {
-                Log.w("CHAT_DEBUG", "[scrollRestore] messages still empty after wait, skipping")
             }
         } else {
-            // First entry (scrollRestoreVersion == 0): reverseLayout=true anchors at bottom,
-            // so no explicit scroll is needed.
-            Log.w("CHAT_DEBUG", "[firstEntry] reverseLayout=true anchors at bottom, no scroll needed")
+            // Initial load: scroll to bottom (item 0)
+            snapshotFlow { messageState.messages.isNotEmpty() }
+                .first { it }
+            listState.scrollToItem(0)
+            autoScrollEnabled = true
         }
     }
 
@@ -750,13 +708,10 @@ fun ChatScreen(
                                 attachmentHandler.clearAttachments()
                                 // Scroll to bottom after sending to follow the response
                                 coroutineScope.launch {
-                                    val currentCount = listState.layoutInfo.totalItemsCount
-                                    Log.w("CHAT_DEBUG", "[afterSend] waiting: currentCount=$currentCount canForward=${listState.canScrollForward}")
-                                    snapshotFlow { listState.layoutInfo.totalItemsCount }
+                                    val currentCount = messageState.messages.size
+                                    snapshotFlow { messageState.messages.size }
                                         .first { it > currentCount }
-                                    Log.w("CHAT_DEBUG", "[afterSend] new items detected: count=${listState.layoutInfo.totalItemsCount} canForward=${listState.canScrollForward}")
-                                    listState.smoothScrollToBottom()
-                                    Log.w("CHAT_DEBUG", "[afterSend] DONE: canBackward=${listState.canScrollBackward} first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
+                                    listState.scrollToBottom()
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -961,7 +916,7 @@ fun ChatScreen(
                         // messageListState returns oldest-first; normal layout renders
                         // index 0 (oldest) at top, last index (newest) at bottom.
                         val rawMessages = remember(messageState.messages) {
-                            messageState.messages
+                            messageState.messages.reversed()
                         }
 
                         // Filter: keep user messages + first assistant in each turn group
@@ -1000,10 +955,6 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
-                                onScrollToBottom = {
-                                    autoScrollEnabled = true
-                                    coroutineScope.launch { listState.snapToBottom() }
-                                },
                                 agents = modelConfig.agents,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -1026,10 +977,6 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
-                                onScrollToBottom = {
-                                    autoScrollEnabled = true
-                                    coroutineScope.launch { listState.snapToBottom() }
-                                },
                                 agents = modelConfig.agents,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -1092,32 +1039,29 @@ fun ChatScreen(
  * With reverseLayout=true, "bottom" = item 0.
  * Retries up to 48ms (3×16ms) to handle complex Markdown layout delays.
  */
-internal suspend fun LazyListState.smoothScrollToBottom() {
-    val lastIndex = layoutInfo.totalItemsCount - 1
-    if (lastIndex < 0) return
-    animateScrollToItem(lastIndex)
-    val lastItem = layoutInfo.visibleItemsInfo.lastOrNull()
-    if (lastItem != null) {
-        val overflow = (lastItem.offset + lastItem.size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
-        if (overflow > 0) {
-            scroll { scrollBy(overflow.toFloat()) }
-        }
+internal suspend fun AnchoredLazyListState.smoothScrollToBottom() {
+    scrollToBottom()
+    var attempts = 0
+    while (canScrollBackward && attempts < 3) {
+        delay(16)
+        if (!canScrollBackward) return
+        scroll { scrollBy(-10_000f) }
+        attempts++
     }
 }
 
 /**
  * Instant snap to bottom for explicit user actions (FAB click).
  */
-internal suspend fun LazyListState.snapToBottom() {
-    val lastIndex = layoutInfo.totalItemsCount - 1
-    if (lastIndex < 0) return
-    scrollToItem(lastIndex)
-    val lastItem = layoutInfo.visibleItemsInfo.lastOrNull()
-    if (lastItem != null) {
-        val overflow = (lastItem.offset + lastItem.size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
-        if (overflow > 0) {
-            scroll { scrollBy(overflow.toFloat()) }
-        }
+internal suspend fun AnchoredLazyListState.snapToBottom() {
+    if (totalItemsCount == 0) return
+    scrollToItem(0)
+    var attempts = 0
+    while (canScrollBackward && attempts < 3) {
+        delay(16)
+        if (!canScrollBackward) return
+        scroll { scrollBy(-10_000f) }
+        attempts++
     }
 }
 
