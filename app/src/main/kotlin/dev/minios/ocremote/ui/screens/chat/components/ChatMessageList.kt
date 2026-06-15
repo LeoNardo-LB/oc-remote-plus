@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import dev.minios.ocremote.ui.components.AnchoredLazyColumn
-import dev.minios.ocremote.ui.components.AnchoredLazyListState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -81,7 +83,7 @@ import dev.minios.ocremote.ui.theme.SpacingTokens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatMessageList(
-    listState: AnchoredLazyListState,
+    listState: LazyListState,
     messageState: MessageListState,
     sessionMeta: SessionMetaState,
     interaction: InteractionState,
@@ -134,7 +136,7 @@ fun ChatMessageList(
                 state = pullToRefreshState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                AnchoredLazyColumn(
+                LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize()
                         .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
@@ -145,7 +147,6 @@ fun ChatMessageList(
                         bottom = SpacingTokens.SM.dp
                     ),
                     reverseLayout = true,
-                    isAtBottom = isAtBottom,
                     verticalArrangement = Arrangement.spacedBy(messageSpacing)
                 ) {
                     // reverseLayout=true: items declared first render at the BOTTOM.

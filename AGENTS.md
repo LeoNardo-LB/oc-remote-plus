@@ -103,13 +103,6 @@ di/                Hilt modules (NetworkModule, DomainModule)
 
 ## Critical Constraints
 
-### AnchoredLazyColumn Architecture Decision
-**Do NOT replace with standard LazyColumn.** The custom `AnchoredLazyColumn` (LazyLayout API) is the permanent solution for scroll anchoring in SSE streaming. Key rules:
-- `Modifier.scrollable(reverseDirection = reverseLayout)` — let Compose's scrollable mechanism handle direction (including fling). Do NOT use `reverseDirection = false` with manual direction handling.
-- `scrollToBeConsumed += delta` (not `-=`) —配合 reverseDirection 反转后的 delta 符号。
-- Measure policy 的 offset/scroll 方向逻辑不需要根据 reverseLayout 分支——符号约定统一。
-- 任何对 AnchoredLazyColumn.kt 的修改必须编译验证 + 模拟器手动测试滚动稳定性。
-
 ### ChatScreen.kt Editing Protocol
 See `docs/chatscreen-editing-protocol.md`. Rules:
 - Never edit in parallel across agents

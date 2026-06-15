@@ -37,7 +37,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import dev.minios.ocremote.ui.components.AnchoredLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -286,7 +287,7 @@ fun ChatScreen(
             inputText = TextFieldValue(payload.text, TextRange(payload.text.length))
         }
     }
-    val listState = remember { AnchoredLazyListState() }
+    val listState = rememberLazyListState()
 
     // Whether auto-scroll should follow new content.
     var autoScrollEnabled by remember { mutableStateOf(true) }
@@ -329,7 +330,7 @@ fun ChatScreen(
             }
             if (messageState.messages.isNotEmpty()) {
                 val savedIdx = viewModel.savedLazyIndex
-                val totalItems = listState.totalItemsCount
+                val totalItems = listState.layoutInfo.totalItemsCount
                 val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
                 listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
             }
@@ -711,7 +712,7 @@ fun ChatScreen(
                                     val currentCount = messageState.messages.size
                                     snapshotFlow { messageState.messages.size }
                                         .first { it > currentCount }
-                                    listState.scrollToBottom()
+                                    listState.scrollToItem(0)
                                 }
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
@@ -1039,8 +1040,8 @@ fun ChatScreen(
  * With reverseLayout=true, "bottom" = item 0.
  * Retries up to 48ms (3×16ms) to handle complex Markdown layout delays.
  */
-internal suspend fun AnchoredLazyListState.smoothScrollToBottom() {
-    scrollToBottom()
+internal suspend fun LazyListState.smoothScrollToBottom() {
+    scrollToItem(0)
     var attempts = 0
     while (canScrollBackward && attempts < 3) {
         delay(16)
@@ -1053,8 +1054,8 @@ internal suspend fun AnchoredLazyListState.smoothScrollToBottom() {
 /**
  * Instant snap to bottom for explicit user actions (FAB click).
  */
-internal suspend fun AnchoredLazyListState.snapToBottom() {
-    if (totalItemsCount == 0) return
+internal suspend fun LazyListState.snapToBottom() {
+    if (layoutInfo.totalItemsCount == 0) return
     scrollToItem(0)
     var attempts = 0
     while (canScrollBackward && attempts < 3) {
