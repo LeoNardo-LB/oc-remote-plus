@@ -321,16 +321,21 @@ fun ChatScreen(
     }
 
     // SSE scroll compensation: when user is NOT scrolling and NOT at bottom,
-    // detect firstVisibleItem position jumps caused by item height changes
-    // (SSE streaming grows items below the viewport) and compensate with
-    // scrollBy to keep the viewport stable.
+    // detect lastVisibleItem position jumps caused by Markdown async rendering
+    // (height changes push upper items). Compensate with scrollBy.
+    //
+    // Why lastVisibleItem not firstVisibleItem?
+    // Standard LazyColumn keeps firstVisibleItemIndex/offset unchanged when
+    // item heights change. So firstVisibleItem.offset never moves.
+    // But lastVisibleItem.offset DOES move when items between first and last
+    // change height → that's the signal we need.
     LaunchedEffect(listState) {
         var prevIndex = -1
         var prevOffset = Int.MIN_VALUE
 
         snapshotFlow {
-            val first = listState.layoutInfo.visibleItemsInfo.firstOrNull()
-            Triple(first?.index ?: -1, first?.offset ?: Int.MIN_VALUE, listState.isScrollInProgress)
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            Triple(last?.index ?: -1, last?.offset ?: Int.MIN_VALUE, listState.isScrollInProgress)
         }.distinctUntilChanged().collect { (index, offset, scrolling) ->
             if (!scrolling && index == prevIndex && index > 0 &&
                 prevOffset != Int.MIN_VALUE &&
@@ -338,8 +343,6 @@ fun ChatScreen(
             ) {
                 val delta = (offset - prevOffset).toFloat()
                 listState.scroll { scrollBy(delta) }
-                // Don't update prevOffset — expect compensation to restore it.
-                // Next emit should have offset ≈ prevOffset → delta < 2 → no loop.
             } else {
                 prevIndex = index
                 prevOffset = offset
