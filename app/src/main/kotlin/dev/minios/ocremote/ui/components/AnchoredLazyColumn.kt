@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.layout.LazyLayoutMeasurePolicy
 import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import androidx.compose.foundation.lazy.layout.getDefaultLazyLayoutKey
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -250,6 +251,8 @@ fun AnchoredLazyColumn(
     //    LazyLayout 通过 key 匹配复用 composition slot，只有内容真正变化的 item 才 recompose。
     val itemProvider = remember { AnchoredItemProvider() }
     itemProvider.updateItems(scope.items)
+    // items 变了 → 强制 LazyLayout 重新 measure（provider 实例 stable，但内容需要刷新）
+    SideEffect { state.forceRemeasure() }
 
     // 3. measure policy 不依赖 itemProvider 实例变化（它通过 provider 方法读取最新数据）。
     val measurePolicy: LazyLayoutMeasurePolicy =
@@ -291,7 +294,7 @@ fun AnchoredLazyColumn(
 @OptIn(ExperimentalFoundationApi::class)
 private class AnchoredItemProvider : LazyLayoutItemProvider {
 
-    private var items: List<AnchoredItem> = emptyList()
+    private var items by mutableStateOf<List<AnchoredItem>>(emptyList())
 
     fun updateItems(newItems: List<AnchoredItem>) {
         items = newItems
