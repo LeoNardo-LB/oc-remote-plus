@@ -310,23 +310,28 @@ fun ChatScreen(
     }
 
     // reverseLayout=true: item 0 = newest at bottom.
-    // When new messages arrive (messageCount changes due to P5-3 filter release):
-    // - At bottom: scrollToItem(0) to follow newest content.
-    // - NOT at bottom: requestScrollToItem to FREEZE current position, overriding
-    //   LazyColumn's default key-based anchor adjustment (the drift source).
-    // requestScrollToItem is non-suspend, takes effect on next measure only —
-    // no isScrollInProgress, no animation, no flicker.
+    // Only scrollToItem(0) when at bottom AND new messages arrive.
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
-        if (messageCount > 0) {
-            if (autoScrollEnabled) {
-                listState.scrollToItem(0)
-            } else if (!listState.isScrollInProgress) {
-                listState.requestScrollToItem(
-                    listState.firstVisibleItemIndex,
-                    listState.firstVisibleItemScrollOffset
-                )
-            }
+        if (messageCount > 0 && autoScrollEnabled) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    // SSE drift compensation: on every recomposition, if user is NOT at bottom
+    // and NOT scrolling, request the next measure to keep current position.
+    // This overrides LazyColumn's default key-based scroll position maintenance
+    // (the documented purpose of requestScrollToItem, Compose 1.7+).
+    // SideEffect runs synchronously after composition, before next measure —
+    // unlike LaunchedEffect which may lag a frame.
+    SideEffect {
+        if (!isAtBottom && !listState.isScrollInProgress &&
+            listState.layoutInfo.totalItemsCount > 0
+        ) {
+            listState.requestScrollToItem(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
         }
     }
 
