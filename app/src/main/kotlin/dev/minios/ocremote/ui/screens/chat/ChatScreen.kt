@@ -302,38 +302,51 @@ fun ChatScreen(
     // SSE streaming drift compensation.
     // When user is NOT at bottom and NOT actively scrolling, the streaming
     // assistant message (item 0, visual bottom) grows in height and pushes
-    // visible content upward. This detects the drift via firstVisibleItemScrollOffset
-    // changes and reverses it with scrollBy.
+    // OTHER visible items upward. firstVisibleItemScrollOffset stays constant
+    // (anchor mechanism works), so we must monitor a MID-list visible item's
+    // offset via layoutInfo.visibleItemsInfo instead.
+    //
+    // Uses requestScrollToItem (Compose 1.7+) — non-suspend, doesn't trigger
+    // isScrollInProgress, takes effect on next measure pass only.
     LaunchedEffect(Unit) {
-        var prevIndex = listState.firstVisibleItemIndex
-        var prevOffset = listState.firstVisibleItemScrollOffset
+        var pinnedKey: Any? = null
+        var pinnedIndex = -1
+        var pinnedOffset = 0
 
-        snapshotFlow {
-            Triple(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-                listState.isScrollInProgress
-            )
-        }.collect { (index, offset, scrolling) ->
-            if (scrolling) {
-                prevIndex = index
-                prevOffset = offset
-                return@collect
-            }
-            if (index == prevIndex) {
-                val drift = offset - prevOffset
-                if (drift != 0) {
-                    // Cap to prevent runaway if direction is wrong
-                    val safeDrift = drift.coerceIn(-50, 50)
-                    listState.scroll { scrollBy(-safeDrift.toFloat()) }
-                    // Keep prevOffset — after compensation offset should
-                    // return to prevOffset on next layout pass
+        snapshotFlow { listState.layoutInfo to listState.isScrollInProgress }
+            .collect { (info, scrolling) ->
+                if (scrolling) {
+                    pinnedKey = null
+                    return@collect
                 }
-            } else {
-                prevIndex = index
-                prevOffset = offset
+
+                val visible = info.visibleItemsInfo
+                if (visible.isEmpty()) {
+                    pinnedKey = null
+                    return@collect
+                }
+
+                // Find or initialise the pinned anchor item
+                val pinned = if (pinnedKey != null) {
+                    visible.firstOrNull { it.key == pinnedKey }
+                } else null
+
+                if (pinned == null) {
+                    // Pick a mid-list item (avoid item 0 which is the streaming one)
+                    val anchor = visible.getOrNull(visible.size / 2) ?: visible.first()
+                    pinnedKey = anchor.key
+                    pinnedIndex = anchor.index
+                    pinnedOffset = anchor.offset
+                    return@collect
+                }
+
+                pinnedIndex = pinned.index
+                val drift = pinned.offset - pinnedOffset
+                if (drift != 0) {
+                    // Request next measure to restore pinned item to its original offset
+                    listState.requestScrollToItem(pinnedIndex, pinnedOffset)
+                }
             }
-        }
     }
 
     // reverseLayout=true: item 0 = newest at bottom.
