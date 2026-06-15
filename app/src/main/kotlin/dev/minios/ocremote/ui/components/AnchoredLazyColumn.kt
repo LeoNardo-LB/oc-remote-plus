@@ -362,9 +362,10 @@ private fun SubcomposeMeasureScope.measureAnchoredItems(
     isAtBottom: Boolean
 ): MeasureResult {
     // === helper: measure + wrap ===
-    // 用 index 做 slot ID（保证唯一），key 仅用于 scroll position 追踪
-    // displayItems 中可能有重复的 message ID（如 turnGroups 展开），
-    // SubcomposeLayout 要求 slot ID 唯一，用 index 规避
+    // 用 index 做 slot ID。SubcomposeLayout 要求每次 measure pass 内 slot ID 唯一，
+    // 因此必须保证同一 index 不会被 getAndMeasure 调用两次。
+    // 调用点有三处（step 4 backward / step 6b forward / step 7 scroll-back），
+    // step 6b 的 scroll-past items 会加入 visibleItems 供 step 7 复用，避免重复 compose。
     fun getAndMeasure(index: Int): MeasureItem {
         val item = items[index]
         val measurables = subcompose(index) { item.content() }
@@ -433,7 +434,9 @@ private fun SubcomposeMeasureScope.measureAnchoredItems(
         }
     }
 
-    // 6b. Forward fill（inline carry：item 在视口上方时不加入 visibleItems，推进 index）
+    // 6b. Forward fill（inline carry：item 在视口上方时推进 firstVisibleItemIndex）
+    // 注意：scrolled-past items 也加入 visibleItems——SubcomposeLayout 的 slot 已被
+    // subcompose(index) 占用，不能丢弃。否则 step 7 会重复 compose 同一 index → crash。
     while (index < itemCount &&
         (currentMainAxisOffset < maxMainAxis ||
             currentMainAxisOffset <= 0 ||
@@ -441,13 +444,11 @@ private fun SubcomposeMeasureScope.measureAnchoredItems(
     ) {
         val measuredItem = getAndMeasure(index)
         currentMainAxisOffset += measuredItem.mainAxisSizeWithSpacings
-
+        visibleItems.add(measuredItem)
         if (currentMainAxisOffset <= minOffset && index != itemCount - 1) {
             // item 完全在视口上方 → 推进 firstVisibleItemIndex
             currentFirstItemIndex = index + 1
             currentFirstItemScrollOffset -= measuredItem.mainAxisSizeWithSpacings
-        } else {
-            visibleItems.add(measuredItem)
         }
         index++
     }
@@ -462,10 +463,18 @@ private fun SubcomposeMeasureScope.measureAnchoredItems(
             currentFirstItemIndex > 0
         ) {
             val previousIndex = currentFirstItemIndex - 1
-            val measuredItem = getAndMeasure(previousIndex)
-            visibleItems.add(0, measuredItem)
-            currentFirstItemScrollOffset += measuredItem.mainAxisSizeWithSpacings
-            currentFirstItemIndex = previousIndex
+            // 先查 visibleItems——step 6b 的 scroll-past items 已在其中，
+            // 直接复用，避免重复 subcompose 同一 index 导致 crash
+            val existing = visibleItems.firstOrNull { it.index == previousIndex }
+            if (existing != null) {
+                currentFirstItemScrollOffset += existing.mainAxisSizeWithSpacings
+                currentFirstItemIndex = previousIndex
+            } else {
+                val measuredItem = getAndMeasure(previousIndex)
+                visibleItems.add(0, measuredItem)
+                currentFirstItemScrollOffset += measuredItem.mainAxisSizeWithSpacings
+                currentFirstItemIndex = previousIndex
+            }
         }
         scrollDelta += toScrollBack
         if (currentFirstItemScrollOffset < 0) {
