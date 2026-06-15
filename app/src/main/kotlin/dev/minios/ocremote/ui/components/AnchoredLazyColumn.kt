@@ -160,19 +160,19 @@ class AnchoredLazyListState(
     /**
      * 手势 / fling 的 scroll 入口。
      *
-     * delta 符号：`reverseDirection = false` 时，手指上滑 → delta > 0。
-     * 我们用 `scrollToBeConsumed -= delta`：
-     * - delta > 0 → scrollToBeConsumed < 0 → measure 中 currentOffset -= (负) = currentOffset+|delta| → offset 增大 → 向上滚 ✓
-     * - delta < 0 → scrollToBeConsumed > 0 → measure 中 currentOffset -= (正) → offset 减小 → 向下滚 ✓
+     * delta 符号：`reverseDirection = reverseLayout`（true）时，手指上滑 → delta < 0（被 scrollable 反转）。
+     * 我们用 `scrollToBeConsumed += delta`：
+     * - delta < 0 → scrollToBeConsumed < 0 → measure 中 currentOffset -= (负) = offset 增大 → 向上滚 ✓
+     * - delta > 0 → scrollToBeConsumed > 0 → measure 中 currentOffset -= (正) → offset 减小 → 向下滚 ✓
      *
-     * 边界守卫：在 measure 更新 canScrollForward/Backward 后，拒绝过界滚动。
+     * 边界守卫：delta < 0 = 向 index 增大方向 = 需要 canScrollForward；
+     * delta > 0 = 向 index 减小方向 = 需要 canScrollBackward。
      */
     val scrollableState: ScrollableState = ScrollableState { delta ->
-        // Fix 2: 边界守卫——拒绝过界 delta
-        if (delta < 0f && !canScrollBackward) return@ScrollableState 0f
-        if (delta > 0f && !canScrollForward && totalItemsCount > 0) return@ScrollableState 0f
+        if (delta < 0f && !canScrollForward && totalItemsCount > 0) return@ScrollableState 0f
+        if (delta > 0f && !canScrollBackward) return@ScrollableState 0f
 
-        scrollToBeConsumed -= delta
+        scrollToBeConsumed += delta
         if (abs(scrollToBeConsumed) > 0.5f) {
             forceRemeasure()
         }
@@ -279,7 +279,7 @@ fun AnchoredLazyColumn(
             .scrollable(
                 state = state.scrollableState,
                 orientation = Orientation.Vertical,
-                reverseDirection = false, // Fix 1: 不反转——measure policy 的 offset 逻辑已处理方向
+                reverseDirection = reverseLayout, // 让 Compose scrollable 处理方向（包括 fling）
                 enabled = userScrollEnabled,
                 flingBehavior = ScrollableDefaults.flingBehavior(),
                 interactionSource = interactionSource
