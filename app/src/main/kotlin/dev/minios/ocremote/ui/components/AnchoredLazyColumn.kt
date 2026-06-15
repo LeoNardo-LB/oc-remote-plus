@@ -548,23 +548,25 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     }
 
     // === 8.5. Scroll anchoring（核心新增：同帧 item 增长补偿）===
+    // Fix Bug 2+3: 用纯 height（不含 spacing）检测增长，避免 items 增删时 spacing 变化被误判
+    // 加最小阈值（>1px），过滤 Markdown 异步布局导致的微小尺寸波动
     if (!isAtBottom && !state.isScrollInProgress && visibleItems.isNotEmpty()) {
         var totalGrowth = 0
         for (vi in visibleItems) {
             val prevSize = state.prevItemSizes[vi.key]
-            if (prevSize != null && vi.mainAxisSizeWithSpacings > prevSize) {
-                totalGrowth += vi.mainAxisSizeWithSpacings - prevSize
+            if (prevSize != null && vi.height > prevSize + 1) {
+                totalGrowth += vi.height - prevSize
             }
         }
-        if (totalGrowth > 0) {
+        if (totalGrowth > 1) {
             currentFirstItemScrollOffset += totalGrowth
         }
     }
 
-    // --- 9. 记录 sizes ---
+    // --- 9. 记录 sizes（用纯 height，不含 spacing）---
     val newSizes = HashMap<Any, Int>(visibleItems.size)
     for (vi in visibleItems) {
-        newSizes[vi.key] = vi.mainAxisSizeWithSpacings
+        newSizes[vi.key] = vi.height
     }
     state.prevItemSizes.clear()
     state.prevItemSizes.putAll(newSizes)
@@ -575,7 +577,11 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     state.lastKnownFirstItemKey = firstItem.key
     state.totalItemsCount = itemCount
     val lastVisibleIndex = visibleItems.last().index
-    state.canScrollForward = lastVisibleIndex < itemCount - 1
+    // Fix Bug 1: canScrollForward 需要同时检查 item index 和内容高度
+    // 标准实现: canScrollForward = index < itemsCount || currentMainAxisOffset > maxOffset
+    // 只有 2 条消息但 AI 文章很长时，所有 items 都被测量了但内容远超视口 → 仍可滚动
+    state.canScrollForward = lastVisibleIndex < itemCount - 1 ||
+        currentMainAxisOffset > maxOffset + afterContentPadding
     state.canScrollBackward = currentFirstItemIndex > 0 || currentFirstItemScrollOffset > 0
 
     // --- 11. Position items（对应标准 calculateItemsOffsets 的非 spareSpace 分支）---
