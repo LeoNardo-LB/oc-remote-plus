@@ -313,47 +313,45 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom when content changes (streaming, new messages, pending items)
-    val messageCount = messageState.messages.size
-    val lastPartCount = messageState.messages.lastOrNull()?.parts?.size ?: 0
-    val lastContentLength = messageState.messages.lastOrNull()?.parts?.lastOrNull()?.let { part ->
-        when (part) {
-            is Part.Text -> part.text.length
-            is Part.Reasoning -> part.text.length
-            else -> 0
-        }
-    } ?: 0
-    val pendingCount = interaction.pendingPermissions.size + interaction.pendingQuestions.size
-    val isBusy = sessionMeta.sessionStatus is SessionStatus.Busy
-    LaunchedEffect(messageCount, lastPartCount, lastContentLength, pendingCount, isBusy) {
-        if (messageCount > 0 && autoScrollEnabled) {
-            val lastIndex = listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1
-            listState.scrollToItem(lastIndex)
-            val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            if (lastItem != null) {
-                val overflow = (lastItem.offset + lastItem.size - listState.layoutInfo.viewportEndOffset).coerceAtLeast(0)
-                if (overflow > 0) {
-                    listState.scroll { scrollBy(overflow.toFloat()) }
+    // Auto-follow: unified scroll management via snapshotFlow.
+    // - New items (new message / initial load): scrollToItem + overflow (hard jump, low frequency)
+    // - Content growth (SSE streaming): scrollBy incremental (smooth, no visual jumps)
+    LaunchedEffect(Unit) {
+        var prevItemCount = 0
+        var prevBottom = 0
+        snapshotFlow { listState.layoutInfo }
+            .collect { info ->
+                if (!autoScrollEnabled) {
+                    prevItemCount = 0
+                    prevBottom = 0
+                    return@collect
+                }
+                val currentItemCount = info.totalItemsCount
+                val lastItem = info.visibleItemsInfo.lastOrNull()
+                if (currentItemCount != prevItemCount) {
+                    // New items arrived — jump to bottom
+                    prevItemCount = currentItemCount
+                    if (currentItemCount > 0) {
+                        listState.scrollToItem(currentItemCount - 1)
+                        val li = listState.layoutInfo
+                        val liLast = li.visibleItemsInfo.lastOrNull()
+                        if (liLast != null) {
+                            val overflow = (liLast.offset + liLast.size - li.viewportEndOffset).coerceAtLeast(0)
+                            if (overflow > 0) {
+                                listState.scroll { scrollBy(overflow.toFloat()) }
+                            }
+                        }
+                    }
+                    prevBottom = 0
+                } else if (lastItem != null) {
+                    val currentBottom = lastItem.offset + lastItem.size
+                    if (currentBottom > prevBottom && prevBottom > 0) {
+                        // Same items, content grew — follow incrementally
+                        listState.scroll { scrollBy((currentBottom - prevBottom).toFloat()) }
+                    }
+                    prevBottom = currentBottom
                 }
             }
-        }
-    }
-
-
-    // Scroll to bottom on initial load
-    LaunchedEffect(interaction.isLoading) {
-        if (!interaction.isLoading && messageState.messages.isNotEmpty()) {
-            val lastIndex = listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1
-            listState.scrollToItem(lastIndex)
-            val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            if (lastItem != null) {
-                val overflow = (lastItem.offset + lastItem.size - listState.layoutInfo.viewportEndOffset).coerceAtLeast(0)
-                if (overflow > 0) {
-                    listState.scroll { scrollBy(overflow.toFloat()) }
-                }
-            }
-            autoScrollEnabled = true
-        }
     }
 
     // Restore scroll position when returning from sub-session navigation.
