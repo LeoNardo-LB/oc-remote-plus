@@ -201,6 +201,9 @@ class EventDispatcher @Inject constructor(
     fun clearRevert(sessionId: String) =
         sessionHandler.clearRevert(sessionId)
 
+    fun setRevert(sessionId: String, messageId: String) =
+        sessionHandler.setRevert(sessionId, messageId)
+
     fun setMessages(sessionId: String, messages: List<MessageWithParts>) =
         messageHandler.setMessages(sessionId, messages)
 

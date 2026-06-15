@@ -405,6 +405,10 @@ class ChatRepositoryImpl @Inject constructor(
         eventDispatcher.clearRevert(sessionId)
     }
 
+    override fun setRevert(sessionId: String, messageId: String) {
+        eventDispatcher.setRevert(sessionId, messageId)
+    }
+
     override fun removePermission(permissionId: String) {
         eventDispatcher.removePermission(permissionId)
     }

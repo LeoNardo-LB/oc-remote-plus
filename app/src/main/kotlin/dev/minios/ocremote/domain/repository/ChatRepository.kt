@@ -245,6 +245,9 @@ interface ChatRepository {
      */
     fun clearRevert(sessionId: String)
 
+    /** Set local revert state immediately after REST revert (prevents flash of old messages). */
+    fun setRevert(sessionId: String, messageId: String)
+
     /**
      * Remove a permission card by ID (optimistic removal after reply).
      */

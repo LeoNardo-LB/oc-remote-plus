@@ -257,6 +257,20 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         }
     }
 
+    fun setRevert(sessionId: String, messageId: String) {
+        _sessions.update { current ->
+            val idx = current.indexOfFirst { it.id == sessionId }
+            if (idx >= 0) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Setting revert for session $sessionId msg=$messageId")
+                current.toMutableList().apply {
+                    set(idx, current[idx].copy(revert = Session.Revert(messageId = messageId)))
+                }
+            } else {
+                current
+            }
+        }
+    }
+
     fun clearAll() {
         _serverSessions.value = emptyMap()
         _sessions.value = emptyList()

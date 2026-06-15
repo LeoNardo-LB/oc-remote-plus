@@ -1917,6 +1917,12 @@ class ChatViewModel @Inject constructor(
 
                 undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
+
+                // Set local revert state immediately — don't wait for SSE events.
+                // Without this, the new SSE connection may push the old (pre-revert)
+                // message snapshot, causing the reverted content to flash briefly.
+                chatRepository.setRevert(sessionId, messageId)
+
                 val targetMessage = messageListState.value.messages
                     .firstOrNull { it.message.id == messageId && it.isUser }
                 val fallbackPayload = RevertedDraftPayload(text = revertedText.orEmpty())
