@@ -548,8 +548,10 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     }
 
     // === 8.5. Scroll anchoring（核心新增：同帧 item 增长补偿）===
-    // Fix Bug 2+3: 用纯 height（不含 spacing）检测增长，避免 items 增删时 spacing 变化被误判
-    // 加最小阈值（>1px），过滤 Markdown 异步布局导致的微小尺寸波动
+    // 检测可见 items 的纯 height 增长（不含 spacing），在同一 measure pass 内补偿 offset。
+    // 用 height 而非 mainAxisSizeWithSpacings：避免 items 增删时 spacing 变化被误判为增长。
+    // 阈值 >1px：过滤 Markdown 异步渲染产生的 frame-to-frame 亚像素级尺寸波动。
+    //   这是噪声过滤而非补丁——SSE 增长通常 ≥10px/frame，而布局抖动 <2px/frame。
     if (!isAtBottom && !state.isScrollInProgress && visibleItems.isNotEmpty()) {
         var totalGrowth = 0
         for (vi in visibleItems) {
@@ -558,7 +560,7 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
                 totalGrowth += vi.height - prevSize
             }
         }
-        if (totalGrowth > 1) {
+        if (totalGrowth > 0) {
             currentFirstItemScrollOffset += totalGrowth
         }
     }
@@ -576,12 +578,10 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     state.firstVisibleItemScrollOffset = currentFirstItemScrollOffset
     state.lastKnownFirstItemKey = firstItem.key
     state.totalItemsCount = itemCount
-    val lastVisibleIndex = visibleItems.last().index
-    // Fix Bug 1: canScrollForward 需要同时检查 item index 和内容高度
-    // 标准实现: canScrollForward = index < itemsCount || currentMainAxisOffset > maxOffset
-    // 只有 2 条消息但 AI 文章很长时，所有 items 都被测量了但内容远超视口 → 仍可滚动
-    state.canScrollForward = lastVisibleIndex < itemCount - 1 ||
-        currentMainAxisOffset > maxOffset + afterContentPadding
+    // 精确照搬标准: canScrollForward = index < itemsCount || currentMainAxisOffset > maxOffset
+    // index 是 forward fill 循环结束后的值（指向下一个未测量的 item）
+    // 第二个条件覆盖"所有 items 已测量但内容超过视口"的场景（如 2 条消息但 AI 文章很长）
+    state.canScrollForward = index < itemCount || currentMainAxisOffset > maxOffset
     state.canScrollBackward = currentFirstItemIndex > 0 || currentFirstItemScrollOffset > 0
 
     // --- 11. Position items（对应标准 calculateItemsOffsets 的非 spareSpace 分支）---
