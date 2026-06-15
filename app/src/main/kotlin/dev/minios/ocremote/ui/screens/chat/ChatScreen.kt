@@ -331,8 +331,7 @@ fun ChatScreen(
             listState.scrollToItem(lastIndex)
             val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
             if (lastItem != null) {
-                val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                val overflow = lastItem.size - viewport
+                val overflow = (lastItem.offset + lastItem.size - listState.layoutInfo.viewportEndOffset).coerceAtLeast(0)
                 if (overflow > 0) {
                     listState.scroll { scrollBy(overflow.toFloat()) }
                 }
@@ -348,8 +347,7 @@ fun ChatScreen(
             listState.scrollToItem(lastIndex)
             val lastItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
             if (lastItem != null) {
-                val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                val overflow = lastItem.size - viewport
+                val overflow = (lastItem.offset + lastItem.size - listState.layoutInfo.viewportEndOffset).coerceAtLeast(0)
                 if (overflow > 0) {
                     listState.scroll { scrollBy(overflow.toFloat()) }
                 }
@@ -1004,6 +1002,10 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                onScrollToBottom = {
+                                    autoScrollEnabled = true
+                                    coroutineScope.launch { listState.snapToBottom() }
+                                },
                                 agents = modelConfig.agents,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -1026,6 +1028,10 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                onScrollToBottom = {
+                                    autoScrollEnabled = true
+                                    coroutineScope.launch { listState.snapToBottom() }
+                                },
                                 agents = modelConfig.agents,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -1094,8 +1100,7 @@ internal suspend fun LazyListState.smoothScrollToBottom() {
     animateScrollToItem(lastIndex)
     val lastItem = layoutInfo.visibleItemsInfo.lastOrNull()
     if (lastItem != null) {
-        val viewport = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-        val overflow = lastItem.size - viewport
+        val overflow = (lastItem.offset + lastItem.size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
         if (overflow > 0) {
             scroll { scrollBy(overflow.toFloat()) }
         }
@@ -1111,8 +1116,7 @@ internal suspend fun LazyListState.snapToBottom() {
     scrollToItem(lastIndex)
     val lastItem = layoutInfo.visibleItemsInfo.lastOrNull()
     if (lastItem != null) {
-        val viewport = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-        val overflow = lastItem.size - viewport
+        val overflow = (lastItem.offset + lastItem.size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
         if (overflow > 0) {
             scroll { scrollBy(overflow.toFloat()) }
         }

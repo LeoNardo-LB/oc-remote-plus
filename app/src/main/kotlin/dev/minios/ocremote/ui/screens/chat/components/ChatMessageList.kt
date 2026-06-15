@@ -100,6 +100,7 @@ fun ChatMessageList(
     keyboardController: SoftwareKeyboardController?,
     viewModel: ChatViewModel,
     navigateToChildSession: (String) -> Unit,
+    onScrollToBottom: () -> Unit,
     agents: List<dev.minios.ocremote.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -392,11 +393,7 @@ fun ChatMessageList(
             // Scroll-to-bottom FAB
             if (!isAtBottom) {
                 SmallFloatingActionButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            listState.snapToBottom()
-                        }
-                    },
+                    onClick = onScrollToBottom,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = SpacingTokens.SM.dp),
@@ -543,14 +540,4 @@ private fun RetryBanner(retry: SessionStatus.Retry) {
  * Instant snap to bottom for explicit user actions (FAB click).
  */
 private suspend fun LazyListState.snapToBottom() {
-    val lastIndex = layoutInfo.totalItemsCount - 1
-    if (lastIndex < 0) return
-    scrollToItem(lastIndex)
-    var attempts = 0
-    while (canScrollForward && attempts < 3) {
-        delay(16)
-        if (!canScrollForward) return
-        scroll { scrollBy(10_000f) }
-        attempts++
-    }
 }
