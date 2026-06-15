@@ -590,17 +590,16 @@ class ChatViewModel @Inject constructor(
             } else {
                 val sorted = sessionMessages.sortedBy { it.time.created }
                 if (revertState != null) {
-                    // Check if a new AI response has started after the revert point.
-                    // If so, the server has consumed the revert — stop filtering to
-                    // avoid hiding the new response. This replaces the old
-                    // clearRevert() call in sendMessage that caused flash of old messages.
-                    val hasNewContent = sorted.any {
-                        it.id > revertState.messageId
-                    }
-                    if (hasNewContent) {
+                    // Revert filter: only show messages up to and including the revert point.
+                    // Use index-based filtering (not id comparison) for correctness.
+                    // When session becomes Busy (new AI response), stop filtering —
+                    // the server has already deleted old messages via SSE.
+                    val fsmStatus = statuses[sid] ?: SessionStatus.Idle
+                    if (fsmStatus is SessionStatus.Busy || fsmStatus is SessionStatus.Retry) {
                         sorted
                     } else {
-                        sorted.filter { it.id < revertState.messageId }
+                        val revertIdx = sorted.indexOfFirst { it.id == revertState.messageId }
+                        if (revertIdx >= 0) sorted.subList(0, revertIdx + 1) else sorted
                     }
                 } else {
                     sorted
