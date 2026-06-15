@@ -183,7 +183,6 @@ import dev.minios.ocremote.ui.screens.chat.util.formatTokenCount
 import dev.minios.ocremote.ui.screens.chat.util.formatAssistantErrorMessage
 import dev.minios.ocremote.ui.screens.chat.util.formatDuration
 import dev.minios.ocremote.ui.screens.chat.util.resolveUserCommandLabel
-import dev.minios.ocremote.ui.screens.chat.util.ScrollPositionChecker
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.codeHorizontalScroll
 import dev.minios.ocremote.ui.screens.chat.util.LocalChatFontSize
