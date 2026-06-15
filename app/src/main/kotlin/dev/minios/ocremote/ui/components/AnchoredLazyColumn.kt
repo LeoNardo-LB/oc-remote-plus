@@ -362,9 +362,12 @@ private fun SubcomposeMeasureScope.measureAnchoredItems(
     isAtBottom: Boolean
 ): MeasureResult {
     // === helper: measure + wrap ===
+    // 用 index 做 slot ID（保证唯一），key 仅用于 scroll position 追踪
+    // displayItems 中可能有重复的 message ID（如 turnGroups 展开），
+    // SubcomposeLayout 要求 slot ID 唯一，用 index 规避
     fun getAndMeasure(index: Int): MeasureItem {
         val item = items[index]
-        val measurables = subcompose(item.key) { item.content() }
+        val measurables = subcompose(index) { item.content() }
         val placeables = measurables.map { it.measure(childConstraints) }
         val itemSpacing = if (index == itemCount - 1) 0 else spacing
         return MeasureItem(index, placeables, item.key, itemSpacing)
