@@ -382,6 +382,35 @@ fun ChatScreen(
     // IME scroll LaunchedEffect removed — reverseLayout=true anchors at bottom,
     // keyboard push content naturally without explicit scroll.
 
+    // Scroll anchor lock: prevent viewport drift during SSE streaming.
+    //
+    // reverseLayout=true does NOT anchor scroll position when the bottom item
+    // (streaming message) grows in height — the growth pushes upper content
+    // downward, perceived as "being pulled toward the bottom". This effect
+    // locks the visual top item's offset; when non-user layout changes shift
+    // it, scrollBy compensates immediately to keep the viewport stable.
+    LaunchedEffect(Unit) {
+        var anchorKey: Any? = null
+        var anchorOffset = 0
+
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val top = info.visibleItemsInfo.lastOrNull()
+            Triple(top?.key, top?.offset ?: 0, listState.isScrollInProgress)
+        }.collect { (key, offset, scrolling) ->
+            if (key == null) return@collect
+            if (scrolling || isAtBottom) {
+                anchorKey = key
+                anchorOffset = offset
+            } else if (key == anchorKey && offset != anchorOffset) {
+                listState.scroll { scrollBy((offset - anchorOffset).toFloat()) }
+            } else if (key != anchorKey) {
+                anchorKey = key
+                anchorOffset = offset
+            }
+        }
+    }
+
     // @ file mention state
     val fileSearchResults by viewModel.fileSearchResults.collectAsStateWithLifecycle()
     val confirmedFilePaths by viewModel.confirmedFilePaths.collectAsStateWithLifecycle()
