@@ -590,16 +590,24 @@ class ChatViewModel @Inject constructor(
             } else {
                 val sorted = sessionMessages.sortedBy { it.time.created }
                 if (revertState != null) {
-                    // Revert filter: only show messages up to and including the revert point.
-                    // Use index-based filtering (not id comparison) for correctness.
-                    // When session becomes Busy (new AI response), stop filtering —
-                    // the server has already deleted old messages via SSE.
-                    val fsmStatus = statuses[sid] ?: SessionStatus.Idle
-                    if (fsmStatus is SessionStatus.Busy || fsmStatus is SessionStatus.Retry) {
-                        sorted
+                    // Revert filter: show messages up to revert point.
+                    // When a NEW user message appears after revert point,
+                    // show it and everything after it (new conversation branch).
+                    // Old AI replies between revert point and new user message are skipped.
+                    val revertIdx = sorted.indexOfFirst { it.id == revertState.messageId }
+                    if (revertIdx >= 0) {
+                        val beforeRevert = sorted.take(revertIdx + 1)
+                        val afterRevert = sorted.drop(revertIdx + 1)
+                        val newPromptIdx = afterRevert.indexOfFirst { it.role == "user" }
+                        if (newPromptIdx >= 0) {
+                            // New prompt sent — show before-revert + new branch
+                            beforeRevert + afterRevert.drop(newPromptIdx)
+                        } else {
+                            // No new prompt yet — hide everything after revert
+                            beforeRevert
+                        }
                     } else {
-                        val revertIdx = sorted.indexOfFirst { it.id == revertState.messageId }
-                        if (revertIdx >= 0) sorted.subList(0, revertIdx + 1) else sorted
+                        sorted
                     }
                 } else {
                     sorted
