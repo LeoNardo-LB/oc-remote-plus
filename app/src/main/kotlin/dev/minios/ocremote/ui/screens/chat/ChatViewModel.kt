@@ -1912,16 +1912,21 @@ class ChatViewModel @Inject constructor(
                     sseJob = null
                     runCatching { sessionRepository.abort(serverId, sessionId, sessionDirectory) }
                     sessionRepository.markSessionIdle(sessionId)
-                    runCatching { startObservingMessages() }
+                    // NOTE: startObservingMessages deferred to after setRevert below
                 }
 
                 undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
 
-                // Set local revert state immediately — don't wait for SSE events.
-                // Without this, the new SSE connection may push the old (pre-revert)
-                // message snapshot, causing the reverted content to flash briefly.
+                // Set local revert state BEFORE reconnecting SSE.
+                // This ensures the message filter (id < revertState.messageId)
+                // is active when the new SSE connection pushes messages.
                 chatRepository.setRevert(sessionId, messageId)
+
+                // Reconnect SSE now — old messages will be filtered by revert state.
+                if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
+                    runCatching { startObservingMessages() }
+                }
 
                 val targetMessage = messageListState.value.messages
                     .firstOrNull { it.message.id == messageId && it.isUser }
