@@ -1,6 +1,5 @@
 package dev.minios.ocremote.ui.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clipScrollableContainer
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollScope
@@ -12,11 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.lazy.layout.LazyLayout
-import androidx.compose.foundation.lazy.layout.LazyLayoutItemProvider
-import androidx.compose.foundation.lazy.layout.LazyLayoutMeasurePolicy
-import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
-import androidx.compose.foundation.lazy.layout.getDefaultLazyLayoutKey
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +21,8 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.Remeasurement
 import androidx.compose.ui.layout.RemeasurementModifier
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.SubcomposeMeasureScope
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
@@ -36,7 +32,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * 一个基于 Compose [LazyLayout] 公共 API 的自定义垂直列表，核心能力是
+ * 一个基于 Compose [SubcomposeLayout] 的自定义垂直列表，核心能力是
  * **scroll anchoring**：在 reverseLayout 中当 item 增长时（如 SSE 流式输出），
  * 保持用户视窗稳定，避免被"拖着走"。
  *
@@ -64,7 +60,7 @@ class AnchoredLazyListScope {
     fun item(key: Any? = null, contentType: Any? = null, content: @Composable () -> Unit) {
         items.add(
             AnchoredItem(
-                key = key ?: getDefaultLazyLayoutKey(items.size),
+                key = key ?: items.size,
                 contentType = contentType,
                 content = content
             )
@@ -141,7 +137,7 @@ class AnchoredLazyListState(
 
     private var remeasurement: Remeasurement? = null
 
-    /** 作为 Modifier.Element 提供给 LazyLayout，以获取 [Remeasurement] 句柄。 */
+    /** 作为 Modifier.Element 提供给布局，以获取 [Remeasurement] 句柄。 */
     internal val remeasurementModifierElement: Modifier.Element = object : RemeasurementModifier {
         override fun onRemeasurementAvailable(remeasurement: Remeasurement) {
             this@AnchoredLazyListState.remeasurement = remeasurement
@@ -227,7 +223,6 @@ class AnchoredLazyListState(
  *                   （让 auto-scroll 自然跟随）；为 false 时启用 anchoring，保持视窗稳定。
  * @param reverseLayout 默认 true：index 0 渲染在底部（适合聊天消息流）。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AnchoredLazyColumn(
     state: AnchoredLazyListState,
@@ -242,26 +237,9 @@ fun AnchoredLazyColumn(
     // 1. 构建 item 列表。content 作为 key —— 调用方应传稳定 lambda。
     val items = remember(content) { AnchoredLazyListScope().apply(content).items }
 
-    // 2. item provider（稳定实例，items 变化时重建）。
-    val itemProvider = remember(items) { AnchoredItemProvider(items) }
-
-    // 3. measure policy。捕获 itemProvider 与配置参数；任一变化时重建。
-    val measurePolicy: LazyLayoutMeasurePolicy =
-        remember(state, contentPadding, reverseLayout, verticalArrangement, isAtBottom, itemProvider) {
-            anchoredMeasurePolicy(
-                state = state,
-                itemProvider = itemProvider,
-                contentPadding = contentPadding,
-                reverseLayout = reverseLayout,
-                isAtBottom = isAtBottom,
-                spacingProvider = { verticalArrangement.spacing }
-            )
-        }
-
     val interactionSource = remember { MutableInteractionSource() }
 
-    LazyLayout(
-        itemProvider = { itemProvider },
+    SubcomposeLayout(
         modifier = modifier
             .then(state.remeasurementModifierElement)
             .clipScrollableContainer(Orientation.Vertical) // Fix #1: 裁剪主轴方向
@@ -272,30 +250,55 @@ fun AnchoredLazyColumn(
                 enabled = userScrollEnabled,
                 flingBehavior = ScrollableDefaults.flingBehavior(),
                 interactionSource = interactionSource
-            ),
-        prefetchState = null,
-        measurePolicy = measurePolicy
-    )
-}
+            )
+    ) { constraints ->
+        val topPadding = contentPadding.calculateTopPadding().roundToPx()
+        val bottomPadding = contentPadding.calculateBottomPadding().roundToPx()
+        val startPadding = contentPadding.calculateStartPadding(layoutDirection).roundToPx()
+        val endPadding = contentPadding.calculateEndPadding(layoutDirection).roundToPx()
+        val spacing = verticalArrangement.spacing.roundToPx()
 
-// =====================================================================================
-// ItemProvider
-// =====================================================================================
+        val beforeContentPadding = if (reverseLayout) bottomPadding else topPadding
+        val afterContentPadding = if (reverseLayout) topPadding else bottomPadding
+        val totalMainAxisPadding = beforeContentPadding + afterContentPadding
 
-@OptIn(ExperimentalFoundationApi::class)
-private class AnchoredItemProvider(
-    private val items: List<AnchoredItem>
-) : LazyLayoutItemProvider {
+        val mainAxisAvailableSize = (constraints.maxHeight - topPadding - bottomPadding).coerceAtLeast(0)
+        val childConstraints = Constraints(
+            minWidth = 0,
+            maxWidth = if (constraints.maxWidth == Constraints.Infinity)
+                Constraints.Infinity
+            else
+                (constraints.maxWidth - startPadding - endPadding).coerceAtLeast(0),
+            minHeight = 0,
+            maxHeight = Constraints.Infinity
+        )
 
-    override val itemCount: Int get() = items.size
+        val itemCount = items.size
 
-    override fun getContentType(index: Int): Any? = items[index].contentType
-
-    override fun getKey(index: Int): Any = items[index].key
-
-    @Composable
-    override fun Item(index: Int, key: Any) {
-        items[index].content()
+        if (itemCount == 0) {
+            state.canScrollForward = false
+            state.canScrollBackward = false
+            state.prevItemSizes.clear()
+            layout(constraints.constrainWidth(constraints.maxWidth), constraints.maxHeight) {}
+        } else {
+            measureAnchoredItems(
+                constraints = constraints,
+                items = items,
+                itemCount = itemCount,
+                topPadding = topPadding,
+                bottomPadding = bottomPadding,
+                startPadding = startPadding,
+                endPadding = endPadding,
+                beforeContentPadding = beforeContentPadding,
+                afterContentPadding = afterContentPadding,
+                spacing = spacing,
+                mainAxisAvailableSize = mainAxisAvailableSize,
+                childConstraints = childConstraints,
+                state = state,
+                reverseLayout = reverseLayout,
+                isAtBottom = isAtBottom
+            )
+        }
     }
 }
 
@@ -336,75 +339,14 @@ private class MeasureItem(
 }
 
 /**
- * 构造 measure policy。
- */
-@OptIn(ExperimentalFoundationApi::class)
-private fun anchoredMeasurePolicy(
-    state: AnchoredLazyListState,
-    itemProvider: AnchoredItemProvider,
-    contentPadding: PaddingValues,
-    reverseLayout: Boolean,
-    isAtBottom: Boolean,
-    spacingProvider: () -> androidx.compose.ui.unit.Dp
-): LazyLayoutMeasurePolicy = LazyLayoutMeasurePolicy { constraints ->
-    val topPadding = contentPadding.calculateTopPadding().roundToPx()
-    val bottomPadding = contentPadding.calculateBottomPadding().roundToPx()
-    val startPadding = contentPadding.calculateStartPadding(layoutDirection).roundToPx()
-    val endPadding = contentPadding.calculateEndPadding(layoutDirection).roundToPx()
-    val spacing = spacingProvider().roundToPx()
-
-    val beforeContentPadding = if (reverseLayout) bottomPadding else topPadding
-    val afterContentPadding = if (reverseLayout) topPadding else bottomPadding
-    val totalMainAxisPadding = beforeContentPadding + afterContentPadding
-
-    val mainAxisAvailableSize = (constraints.maxHeight - topPadding - bottomPadding).coerceAtLeast(0)
-    val childConstraints = Constraints(
-        minWidth = 0,
-        maxWidth = if (constraints.maxWidth == Constraints.Infinity)
-            Constraints.Infinity
-        else
-            (constraints.maxWidth - startPadding - endPadding).coerceAtLeast(0),
-        minHeight = 0,
-        maxHeight = Constraints.Infinity
-    )
-
-    val itemCount = itemProvider.itemCount
-
-    if (itemCount == 0) {
-        state.canScrollForward = false
-        state.canScrollBackward = false
-        state.prevItemSizes.clear()
-        layout(constraints.constrainWidth(constraints.maxWidth), constraints.maxHeight) {}
-    } else {
-        measureAnchoredItems(
-            constraints = constraints,
-            itemCount = itemCount,
-            topPadding = topPadding,
-            bottomPadding = bottomPadding,
-            startPadding = startPadding,
-            endPadding = endPadding,
-            beforeContentPadding = beforeContentPadding,
-            afterContentPadding = afterContentPadding,
-            spacing = spacing,
-            mainAxisAvailableSize = mainAxisAvailableSize,
-            childConstraints = childConstraints,
-            state = state,
-            itemProvider = itemProvider,
-            reverseLayout = reverseLayout,
-            isAtBottom = isAtBottom
-        )
-    }
-}
-
-/**
  * 核心算法——逐行翻译自 measureLazyList。
  *
  * 剥离项：animation、prefetch、lookahead pass、stickyHeaders、beyondBounds。
  * 新增项：scroll anchoring（step 7）。
  */
-@OptIn(ExperimentalFoundationApi::class)
-private fun LazyLayoutMeasureScope.measureAnchoredItems(
+private fun SubcomposeMeasureScope.measureAnchoredItems(
     constraints: Constraints,
+    items: List<AnchoredItem>,
     itemCount: Int,
     topPadding: Int,
     bottomPadding: Int,
@@ -416,25 +358,25 @@ private fun LazyLayoutMeasureScope.measureAnchoredItems(
     mainAxisAvailableSize: Int,
     childConstraints: Constraints,
     state: AnchoredLazyListState,
-    itemProvider: AnchoredItemProvider,
     reverseLayout: Boolean,
     isAtBottom: Boolean
 ): MeasureResult {
     // === helper: measure + wrap ===
     fun getAndMeasure(index: Int): MeasureItem {
-        val key = itemProvider.getKey(index)
-        val placeables = measure(index, childConstraints)
+        val item = items[index]
+        val measurables = subcompose(item.key) { item.content() }
+        val placeables = measurables.map { it.measure(childConstraints) }
         val itemSpacing = if (index == itemCount - 1) 0 else spacing
-        return MeasureItem(index, placeables, key, itemSpacing)
+        return MeasureItem(index, placeables, item.key, itemSpacing)
     }
 
     // --- 1. 初始位置（key-based 追踪）---
     var currentFirstItemIndex = state.firstVisibleItemIndex.coerceIn(0, itemCount - 1)
     val savedKey = state.lastKnownFirstItemKey
     if (savedKey != null && currentFirstItemIndex < itemCount &&
-        itemProvider.getKey(currentFirstItemIndex) != savedKey
+        items[currentFirstItemIndex].key != savedKey
     ) {
-        val newIndex = itemProvider.getIndex(savedKey)
+        val newIndex = items.indexOfFirst { it.key == savedKey }
         if (newIndex >= 0) currentFirstItemIndex = newIndex
     }
     var currentFirstItemScrollOffset = state.firstVisibleItemScrollOffset
