@@ -310,68 +310,13 @@ fun ChatScreen(
     }
 
     // reverseLayout=true: item 0 = newest at bottom.
-    // DIAGNOSTIC: scrollToItem(0) temporarily disabled to test if drift
-    // is caused by it. New messages should still appear at bottom naturally
-    // due to reverseLayout=true anchor behavior.
+    // Scroll to bottom when new messages arrive AND user is at bottom AND
+    // not actively scrolling (prevents race with user gestures).
     val messageCount = messageState.messages.size
-
-    // SSE drift compensation + diagnostic logging.
-    // Logs to: /sdcard/Download/scroll_debug.log
-    val debugContext = LocalContext.current
-    val logFile = remember {
-        val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-        java.io.File(downloadDir, "scroll_debug.log").apply {
-            writeText("") // Clear on each app launch
+    LaunchedEffect(messageCount) {
+        if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
+            listState.scrollToItem(0)
         }
-    }
-
-    LaunchedEffect(Unit) {
-        var prevOffsets: Map<Any, Int> = emptyMap()
-        var prevIndex = listState.firstVisibleItemIndex
-        var prevOffset = listState.firstVisibleItemScrollOffset
-        var prevTotalSize = 0
-        var prevScrolling = false
-        var firstLog = true
-
-        snapshotFlow { listState.layoutInfo to listState.isScrollInProgress }
-            .collect { (info, scrolling) ->
-                val visible = info.visibleItemsInfo
-                val currentOffsets: Map<Any, Int> = visible.associate { it.key to it.offset }
-                val totalSize = visible.sumOf { it.size }
-                val fvi = listState.firstVisibleItemIndex
-                val fvo = listState.firstVisibleItemScrollOffset
-
-                val firstKey = visible.firstOrNull()?.key
-                val commonKey = prevOffsets.keys
-                    .intersect(currentOffsets.keys)
-                    .firstOrNull { it != firstKey }
-                val pinDrift = if (!scrolling && commonKey != null) {
-                    currentOffsets[commonKey]!! - prevOffsets[commonKey]!!
-                } else 0
-                val fvoDrift = if (!scrolling && fvi == prevIndex) fvo - prevOffset else 0
-                val sizeDelta = totalSize - prevTotalSize
-                val itemsChanged = currentOffsets.keys != prevOffsets.keys
-
-                // Only log when something actually changes
-                val shouldLog = firstLog || pinDrift != 0 || fvoDrift != 0 ||
-                    sizeDelta != 0 || itemsChanged || scrolling != prevScrolling
-                if (shouldLog) {
-                    val line = "fvi=$fvi fvo=$fvo pinDrift=$pinDrift sizeDelta=$sizeDelta " +
-                        "nItems=${visible.size} scroll=$scrolling\n"
-                    android.util.Log.d("ScrollDebug", line.trim())
-                    try {
-                        if (logFile.length() > 500_000) logFile.writeText(line)
-                        else logFile.appendText(line)
-                    } catch (_: Exception) { }
-                    firstLog = false
-                }
-
-                prevOffsets = currentOffsets
-                prevIndex = fvi
-                prevOffset = fvo
-                prevTotalSize = totalSize
-                prevScrolling = scrolling
-            }
     }
 
     // Restore scroll position when returning from sub-session navigation.

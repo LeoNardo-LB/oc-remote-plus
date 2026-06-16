@@ -231,6 +231,10 @@ class ChatViewModel @Inject constructor(
     private val sessionStatusManager: SessionStatusManager,
 ) : ViewModel() {
 
+    /** Snapshot of message IDs at the time of revert. Used to distinguish
+     *  old messages (should be hidden) from new messages (should be shown). */
+    private var messageIdsAtRevert: Set<String> = emptySet()
+
     // ============ Loading & Error State ============
     private val _isLoading = MutableStateFlow(true)
     private val _isRefreshing = MutableStateFlow(false)  // Background refresh — no UI wipe
@@ -591,21 +595,15 @@ class ChatViewModel @Inject constructor(
                 val sorted = sessionMessages.sortedBy { it.time.created }
                 if (revertState != null) {
                     // Revert filter: show messages up to revert point.
-                    // When a NEW user message appears after revert point,
-                    // show it and everything after it (new conversation branch).
-                    // Old AI replies between revert point and new user message are skipped.
+                    // Only messages NOT in the snapshot at revert time are "new"
+                    // (sent by user after reverting) — those are shown too.
                     val revertIdx = sorted.indexOfFirst { it.id == revertState.messageId }
                     if (revertIdx >= 0) {
                         val beforeRevert = sorted.take(revertIdx + 1)
                         val afterRevert = sorted.drop(revertIdx + 1)
-                        val newPromptIdx = afterRevert.indexOfFirst { it.role == "user" }
-                        if (newPromptIdx >= 0) {
-                            // New prompt sent — show before-revert + new branch
-                            beforeRevert + afterRevert.drop(newPromptIdx)
-                        } else {
-                            // No new prompt yet — hide everything after revert
-                            beforeRevert
-                        }
+                        // New messages = ones whose ID wasn't in the list when revert happened
+                        val newMessages = afterRevert.filterNot { it.id in messageIdsAtRevert }
+                        beforeRevert + newMessages
                     } else {
                         sorted
                     }
@@ -1932,6 +1930,10 @@ class ChatViewModel @Inject constructor(
 
                 undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
+
+                // Snapshot message IDs at revert time — used by messageListState
+                // combine to distinguish old messages (hidden) from new ones (shown).
+                messageIdsAtRevert = messageListState.value.messages.map { it.message.id }.toSet()
 
                 // Set local revert state BEFORE reconnecting SSE.
                 // This ensures the message filter (id < revertState.messageId)
