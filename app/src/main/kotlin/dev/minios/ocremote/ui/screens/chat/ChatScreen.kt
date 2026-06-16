@@ -957,6 +957,7 @@ fun ChatScreen(
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
                                 agents = modelConfig.agents,
+
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -979,6 +980,7 @@ fun ChatScreen(
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
                                 agents = modelConfig.agents,
+
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

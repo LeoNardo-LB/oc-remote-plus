@@ -349,7 +349,6 @@ class ChatViewModel @Inject constructor(
     val collapseTools = settingsRepository.getSettingsFlow().map { it.collapseTools }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-
     // ============ Optimistic Send ============
 
     /** Locally-generated IDs for optimistic messages. Used to distinguish from server-confirmed. */
