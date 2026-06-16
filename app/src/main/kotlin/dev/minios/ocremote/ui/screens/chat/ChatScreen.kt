@@ -310,10 +310,9 @@ fun ChatScreen(
     }
 
     // SSE drift compensation: when the streaming message grows in height
-    // and user is NOT at bottom, the LazyColumn anchor drags the viewport
-    // down. We counteract with scrollBy(delta) to keep the viewport stable.
-    // This preserves normal scroll behavior (continuous reading) while
-    // eliminating the "drag" effect during SSE streaming.
+    // and user is NOT at bottom, the LazyColumn anchor drags the viewport.
+    // We use requestScrollToItem to pin the scroll position, overriding the
+    // anchor in the same/next measure pass — declarative, no scroll lock.
     val streamingMsgId = remember(messageState.messages) {
         messageState.messages.lastOrNull {
             it.isAssistant && it.message.time.completed == null
@@ -322,6 +321,8 @@ fun ChatScreen(
     LaunchedEffect(streamingMsgId) {
         if (streamingMsgId == null) return@LaunchedEffect
         var prevSize: Int? = null
+        var prevFirstIndex: Int = 0
+        var prevFirstOffset: Int = 0
         snapshotFlow {
             Triple(
                 listState.layoutInfo,
@@ -341,11 +342,14 @@ fun ChatScreen(
             if (prevSize != null) {
                 val delta = item.size - prevSize!!
                 if (delta > 0) {
-                    // Anchor reduced offset by delta; scrollBy to restore it.
-                    listState.scroll { scrollBy(delta.toFloat()) }
+                    // SSE grew item by delta. Anchor will reduce offset.
+                    // Request the previous frame's position to override anchor.
+                    listState.requestScrollToItem(prevFirstIndex, prevFirstOffset)
                 }
             }
             prevSize = item.size
+            prevFirstIndex = listState.firstVisibleItemIndex
+            prevFirstOffset = listState.firstVisibleItemScrollOffset
         }
     }
 
