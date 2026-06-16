@@ -310,11 +310,45 @@ fun ChatScreen(
     }
 
     // reverseLayout=true: item 0 = newest at bottom.
-    // Only scrollToItem(0) when at bottom AND new messages arrive.
+    // Only scrollToItem(0) when at bottom AND new messages arrive AND
+    // user is not actively scrolling (prevents race with user gestures).
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
-        if (messageCount > 0 && autoScrollEnabled) {
+        if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
             listState.scrollToItem(0)
+        }
+    }
+
+    // SSE drift compensation (requires animateContentSize disabled).
+    // With animations off, height changes are instantaneous steps. Each step
+    // triggers a full LazyColumn measure pass where firstVisibleItemScrollOffset
+    // may shift. This effect detects that shift and reverses it with scrollBy.
+    LaunchedEffect(Unit) {
+        var prevIndex = listState.firstVisibleItemIndex
+        var prevOffset = listState.firstVisibleItemScrollOffset
+
+        snapshotFlow {
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                listState.isScrollInProgress
+            )
+        }.collect { (index, offset, scrolling) ->
+            if (scrolling) {
+                prevIndex = index
+                prevOffset = offset
+                return@collect
+            }
+            if (index == prevIndex) {
+                val drift = offset - prevOffset
+                if (drift != 0) {
+                    listState.scroll { scrollBy(-drift.toFloat()) }
+                    // Don't update prevOffset — compensation should restore it
+                }
+            } else {
+                prevIndex = index
+                prevOffset = offset
+            }
         }
     }
 
