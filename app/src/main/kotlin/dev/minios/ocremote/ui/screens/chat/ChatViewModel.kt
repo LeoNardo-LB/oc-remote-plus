@@ -598,7 +598,7 @@ class ChatViewModel @Inject constructor(
                     // Message IDs are ULID (monotonically increasing), so
                     // id <= revertId correctly includes the revert point and
                     // everything before it.
-                    sorted.filter { it.id <= revertState.messageId }
+                    sorted.filter { it.id < revertState.messageId }
                 } else {
                     sorted
                 }
