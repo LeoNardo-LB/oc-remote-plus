@@ -194,6 +194,7 @@ gh release create "v2.0.0-beta.XX-dev" \
 - `gh` CLI 不走代理，直接用直连（不加 `HTTP_PROXY`）
 - APK 路径：beta → `app/build/outputs/apk/beta/release/app-beta-release.apk`；dev → `app/build/outputs/apk/dev/release/app-dev-release.apk`
 - **完整步骤顺序**：bump version → commit → build → push master → tag → push tag → `gh release create`（附 APK）
+  - **严禁颠倒 bump 和 build 的顺序**：必须在 `version.properties` 修改完成后再执行 `assemble*`，否则 APK 内嵌的版本号与 tag/release 名称不一致
 
 ### Gradle Timeout
 执行 Gradle 命令时必须设置合理的超时时间，禁止无超时裸跑：
