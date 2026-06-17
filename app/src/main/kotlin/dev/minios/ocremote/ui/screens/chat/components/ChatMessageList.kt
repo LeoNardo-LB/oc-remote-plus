@@ -61,8 +61,7 @@ import dev.minios.ocremote.domain.model.SessionStatus
 import dev.minios.ocremote.domain.model.StepProgressInfo
 import dev.minios.ocremote.domain.model.ToolProgressInfo
 import dev.minios.ocremote.ui.components.ConfirmDialog
-import dev.minios.ocremote.ui.components.DialogButtonRole
-import dev.minios.ocremote.ui.components.DialogButtons
+import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.ui.screens.chat.ChatMessage
 import dev.minios.ocremote.ui.screens.chat.ChatViewModel
 import dev.minios.ocremote.ui.screens.chat.InteractionState
@@ -71,7 +70,6 @@ import dev.minios.ocremote.ui.screens.chat.SessionMetaState
 import dev.minios.ocremote.ui.screens.chat.dialog.PermissionCard
 import dev.minios.ocremote.ui.screens.chat.dialog.QuestionCard
 import dev.minios.ocremote.ui.screens.chat.components.AlwaysConfirmDialog
-import dev.minios.ocremote.domain.model.SseEvent
 import dev.minios.ocremote.ui.screens.chat.snapToBottom
 import dev.minios.ocremote.ui.screens.chat.util.computeTurnGroups
 import kotlinx.coroutines.CoroutineScope
@@ -106,6 +104,7 @@ fun ChatMessageList(
     keyboardController: SoftwareKeyboardController?,
     viewModel: ChatViewModel,
     navigateToChildSession: (String) -> Unit,
+    onForceScrollToBottom: () -> Unit,
     agents: List<dev.minios.ocremote.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -178,66 +177,6 @@ fun ChatMessageList(
                     // Visual order (top→bottom): oldest msgs → newest msgs → revert → pending.
                     // Declaration order is bottom-up: pending (bottom) → messages (top).
 
-                    // Pending questions (declared first = bottom-most visually)
-                    // 批量问题操作栏 - 当有2个及以上问题时显示
-                    if (interaction.pendingQuestions.size > 1) {
-                        item(key = "question_batch_actions") {
-                            QuestionBatchActionBar(
-                                count = interaction.pendingQuestions.size,
-                                onSkipAll = {
-                                    interaction.pendingQuestions.forEach { question ->
-                                        viewModel.rejectQuestion(question.id)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    items(
-                        interaction.pendingQuestions.reversed(),
-                        key = { "question_${it.id}" }
-                    ) { question ->
-                        QuestionCard(
-                            question = question,
-                            onSubmit = { answers ->
-                                viewModel.replyToQuestion(question.id, answers)
-                            },
-                            onReject = {
-                                viewModel.rejectQuestion(question.id)
-                            }
-                        )
-                    }
-
-                    // 批量权限操作栏 - 当有2个及以上权限时显示
-                    if (interaction.pendingPermissions.size > 1) {
-                        item(key = "perm_batch_actions") {
-                            PermissionBatchActionBar(
-                                count = interaction.pendingPermissions.size,
-                                onAllowAll = {
-                                    interaction.pendingPermissions.forEach { perm ->
-                                        viewModel.replyToPermission(perm.id, "once")
-                                    }
-                                },
-                                onRejectAll = {
-                                    interaction.pendingPermissions.forEach { perm ->
-                                        viewModel.replyToPermission(perm.id, "reject")
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    // Pending permissions
-                    items(
-                        interaction.pendingPermissions.reversed(),
-                        key = { "perm_${it.id}" }
-                    ) { permission ->
-                        PermissionCard(
-                            permission = permission,
-                            onOnce = { viewModel.replyToPermission(permission.id, "once") },
-                            onAlways = { showAlwaysDialog = permission },
-                            onReject = { viewModel.replyToPermission(permission.id, "reject") }
-                        )
-                    }
-
                     // Revert banner
                     if (sessionMeta.revert != null) {
                         item(key = "revert_banner") {
@@ -249,6 +188,7 @@ fun ChatMessageList(
                                         )
                                     }
                                 }
+                                onForceScrollToBottom()
                             })
                         }
                     }
@@ -283,6 +223,44 @@ fun ChatMessageList(
                         item(key = "step_progress") {
                             StepProgressIndicator(stepInfo = currentStep)
                         }
+                    }
+
+                    // Pending questions — declared after banners so they render
+                    // just below the newest messages (closest to the input bar).
+                    items(
+                        interaction.pendingQuestions.reversed(),
+                        key = { "question_${it.id}" }
+                    ) { question ->
+                        QuestionCard(
+                            question = question,
+                            onSubmit = { answers ->
+                                viewModel.replyToQuestion(question.id, answers)
+                                onForceScrollToBottom()
+                            },
+                            onReject = {
+                                viewModel.rejectQuestion(question.id)
+                                onForceScrollToBottom()
+                            }
+                        )
+                    }
+
+                    // Pending permissions
+                    items(
+                        interaction.pendingPermissions.reversed(),
+                        key = { "perm_${it.id}" }
+                    ) { permission ->
+                        PermissionCard(
+                            permission = permission,
+                            onOnce = {
+                                viewModel.replyToPermission(permission.id, "once")
+                                onForceScrollToBottom()
+                            },
+                            onAlways = { showAlwaysDialog = permission },
+                            onReject = {
+                                viewModel.replyToPermission(permission.id, "reject")
+                                onForceScrollToBottom()
+                            }
+                        )
                     }
 
                     // Chat messages: displayItems is already newest-first (descending).
@@ -420,6 +398,7 @@ fun ChatMessageList(
                                                     )
                                                 }
                                             }
+                                            onForceScrollToBottom()
                                         }
                                     } else null,
                                     onCopyText = {
@@ -466,6 +445,7 @@ fun ChatMessageList(
                     )
                 }
             }
+
             // Always-allow confirmation dialog
             showAlwaysDialog?.let { perm ->
                 AlwaysConfirmDialog(
@@ -483,78 +463,6 @@ fun ChatMessageList(
     } // Column
 }
 
-
-/**
- * 批量权限操作栏：全部允许 / 全部拒绝
- */
-@Composable
-private fun PermissionBatchActionBar(
-    count: Int,
-    onAllowAll: () -> Unit,
-    onRejectAll: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = SpacingTokens.LG.dp),
-        shape = ShapeTokens.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        tonalElevation = 1.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = SpacingTokens.LG.dp, vertical = SpacingTokens.SM.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "$count 项权限请求",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            DialogButtons(
-                buttons = listOf(
-                    Triple("全部拒绝", DialogButtonRole.Danger) { onRejectAll() },
-                    Triple("全部允许", DialogButtonRole.Primary) { onAllowAll() },
-                )
-            )
-        }
-    }
-}
-
-/**
- * 批量问题操作栏：全部跳过（question 的 reply 需要 answers 参数，批量回答不实际）
- */
-@Composable
-private fun QuestionBatchActionBar(
-    count: Int,
-    onSkipAll: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = SpacingTokens.LG.dp, vertical = SpacingTokens.XS.dp),
-        shape = ShapeTokens.medium,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        tonalElevation = 1.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = SpacingTokens.LG.dp, vertical = SpacingTokens.SM.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "$count 项问题请求",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-            DialogButtons(
-                buttons = listOf(
-                    Triple("全部跳过", DialogButtonRole.Secondary) { onSkipAll() },
-                )
-            )
-        }
-    }
-}
 
 @Composable
 private fun RetryBanner(retry: SessionStatus.Retry) {

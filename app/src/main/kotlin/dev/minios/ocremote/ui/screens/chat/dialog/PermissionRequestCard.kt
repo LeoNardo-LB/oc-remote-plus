@@ -141,8 +141,9 @@ internal fun PermissionCard(
                     },
                     Triple(stringResource(R.string.permission_allow_always), DialogButtonRole.Secondary) {
                         if (!submitted) {
-                            performHaptic(hapticView, hapticOn); submitted = true; onAlways()
-                            scope.launch { delay(5_000); submitted = false }
+                            performHaptic(hapticView, hapticOn); onAlways()
+                            // Don't set submitted=true here — onAlways opens a confirmation dialog.
+                            // submitted is set when the user actually confirms (onConfirm in AlwaysConfirmDialog).
                         }
                     },
                 )

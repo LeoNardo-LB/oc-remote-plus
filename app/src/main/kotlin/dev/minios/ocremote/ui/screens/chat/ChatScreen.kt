@@ -240,6 +240,7 @@ import dev.minios.ocremote.ui.screens.chat.terminal.ChatTerminalView
 import dev.minios.ocremote.ui.screens.chat.dialog.RenameSessionDialog
 import dev.minios.ocremote.ui.screens.chat.dialog.SendConfirmDialog
 import dev.minios.ocremote.ui.theme.AlphaTokens
+import dev.minios.ocremote.ui.theme.SpacingTokens
 
 
 /**
@@ -294,6 +295,10 @@ fun ChatScreen(
     // Whether auto-scroll should follow new content.
     var autoScrollEnabled by remember { mutableStateOf(true) }
 
+    // Force scroll trigger — incremented by user actions to force-scroll to bottom
+    // regardless of autoScrollEnabled. Each tick forces a snapToBottom().
+    var forceScrollTick by remember { mutableIntStateOf(0) }
+
     // True when the very bottom of the list is visible (50px tolerance)
     val isAtBottom by remember {
         derivedStateOf {
@@ -321,7 +326,25 @@ fun ChatScreen(
         }
     }
 
-    // Restore scroll position when returning from sub-session navigation.
+    // Force-scroll to bottom on explicit user actions (send, command, compact, etc.)
+    LaunchedEffect(forceScrollTick) {
+        if (forceScrollTick > 0) {
+            listState.snapToBottom()
+        }
+    }
+
+    // Auto-scroll to bottom when a pending question/permission arrives,
+    // so the user immediately sees the newly rendered card.
+    val pendingCount = interaction.pendingQuestions.size + interaction.pendingPermissions.size
+    LaunchedEffect(pendingCount) {
+        if (pendingCount > 0) {
+            // Wait until the list has items to scroll to.
+            snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
+            listState.snapToBottom()
+        }
+    }
+
+    // Restore scroll positions when returning from sub-session navigation.
     LaunchedEffect(viewModel.scrollRestoreVersion) {
         val version = viewModel.scrollRestoreVersion
         if (version > 0) {
@@ -484,7 +507,27 @@ fun ChatScreen(
         LocalToolCardResolver provides viewModel.toolCardResolver,
     ) {
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    modifier = Modifier.padding(horizontal = SpacingTokens.LG.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    actionContentColor = MaterialTheme.colorScheme.primary,
+                    action = {
+                        TextButton(onClick = { data.dismiss() }) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.a11y_icon_close),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                ) {
+                    Text(data.visuals.message)
+                }
+            }
+        },
         topBar = {
             if (!isTerminalMode) {
                 Column {
@@ -519,6 +562,7 @@ fun ChatScreen(
                             }
                         },
                         onCompactSession = {
+                            forceScrollTick++
                             viewModel.compactSession { ok ->
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
@@ -528,6 +572,7 @@ fun ChatScreen(
                             }
                         },
                         onReviewChanges = {
+                            forceScrollTick++
                             viewModel.executeCommand("review") { ok ->
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(
@@ -680,6 +725,7 @@ fun ChatScreen(
                                     viewModel.clearConfirmedPaths()
                                     viewModel.clearFileSearch()
                                     viewModel.clearDraft()
+                                    forceScrollTick++
                                     return@doSend
                                 }
                                 // Detect slash commands (e.g., /skillname arguments)
@@ -703,6 +749,7 @@ fun ChatScreen(
                                         viewModel.clearConfirmedPaths()
                                         viewModel.clearFileSearch()
                                         viewModel.clearDraft()
+                                        forceScrollTick++
                                         return@doSend
                                     }
                                 }
@@ -720,13 +767,7 @@ fun ChatScreen(
                                 viewModel.sendMessage(allParts, attachmentParts)
                                 inputText = TextFieldValue("")
                                 attachmentHandler.clearAttachments()
-                                // Scroll to bottom after sending to follow the response
-                                coroutineScope.launch {
-                                    val currentCount = messageState.messages.size
-                                    snapshotFlow { messageState.messages.size }
-                                        .first { it > currentCount }
-                                    listState.scrollToItem(0)
-                                }
+                                forceScrollTick++
                                 viewModel.clearConfirmedPaths()
                                 viewModel.clearFileSearch()
                                 viewModel.clearDraft()
@@ -796,6 +837,7 @@ fun ChatScreen(
                                     onNavigateToSession("")  // Empty sessionId = lazy creation
                                 }
                                 "compact" -> {
+                                    forceScrollTick++
                                     viewModel.compactSession { ok ->
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
@@ -861,6 +903,7 @@ fun ChatScreen(
                                     inputMode = ChatInputMode.SHELL.name
                                 }
                                 "review" -> {
+                                    forceScrollTick++
                                     viewModel.executeCommand("review") { ok ->
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
@@ -870,6 +913,7 @@ fun ChatScreen(
                                     }
                                 }
                                 else -> {
+                                    forceScrollTick++
                                     viewModel.executeCommand(cmd.name) { ok ->
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
@@ -969,6 +1013,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 
                                 modifier = Modifier.fillMaxSize(),
@@ -992,6 +1037,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 
                                 modifier = Modifier.fillMaxSize(),
