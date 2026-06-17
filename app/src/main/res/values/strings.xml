@@ -226,13 +226,6 @@
     <string name="chat_tool_updating_tasks">Updating tasks…</string>
     <string name="chat_tool_thinking">Thinking…</string>
     <string name="chat_tool_running_tool">Running %1$s…</string>
-    <!-- Tool aggregation card -->
-    <string name="chat_context_gathering">正在收集上下文</string>
-    <string name="chat_context_gathered">已收集上下文</string>
-    <string name="chat_context_count_read">%1$d 次读取</string>
-    <string name="chat_context_count_search">%1$d 次搜索</string>
-    <string name="chat_context_count_list">%1$d 次列表</string>
-    <string name="chat_context_count_write">%1$d 次写入</string>
     <string name="chat_hint_ask">Ask a question…</string>
     <string name="chat_hint_fix">Fix the bug in…</string>
     <string name="chat_hint_refactor">Refactor the…</string>
