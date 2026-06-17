@@ -309,9 +309,12 @@ fun ChatMessageList(
                                     if (compensateState.shouldCompensate && !listState.isScrollInProgress) {
                                         val delta = realHeight - compensateState.lastHeight
                                         if (delta > 0) {
+                                            // Compensate delta + 20% to cover second-pass SSE growth
+                                            val compensated = (delta * 1.2f).toInt()
+                                            android.util.Log.d("FREEZE", "COMP: delta=$delta comp=$compensated real=$realHeight off=${listState.firstVisibleItemScrollOffset}")
                                             listState.requestScrollToItem(
                                                 listState.firstVisibleItemIndex,
-                                                listState.firstVisibleItemScrollOffset + delta
+                                                listState.firstVisibleItemScrollOffset + compensated
                                             )
                                         }
                                     }
