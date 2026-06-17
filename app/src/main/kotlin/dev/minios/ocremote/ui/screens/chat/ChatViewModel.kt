@@ -370,8 +370,11 @@ class ChatViewModel @Inject constructor(
     }
 
     // ============ Pagination ============
-    /** Number of messages to load per page. Doubles each "load older" click. */
-    private var currentMessageLimit = 20
+    /**
+     * Number of messages to load per page. Doubles each "load older" click.
+     * Refreshed from the user's initialMessageCount setting at the start of [loadSession].
+     */
+    private var currentMessageLimit = 30
     /** Whether there are more messages on the server beyond the current limit. */
     private val _hasOlderMessages = MutableStateFlow(false)
     /** Whether a "load older" request is in flight. */
@@ -944,6 +947,8 @@ class ChatViewModel @Inject constructor(
      * Load session info and messages via V1 API, then observe SSE-driven flows.
      */
     private suspend fun loadSession() {
+        // Apply user-configured initial message count as the pagination starting point
+        currentMessageLimit = settingsRepository.getSettingsFlow().first().initialMessageCount
         try {
             // 1. Load session info for directory / session metadata
             val session = manageSessionUseCase.getSession(serverId, sessionId)
@@ -962,7 +967,7 @@ class ChatViewModel @Inject constructor(
 
         // 2. Load messages via V1 API
         try {
-            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = 200)
+            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
             chatRepository.setMessages(sessionId, messages)
             if (BuildConfig.DEBUG) Log.d(TAG, "V1 loaded ${messages.size} messages for session $sessionId")
         } catch (e: Exception) {

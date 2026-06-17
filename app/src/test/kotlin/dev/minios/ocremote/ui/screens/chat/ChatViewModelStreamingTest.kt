@@ -334,4 +334,18 @@ class ChatViewModelStreamingTest {
 
         collectJob.cancel()
     }
+
+    // ========== Test 5: loadSession applies initialMessageCount from settings ==========
+
+    @Test
+    fun `loadSession applies initialMessageCount from settings as listMessages limit`() = runTest {
+        // Given: settings mock returns initialMessageCount = 50 (see setup)
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        // Then: listMessages must be called with limit = 50 (from AppSettings.initialMessageCount).
+        // Before this fix, loadSession hardcoded limit=200 and loadMessages used currentMessageLimit=20,
+        // so the user's "initial message count" setting was never consumed.
+        coVerify(atLeast = 1) { manageSessionUseCase.listMessages(any(), any(), eq(50)) }
+    }
 }
