@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,6 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import androidx.compose.material3.BasicAlertDialog
@@ -62,9 +65,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.filled.Search
 import dev.minios.ocremote.ui.components.amoledOutlinedTextFieldColors
@@ -114,7 +114,7 @@ fun SessionListScreen(
     // Dialog states
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameSessionId by remember { mutableStateOf("") }
-    var renameText by remember { mutableStateOf("") }
+    var renameText by remember { mutableStateOf(TextFieldValue("")) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteSessionId by remember { mutableStateOf("") }
@@ -156,48 +156,27 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
-                    // Overflow menu: only on sessions page (page 0)
+                    // Only on sessions page (page 0)
                     if (pagerState.currentPage == 0) {
-                        var menuExpanded by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { menuExpanded = true }) {
-                                Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = stringResource(R.string.a11y_icon_more_options),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.sessions_view_recent)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        if (currentViewMode != SessionViewMode.RECENT) {
-                                            viewModel.toggleViewMode()
-                                        }
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.sessions_view_folders)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        if (currentViewMode != SessionViewMode.FOLDER) {
-                                            viewModel.toggleViewMode()
-                                        }
-                                    }
-                                )
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.sessions_new)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        showOpenProject = true
-                                    }
-                                )
-                            }
+                        // Toggle view mode: recent <-> folders
+                        IconButton(onClick = { viewModel.toggleViewMode() }) {
+                            Icon(
+                                if (currentViewMode == SessionViewMode.RECENT) Icons.Default.Folder
+                                else Icons.AutoMirrored.Filled.List,
+                                contentDescription = stringResource(
+                                    if (currentViewMode == SessionViewMode.RECENT) R.string.sessions_view_folders
+                                    else R.string.sessions_view_recent
+                                ),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        // New session
+                        IconButton(onClick = { showOpenProject = true }) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = stringResource(R.string.sessions_new),
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 },
@@ -403,7 +382,11 @@ fun SessionListScreen(
                                         },
                                         onRename = {
                                             renameSessionId = node.id
-                                            renameText = node.session.session.title ?: ""
+                                            val title = node.session.session.title ?: ""
+                                            renameText = TextFieldValue(
+                                                text = title,
+                                                selection = TextRange(0, title.length)
+                                            )
                                             showRenameDialog = true
                                         },
                                         onDelete = {
@@ -518,7 +501,7 @@ fun SessionListScreen(
                         buttons = listOf(
                             Triple(stringResource(R.string.cancel), DialogButtonRole.Secondary) { showRenameDialog = false },
                             Triple(stringResource(R.string.session_rename_button), DialogButtonRole.Primary) {
-                                viewModel.renameSession(renameSessionId, renameText)
+                                viewModel.renameSession(renameSessionId, renameText.text)
                                 showRenameDialog = false
                             },
                         )
