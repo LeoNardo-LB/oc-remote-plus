@@ -88,6 +88,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import android.app.NotificationManager
+import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -438,6 +440,17 @@ fun ChatScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Notification lifecycle: cancel existing + set active focus on enter, clear on leave
+    LaunchedEffect(viewModel.sessionId) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        viewModel.onSessionFocused(notificationManager)
+    }
+    DisposableEffect(viewModel.sessionId) {
+        onDispose {
+            viewModel.onSessionUnfocused()
+        }
+    }
 
     // Sync session status when entering a session (REST fallback for missed SSE events)
     LaunchedEffect(viewModel.sessionId) {
