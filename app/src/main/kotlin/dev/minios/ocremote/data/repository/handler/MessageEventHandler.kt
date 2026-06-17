@@ -3,6 +3,7 @@ package dev.minios.ocremote.data.repository.handler
 import android.util.Log
 import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.domain.model.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,70 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
 
     /** Set of assistant message IDs for fast O(1) lookup in PartUpdated handler. */
     private val assistantMessageIds = mutableSetOf<String>()
+
+    // ── SSE delta batching (48ms window) ──────────────────────────────
+    // Buffers incoming deltas and flushes every 48ms to reduce
+    // recomposition frequency. Each flush = 1 StateFlow update = 1
+    // recomposition = 1 layout modifier measure pass.
+    private data class PendingDelta(
+        val messageId: String,
+        val partId: String,
+        val sessionId: String,
+        val delta: String,
+        val type: String  // "text" or "reasoning"
+    )
+
+    private val batchScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val pendingDeltas = mutableListOf<PendingDelta>()
+    private val pendingLock = Any()
+    private var batchJob: Job? = null
+
+    private fun scheduleFlush() {
+        batchJob?.cancel()
+        batchJob = batchScope.launch {
+            delay(48)
+            flushPendingDeltas()
+        }
+    }
+
+    private fun flushPendingDeltas() {
+        val batch: List<PendingDelta>
+        synchronized(pendingLock) {
+            if (pendingDeltas.isEmpty()) return
+            batch = pendingDeltas.toList()
+            pendingDeltas.clear()
+        }
+
+        _parts.update { current ->
+            var updated = current
+            for (entry in batch) {
+                val messageParts = updated[entry.messageId]?.toMutableList() ?: mutableListOf()
+                val idx = messageParts.indexOfFirst { it.id == entry.partId }
+                if (idx >= 0) {
+                    val part = messageParts[idx]
+                    val newPart = when (part) {
+                        is Part.Text -> {
+                            if (part.text.endsWith(entry.delta)) part  // dedup
+                            else part.copy(text = part.text + entry.delta)
+                        }
+                        is Part.Reasoning -> part.copy(text = part.text + entry.delta)
+                        else -> part
+                    }
+                    messageParts[idx] = newPart
+                } else {
+                    messageParts.add(Part.Text(
+                        id = entry.partId,
+                        sessionId = entry.sessionId,
+                        messageId = entry.messageId,
+                        text = entry.delta
+                    ))
+                }
+                updated = updated + (entry.messageId to messageParts)
+            }
+            updated
+        }
+    }
+    // ── End SSE delta batching ────────────────────────────────────────
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
         return when (event) {
@@ -221,54 +286,23 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
 
     private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
-        val thread = Thread.currentThread().id
-        _parts.update { current ->
-            val messageParts = current[event.messageId]?.toMutableList() ?: mutableListOf()
-            val idx = messageParts.indexOfFirst { it.id == event.partId }
-            if (idx >= 0) {
-                val part = messageParts[idx]
-                val updated = when (part) {
-                    is Part.Text -> {
-                        // === DELTA DEDUPLICATION: skip if already present ===
-                        // The server may send a delta that is already a suffix of
-                        // the existing text (e.g. sends the full accumulated text
-                        // as a delta instead of just the new characters). This is
-                        // a known server-side race condition (opencode#26924) where
-                        // message.part.delta can arrive before message.part.updated,
-                        // causing the delta content to overlap with the snapshot.
-                        // Rather than tracking external state, we simply skip
-                        // deltas whose content is already present — this is the
-                        // canonical deduplication pattern for streaming protocols.
-                        if (part.text.endsWith(event.delta)) {
-                            Log.w(TAG, "[PartDelta] t=$thread msg=${event.messageId.take(8)} " +
-                                "part=${event.partId.take(8)} SKIP: delta \"${event.delta.take(30)}\" " +
-                                "already at end of text len=${part.text.length}")
-                            return@update current
-                        }
-                        val newText = part.text + event.delta
-                        Log.d(TAG, "[PartDelta] t=$thread msg=${event.messageId.take(8)} " +
-                            "part=${event.partId.take(8)} \"${part.text.length}\"+\"${event.delta.length}\"" +
-                            "=\"${newText.length}\" delta=\"${event.delta.take(30)}\"")
-                        part.copy(text = newText)
-                    }
-                    is Part.Reasoning -> part.copy(text = part.text + event.delta)
-                    else -> part
-                }
-                messageParts[idx] = updated
-            } else {
-                // Defensive: create synthetic part when partId not found
-                val syntheticPart = Part.Text(
-                    id = event.partId,
-                    sessionId = event.sessionId,
-                    messageId = event.messageId,
-                    text = event.delta
-                )
-                Log.w(TAG, "[PartDelta] t=$thread SYNTHETIC msg=${event.messageId.take(8)} " +
-                    "part=${event.partId.take(8)} text=\"${event.delta.take(30)}\"")
-                messageParts.add(syntheticPart)
-            }
-            current + (event.messageId to messageParts)
+        // Buffer delta for batch flush (48ms window) — reduces recomposition
+        // frequency from per-token to ~20/sec, eliminating layout jitter.
+        val partType = when (_parts.value[event.messageId]
+            ?.firstOrNull { it.id == event.partId }) {
+            is Part.Reasoning -> "reasoning"
+            else -> "text"
         }
+        synchronized(pendingLock) {
+            pendingDeltas.add(PendingDelta(
+                messageId = event.messageId,
+                partId = event.partId,
+                sessionId = event.sessionId,
+                delta = event.delta,
+                type = partType
+            ))
+        }
+        scheduleFlush()
     }
 
     private fun handleMessagePartRemoved(event: SseEvent.MessagePartRemoved) {
