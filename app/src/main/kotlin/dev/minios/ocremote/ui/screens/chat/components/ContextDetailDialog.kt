@@ -175,8 +175,6 @@ internal fun ContextDetailDialog(state: ContextDetailState?, onDismiss: () -> Un
                     cacheReadTokens = state.cacheReadTokens,
                     cacheWriteTokens = state.cacheWriteTokens,
                     totalCost = state.totalCost,
-                    contextWindow = state.contextWindow,
-                    contextTokens = state.contextTokens,
                 )
 
                 Spacer(Modifier.height(SpacingTokens.SM.dp))

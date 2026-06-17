@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,8 +30,6 @@ fun TokenUsageCard(
     cacheReadTokens: Int,
     cacheWriteTokens: Int,
     totalCost: Double,
-    contextWindow: Int,
-    contextTokens: Int = 0,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -64,22 +61,6 @@ fun TokenUsageCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
                     )
                 }
-            }
-
-            // Context window progress bar (same formula as circular indicator)
-            if (contextWindow > 0 && contextTokens > 0) {
-                val progress = (contextTokens.toFloat() / contextWindow).coerceIn(0f, 1f)
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                )
-                Text(
-                    text = stringResource(R.string.chat_token_context_usage, contextTokens, contextWindow),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AlphaTokens.MUTED)
-                )
             }
 
             Spacer(modifier = Modifier.height(2.dp))
