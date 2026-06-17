@@ -388,6 +388,21 @@ class AppNotificationManager @Inject constructor(
         return previews.takeLast(limit)
     }
 
+    /**
+     * Cancel all event notifications for a specific session (TaskComplete/Permission/Question/Error).
+     * Called when the user enters the session's ChatScreen.
+     * Does NOT cancel the server group summary (other sessions may still have notifications).
+     */
+    fun cancelSessionNotifications(
+        notificationManager: NotificationManager,
+        serverId: String,
+        sessionId: String
+    ) {
+        for (offset in intArrayOf(0, 1000, 2000, 3000)) {
+            notificationManager.cancel(eventNotificationId(serverId, sessionId, offset))
+        }
+    }
+
     // ============ Private Helpers ============
 
     private fun showServerGroupSummary(
