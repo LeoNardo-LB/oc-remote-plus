@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -166,11 +167,11 @@ fun ChatMessageList(
                     modifier = Modifier.fillMaxSize()
                         .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) }
                         .pointerInput(Unit) {
-                            // Track finger state to distinguish drag (pointer down)
-                            // from fling (pointer up, inertial scroll).
+                            // Track finger state on Initial pass (before detectTapGestures
+                            // consumes events on Main pass) to distinguish drag from fling.
                             awaitPointerEventScope {
                                 while (true) {
-                                    val event = awaitPointerEvent()
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
                                     compensateState.isPointerDown = event.changes.any { it.pressed }
                                 }
                             }
