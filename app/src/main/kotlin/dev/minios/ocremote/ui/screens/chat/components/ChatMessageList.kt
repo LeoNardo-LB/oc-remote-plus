@@ -303,10 +303,11 @@ fun ChatMessageList(
                                     )
                                     val realHeight = placeable.height
 
-                                    // Compensate SSE height growth — NO FREEZE
-                                    // When item grows by delta, anchor reduces offset by delta.
-                                    // requestScrollToItem restores offset in same/next measure pass.
-                                    if (compensateState.shouldCompensate) {
+                                    // Compensate SSE height growth — only when NOT scrolling.
+                                    // requestScrollToItem cancels fling (calls scroll{} internally),
+                                    // so we skip compensation during active scroll/fling.
+                                    // With 48ms batching, drift during fling is minimal.
+                                    if (compensateState.shouldCompensate && !listState.isScrollInProgress) {
                                         val delta = realHeight - compensateState.lastHeight
                                         if (delta > 0) {
                                             listState.requestScrollToItem(
