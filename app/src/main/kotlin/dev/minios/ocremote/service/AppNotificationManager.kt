@@ -19,6 +19,12 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** A user message preview for notification display. */
+data class UserMessagePreview(
+    val text: String,
+    val timestamp: Long
+)
+
 private const val NOTIFICATION_CHANNEL_ID = "opencode_connection"
 private const val NOTIFICATION_CHANNEL_TASKS_ID = "opencode_tasks"
 private const val NOTIFICATION_CHANNEL_TASKS_SILENT_ID = "opencode_tasks_silent"
@@ -354,6 +360,32 @@ class AppNotificationManager @Inject constructor(
 
         lastNotifiedAssistantMessageBySession[sessionId] = latestAssistant.id
         return latestAssistant.id
+    }
+
+    /**
+     * Extract the latest N user messages (non-synthetic) for MessagingStyle display.
+     * Messages are ordered oldest-to-newest.
+     */
+    fun findLatestUserMessages(sessionId: String, limit: Int): List<UserMessagePreview> {
+        val sessionMessages = eventDispatcher.messages.value[sessionId] ?: return emptyList()
+        val partsMap = eventDispatcher.parts.value
+
+        val previews = sessionMessages
+            .filterIsInstance<Message.User>()
+            .mapNotNull { userMsg ->
+                val parts = partsMap[userMsg.id] ?: return@mapNotNull null
+                val text = parts
+                    .filterIsInstance<Part.Text>()
+                    .firstOrNull { it.synthetic != true && it.ignored != true && it.text.isNotBlank() }
+                    ?.text
+                    ?: return@mapNotNull null
+                UserMessagePreview(
+                    text = if (text.length > 100) text.take(100) + "…" else text,
+                    timestamp = userMsg.time.created
+                )
+            }
+
+        return previews.takeLast(limit)
     }
 
     // ============ Private Helpers ============
