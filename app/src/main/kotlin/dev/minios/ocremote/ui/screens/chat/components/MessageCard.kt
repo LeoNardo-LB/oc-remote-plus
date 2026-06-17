@@ -52,6 +52,7 @@ import dev.minios.ocremote.ui.theme.QueuedBadgeTextColor
 import dev.minios.ocremote.ui.screens.chat.util.agentColor
 import dev.minios.ocremote.ui.screens.chat.util.formatAssistantErrorMessage
 import dev.minios.ocremote.ui.screens.chat.util.formatDuration
+import dev.minios.ocremote.ui.screens.chat.util.formatTokenCount
 import dev.minios.ocremote.ui.screens.chat.util.isAmoledTheme
 import dev.minios.ocremote.ui.screens.chat.util.performHaptic
 import dev.minios.ocremote.ui.screens.chat.util.resolveUserCommandLabel
@@ -491,7 +492,7 @@ private fun MessageCardAssistant(
                             }
                             if (totalInput > 0 || totalOutput > 0) {
                                 Text(
-                                    text = "↑$totalInput ↓$totalOutput",
+                                    text = "↑${formatTokenCount(totalInput)} ↓${formatTokenCount(totalOutput)}",
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                                 )
