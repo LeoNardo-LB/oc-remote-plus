@@ -135,21 +135,13 @@ fun ChatMessageList(
         runCatching { freezeLogFile?.appendText("${System.currentTimeMillis()} $msg\n") }
     }
 
-    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
-        if (listState.isScrollInProgress && !freezeState.isAnimatingToBottom) {
+    // Only freeze on user scroll — never auto-unfreeze on isAtBottom.
+    // Unfreeze happens via FAB button click (Discord/Telegram pattern).
+    var isFrozen by remember { mutableStateOf(false) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
             freezeState.autoScrollEnabled = false
-        } else if (isAtBottom && !freezeState.isAnimatingToBottom) {
-            if (!freezeState.autoScrollEnabled && freezeState.frozenHeight != null) {
-                // Smooth unfreeze: animate to bottom first, then passthrough
-                freezeState.isAnimatingToBottom = true
-                coroutineScope.launch {
-                    listState.animateScrollToItem(0)
-                    freezeState.autoScrollEnabled = true
-                    freezeState.isAnimatingToBottom = false
-                }
-            } else {
-                freezeState.autoScrollEnabled = true
-            }
+            isFrozen = true
         }
     }
 
@@ -471,13 +463,14 @@ fun ChatMessageList(
                 }
             } // PullToRefreshBox
 
-            // Scroll-to-bottom FAB
-            if (!isAtBottom) {
+            // Scroll-to-bottom FAB — shows when not at bottom OR frozen
+            if (!isAtBottom || isFrozen) {
                 SmallFloatingActionButton(
                     onClick = {
                         coroutineScope.launch {
-                            // reverseLayout=true: item 0 = bottom (newest messages)
-                            listState.snapToBottom()
+                            listState.animateScrollToItem(0)
+                            freezeState.autoScrollEnabled = true
+                            isFrozen = false
                         }
                     },
                     modifier = Modifier
