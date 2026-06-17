@@ -113,6 +113,7 @@ class MessageEventHandlerTest {
             sessionId = "s1", messageId = "m1", partId = "part1",
             field = "text", delta = " World"
         ), "server1")
+        handler.forceFlushDeltas()
 
         assertEquals("Hello World", (handler.parts.value["m1"]!![0] as Part.Text).text)
     }
@@ -126,6 +127,7 @@ class MessageEventHandlerTest {
             sessionId = "s1", messageId = "m1", partId = "part1",
             field = "text", delta = " more"
         ), "server1")
+        handler.forceFlushDeltas()
 
         assertEquals("Thinking more", (handler.parts.value["m1"]!![0] as Part.Reasoning).text)
     }
@@ -136,6 +138,7 @@ class MessageEventHandlerTest {
             sessionId = "s1", messageId = "m1", partId = "nonexistent",
             field = "text", delta = "created"
         ), "server1")
+        handler.forceFlushDeltas()
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
         assertEquals("created", (handler.parts.value["m1"]!![0] as Part.Text).text)
@@ -246,6 +249,7 @@ class MessageEventHandlerTest {
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = " World"
         ), "server1")
+        handler.forceFlushDeltas()
 
         // Server sends stale snapshot with original text
         val stalePart = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello")
@@ -300,6 +304,7 @@ class MessageEventHandlerTest {
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = "synthetic"
         ), "server1")
+        handler.forceFlushDeltas()
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
         val part = handler.parts.value["m1"]!![0] as Part.Text
@@ -317,6 +322,7 @@ class MessageEventHandlerTest {
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = " more deeply"
         ), "server1")
+        handler.forceFlushDeltas()
 
         // Stale snapshot arrives
         val stale = Part.Reasoning(id = "p1", sessionId = "s1", messageId = "m1", text = "Thinking")

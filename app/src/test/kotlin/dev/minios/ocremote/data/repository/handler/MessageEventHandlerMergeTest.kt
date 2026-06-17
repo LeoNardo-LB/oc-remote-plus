@@ -45,6 +45,7 @@ class MessageEventHandlerMergeTest {
             sessionId = "s1", messageId = "msg-1", partId = "p1",
             field = "text", delta = " World"
         ), "server1")
+        handler.forceFlushDeltas()
 
         // Verify SSE accumulation worked
         assertEquals("Hello World", (handler.parts.value["msg-1"]!![0] as Part.Text).text)
@@ -114,6 +115,7 @@ class MessageEventHandlerMergeTest {
             sessionId = "s1", messageId = "msg-2", partId = "pa2",
             field = "text", delta = "Text 2"
         ), "server1")
+        handler.forceFlushDeltas()
 
         // REST: only msg-1 (msg-2 is streaming and not in REST snapshot yet)
         handler.setMessages("s1", listOf(MessageWithParts(msg1, listOf(part1))))
@@ -143,6 +145,7 @@ class MessageEventHandlerMergeTest {
             sessionId = "s1", messageId = "msg-1", partId = "p1",
             field = "text", delta = " SSE text"
         ), "server1")
+        handler.forceFlushDeltas()
 
         assertEquals("Accumulated SSE text", (handler.parts.value["msg-1"]!![0] as Part.Text).text)
 

@@ -93,6 +93,13 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
             updated
         }
     }
+
+    /** Immediately flush any pending deltas (for tests). */
+    internal fun forceFlushDeltas() {
+        batchJob?.cancel()
+        batchJob = null
+        flushPendingDeltas()
+    }
     // ── End SSE delta batching ────────────────────────────────────────
 
     override fun handle(event: SseEvent, serverId: String): Boolean {
