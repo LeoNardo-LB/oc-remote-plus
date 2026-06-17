@@ -306,7 +306,7 @@ fun ChatMessageList(
                                     // Compensate SSE height growth — NO FREEZE
                                     // When item grows by delta, anchor reduces offset by delta.
                                     // requestScrollToItem restores offset in same/next measure pass.
-                                    if (compensateState.shouldCompensate && !listState.isScrollInProgress) {
+                                    if (compensateState.shouldCompensate) {
                                         val delta = realHeight - compensateState.lastHeight
                                         if (delta > 0) {
                                             listState.requestScrollToItem(
