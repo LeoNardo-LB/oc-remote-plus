@@ -304,11 +304,12 @@ fun ChatMessageList(
                                     val realHeight = placeable.height
 
                                     // Compensate SSE height growth in all states (static/drag/fling).
-                                    // requestScrollToItem sets pending position consumed by next
-                                    // measure pass — zero-delay, no flicker.
+                                    // Uses reflection to bypass requestScrollToItem's scroll{} mutex
+                                    // cancellation — sets pending position directly without killing fling.
                                     val delta = realHeight - compensateState.lastHeight
                                     if (compensateState.shouldCompensate && delta > 0) {
-                                        listState.requestScrollToItem(
+                                        LazyListReflection.requestScrollToItemNoCancel(
+                                            listState,
                                             listState.firstVisibleItemIndex,
                                             listState.firstVisibleItemScrollOffset + delta
                                         )
@@ -597,4 +598,40 @@ private fun RetryBanner(retry: SessionStatus.Retry) {
 private class CompensateState {
     var lastHeight: Int = 0
     var shouldCompensate: Boolean = false
+}
+
+// --- Reflection: bypass requestScrollToItem's scroll{} mutex cancellation ---
+// requestScrollToItem does two things:
+//   ① if (isScrollInProgress) scroll {} ← grabs mutex, KILLS fling
+//   ② scrollPosition.requestPosition + invalidateScope ← sets pending position
+// We only want ② — set pending position without killing fling inertia.
+// Reflection accesses private/internal fields directly.
+private object LazyListReflection {
+    private val scrollPositionField by lazy {
+        Class.forName("androidx.compose.foundation.lazy.LazyListState")
+            .getDeclaredField("scrollPosition")
+            .apply { isAccessible = true }
+    }
+
+    private val requestPositionMethod by lazy {
+        scrollPositionField.type
+            .getDeclaredMethod("requestPositionAndForgetLastKnownKey",
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+    }
+
+    private val invalidatorField by lazy {
+        Class.forName("androidx.compose.foundation.lazy.LazyListState")
+            .getDeclaredField("measurementScopeInvalidator")
+            .apply { isAccessible = true }
+    }
+
+    fun requestScrollToItemNoCancel(state: LazyListState, index: Int, scrollOffset: Int) {
+        val scrollPosition = scrollPositionField.get(state)
+        requestPositionMethod.invoke(scrollPosition, index, scrollOffset)
+        // ObservableScopeInvalidator is a value class wrapping MutableState<Unit>.
+        // Setting value = Unit triggers the invalidation.
+        @Suppress("UNCHECKED_CAST")
+        (invalidatorField.get(state) as androidx.compose.runtime.MutableState<Unit>).value = Unit
+    }
 }

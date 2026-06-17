@@ -33,3 +33,8 @@
 # Markdown Renderer (mikepenz) — keep state/model classes to prevent R8 breaking async parsing
 -keep class com.mikepenz.markdown.** { *; }
 -keep class org.intellij.markdown.** { *; }
+
+# Compose LazyListState — reflection access for SSE drift compensation
+# (bypass requestScrollToItem's scroll{} mutex cancellation)
+-keep class androidx.compose.foundation.lazy.LazyListState { *; }
+-keep class androidx.compose.foundation.lazy.LazyListScrollPosition { *; }
