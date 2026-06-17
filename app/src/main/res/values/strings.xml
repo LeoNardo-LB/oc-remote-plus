@@ -565,6 +565,16 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="chat_context_detail_cache_write">Cache write</string>
     <string name="chat_context_detail_cost">总费用: $%1$s</string>
 
+    <!-- Context detail dialog -->
+    <string name="chat_context_composition">上下文构成（估算）</string>
+    <string name="chat_context_other_note">其余（含 system 等）</string>
+    <string name="chat_role_user">用户</string>
+    <string name="chat_role_assistant">助手</string>
+    <string name="chat_role_tool">工具调用</string>
+    <string name="chat_role_other">其余</string>
+    <string name="chat_context_msg_summary">消息 %1$d（用户 %2$d · 助手 %3$d）</string>
+    <string name="chat_context_cache_hit">缓存命中 %1$d%%</string>
+
     <!-- About Screen -->
     <string name="about_title">About</string>
     <string name="about_version">Version %s</string>
