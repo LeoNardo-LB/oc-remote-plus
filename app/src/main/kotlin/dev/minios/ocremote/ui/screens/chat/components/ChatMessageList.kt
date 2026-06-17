@@ -326,15 +326,26 @@ fun ChatMessageList(
                                             freezeState.frozenHeight = null
                                             realHeight to 0
                                         }
+                                        // User at bottom (autoScroll) → ALWAYS passthrough
+                                        // Must check BEFORE frozenHeight to prevent
+                                        // incorrect freeze when SSE anchor shifts offset
+                                        freezeState.autoScrollEnabled -> {
+                                            if (freezeState.frozenHeight != null) {
+                                                freezeLog("UNFREEZE(auto): frozen=${freezeState.frozenHeight} real=$realHeight off=$currentOffset")
+                                            }
+                                            freezeState.frozenHeight = null
+                                            realHeight to 0
+                                        }
                                         // First freeze: record snapshot
                                         freezeState.frozenHeight == null -> {
+                                            freezeLog("FREEZE: real=$realHeight off=$currentOffset")
                                             freezeState.frozenHeight = realHeight
                                             freezeState.frozenOffset = currentOffset
                                             realHeight to 0
                                         }
-                                        // Fully scrolled back → passthrough (unfreeze)
-                                        currentOffset <= 0 && freezeState.autoScrollEnabled -> {
-                                            freezeLog("UNFREEZE: frozen=${freezeState.frozenHeight} real=$realHeight off=$currentOffset")
+                                        // Fully scrolled back → passthrough
+                                        currentOffset <= 0 -> {
+                                            freezeLog("UNFREEZE(bottom): frozen=${freezeState.frozenHeight} real=$realHeight off=$currentOffset")
                                             freezeState.frozenHeight = null
                                             realHeight to 0
                                         }
@@ -343,9 +354,9 @@ fun ChatMessageList(
                                             val slideBack = (freezeState.frozenOffset - currentOffset).coerceAtLeast(0)
                                             val maxShift = maxOf(realHeight - freezeState.frozenHeight!!, 0)
                                             val ratio = if (freezeState.frozenOffset > 0)
-                                                maxShift.toFloat() / freezeState.frozenOffset else 0f
+                                                minOf(maxShift.toFloat() / freezeState.frozenOffset, 1.0f) else 0f
                                             val shift = (slideBack * ratio).toInt().coerceIn(0, maxShift)
-                                            if (shift > 0) freezeLog("EXPAND: slide=$slideBack shift=$shift max=$maxShift ratio=${"%.1f".format(ratio)} off=$currentOffset")
+                                            freezeLog("FROZEN: slide=$slideBack shift=$shift max=$maxShift ratio=${"%.2f".format(ratio)} off=$currentOffset fOff=${freezeState.frozenOffset} frozen=${freezeState.frozenHeight} real=$realHeight")
                                             freezeState.frozenHeight!! to -shift
                                         }
                                     }
