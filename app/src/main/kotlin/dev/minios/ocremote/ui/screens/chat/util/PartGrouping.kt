@@ -3,7 +3,7 @@ package dev.minios.ocremote.ui.screens.chat.util
 import dev.minios.ocremote.domain.model.Part
 
 /** 探查类工具集合 —— 连续出现时聚合展示。对齐 opencode CONTEXT_GROUP_TOOLS。 */
-val CONTEXT_GROUP_TOOLS: Set<String> = setOf("read", "glob", "grep", "list")
+val CONTEXT_GROUP_TOOLS: Set<String> = setOf("read", "glob", "grep", "list", "listDirectory", "write")
 
 /** parts 列表的可渲染单元：单个 part 或一组连续探查工具。 */
 sealed class PartRenderUnit {
@@ -41,20 +41,22 @@ fun groupContextTools(parts: List<Part>): List<PartRenderUnit> {
     return result
 }
 
-/** 探查工具分类计数：read / search(glob+grep) / list。 */
-data class ContextToolSummary(val read: Int, val search: Int, val list: Int)
+/** 探查工具分类计数：read / search(glob+grep) / list / write。 */
+data class ContextToolSummary(val read: Int, val search: Int, val list: Int, val write: Int)
 
 /** 计算一组探查工具的分类计数。 */
 fun contextToolSummary(tools: List<Part.Tool>): ContextToolSummary {
     var read = 0
     var search = 0
     var list = 0
+    var write = 0
     for (t in tools) {
         when (t.tool) {
             "read" -> read++
             "glob", "grep" -> search++
-            "list" -> list++
+            "list", "listDirectory" -> list++
+            "write" -> write++
         }
     }
-    return ContextToolSummary(read, search, list)
+    return ContextToolSummary(read, search, list, write)
 }

@@ -232,6 +232,7 @@
     <string name="chat_context_count_read">%1$d 次读取</string>
     <string name="chat_context_count_search">%1$d 次搜索</string>
     <string name="chat_context_count_list">%1$d 次列表</string>
+    <string name="chat_context_count_write">%1$d 次写入</string>
     <string name="chat_hint_ask">Ask a question…</string>
     <string name="chat_hint_fix">Fix the bug in…</string>
     <string name="chat_hint_refactor">Refactor the…</string>

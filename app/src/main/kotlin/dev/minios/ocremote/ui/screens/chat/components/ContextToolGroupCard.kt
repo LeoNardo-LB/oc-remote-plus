@@ -102,6 +102,13 @@ internal fun ContextToolGroupCard(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED)
                     )
                 }
+                if (summary.write > 0) {
+                    Text(
+                        text = stringResource(R.string.chat_context_count_write, summary.write),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED)
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,

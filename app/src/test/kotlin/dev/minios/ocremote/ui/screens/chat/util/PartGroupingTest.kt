@@ -60,15 +60,30 @@ class PartGroupingTest {
         assertTrue(result.all { it is PartRenderUnit.Single })
     }
 
-    @Test fun `summary counts read_search_list correctly`() {
+    @Test fun `summary counts read_search_list_write correctly`() {
         val tools = listOf(
             tool("a", "read"), tool("b", "read"),
             tool("c", "glob"), tool("d", "grep"),
-            tool("e", "list")
+            tool("e", "list"), tool("f", "write")
         )
         val s = contextToolSummary(tools)
         assertEquals(2, s.read)
         assertEquals(2, s.search)   // glob + grep
         assertEquals(1, s.list)
+        assertEquals(1, s.write)
+    }
+
+    @Test fun `listDirectory is grouped as context tool`() {
+        val parts = listOf(tool("t1", "listDirectory"), tool("t2", "read"))
+        val result = groupContextTools(parts)
+        assertEquals(1, result.size)
+        assertTrue(result[0] is PartRenderUnit.ContextGroup)
+    }
+
+    @Test fun `write is grouped as context tool`() {
+        val parts = listOf(tool("t1", "read"), tool("t2", "write"))
+        val result = groupContextTools(parts)
+        assertEquals(1, result.size)
+        assertTrue(result[0] is PartRenderUnit.ContextGroup)
     }
 }

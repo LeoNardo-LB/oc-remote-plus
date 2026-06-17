@@ -6,6 +6,7 @@
     <string name="chat_context_count_read">%1$d reads</string>
     <string name="chat_context_count_search">%1$d searches</string>
     <string name="chat_context_count_list">%1$d lists</string>
+    <string name="chat_context_count_write">%1$d writes</string>
 
     <!-- Context detail dialog -->
     <string name="chat_context_composition">Context breakdown (estimated)</string>

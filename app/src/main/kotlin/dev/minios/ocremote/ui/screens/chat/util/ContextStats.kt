@@ -112,6 +112,8 @@ fun countMessages(messages: List<Message>): MessageCount {
     return MessageCount(user, assistant)
 }
 
-/** 缓存命中率 = cacheRead / input */
-fun cacheHitRate(cacheRead: Int, input: Int): Float? =
-    if (input <= 0) null else cacheRead.toFloat() / input
+/** 缓存命中率 = cacheRead / (input + cacheRead) */
+fun cacheHitRate(cacheRead: Int, input: Int): Float? {
+    val total = input + cacheRead
+    return if (total <= 0) null else cacheRead.toFloat() / total
+}

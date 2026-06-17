@@ -81,7 +81,17 @@ class ContextStatsTest {
     }
 
     @Test
-    fun `cacheHitRate is cacheRead over input`() {
-        assertEquals(0.5f, cacheHitRate(cacheRead = 50, input = 100)!!, 0.001f)
+    fun `cacheHitRate is cacheRead over total reads`() {
+        assertEquals(0.5f, cacheHitRate(cacheRead = 50, input = 50)!!, 0.001f)
+    }
+
+    @Test
+    fun `cacheHitRate returns 0 when no cache`() {
+        assertEquals(0f, cacheHitRate(cacheRead = 0, input = 100)!!, 0.001f)
+    }
+
+    @Test
+    fun `cacheHitRate returns null when both zero`() {
+        assertNull(cacheHitRate(cacheRead = 0, input = 0))
     }
 }
