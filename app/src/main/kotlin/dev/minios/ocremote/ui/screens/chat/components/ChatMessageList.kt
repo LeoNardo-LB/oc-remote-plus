@@ -136,10 +136,20 @@ fun ChatMessageList(
     }
 
     LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
-        if (listState.isScrollInProgress) {
+        if (listState.isScrollInProgress && !freezeState.isAnimatingToBottom) {
             freezeState.autoScrollEnabled = false
-        } else if (isAtBottom) {
-            freezeState.autoScrollEnabled = true
+        } else if (isAtBottom && !freezeState.isAnimatingToBottom) {
+            if (!freezeState.autoScrollEnabled && freezeState.frozenHeight != null) {
+                // Smooth unfreeze: animate to bottom first, then passthrough
+                freezeState.isAnimatingToBottom = true
+                coroutineScope.launch {
+                    listState.animateScrollToItem(0)
+                    freezeState.autoScrollEnabled = true
+                    freezeState.isAnimatingToBottom = false
+                }
+            } else {
+                freezeState.autoScrollEnabled = true
+            }
         }
     }
 
@@ -316,50 +326,25 @@ fun ChatMessageList(
                                         constraints.copy(maxHeight = Constraints.Infinity)
                                     )
                                     val realHeight = placeable.height
-                                    val itemInfo = listState.layoutInfo.visibleItemsInfo
-                                        .firstOrNull { it.key == msg.message.id }
-                                    val currentOffset = itemInfo?.offset
-
-                                    val (reportedHeight, yOffset) = when {
-                                        // Item not visible → normal layout
-                                        currentOffset == null -> {
-                                            freezeState.frozenHeight = null
-                                            realHeight to 0
-                                        }
-                                        // Truly at bottom (can't scroll forward) → passthrough
-                                        !listState.canScrollForward -> {
+                                    val reportedHeight = when {
+                                        freezeState.autoScrollEnabled -> {
                                             if (freezeState.frozenHeight != null) {
-                                                freezeLog("UNFREEZE(bottom): frozen=${freezeState.frozenHeight} real=$realHeight")
+                                                freezeLog("UNFREEZE: frozen=${freezeState.frozenHeight} real=$realHeight")
                                             }
                                             freezeState.frozenHeight = null
-                                            realHeight to 0
+                                            realHeight
                                         }
-                                        // First freeze: record snapshot
                                         freezeState.frozenHeight == null -> {
-                                            freezeLog("FREEZE: real=$realHeight off=$currentOffset")
+                                            freezeLog("FREEZE: real=$realHeight")
                                             freezeState.frozenHeight = realHeight
-                                            freezeState.frozenOffset = currentOffset
-                                            realHeight to 0
+                                            realHeight
                                         }
-                                        // Frozen: expand via yOffset driven by finger scroll
                                         else -> {
-                                            // Track farthest scroll position (user may scroll further up after freeze)
-                                            if (currentOffset < freezeState.frozenOffset) {
-                                                freezeState.frozenOffset = currentOffset
-                                            }
-                                            // slideBack: how far user has scrolled back toward bottom
-                                            val slideBack = (currentOffset - freezeState.frozenOffset).coerceAtLeast(0)
-                                            val maxShift = maxOf(realHeight - freezeState.frozenHeight!!, 0)
-                                            val absFrozen = kotlin.math.abs(freezeState.frozenOffset)
-                                            val ratio = if (absFrozen > 0)
-                                                minOf(maxShift.toFloat() / absFrozen, 1.0f) else 0f
-                                            val shift = (slideBack * ratio).toInt().coerceIn(0, maxShift)
-                                            freezeLog("FROZEN: slide=$slideBack shift=$shift max=$maxShift ratio=${"%.2f".format(ratio)} off=$currentOffset fOff=${freezeState.frozenOffset}")
-                                            freezeState.frozenHeight!! to -shift
+                                            freezeState.frozenHeight!!
                                         }
                                     }
                                     layout(placeable.width, reportedHeight) {
-                                        placeable.placeRelative(0, yOffset)
+                                        placeable.placeRelative(0, 0)
                                     }
                                 }
                         } else Modifier.fillMaxWidth()
@@ -639,6 +624,6 @@ private fun RetryBanner(retry: SessionStatus.Retry) {
 
 private class FreezeState {
     var frozenHeight: Int? = null
-    var frozenOffset: Int = 0
     var autoScrollEnabled: Boolean = true
+    var isAnimatingToBottom: Boolean = false
 }
