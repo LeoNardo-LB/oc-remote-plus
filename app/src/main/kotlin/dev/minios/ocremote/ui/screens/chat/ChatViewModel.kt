@@ -229,6 +229,8 @@ class ChatViewModel @Inject constructor(
     private val httpClient: io.ktor.client.HttpClient,
     private val sseClient: SseClient,
     private val sessionStatusManager: SessionStatusManager,
+    private val sessionFocusHolder: dev.minios.ocremote.service.SessionFocusHolder,
+    private val appNotificationManager: dev.minios.ocremote.service.AppNotificationManager,
 ) : ViewModel() {
 
     /** Snapshot of message IDs at the time of revert. Used to distinguish
@@ -266,7 +268,7 @@ class ChatViewModel @Inject constructor(
     val serverName: String = URLDecoder.decode(
         savedStateHandle.get<String>("serverName") ?: "", "UTF-8"
     )
-    private val serverId: String = URLDecoder.decode(
+    val serverId: String = URLDecoder.decode(
         savedStateHandle.get<String>("serverId") ?: "", "UTF-8"
     )
     private val directoryParam: String = URLDecoder.decode(
@@ -276,6 +278,24 @@ class ChatViewModel @Inject constructor(
         savedStateHandle.get<String>("sessionId") ?: "", "UTF-8"
     ))
     val sessionId: String get() = _sessionId.value
+
+    /**
+     * Called when ChatScreen enters composition.
+     * Cancels existing notifications for this session and registers active focus
+     * so future TaskComplete notifications are suppressed.
+     */
+    fun onSessionFocused(notificationManager: android.app.NotificationManager) {
+        appNotificationManager.cancelSessionNotifications(notificationManager, serverId, sessionId)
+        sessionFocusHolder.setActiveFocus(serverId, sessionId)
+    }
+
+    /**
+     * Called when ChatScreen leaves composition.
+     * Clears active focus so notifications resume.
+     */
+    fun onSessionUnfocused() {
+        sessionFocusHolder.setActiveFocus(null, null)
+    }
 
     init {
         sessionStatusManager.setServerId(serverId)
