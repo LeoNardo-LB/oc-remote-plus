@@ -303,18 +303,15 @@ fun ChatMessageList(
                                     )
                                     val realHeight = placeable.height
 
-                                    // Compensate SSE height growth — only when NOT scrolling.
-                                    // During scroll (drag/fling), requestScrollToItem's internal
-                                    // scroll{} cancels the gesture via immediate dispatcher.
-                                    // With 48ms batching, drift during scroll is minimal.
-                                    if (compensateState.shouldCompensate && !listState.isScrollInProgress) {
-                                        val delta = realHeight - compensateState.lastHeight
-                                        if (delta > 0) {
-                                            listState.requestScrollToItem(
-                                                listState.firstVisibleItemIndex,
-                                                listState.firstVisibleItemScrollOffset + delta
-                                            )
-                                        }
+                                    // Compensate SSE height growth in all states (static/drag/fling).
+                                    // requestScrollToItem sets pending position consumed by next
+                                    // measure pass — zero-delay, no flicker.
+                                    val delta = realHeight - compensateState.lastHeight
+                                    if (compensateState.shouldCompensate && delta > 0) {
+                                        listState.requestScrollToItem(
+                                            listState.firstVisibleItemIndex,
+                                            listState.firstVisibleItemScrollOffset + delta
+                                        )
                                     }
                                     compensateState.lastHeight = realHeight
 
