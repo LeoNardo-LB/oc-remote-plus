@@ -52,6 +52,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -472,6 +474,10 @@ fun SessionListScreen(
     // Rename dialog
     if (showRenameDialog) {
         val renameParams = amoledDialogParams()
+        val renameFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            renameFocusRequester.requestFocus()
+        }
         BasicAlertDialog(
             onDismissRequest = { showRenameDialog = false },
             properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -494,7 +500,9 @@ fun SessionListScreen(
                         onValueChange = { renameText = it },
                         label = { Text(stringResource(R.string.session_rename_title)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(renameFocusRequester)
                     )
                     Spacer(Modifier.height(16.dp))
                     DialogButtons(
