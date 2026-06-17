@@ -85,9 +85,10 @@ fun estimateContextBreakdown(messages: List<MessageWithParts>, realInput: Int): 
     val assistantTokens = estimateTokens(assistantChars)
     val toolTokens = estimateTokens(toolChars)
     val estimated = userTokens + assistantTokens + toolTokens
+    val denominator = maxOf(estimated, realInput)
     val otherTokens = (realInput - estimated).coerceAtLeast(0)
 
-    fun pct(tokens: Int) = if (realInput <= 0) 0f else tokens.toFloat() / realInput
+    fun pct(tokens: Int) = if (denominator <= 0) 0f else tokens.toFloat() / denominator
 
     val segments = listOf(
         ContextBreakdownSegment(BreakdownRole.USER, userTokens, pct(userTokens)),

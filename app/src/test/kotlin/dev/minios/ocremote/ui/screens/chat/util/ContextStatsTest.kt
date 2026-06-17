@@ -73,6 +73,29 @@ class ContextStatsTest {
     }
 
     @Test
+    fun `percents normalized when estimate exceeds input`() {
+        // user 4000 chars=1000 tok, assistant 3640 chars=910 tok, tool 29200 chars=7300 tok
+        // estimated = 9210, realInput = 1958 -> denominator = estimated = 9210
+        val msgs = listOf(
+            userMsg("u1", 4000),
+            assistantMsg("a1", textLen = 3640, toolOutputLen = 29200)
+        )
+        val b = estimateContextBreakdown(msgs, realInput = 1958)
+
+        // no other segment (estimated > input)
+        assertNull(b.segments.firstOrNull { it.role == BreakdownRole.OTHER })
+
+        // each segment ≤ 1.0
+        for (seg in b.segments) {
+            assert(seg.percent <= 1.0f) { "${seg.role} percent ${seg.percent} > 1.0" }
+        }
+
+        // all segments sum to ~1.0 (100%)
+        val total = b.segments.sumOf { it.percent.toDouble() }
+        assertEquals(1.0, total, 0.01)
+    }
+
+    @Test
     fun `countMessages splits user and assistant`() {
         val msgs = listOf(userMsg("u1", 1), assistantMsg("a1"), assistantMsg("a2"))
         val c = countMessages(msgs.map { it.info })
