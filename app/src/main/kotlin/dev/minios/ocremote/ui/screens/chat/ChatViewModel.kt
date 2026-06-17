@@ -804,9 +804,10 @@ class ChatViewModel @Inject constructor(
             messageListState,
             tokenStatsState,
             sessionRepository.getSessionsFlow(serverId),
-        ) { msgList, stats, sessions ->
+            modelConfigState,
+        ) { msgList, stats, sessions, modelCfg ->
             val session = sessions.find { it.id == sid }
-            buildContextDetailState(msgList.messages, stats, session)
+            buildContextDetailState(msgList.messages, stats, session, modelCfg.contextWindow)
         }
     }.stateIn(
         viewModelScope,
@@ -817,7 +818,8 @@ class ChatViewModel @Inject constructor(
     private fun buildContextDetailState(
         messages: List<ChatMessage>,
         stats: TokenStatsState,
-        session: Session?
+        session: Session?,
+        contextWindow: Int,
     ): ContextDetailState {
         // Use stats-derived values (single source of truth, avoids re-scanning messages)
         val realInput = stats.totalInputTokens
@@ -843,7 +845,7 @@ class ChatViewModel @Inject constructor(
             cacheReadTokens = stats.totalCacheReadTokens,
             cacheWriteTokens = stats.totalCacheWriteTokens,
             totalCost = stats.totalCost,
-            contextWindow = stats.contextWindow,
+            contextWindow = contextWindow,
             contextTokens = stats.lastContextTokens,
             messageCount = messageCount,
             providerModel = providerModel,
