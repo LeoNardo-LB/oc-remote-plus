@@ -5,7 +5,15 @@ import android.os.Build
 import android.os.Environment
 import android.util.Log
 import android.widget.Toast
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.components.SingletonComponent
+import dev.minios.ocremote.service.SessionFocusHolder
 import java.io.File
 import java.io.StringWriter
 import java.text.SimpleDateFormat
@@ -92,5 +100,27 @@ class OpenCodeApp : Application() {
         if (hasUnreadCrash) {
             Toast.makeText(this, "崩溃日志在 Download/$CRASH_DIR/", Toast.LENGTH_LONG).show()
         }
+
+        // Track app foreground/background for notification suppression
+        val focusHolder = EntryPointAccessors.fromApplication(
+            this,
+            SessionFocusEntryPoint::class.java
+        ).sessionFocusHolder()
+
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                focusHolder.setAppInForeground(true)
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                focusHolder.setAppInForeground(false)
+            }
+        })
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface SessionFocusEntryPoint {
+    fun sessionFocusHolder(): SessionFocusHolder
 }
