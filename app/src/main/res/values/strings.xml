@@ -574,6 +574,7 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="chat_role_other">其余</string>
     <string name="chat_context_msg_summary">消息 %1$d（用户 %2$d · 助手 %3$d）</string>
     <string name="chat_context_cache_hit">缓存命中 %1$d%%</string>
+    <string name="chat_context_timestamps">创建 %1$s · 活动 %2$s</string>
 
     <!-- About Screen -->
     <string name="about_title">About</string>

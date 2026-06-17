@@ -73,7 +73,7 @@ internal fun ContextDetailDialog(state: ContextDetailState?, onDismiss: () -> Un
                 state.timestamps?.let { ts ->
                     val fmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
                     Text(
-                        text = "创建 ${fmt.format(Date(ts.created))} · 活动 ${fmt.format(Date(ts.updated))}",
+                        text = stringResource(R.string.chat_context_timestamps, fmt.format(Date(ts.created)), fmt.format(Date(ts.updated))),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
                     )
