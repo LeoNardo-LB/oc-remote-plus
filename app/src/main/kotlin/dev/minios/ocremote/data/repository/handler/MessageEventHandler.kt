@@ -134,6 +134,29 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         if (event.info is Message.Assistant) {
             assistantMessageIds.add(event.info.id)
         }
+        // SSE MessageUpdated carries no parts; for User messages, seed parts map from summary
+        // so that consumers (notifications, UI) can read text without waiting for REST sync.
+        val info = event.info
+        if (info is Message.User) {
+            _parts.update { current ->
+                if (current.containsKey(info.id)) {
+                    current
+                } else {
+                    val summaryText = info.summary?.body?.takeIf { it.isNotBlank() }
+                        ?: info.summary?.title?.takeIf { it.isNotBlank() }
+                    if (summaryText != null) {
+                        current + (info.id to listOf(Part.Text(
+                            id = "${info.id}_summary",
+                            sessionId = sessionId,
+                            messageId = info.id,
+                            text = summaryText
+                        )))
+                    } else {
+                        current
+                    }
+                }
+            }
+        }
     }
 
     /**
