@@ -47,7 +47,11 @@ fun FileViewerScreen(
                     message = stringResource(R.string.viewer_binary_not_supported),
                     detail = uiState.mimeType?.let { stringResource(R.string.viewer_binary_mime, it) }
                 )
-                uiState.mode == FileViewerMode.DIFF -> DiffViewPlaceholder()
+                uiState.mode == FileViewerMode.DIFF -> DiffView(
+                    uiState = uiState,
+                    onNextHunk = onNextHunk,
+                    onPrevHunk = onPrevHunk
+                )
                 uiState.isEmpty -> MessageState(message = stringResource(R.string.viewer_empty_file))
                 uiState.isTruncated -> Column(Modifier.fillMaxSize()) {
                     TruncationBanner()
@@ -167,15 +171,3 @@ private fun TruncationBanner() {
     }
 }
 
-@Composable
-private fun DiffViewPlaceholder() {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(SpacingTokens.LG.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = stringResource(R.string.viewer_diff_placeholder),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}

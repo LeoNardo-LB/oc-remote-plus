@@ -666,4 +666,6 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_empty_file">Arquivo vazio</string>
     <string name="viewer_truncated">Arquivo grande — mostrando as primeiras 5.000 linhas</string>
     <string name="viewer_diff_placeholder">Visualização de diff (Tarefa 16)</string>
+    <string name="a11y_icon_hunk_previous">Bloco anterior</string>
+    <string name="a11y_icon_hunk_next">Próximo bloco</string>
 </resources>

@@ -666,4 +666,6 @@ Tokeny: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_empty_file">Plik jest pusty</string>
     <string name="viewer_truncated">Duży plik — wyświetlanie pierwszych 5 000 wierszy</string>
     <string name="viewer_diff_placeholder">Widok diff (zadanie 16)</string>
+    <string name="a11y_icon_hunk_previous">Poprzedni blok zmian</string>
+    <string name="a11y_icon_hunk_next">Następny blok zmian</string>
 </resources>

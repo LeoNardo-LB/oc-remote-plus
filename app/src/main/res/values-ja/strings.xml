@@ -666,4 +666,6 @@
     <string name="viewer_empty_file">ファイルは空です</string>
     <string name="viewer_truncated">大きなファイル — 先頭5,000行を表示</string>
     <string name="viewer_diff_placeholder">差分ビュー（タスク16）</string>
+    <string name="a11y_icon_hunk_previous">前の差分ブロック</string>
+    <string name="a11y_icon_hunk_next">次の差分ブロック</string>
 </resources>

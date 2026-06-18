@@ -672,4 +672,6 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_empty_file">Berkas kosong</string>
     <string name="viewer_truncated">Berkas besar — menampilkan 5.000 baris pertama</string>
     <string name="viewer_diff_placeholder">Tampilan diff (Tugas 16)</string>
+    <string name="a11y_icon_hunk_previous">Blok sebelumnya</string>
+    <string name="a11y_icon_hunk_next">Blok berikutnya</string>
 </resources>

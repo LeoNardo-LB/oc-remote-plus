@@ -721,4 +721,6 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_empty_file">File is empty</string>
     <string name="viewer_truncated">Large file — showing first 5,000 lines</string>
     <string name="viewer_diff_placeholder">Diff view (Task 16)</string>
+    <string name="a11y_icon_hunk_previous">Previous hunk</string>
+    <string name="a11y_icon_hunk_next">Next hunk</string>
 </resources>

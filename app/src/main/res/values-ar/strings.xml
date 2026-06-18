@@ -666,4 +666,6 @@
     <string name="viewer_empty_file">الملف فارغ</string>
     <string name="viewer_truncated">ملف كبير — عرض أول 5,000 سطر</string>
     <string name="viewer_diff_placeholder">عرض الفروق (المهمة 16)</string>
+    <string name="a11y_icon_hunk_previous">الكتلة السابقة</string>
+    <string name="a11y_icon_hunk_next">الكتلة التالية</string>
 </resources>

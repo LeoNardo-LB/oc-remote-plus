@@ -666,4 +666,6 @@
     <string name="viewer_empty_file">파일이 비어 있습니다.</string>
     <string name="viewer_truncated">대용량 파일 — 처음 5,000줄 표시</string>
     <string name="viewer_diff_placeholder">차이 보기 (작업 16)</string>
+    <string name="a11y_icon_hunk_previous">이전 변경 부분</string>
+    <string name="a11y_icon_hunk_next">다음 변경 부분</string>
 </resources>

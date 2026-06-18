@@ -667,4 +667,6 @@
     <string name="viewer_empty_file">Файл пуст</string>
     <string name="viewer_truncated">Большой файл — показаны первые 5 000 строк</string>
     <string name="viewer_diff_placeholder">Просмотр различий (Задача 16)</string>
+    <string name="a11y_icon_hunk_previous">Предыдущий блок изменений</string>
+    <string name="a11y_icon_hunk_next">Следующий блок изменений</string>
 </resources>

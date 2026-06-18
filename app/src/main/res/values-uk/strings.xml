@@ -666,4 +666,6 @@
     <string name="viewer_empty_file">Файл порожній</string>
     <string name="viewer_truncated">Великий файл — показ перших 5 000 рядків</string>
     <string name="viewer_diff_placeholder">Перегляд відмінностей (Завдання 16)</string>
+    <string name="a11y_icon_hunk_previous">Попередній блок змін</string>
+    <string name="a11y_icon_hunk_next">Наступний блок змін</string>
 </resources>

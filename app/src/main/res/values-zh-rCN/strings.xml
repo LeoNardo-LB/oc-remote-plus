@@ -666,4 +666,6 @@
     <string name="viewer_empty_file">文件为空</string>
     <string name="viewer_truncated">大文件 — 显示前5000行</string>
     <string name="viewer_diff_placeholder">差异视图（任务16）</string>
+    <string name="a11y_icon_hunk_previous">上一个差异块</string>
+    <string name="a11y_icon_hunk_next">下一个差异块</string>
 </resources>

@@ -666,4 +666,6 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_empty_file">Dosya boş</string>
     <string name="viewer_truncated">Büyük dosya — ilk 5.000 satır gösteriliyor</string>
     <string name="viewer_diff_placeholder">Diff görünümü (Görev 16)</string>
+    <string name="a11y_icon_hunk_previous">Önceki değişiklik bloğu</string>
+    <string name="a11y_icon_hunk_next">Sonraki değişiklik bloğu</string>
 </resources>
