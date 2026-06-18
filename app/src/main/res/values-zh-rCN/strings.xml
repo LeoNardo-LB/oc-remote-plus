@@ -631,6 +631,11 @@
     <string name="a11y_icon_remove_from_list">从列表中移除</string>
     <string name="a11y_icon_scroll_to_top">滚动到顶部</string>
     <string name="a11y_icon_hide_keyboard">隐藏键盘</string>
+    <string name="a11y_icon_git_changes">Git更改</string>
+    <string name="workspace_refresh">刷新</string>
+    <string name="workspace_show_ignored">显示忽略项</string>
+    <string name="workspace_empty_directory">空目录</string>
+    <string name="workspace_retry">重试</string>
     <string name="sessions_view_folders">文件夹</string>
     <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">清除搜索</string>

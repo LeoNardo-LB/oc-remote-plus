@@ -628,6 +628,11 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Aus Liste entfernen</string>
     <string name="a11y_icon_scroll_to_top">Nach oben scrollen</string>
     <string name="a11y_icon_hide_keyboard">Tastatur ausblenden</string>
+    <string name="a11y_icon_git_changes">Git-Änderungen</string>
+    <string name="workspace_refresh">Aktualisieren</string>
+    <string name="workspace_show_ignored">Ignorierte anzeigen</string>
+    <string name="workspace_empty_directory">Leeres Verzeichnis</string>
+    <string name="workspace_retry">Erneut versuchen</string>
     <string name="sessions_view_folders">Ordner</string>
     <string name="sessions_view_recent">Letzte</string>
     <string name="sessions_clear_search">Suche löschen</string>

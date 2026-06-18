@@ -634,6 +634,11 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Hapus dari daftar</string>
     <string name="a11y_icon_scroll_to_top">Gulir ke atas</string>
     <string name="a11y_icon_hide_keyboard">Sembunyikan keyboard</string>
+    <string name="a11y_icon_git_changes">Perubahan Git</string>
+    <string name="workspace_refresh">Segarkan</string>
+    <string name="workspace_show_ignored">Tampilkan yang diabaikan</string>
+    <string name="workspace_empty_directory">Direktori kosong</string>
+    <string name="workspace_retry">Coba lagi</string>
     <string name="sessions_view_folders">Folder</string>
     <string name="sessions_view_recent">Terbaru</string>
     <string name="sessions_clear_search">Hapus pencarian</string>

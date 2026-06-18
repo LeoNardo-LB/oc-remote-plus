@@ -628,6 +628,11 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Listeden kaldır</string>
     <string name="a11y_icon_scroll_to_top">Üste kaydır</string>
     <string name="a11y_icon_hide_keyboard">Klavyeyi gizle</string>
+    <string name="a11y_icon_git_changes">Git değişiklikleri</string>
+    <string name="workspace_refresh">Yenile</string>
+    <string name="workspace_show_ignored">Yoksayılanları göster</string>
+    <string name="workspace_empty_directory">Boş dizin</string>
+    <string name="workspace_retry">Yeniden dene</string>
     <string name="sessions_view_folders">Klasörler</string>
     <string name="sessions_view_recent">Son</string>
     <string name="sessions_clear_search">Aramayı temizle</string>

@@ -628,6 +628,11 @@
     <string name="a11y_icon_remove_from_list">إزالة من القائمة</string>
     <string name="a11y_icon_scroll_to_top">التمرير للأعلى</string>
     <string name="a11y_icon_hide_keyboard">إخفاء لوحة المفاتيح</string>
+    <string name="a11y_icon_git_changes">تغييرات Git</string>
+    <string name="workspace_refresh">تحديث</string>
+    <string name="workspace_show_ignored">إظهار المتجاهَل</string>
+    <string name="workspace_empty_directory">دليل فارغ</string>
+    <string name="workspace_retry">إعادة المحاولة</string>
     <string name="sessions_view_folders">المجلدات</string>
     <string name="sessions_view_recent">الأحدث</string>
     <string name="sessions_clear_search">مسح البحث</string>

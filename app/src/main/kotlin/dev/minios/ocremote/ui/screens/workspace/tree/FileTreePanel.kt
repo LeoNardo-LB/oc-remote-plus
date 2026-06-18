@@ -30,7 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.isDirectory
 import dev.minios.ocremote.ui.screens.workspace.FileTreeNode
 import dev.minios.ocremote.ui.screens.workspace.WorkspaceUiState
@@ -51,6 +53,7 @@ fun FileTreePanel(
     onOpenFile: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val emptyDirectoryMessage = stringResource(R.string.workspace_empty_directory)
     Column(modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(SpacingTokens.SM.dp),
@@ -58,12 +61,12 @@ fun FileTreePanel(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onRefreshRoot) {
-                Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.workspace_refresh))
             }
             FilterChip(
                 selected = uiState.showIgnored,
                 onClick = onToggleShowIgnored,
-                label = { Text("显示隐藏") },
+                label = { Text(stringResource(R.string.workspace_show_ignored)) },
                 leadingIcon = { Icon(Icons.Filled.Visibility, contentDescription = null) }
             )
         }
@@ -80,7 +83,7 @@ fun FileTreePanel(
                 onRetry = onRefreshRoot
             )
 
-            uiState.rootNodes.isEmpty() -> FileTreeEmptyState(message = "空目录")
+            uiState.rootNodes.isEmpty() -> FileTreeEmptyState(message = emptyDirectoryMessage)
 
             else -> {
                 val flattened = remember(uiState.rootNodes, uiState.showIgnored) {
@@ -172,7 +175,7 @@ private fun FileTreeErrorState(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
-            TextButton(onClick = onRetry) { Text("重试") }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.workspace_retry)) }
         }
     }
 }

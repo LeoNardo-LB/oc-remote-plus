@@ -628,6 +628,11 @@
     <string name="a11y_icon_remove_from_list">Видалити зі списку</string>
     <string name="a11y_icon_scroll_to_top">Прокрутити вгору</string>
     <string name="a11y_icon_hide_keyboard">Приховати клавіатуру</string>
+    <string name="a11y_icon_git_changes">Зміни Git</string>
+    <string name="workspace_refresh">Оновити</string>
+    <string name="workspace_show_ignored">Показати ігноровані</string>
+    <string name="workspace_empty_directory">Порожній каталог</string>
+    <string name="workspace_retry">Повторити</string>
     <string name="sessions_view_folders">Папки</string>
     <string name="sessions_view_recent">Нещодавні</string>
     <string name="sessions_clear_search">Очистити пошук</string>

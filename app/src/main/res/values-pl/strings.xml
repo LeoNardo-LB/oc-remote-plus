@@ -628,6 +628,11 @@ Tokeny: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_remove_from_list">Usuń z listy</string>
     <string name="a11y_icon_scroll_to_top">Przewiń do góry</string>
     <string name="a11y_icon_hide_keyboard">Ukryj klawiaturę</string>
+    <string name="a11y_icon_git_changes">Zmiany Git</string>
+    <string name="workspace_refresh">Odśwież</string>
+    <string name="workspace_show_ignored">Pokaż ignorowane</string>
+    <string name="workspace_empty_directory">Pusty katalog</string>
+    <string name="workspace_retry">Ponów</string>
     <string name="sessions_view_folders">Foldery</string>
     <string name="sessions_view_recent">Ostatnie</string>
     <string name="sessions_clear_search">Wyczyść wyszukiwanie</string>

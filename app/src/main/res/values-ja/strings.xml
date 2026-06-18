@@ -628,6 +628,11 @@
     <string name="a11y_icon_remove_from_list">リストから削除</string>
     <string name="a11y_icon_scroll_to_top">上にスクロール</string>
     <string name="a11y_icon_hide_keyboard">キーボード非表示</string>
+    <string name="a11y_icon_git_changes">Gitの変更</string>
+    <string name="workspace_refresh">更新</string>
+    <string name="workspace_show_ignored">無視を表示</string>
+    <string name="workspace_empty_directory">空のディレクトリ</string>
+    <string name="workspace_retry">再試行</string>
     <string name="sessions_view_folders">フォルダ</string>
     <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">検索をクリア</string>

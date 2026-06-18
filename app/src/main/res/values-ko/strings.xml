@@ -628,6 +628,11 @@
     <string name="a11y_icon_remove_from_list">목록에서 제거</string>
     <string name="a11y_icon_scroll_to_top">위로 스크롤</string>
     <string name="a11y_icon_hide_keyboard">키보드 숨기기</string>
+    <string name="a11y_icon_git_changes">Git 변경사항</string>
+    <string name="workspace_refresh">새로고침</string>
+    <string name="workspace_show_ignored">무시된 항목 표시</string>
+    <string name="workspace_empty_directory">빈 디렉토리</string>
+    <string name="workspace_retry">재시도</string>
     <string name="sessions_view_folders">폴더</string>
     <string name="sessions_view_recent">최근</string>
     <string name="sessions_clear_search">검색 지우기</string>
