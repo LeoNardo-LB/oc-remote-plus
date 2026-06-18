@@ -660,6 +660,8 @@ http://{host}:{port}
 - 源码：`handlers/project.ts`、`groups/project.ts`
 - `svc.list()` 从项目元数据数据库查询所有记录
 
+**错误码**：无业务错误码（除非实例/认证失败 → 500/401）。
+
 **建议用法**：
 - 用于项目选择器、历史列表
 - 客户端可自行按访问时间排序（数据库记录顺序不保证）
@@ -680,6 +682,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`handlers/project.ts`
 - `(yield* InstanceState.context).project` —— 直接从实例上下文获取，**无数据库查询**，效率最高
+
+**错误码**：无业务错误码（实例上下文始终存在 project，不会主动返回 404/null；实例已销毁时由中间件返回相应错误）。
 
 **建议用法**：
 - 优先用此端点获取当前项目（比 `/project` 过滤效率高）
@@ -704,6 +708,8 @@ http://{host}:{port}
 - `svc.initGit({ directory, project })` 执行 `git init`
 - **reload 决策逻辑**：比较新旧 `id` / `vcs` / `worktree` 三个字段，任一变化即 `markInstanceForReload(ctx, { directory, worktree, project })`；三者均不变则直接返回
 - **reload vs disposal**：`markInstanceForReload` 更新实例上下文但保留进程；`markInstanceForDisposal` 销毁实例。initGit 后通常需要 reload 因为 worktree/vcs 信息变了
+
+**错误码**：500（`git init` 执行失败 → defect，无错误 body）；无 400/404；401（认证缺失）。
 
 **建议用法**：
 - 调用后客户端应监听实例 reload 事件，重新初始化依赖 vcs 的视图
@@ -738,6 +744,8 @@ http://{host}:{port}
 - `svc.update()` 写入元数据数据库
 - 错误处理：`Project.NotFoundError` 映射为 `ProjectNotFoundError`（404）
 
+**错误码**：400（`HttpApiError.BadRequest`，参数格式错误）；404（`ProjectNotFoundError`，body 含 `projectID` + `message`）；401（认证缺失）。详见上"边界情况"。
+
 **建议用法**：
 - 更新前先 GET 当前 `commands`，合并后再 PATCH（避免全量替换丢失）
 - 仅修改单个命令时也需传完整 `commands` 映射
@@ -764,6 +772,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`handlers/project.ts`
 - `project.directories({ projectID })` 查询项目元数据 + 扫描本地 worktree
+
+**错误码**：404（`ProjectNotFoundError`，项目不存在）；401（认证缺失）。
 
 **建议用法**：
 - 用于 worktree 选择器、目录切换 UI
@@ -833,6 +843,8 @@ http://{host}:{port}
 | `DirectoryUnavailableError` | `Project copy directory unavailable: ${directory}` |
 | `StrategyNotFoundError` | `Project copy strategy not found for: ${directory}` |
 
+**错误码**：统一 400（`ApiProjectCopyError`，按 `message` 区分 4 种子类型——见上"边界情况"；含可选 `forceRequired: true`，仅 `Git.WorktreeError` 时出现）；401（认证缺失）。
+
 **建议用法**：
 - 名称可读性重要时，**显式传入 `name`** 字段，避免依赖 LLM
 - 或检查返回的 `name` 是否像 slug（短随机字符串）判断是否为 fallback
@@ -863,6 +875,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`groups/project-copy.ts:25-28`（`RemovePayload`）、`handlers/project-copy.ts`
 - 由 `ProjectCopy.Service` 委托 strategy 执行清理（如 `git worktree remove`）
+
+**错误码**：400（`ApiProjectCopyError`：含 `forceRequired: true` 时需重试 `force: true`；body 被 HTTP 代理剥离时也走 400）；401（认证缺失）。
 
 **建议用法**：
 - 客户端需显式设置 body：
@@ -898,6 +912,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`handlers/project-copy.ts`
 - `service.refresh({ projectID })` 遍历所有 strategy，每个 strategy 自扫描本地后向数据库注册遗漏的副本
+
+**错误码**：400（`ApiProjectCopyError`，body 缺失或非 JSON；尽管 body 为空仍要求 `Content-Type: application/json`）；401（认证缺失）。
 
 **建议用法**：
 - 用户外部创建了 worktree（如手动 `git worktree add`）后调用此端点同步到系统
@@ -963,6 +979,8 @@ http://{host}:{port}
 - 源码：`handlers/workspace.ts`
 - `listAdapters(instance.project.id)` 同步函数，从 adapter 注册表查询
 
+**错误码**：无业务错误码（除非 401 认证、实例/中间件错误）。
+
 **建议用法**：
 - 创建工作区前先调用此端点，UI 上展示可用 adapter
 - 灰显 `available: false` 的 adapter
@@ -984,6 +1002,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`handlers/workspace.ts`
 - `workspace.list(instance.project)` 从数据库查询
+
+**错误码**：无业务错误码（除非 401 认证、实例/中间件错误）。
 
 **建议用法**：
 - 工作区选择器、切换 UI
@@ -1013,6 +1033,8 @@ http://{host}:{port}
 - 源码：`groups/workspace.ts:13`、`handlers/workspace.ts:33-48`
 - 由 adapter 执行实际创建（如 ssh adapter 在远程主机创建目录）
 
+**错误码**：400（`ApiWorkspaceCreateError`，含 `message`；`message` 可能来自 defect cause，需解析；或 `HttpApiError.BadRequest`，参数错误）；401（认证缺失）。
+
 **建议用法**：
 - 创建前确保 adapter 可用（参考 `GET /experimental/workspace/adapter`）
 - 捕获 400 错误时，`message` 可能来自 defect cause，需要解析
@@ -1033,6 +1055,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`handlers/workspace.ts`
 - `workspace.syncList(instance.project)` 遍历所有 adapter，对比数据库注册遗漏的工作区
+
+**错误码**：无业务错误码（adapter 故障一般以 defect 形式穿透为 500）；401（认证缺失）。
 
 **建议用法**：
 - 外部修改工作区后调用，确保本地数据库一致
@@ -1058,6 +1082,8 @@ http://{host}:{port}
   1. `workspace.list(project)` 获取当前项目的 workspace ID 集合
   2. `workspace.status()` 返回所有 workspace 状态
   3. 过滤：`ids.has(item.workspaceID)` —— 只返回当前项目的状态
+
+**错误码**：无业务错误码（远程工作区连接失败体现在 `connected: false` + `error` 字段，非 HTTP 错误）；401（认证缺失）。
 
 **建议用法**：
 - 工作区列表 UI 中实时展示连接状态
@@ -1085,6 +1111,8 @@ http://{host}:{port}
 **数据来源/原理**：
 - 源码：`handlers/workspace.ts`
 - `workspace.remove(id)` 从数据库删除记录
+
+**错误码**：400（`HttpApiError.BadRequest`，参数校验）；**不返回 404**——工作区不存在时返回 `undefined`；401（认证缺失）。
 
 **建议用法**：
 - 删除前可选 GET 确认存在
@@ -1122,6 +1150,8 @@ http://{host}:{port}
 | `Workspace.WorkspaceNotFoundError` | `ApiNotFoundError` | 404 |
 | `Vcs.PatchApplyError` | `ApiVcsApplyError` | 400（含 `reason`） |
 | 其他 | `ApiWorkspaceWarpError` | 400 |
+
+**错误码**：404（`ApiNotFoundError`，工作区不存在）；400（`ApiVcsApplyError`：`reason: "non-git" | "not-clean"`；`ApiWorkspaceWarpError`：其他业务错误）；401（认证缺失）。完整映射见上表。
 
 **建议用法**：
 - "切换工作区"功能：传入新的 `id` 和 `sessionID`
@@ -1188,6 +1218,8 @@ http://{host}:{port}
 - 源码：`groups/reference.ts:8-27`（`ReferenceDescriptor` schema）、`handlers/reference.ts:13-22`
 - `reference.list()` 解析配置中的 `reference` 字段，对每条引用执行解析（本地路径校验 / git 仓库 probe）
 - handler 对非 git 引用原样返回，对 git 引用做 `branch` 条件序列化以避免输出 `branch: null`
+
+**错误码**：无业务错误码（解析失败的引用以 `kind: "invalid"` 返回，**非整体错误**，单条失败不影响其他）；401（认证缺失）。
 
 **建议用法**：
 - 客户端 `@` 补全：输入 `@` 时调用此端点列出可用引用
@@ -3010,6 +3042,8 @@ for (const ev of newEvents) {
 - 源码：`groups/file.ts:21-24`（`FindTextQuery`）、`handlers/file.ts:27`
 - 调用 `ripgrep.search({ cwd, pattern, limit: 10 })`，spawn 本地 `rg` 二进制
 
+**错误码**：500（ripgrep 不可用/搜索失败 → defect，无错误 body，**不可恢复**）；**无 400**——`pattern` 即使非法也走 ripgrep 路径；401（认证缺失）。
+
 **建议用法**：
 - 全文搜索 / 关键字定位
 - 需要更多结果时，建议通过 PTY 直接运行 `rg` 命令（可控制 limit 和输出格式）
@@ -3044,6 +3078,8 @@ for (const ev of newEvents) {
 **数据来源/原理**：
 - 源码：`groups/file.ts:26-34`（`FindFileQuery`）、`handlers/file.ts:36-71`
 - fff 优先（frecency 排序），降级到 ripgrep 字面搜索
+
+**错误码**：500（fff/ripgrep 均不可用或失败 → defect）；`limit` 越界（>200 或 <1）由 schema 校验 → 400；401（认证缺失）。
 
 **建议用法**：
 - 快速跳转（类似 VSCode Cmd+P）使用 fff 的 frecency 优势
@@ -3084,6 +3120,8 @@ for (const ev of newEvents) {
 - 源码：`handlers/file.ts:74-76`
 - 设计意图是 LSP workspace/symbol 请求，但尚未接入
 
+**错误码**：无（🔴 **桩实现恒返回 200 + `[]`**，不会失败）；401（认证缺失）。
+
 **建议用法**：
 - ⚠️ **不要依赖此端点**，目前永远返回 `[]`
 - 替代方案：直接调用 LSP，或通过 PTY 运行 `ctags` / `grep`
@@ -3118,6 +3156,8 @@ for (const ev of newEvents) {
 **数据来源/原理**：
 - 源码：`groups/file.ts:16-19`（`FileQuery`）、`groups/file.ts:41-47`（`LegacyEntry`）、`handlers/file.ts`
 - `fs.list({ path: RelativePath })` 列出目录，对每个条目调用 `fs.isIgnored(path, type)` 判断忽略状态
+
+**错误码**：500（路径不存在/无权限 → defect，**无明确 400/404**）；401（认证缺失）。
 
 **建议用法**：
 - 文件浏览器 UI
@@ -3160,6 +3200,8 @@ for (const ev of newEvents) {
   3. **存在性检查**：`fs.existsSafe(file)` —— 不存在 → 返回空 text 内容
   4. 文本内容 `item.content.trim()`
 
+**错误码**：500（🔴 路径逃逸 → `Effect.die`，**非 400**，无错误 body；详见上"边界情况"）；文件不存在 → **200 + `content: ""`**（非 404）；401（认证缺失）。
+
 **建议用法**：
 - 客户端应**自行验证路径**，避免触发服务端逃逸检查（500 难以与其他服务端错误区分）
 - 区分"文件不存在"和"空文件"：两者都返回 `content: ""`，需先 `GET /file` 验证存在
@@ -3186,6 +3228,8 @@ for (const ev of newEvents) {
 **数据来源/原理**：
 - 源码：`handlers/file.ts:113-115`
 - 设计意图是 git status，但未接入
+
+**错误码**：无（🔴 **桩实现恒返回 200 + `[]`**）；401（认证缺失）。
 
 **建议用法**：
 - ⚠️ **不要依赖此端点**，目前永远返回 `[]`
