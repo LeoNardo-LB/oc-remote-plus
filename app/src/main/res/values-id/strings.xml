@@ -639,6 +639,9 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_show_ignored">Tampilkan yang diabaikan</string>
     <string name="workspace_empty_directory">Direktori kosong</string>
     <string name="workspace_retry">Coba lagi</string>
+    <string name="workspace_git_stats">%1$d perubahan (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Bukan repositori Git</string>
+    <string name="workspace_git_working_tree_clean">Pohon kerja bersih</string>
     <string name="sessions_view_folders">Folder</string>
     <string name="sessions_view_recent">Terbaru</string>
     <string name="sessions_clear_search">Hapus pencarian</string>

@@ -631,6 +631,9 @@
     <string name="workspace_show_ignored">Afficher les ignorés</string>
     <string name="workspace_empty_directory">Répertoire vide</string>
     <string name="workspace_retry">Réessayer</string>
+    <string name="workspace_git_stats">%1$d modifications (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Pas un dépôt Git</string>
+    <string name="workspace_git_working_tree_clean">Arborescence propre</string>
     <string name="sessions_view_folders">Dossiers</string>
     <string name="sessions_view_recent">Récents</string>
     <string name="sessions_clear_search"></string>

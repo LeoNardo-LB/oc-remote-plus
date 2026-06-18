@@ -633,6 +633,9 @@
     <string name="workspace_show_ignored">무시된 항목 표시</string>
     <string name="workspace_empty_directory">빈 디렉토리</string>
     <string name="workspace_retry">재시도</string>
+    <string name="workspace_git_stats">%1$d개 변경 (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Git 저장소가 아닙니다</string>
+    <string name="workspace_git_working_tree_clean">작업 트리가 깨끗합니다</string>
     <string name="sessions_view_folders">폴더</string>
     <string name="sessions_view_recent">최근</string>
     <string name="sessions_clear_search">검색 지우기</string>

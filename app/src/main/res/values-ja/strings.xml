@@ -633,6 +633,9 @@
     <string name="workspace_show_ignored">無視を表示</string>
     <string name="workspace_empty_directory">空のディレクトリ</string>
     <string name="workspace_retry">再試行</string>
+    <string name="workspace_git_stats">%1$d 件の変更 (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Git リポジトリではありません</string>
+    <string name="workspace_git_working_tree_clean">ワーキングツリーはクリーンです</string>
     <string name="sessions_view_folders">フォルダ</string>
     <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">検索をクリア</string>

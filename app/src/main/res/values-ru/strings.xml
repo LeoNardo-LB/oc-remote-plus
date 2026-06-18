@@ -634,6 +634,9 @@
     <string name="workspace_show_ignored">Показать игнорируемые</string>
     <string name="workspace_empty_directory">Пустая папка</string>
     <string name="workspace_retry">Повторить</string>
+    <string name="workspace_git_stats">%1$d изменений (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Не Git-репозиторий</string>
+    <string name="workspace_git_working_tree_clean">Рабочее дерево чистое</string>
     <string name="sessions_view_folders">Папки</string>
     <string name="sessions_view_recent">Недавние</string>
     <string name="sessions_clear_search">Очистить поиск</string>

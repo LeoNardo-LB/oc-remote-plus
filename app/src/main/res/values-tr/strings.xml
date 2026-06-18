@@ -633,6 +633,9 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_show_ignored">Yoksayılanları göster</string>
     <string name="workspace_empty_directory">Boş dizin</string>
     <string name="workspace_retry">Yeniden dene</string>
+    <string name="workspace_git_stats">%1$d değişiklik (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Bir Git deposu değil</string>
+    <string name="workspace_git_working_tree_clean">Çalışma ağacı temiz</string>
     <string name="sessions_view_folders">Klasörler</string>
     <string name="sessions_view_recent">Son</string>
     <string name="sessions_clear_search">Aramayı temizle</string>

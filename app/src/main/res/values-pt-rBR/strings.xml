@@ -633,6 +633,9 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_show_ignored">Mostrar ignorados</string>
     <string name="workspace_empty_directory">Diretório vazio</string>
     <string name="workspace_retry">Tentar novamente</string>
+    <string name="workspace_git_stats">%1$d alterações (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Não é um repositório Git</string>
+    <string name="workspace_git_working_tree_clean">Árvore de trabalho limpa</string>
     <string name="sessions_view_folders">Pastas</string>
     <string name="sessions_view_recent">Recentes</string>
     <string name="sessions_clear_search">Limpar busca</string>

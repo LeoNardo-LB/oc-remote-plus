@@ -636,6 +636,9 @@
     <string name="workspace_show_ignored">显示忽略项</string>
     <string name="workspace_empty_directory">空目录</string>
     <string name="workspace_retry">重试</string>
+    <string name="workspace_git_stats">%1$d 个变更（%2$d M，%3$d A，%4$d D）</string>
+    <string name="workspace_git_not_a_repo">当前项目不是 Git 仓库</string>
+    <string name="workspace_git_working_tree_clean">工作区干净，无变更</string>
     <string name="sessions_view_folders">文件夹</string>
     <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">清除搜索</string>

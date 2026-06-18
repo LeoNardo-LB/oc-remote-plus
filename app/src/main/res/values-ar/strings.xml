@@ -633,6 +633,9 @@
     <string name="workspace_show_ignored">إظهار المتجاهَل</string>
     <string name="workspace_empty_directory">دليل فارغ</string>
     <string name="workspace_retry">إعادة المحاولة</string>
+    <string name="workspace_git_stats">%1$d تغييرات (%2$d M، %3$d A، %4$d D)</string>
+    <string name="workspace_git_not_a_repo">ليس مستودع Git</string>
+    <string name="workspace_git_working_tree_clean">شجرة العمل نظيفة</string>
     <string name="sessions_view_folders">المجلدات</string>
     <string name="sessions_view_recent">الأحدث</string>
     <string name="sessions_clear_search">مسح البحث</string>

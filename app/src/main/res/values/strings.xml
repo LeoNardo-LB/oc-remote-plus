@@ -690,6 +690,11 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_empty_directory">Empty directory</string>
     <string name="workspace_retry">Retry</string>
 
+    <!-- Workspace git changes -->
+    <string name="workspace_git_stats">%1$d changes (%2$d M, %3$d A, %4$d D)</string>
+    <string name="workspace_git_not_a_repo">Not a git repository</string>
+    <string name="workspace_git_working_tree_clean">Working tree clean</string>
+
     <!-- Session List view mode toggle -->
     <string name="sessions_view_folders">Folders</string>
     <string name="sessions_view_recent">Recent</string>
