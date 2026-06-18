@@ -1,0 +1,50 @@
+appId: dev.minios.ocremote.dev
+name: "E2E Workspace Git Changes Verification"
+tags:
+  - e2e
+  - workspace
+  - git-changes
+---
+# 工作区 Git 变更验证（入口3）
+# 前置：服务器已配置，目录是 git 仓库且有未提交变更（HEAD 与工作区不同）。
+# 验证：overflow → 工作区 → panel_git_changes → 变更列表可见（状态色块 / +N -M 数字 / 文件路径）。
+
+# === 1. 启动并进入聊天界面（父会话） ===
+- launchApp
+- waitForAnimationToEnd
+
+- tapOn: "Sessions"
+- waitForAnimationToEnd
+
+- tapOn:
+    point: "540,600"
+- waitForAnimationToEnd
+
+# === 2. 进入工作区 ===
+- tapOn:
+    id: "more_vert"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "menu_open_workspace"
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: e2e/21-workspace-initial
+
+# === 3. 切到 Git 变更面板 ===
+- tapOn:
+    id: "panel_git_changes"
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: e2e/21-workspace-git-changes
+
+# === 4. 返回 ===
+- tapOn:
+    id: "back_button"
+- waitForAnimationToEnd
+
+- takeScreenshot: e2e/21-workspace-back-to-chat

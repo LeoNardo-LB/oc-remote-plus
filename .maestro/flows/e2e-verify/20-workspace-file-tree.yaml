@@ -1,0 +1,72 @@
+appId: dev.minios.ocremote.dev
+name: "E2E Workspace File Tree Verification"
+tags:
+  - e2e
+  - workspace
+  - file-tree
+---
+# 工作区文件树验证（入口2）
+# 前置：服务器已配置（URL=http://10.0.2.2:4096 或其他可达地址），至少一个父会话存在。
+# 验证：ChatTopBar overflow 菜单 → 工作区 → 文件树面板 → 点文件 → FileViewer → 返回。
+
+# === 1. 启动并进入聊天界面（父会话） ===
+- launchApp
+- waitForAnimationToEnd
+
+# 进入 Sessions 列表
+- tapOn: "Sessions"
+- waitForAnimationToEnd
+
+# 点击第一个会话（父会话，more_vert 仅在父会话显示）
+- tapOn:
+    point: "540,600"
+- waitForAnimationToEnd
+
+# === 2. 通过 overflow 菜单进入工作区 ===
+- tapOn:
+    id: "more_vert"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "menu_open_workspace"
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: e2e/20-workspace-initial
+
+# === 3. 文件树面板（默认进入） ===
+# 点 panel_file_tree 图标确保切到文件树视图（幂等）
+- tapOn:
+    id: "panel_file_tree"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/20-workspace-file-tree
+
+# === 4. 点第一个文件树项（展开目录或打开文件） ===
+# 用 point 而非 text，因为文件名是动态的；列表第一项通常在内容区顶部附近
+- tapOn:
+    point: "540,400"
+- waitForAnimationToEnd
+- takeScreenshot: e2e/20-workspace-item-tapped
+
+# === 5. 返回（FileViewer 或 Workspace → Chat） ===
+- runFlow:
+    when:
+      visible:
+        id: "back_button"
+    commands:
+      - tapOn:
+          id: "back_button"
+      - waitForAnimationToEnd
+
+# 再按一次 back_button 从 Workspace 返回 Chat（若仍在工作区）
+- runFlow:
+    when:
+      visible:
+        id: "back_button"
+    commands:
+      - tapOn:
+          id: "back_button"
+      - waitForAnimationToEnd
+
+- takeScreenshot: e2e/20-workspace-back-to-chat

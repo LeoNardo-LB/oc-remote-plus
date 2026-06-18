@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.minios.ocremote.R
+import dev.minios.ocremote.ui.screens.workspace.git.GitChangesPanel
 import dev.minios.ocremote.ui.screens.workspace.tree.FileTreePanel
 import dev.minios.ocremote.ui.theme.SpacingTokens
 
@@ -76,10 +77,10 @@ fun WorkspaceScreen(
                 onOpenFile = onOpenFile,
                 modifier = Modifier.padding(padding)
             )
-            WorkspacePanel.GIT_CHANGES -> GitChangesPanelPlaceholder(
+            WorkspacePanel.GIT_CHANGES -> GitChangesPanel(
                 uiState = uiState,
-                onRefreshGit = onRefreshGit,
-                onOpenGitDiff = onOpenGitDiff,
+                onRefresh = onRefreshGit,
+                onOpenDiff = onOpenGitDiff,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -165,30 +166,6 @@ private fun WorkspaceTopBar(
             }
         }
     )
-}
-
-/**
- * Placeholder for the GitChangesPanel that Task 14 will implement.
- * Real panel must match this signature so WorkspaceScreen only needs a call-site rename.
- */
-@Composable
-private fun GitChangesPanelPlaceholder(
-    uiState: WorkspaceUiState,
-    onRefreshGit: () -> Unit,
-    onOpenGitDiff: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(SpacingTokens.LG.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "GitChangesPanel placeholder — Task 14",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
 }
 
 /** Returns the last path segment, or "/" for empty/root paths. */

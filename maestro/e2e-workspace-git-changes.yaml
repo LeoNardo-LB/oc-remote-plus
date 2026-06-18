@@ -1,0 +1,72 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Workspace Git Changes (Real OpenCode Server)
+tags:
+  - e2e
+  - workspace
+  - git-changes
+---
+
+# E2E Workspace Git Changes Flow
+# Prerequisite: Server at 10.0.2.2:4096 connected
+
+- launchApp
+
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 15000
+    optional: true
+
+- tapOn:
+    text: "Sessions"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+
+- tapOn: "D:/Develop/code/app/oc-remote"
+
+- extendedWaitUntil:
+    visible: "sessions active"
+    timeout: 15000
+    optional: true
+
+- tapOn: "问题总览修复"
+
+- extendedWaitUntil:
+    visible: "Ask a question"
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_git_chat_ready
+
+# Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    id: "menu_open_workspace"
+
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+- takeScreenshot: e2e_git_workspace_loaded
+
+# Switch to Git Changes panel
+- tapOn:
+    id: "panel_git_changes"
+
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 15000
+
+- takeScreenshot: e2e_git_changes_panel
+
+# Back
+- tapOn:
+    id: "back_button"
+    optional: true
+- back
+
+- takeScreenshot: e2e_git_back

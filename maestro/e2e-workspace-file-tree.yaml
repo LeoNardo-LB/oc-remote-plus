@@ -1,0 +1,89 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Workspace File Tree (Real OpenCode Server)
+tags:
+  - e2e
+  - workspace
+  - file-tree
+---
+
+# E2E Workspace File Tree Flow
+# Prerequisite: Server at 10.0.2.2:4096 connected
+
+- launchApp
+
+# Wait for home — server already configured
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 15000
+    optional: true
+
+- takeScreenshot: e2e_ws_home
+
+# Navigate to Sessions
+- tapOn:
+    text: "Sessions"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_ws_sessions
+
+# Tap on project directory
+- tapOn: "D:/Develop/code/app/oc-remote"
+
+- extendedWaitUntil:
+    visible: "sessions active"
+    timeout: 15000
+    optional: true
+
+# Tap on a session
+- tapOn: "问题总览修复"
+
+- extendedWaitUntil:
+    visible: "Ask a question"
+    timeout: 20000
+    optional: true
+
+- takeScreenshot: e2e_ws_chat_ready
+
+# Open workspace via overflow menu
+- tapOn:
+    id: "more_vert"
+
+- takeScreenshot: e2e_ws_menu_open
+
+# Tap "View Workspace" menu item
+- tapOn:
+    id: "menu_open_workspace"
+
+# Wait for workspace screen
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+
+- takeScreenshot: e2e_ws_workspace_loaded
+
+# File tree panel (default)
+- tapOn:
+    id: "panel_file_tree"
+    optional: true
+
+- takeScreenshot: e2e_ws_file_tree
+
+# Tap a file
+- tapOn:
+    text: ".*"
+    index: 0
+
+- takeScreenshot: e2e_ws_file_opened
+
+# Back
+- tapOn:
+    id: "back_button"
+    optional: true
+- back
+
+- takeScreenshot: e2e_ws_back

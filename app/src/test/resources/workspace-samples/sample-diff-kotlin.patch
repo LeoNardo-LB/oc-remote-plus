@@ -1,0 +1,31 @@
+diff --git a/app/src/main/kotlin/dev/minios/ocremote/data/api/OpenCodeApi.kt b/app/src/main/kotlin/dev/minios/ocremote/data/api/OpenCodeApi.kt
+index 1a2b3c4..5d6e7f8 100644
+--- a/app/src/main/kotlin/dev/minios/ocremote/data/api/OpenCodeApi.kt
++++ b/app/src/main/kotlin/dev/minios/ocremote/data/api/OpenCodeApi.kt
+@@ -15,6 +15,8 @@ import io.ktor.client.request.parameter
+ import io.ktor.client.statement.body
+ import dev.minios.ocremote.data.dto.response.*
+ import dev.minios.ocremote.data.dto.response.FileResponses.*
++import kotlinx.serialization.SerialName
++import kotlinx.serialization.json.JsonElement
+ 
+ class OpenCodeApi @Inject constructor(
+     private val httpClient: HttpClient,
+@@ -1003,12 +1005,16 @@ class OpenCodeApi @Inject constructor(
+-    suspend fun readFile(conn: ServerConnection, path: String): FileContentDto {
+-        return httpClient.get("${conn.baseUrl}/file/content") {
++    suspend fun readFile(conn: ServerConnection, path: String, directory: String? = null): FileContentDto {
++        return httpClient.get("${conn.baseUrl}/file/content") {
+             conn.authHeader?.let { header("Authorization", it) }
++            directoryHeader(directory)
+             parameter("path", path)
+         }.body()
+     }
++
++    // ============ VCS ============
++    suspend fun getVcs(conn: ServerConnection, directory: String? = null): VcsBranchDto {
++        return httpClient.get("${conn.baseUrl}/vcs") {
++            conn.authHeader?.let { header("Authorization", it) }
++            directoryHeader(directory)
++        }.body()
++    }

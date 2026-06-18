@@ -1,0 +1,26 @@
+[
+  {
+    "file": "app/src/main/kotlin/dev/minios/ocremote/data/api/OpenCodeApi.kt",
+    "additions": 28,
+    "deletions": 4,
+    "status": "modified"
+  },
+  {
+    "file": "app/src/main/kotlin/dev/minios/ocremote/ui/screens/workspace/WorkspaceViewModel.kt",
+    "additions": 15,
+    "deletions": 0,
+    "status": "added"
+  },
+  {
+    "file": "old/deprecated/LegacyService.kt",
+    "additions": 0,
+    "deletions": 42,
+    "status": "deleted"
+  },
+  {
+    "file": "README.md",
+    "additions": 8,
+    "deletions": 2,
+    "status": "modified"
+  }
+]
