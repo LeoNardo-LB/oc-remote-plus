@@ -652,4 +652,18 @@ Tokeny: ~%4$d -&gt; ~%5$d</string>
     <string name="chat_thinking_in_progress">Myśli… %1$s</string>
     <string name="mcp_servers_title">Serwery MCP</string>
     <string name="mcp_no_servers">Nie skonfigurowano serwerów MCP</string>
+    <string name="chat_context_composition">Skład kontekstu (szacowany)</string>
+    <string name="chat_context_other_note">Pozostałe (w tym system itp.)</string>
+    <string name="chat_role_user">Użytkownik</string>
+    <string name="chat_role_assistant">Asystent</string>
+    <string name="chat_role_tool">Wywołanie narzędzia</string>
+    <string name="chat_role_other">Pozostałe</string>
+    <string name="chat_context_msg_summary">Wiadomość %1$d (Użytkownik %2$d · Asystent %3$d)</string>
+    <string name="chat_context_cache_hit">Trafienie cache %1$d%%</string>
+    <string name="chat_context_timestamps">Utworzono %1$s · aktywność %2$s</string>
+    <string name="viewer_binary_not_supported">Plik binarny, podgląd nieobsługiwany</string>
+    <string name="viewer_binary_mime">Typ MIME: %1$s</string>
+    <string name="viewer_empty_file">Plik jest pusty</string>
+    <string name="viewer_truncated">Duży plik — wyświetlanie pierwszych 5 000 wierszy</string>
+    <string name="viewer_diff_placeholder">Widok diff (zadanie 16)</string>
 </resources>

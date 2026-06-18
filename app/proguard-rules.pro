@@ -34,6 +34,9 @@
 -keep class com.mikepenz.markdown.** { *; }
 -keep class org.intellij.markdown.** { *; }
 
+# Syntax Highlighting (dev.snipme/highlights) — model classes use kotlinx.serialization
+-keep class dev.snipme.highlights.** { *; }
+
 # Compose LazyListState — reflection access for SSE drift compensation
 # (bypass requestScrollToItem's scroll{} mutex cancellation)
 -keep class androidx.compose.foundation.lazy.LazyListState { *; }

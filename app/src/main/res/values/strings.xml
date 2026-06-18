@@ -714,4 +714,11 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="connection_error_title">Server unreachable</string>
     <string name="connection_error_retrying_in">Retrying in %1$ds…</string>
     <string name="connection_error_switch_server">Switch to another server</string>
+
+    <!-- File Viewer -->
+    <string name="viewer_binary_not_supported">Binary file, preview not supported</string>
+    <string name="viewer_binary_mime">MIME type: %1$s</string>
+    <string name="viewer_empty_file">File is empty</string>
+    <string name="viewer_truncated">Large file — showing first 5,000 lines</string>
+    <string name="viewer_diff_placeholder">Diff view (Task 16)</string>
 </resources>

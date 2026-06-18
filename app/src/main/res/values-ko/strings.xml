@@ -652,4 +652,18 @@
     <string name="chat_thinking_in_progress">생각 중… %1$s</string>
     <string name="mcp_servers_title">MCP 서버</string>
     <string name="mcp_no_servers">구성된 MCP 서버가 없습니다</string>
+    <string name="chat_context_composition">컨텍스트 구성（추정）</string>
+    <string name="chat_context_other_note">나머지（시스템 등 포함）</string>
+    <string name="chat_role_user">사용자</string>
+    <string name="chat_role_assistant">어시스턴트</string>
+    <string name="chat_role_tool">도구 호출</string>
+    <string name="chat_role_other">기타</string>
+    <string name="chat_context_msg_summary">메시지 %1$d（사용자 %2$d · 어시스턴트 %3$d）</string>
+    <string name="chat_context_cache_hit">캐시 적중 %1$d%%</string>
+    <string name="chat_context_timestamps">생성 %1$s · 활동 %2$s</string>
+    <string name="viewer_binary_not_supported">바이너리 파일, 미리보기 미지원</string>
+    <string name="viewer_binary_mime">MIME 유형: %1$s</string>
+    <string name="viewer_empty_file">파일이 비어 있습니다.</string>
+    <string name="viewer_truncated">대용량 파일 — 처음 5,000줄 표시</string>
+    <string name="viewer_diff_placeholder">차이 보기 (작업 16)</string>
 </resources>

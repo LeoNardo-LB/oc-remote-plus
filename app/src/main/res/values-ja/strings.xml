@@ -652,4 +652,18 @@
     <string name="chat_thinking_in_progress">思考中… %1$s</string>
     <string name="mcp_servers_title">MCPサーバー</string>
     <string name="mcp_no_servers">MCPサーバーが設定されていません</string>
+    <string name="chat_context_composition">コンテキスト構成（推定）</string>
+    <string name="chat_context_other_note">その他（システム等を含む）</string>
+    <string name="chat_role_user">ユーザー</string>
+    <string name="chat_role_assistant">アシスタント</string>
+    <string name="chat_role_tool">ツール呼び出し</string>
+    <string name="chat_role_other">その他</string>
+    <string name="chat_context_msg_summary">メッセージ %1$d（ユーザー %2$d · アシスタント %3$d）</string>
+    <string name="chat_context_cache_hit">キャッシュヒット %1$d%%</string>
+    <string name="chat_context_timestamps">作成 %1$s · アクティブ %2$s</string>
+    <string name="viewer_binary_not_supported">バイナリファイルのプレビューはサポートされていません</string>
+    <string name="viewer_binary_mime">MIMEタイプ: %1$s</string>
+    <string name="viewer_empty_file">ファイルは空です</string>
+    <string name="viewer_truncated">大きなファイル — 先頭5,000行を表示</string>
+    <string name="viewer_diff_placeholder">差分ビュー（タスク16）</string>
 </resources>

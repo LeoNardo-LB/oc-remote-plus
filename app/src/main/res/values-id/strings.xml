@@ -658,4 +658,18 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="chat_thinking_in_progress">Berpikir… %1$s</string>
     <string name="mcp_servers_title">Server MCP</string>
     <string name="mcp_no_servers">Tidak ada server MCP dikonfigurasi</string>
+    <string name="chat_context_composition">Komposisi konteks (estimasi)</string>
+    <string name="chat_context_other_note">Sisanya (termasuk sistem, dll.)</string>
+    <string name="chat_role_user">Pengguna</string>
+    <string name="chat_role_assistant">Asisten</string>
+    <string name="chat_role_tool">Panggilan alat</string>
+    <string name="chat_role_other">Sisanya</string>
+    <string name="chat_context_msg_summary">Pesan %1$d (Pengguna %2$d · Asisten %3$d)</string>
+    <string name="chat_context_cache_hit">Cache hit %1$d%%</string>
+    <string name="chat_context_timestamps">Buat %1$s · Aktivitas %2$s</string>
+    <string name="viewer_binary_not_supported">Berkas biner, pratinjau tidak didukung</string>
+    <string name="viewer_binary_mime">Tipe MIME: %1$s</string>
+    <string name="viewer_empty_file">Berkas kosong</string>
+    <string name="viewer_truncated">Berkas besar — menampilkan 5.000 baris pertama</string>
+    <string name="viewer_diff_placeholder">Tampilan diff (Tugas 16)</string>
 </resources>

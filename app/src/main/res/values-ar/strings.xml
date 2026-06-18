@@ -652,4 +652,18 @@
     <string name="chat_thinking_in_progress">يفكر… %1$s</string>
     <string name="mcp_servers_title">خوادم MCP</string>
     <string name="mcp_no_servers">لم يتم تكوين خوادم MCP</string>
+    <string name="chat_context_composition">تركيب السياق (تقديري)</string>
+    <string name="chat_context_other_note">الباقي (بما في ذلك النظام وما إلى ذلك)</string>
+    <string name="chat_role_user">المستخدم</string>
+    <string name="chat_role_assistant">المساعد</string>
+    <string name="chat_role_tool">استدعاء الأداة</string>
+    <string name="chat_role_other">الباقي</string>
+    <string name="chat_context_msg_summary">الرسالة %1$d (المستخدم %2$d · المساعد %3$d)</string>
+    <string name="chat_context_cache_hit">إصابة ذاكرة التخزين المؤقت %1$d%%</string>
+    <string name="chat_context_timestamps">إنشاء %1$s · نشاط %2$s</string>
+    <string name="viewer_binary_not_supported">ملف ثنائي، المعاينة غير مدعومة</string>
+    <string name="viewer_binary_mime">نوع MIME: %1$s</string>
+    <string name="viewer_empty_file">الملف فارغ</string>
+    <string name="viewer_truncated">ملف كبير — عرض أول 5,000 سطر</string>
+    <string name="viewer_diff_placeholder">عرض الفروق (المهمة 16)</string>
 </resources>

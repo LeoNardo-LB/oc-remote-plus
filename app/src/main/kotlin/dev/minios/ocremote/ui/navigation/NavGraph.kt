@@ -31,6 +31,7 @@ import dev.minios.ocremote.ui.screens.server.ServerModelFilterRoute
 import dev.minios.ocremote.ui.screens.server.ServerProvidersRoute
 import dev.minios.ocremote.ui.screens.server.ServerSettingsRoute
 import dev.minios.ocremote.ui.screens.settings.SettingsRoute
+import dev.minios.ocremote.ui.screens.viewer.FileViewerRoute
 import dev.minios.ocremote.ui.screens.webview.WebViewScreen
 import dev.minios.ocremote.ui.screens.workspace.WorkspaceRoute
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -506,12 +507,14 @@ fun NavGraph(
             )
         }
 
-        // ============ File Viewer Screen (placeholder — Task 15) ============
+        // ============ File Viewer Screen ============
         composable(
             route = FileViewerNav.routePattern,
             arguments = FileViewerNav.navArguments
         ) {
-            androidx.compose.material3.Text("FileViewer placeholder (Task 15)")
+            FileViewerRoute(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }
