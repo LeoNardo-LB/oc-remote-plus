@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.Person
 import dev.minios.ocremote.BuildConfig
 import dev.minios.ocremote.MainActivity
 import dev.minios.ocremote.R
@@ -190,26 +189,14 @@ class AppNotificationManager @Inject constructor(
         val displayName = sessionTitle?.takeIf { it.isNotBlank() }
             ?: context.getString(R.string.notification_new_session)
 
-        // Type label prefix preserves "Response ready" semantic in MessagingStyle title
+        // Type label prefix preserves "Response ready" semantic in title
         val typeLabel = context.getString(R.string.notification_response_ready)
-        val conversationTitle = "$typeLabel · $displayName"
+        val title = "$typeLabel · $displayName"
 
-        val userMessages = findLatestUserMessages(sessionId, 5)
-
-        val style: NotificationCompat.Style = if (userMessages.isNotEmpty()) {
-            val userPerson = Person.Builder().setName("你").build()
-            NotificationCompat.MessagingStyle(userPerson).also {
-                it.conversationTitle = conversationTitle
-                for (msg in userMessages) {
-                    it.addMessage(msg.text, msg.timestamp, userPerson)
-                }
-            }
-        } else {
-            // Fallback when no extractable user message (image-only, etc.)
-            NotificationCompat.BigTextStyle()
-                .setBigContentTitle(conversationTitle)
-                .bigText(context.getString(R.string.notification_new_message))
-        }
+        // Latest user message as content text (single line, truncated)
+        val userMessages = findLatestUserMessages(sessionId, 1)
+        val contentText = userMessages.firstOrNull()?.text
+            ?: context.getString(R.string.notification_new_message)
 
         val pendingIntent = createSessionPendingIntent(context, server, sessionId, sessionId.hashCode())
         val silent = settingsRepository.silentNotifications.first()
@@ -218,9 +205,10 @@ class AppNotificationManager @Inject constructor(
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(contentText)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setStyle(style)
             .setSubText(server.displayName)
             .setPriority(if (silent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
             .setGroup("server_${server.id}")
@@ -400,8 +388,9 @@ class AppNotificationManager @Inject constructor(
                     .firstOrNull { it.synthetic != true && it.ignored != true && it.text.isNotBlank() }
                     ?.text
                     ?: return@mapNotNull null
+                val cleanText = text.replace("\n", " ").trim()
                 UserMessagePreview(
-                    text = if (text.length > 100) text.take(100) + "…" else text,
+                    text = if (cleanText.length > 100) cleanText.take(100) + "…" else cleanText,
                     timestamp = userMsg.time.created
                 )
             }
