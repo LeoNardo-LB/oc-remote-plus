@@ -20,7 +20,7 @@
 - [7. Workspace 端点（实验性）](#7-workspace-端点实验性)（7 个）
 - [8. Reference 端点](#8-reference-端点)（1 个）
 - [9. Session 端点](#9-session-端点)（20 个）
-- [10. Message 端点](#10-message-端点)（6 个）
+- [10. Message 端点](#10-message-端点)（7 个）
 - [11. Permission 端点](#11-permission-端点)（3 个）
 - [12. Question 端点](#12-question-端点)（3 个）
 - [13. PTY 端点](#13-pty-端点)（8 个）
@@ -541,51 +541,136 @@ data: {"directory": "/path", "project": "...", "workspace": "...", "payload": {"
 
 ## 9. Session 端点
 
-> 路由：`groups/session.ts` · Handler：`handlers/session.ts`
+> 路由：`groups/session.ts` · Handler：`handlers/session.ts` · 详细分析见 [调研报告 1](opencode-api-deep-research/1-session-message.md)。
+> 共 20 个端点（19 个来自调研报告 1，1 个 `/session/import` 保留原说明）。
 
 ### GET `/session`
 
-列出会话（按最近更新排序）。
+**用途**：获取所有 OpenCode 会话列表，按最近更新排序。
 
-| Query 参数 | 类型 | 默认 | 说明 |
-|-----------|------|------|------|
-| `roots` | bool（`"true"/"false"` 字符串） | — | 仅返回根会话（非 fork） |
-| `scope` | `"project"` | — | 限定为当前 project scope |
-| `path` | string | — | 路径过滤 |
-| `start` | number | — | 起始时间戳过滤 |
-| `search` | string | — | 搜索关键词 |
-| `limit` | number | — | 数量限制 |
+**Query 参数**（`ListQuery`）：
 
-> `roots` 用自定义 `QueryBoolean`（接受 `"true"/"false"` 字符串），非原生 boolean。
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `directory` | `string?` | 否 | 工作目录（公共参数） |
+| `workspace` | `string?` | 否 | 工作区 ID（公共参数） |
+| `scope` | `"project"?` | 否 | 限定为当前 project scope（传 `project` 时 directory 传 undefined） |
+| `path` | `string?` | 否 | 路径过滤 |
+| `roots` | `boolean?`（`"true"/"false"` 字符串） | 否 | 是否只返回根会话 |
+| `start` | `number?`（从字符串解析） | 否 | 起始时间戳过滤 |
+| `search` | `string?` | 否 | 搜索关键词 |
+| `limit` | `number?`（从字符串解析） | 否 | 数量限制 |
 
-**响应** `200`: `List<`[`Session`](#session)`>`
+**返回**：`Session.Info[]`
+
+**数据来源**：`Session.Service.list()` → 数据库查询。  
+**注意**：`roots` 参数使用自定义 `QueryBoolean`（接受 `"true"`/`"false"` 字符串），而非原生 boolean。
+
+---
+
+---
 
 ### GET `/session/status`
 
-批量获取所有会话状态（idle/busy/retry）。**状态纯内存维护，不持久化**——idle 会话不出现在 map 中（缺失默认 idle）。
+**用途**：获取所有会话的当前状态（idle/busy/retry）。
 
-**响应** `200`: `Map<sessionId, `[`RestSessionStatusInfo`](#restsessionstatusinfo)`>`
+**Query 参数**：仅 `WorkspaceRoutingQuery`（directory + workspace）。
+
+**返回**：`Record<string, SessionStatus.Info>` —— 键为 sessionID，值为状态对象。
+
+**数据来源**：`SessionStatus.Service.list()` → 内存中的 `InstanceState`（Map）。  
+**原理**：状态不持久化，纯内存维护。idle 状态的会话不会出现在 map 中（handler 用 `Object.fromEntries` 转换，缺失的会话默认为 idle）。
+
+---
+
+---
+
+### GET `/session/{sessionId}`
+
+**Path 参数**：`sessionID: SessionID`  
+**Query 参数**：`WorkspaceRoutingQuery`  
+**返回**：`Session.Info`  
+**错误**：400（参数错误）、404（`ApiNotFoundError`，会话不存在）
+
+**数据来源**：`Session.Service.get(sessionID)` → 数据库。  
+**原理**：handler 通过 `mapStorageNotFound` 将底层 `NotFoundError` 映射为 `ApiNotFoundError`（404）。
+
+---
+
+---
+
+### GET `/session/{sessionId}/children`
+
+**用途**：获取从指定会话 fork 出来的所有子会话。
+
+**Path 参数**：`sessionID`  
+**返回**：`Session.Info[]`  
+**错误**：400、404（父会话不存在）  
+**注意**：先 `requireSession` 验证父会话存在，再调用 `session.children()`。
+
+---
+
+---
+
+### GET `/session/{sessionId}/todo`
+
+**Path 参数**：`sessionID`  
+**返回**：`Todo.Info[]`  
+**数据来源**：`Todo.Service.get()` → 数据库 `TodoTable` 查询（drizzle ORM）。
+
+---
+
+---
+
+### GET `/session/{sessionId}/diff`
+
+**用途**：获取指定消息产生的文件变更。
+
+**Path 参数**：`sessionID`  
+**Query 参数**（`DiffQuery`）：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `directory` / `workspace` | 公共参数 | 否 | |
+| `messageID` | `MessageID?` | 否 | 指定消息 ID，不传则计算整个会话的 diff |
+
+**返回**：`Snapshot.FileDiff[]`  
+**数据来源**：`SessionSummary.Service.diff()` → git diff 计算。  
+**注意**：此端点**不验证 sessionID 是否存在**（无 `requireSession` 调用），直接传给 summary 服务。
+
+---
+
+---
 
 ### POST `/session`
 
-创建会话。**空 body 也能创建**（使用全部默认值）。
+**用途**：创建新的 OpenCode 会话。
 
-**请求体**（所有字段可选）:
-```json
-{
-  "parentID": "ses_...?",
-  "title": "string?",
-  "agent": "string?",
-  "model": { "id": "string", "providerID": "string", "variant": "string?" }?,
-  "metadata": { "key": "value" }?,
-  "permission": [...?, ...]?,
-  "workspaceID": "string?"
-}
-```
+**请求体**（`Session.CreateInput`，可选 —— **空 body 也能创建**）：
 
-**响应** `200`: [`Session`](#session)
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `parentID` | `SessionID?` | 否 | 父会话 ID |
+| `title` | `string?` | 否 | 标题 |
+| `agent` | `string?` | 否 | 默认 agent |
+| `model` | `Model?` | 否 | 默认模型 `{ id, providerID, variant? }` |
+| `metadata` | `Record<string, any>?` | 否 | 元数据 |
+| `permission` | `PermissionV1.Ruleset?` | 否 | 权限规则（数组） |
+| `workspaceID` | `WorkspaceV2.ID?` | 否 | 工作区 ID |
 
-> 使用 raw handler 手动解析 body，支持空 body。`permission` 字段会被展开为数组。
+**返回**：`Session.Info`
+
+**⚠️ Raw handler 行为**：此端点使用 `handleRaw`（`createRaw`），手动解析 body：
+- 空 body → `create({})`（使用全部默认值）
+- 非 JSON body → 400
+- JSON body → `Schema.decodeUnknownEffect` 解码，失败 → 400
+- **特殊处理**：`permission` 字段会被 `[...decoded.permission]` 展开为数组（兼容单对象传入？）
+
+**数据来源**：`SessionShare.Service.create()`（注意：是 share 服务，非直接 Session.create）。
+
+---
+
+---
 
 ### POST `/session/import`
 
@@ -595,250 +680,354 @@ data: {"directory": "/path", "project": "...", "workspace": "...", "payload": {"
 
 **响应** `200`: [`Session`](#session)
 
-### GET `/session/{sessionId}`
-
-获取单个会话详情。**不验证 sessionID 是否存在**时返回 404（`ApiNotFoundError`）。
-
-**响应** `200`: [`Session`](#session)
-
-### PATCH `/session/{sessionId}`
-
-更新会话。
-
-**请求体**（所有字段可选）:
-```json
-{
-  "title": "string?",
-  "metadata": { "key": "value" }?,       // ⚠️ 完全替换
-  "permission": [...],                    // ⚠️ 合并（Permission.merge），非替换！
-  "time": { "archived": 1234567890 }?
-}
-```
-
-**响应** `200`: [`Session`](#session)
-
-> **⚠️ 隐藏陷阱**: `metadata` 是**替换**，`permission` 是**合并**。客户端若期望 permission 替换会踩坑。执行顺序：title → metadata → permission → archived。
+> 此端点不在调研报告 1 中，保留原说明。
+---
 
 ### DELETE `/session/{sessionId}`
 
-删除会话（永久删除会话及所有关联数据）。**不检查会话是否忙碌**。
+**返回**：`boolean`（true）  
+**行为**：永久删除会话及所有关联数据（消息、历史）。  
+**注意**：不检查会话是否忙碌。
 
-**响应** `200`: `boolean`
+---
 
-### POST `/session/{sessionId}/abort`
+---
 
-中止会话当前操作。**不检查会话是否存在**（直接调用 cancel，幂等）。
+### PATCH `/session/{sessionId}`
 
-**响应** `200`: `boolean`
+**请求体**（`UpdatePayload`，所有字段可选）：
 
-### GET `/session/{sessionId}/diff`
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `title` | `string?` | 新标题 |
+| `metadata` | `Record<string, any>?` | 新元数据（**替换**） |
+| `permission` | `PermissionV1.Ruleset?` | 权限规则（**合并**，非替换） |
+| `time.archived` | `ArchivedTimestamp?` | 归档时间戳 |
 
-获取会话文件差异。**不验证 sessionID 是否存在**（直接传给 summary 服务）。
+**返回**：更新后的 `Session.Info`
 
-| Query 参数 | 类型 | 说明 |
-|-----------|------|------|
-| `messageID` | string? | 指定消息 ID，不传则计算整个会话的 diff |
+**⚠️ 关键行为**：
+- `metadata`：直接调用 `setMetadata`，**完全替换**
+- `permission`：调用 `Permission.merge(current.permission ?? [], newPermission)` —— **合并而非替换**！这是隐藏行为，客户端如果期望替换会踩坑
+- 执行顺序：title → metadata → permission → archived，最后重新查询返回
 
-**响应** `200`: `List<`[`FileDiff`](#filediff)`>`
+---
 
-### POST `/session/{sessionId}/summarize`
-
-压缩/总结会话（使用 AI 压缩保留关键信息）。
-
-**请求体**:
-```json
-{
-  "providerID": "string",       // 必填
-  "modelID": "string",          // 必填
-  "auto": false                 // 是否自动压缩（默认 false）
-}
-```
-
-**响应** `200`: `boolean`
-
-**内部流程**: cleanup 回滚状态 → 获取所有消息 → 找最后 user 消息的 agent（缺省 defaultAgent）→ compactSvc.create() → promptSvc.loop() 阻塞直到完成。
-
-### POST `/session/{sessionId}/revert`
-
-回滚到指定消息，**撤销文件变更**并恢复先前状态。
-
-**请求体**:
-```json
-{ "messageID": "string", "partID": "string?" }
-```
-
-**响应** `200`: [`Session`](#session)
-
-**错误**: 404 / 409（`SessionBusyError`，会话忙碌时）
-
-### POST `/session/{sessionId}/unrevert`
-
-恢复所有之前被回滚的消息。**无请求体**。
-
-**响应** `200`: [`Session`](#session)
-
-**错误**: 404 / 409（忙碌）
+---
 
 ### POST `/session/{sessionId}/fork`
 
-分叉会话。**空 body 也能 fork**（在最新消息处分叉）。
+**用途**：在指定消息处分叉出新会话。
 
-**请求体**: `{ "messageID": "string?" }`
+**请求体**（`ForkPayload`，可选 —— 空 body 也能 fork）：
 
-**响应** `200`: [`Session`](#session)（新会话标题为 `原标题 (fork #N)`，N 递增）
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `messageID` | `MessageID?` | 否 | fork 点消息 ID（不传则在最新消息处 fork） |
 
-### POST `/session/{sessionId}/share`
+**返回**：新的 `Session.Info`  
+**行为**：Raw handler（`forkRaw`），空 body 等同不传 messageID。  
+**标题规则**：fork 出的会话标题为 `原标题 (fork #N)`，N 递增。
 
-分享会话（生成链接）。
+---
 
-**响应** `200`: [`Session`](#session)（含 `share.url`）
+---
 
-**错误**: 500（`InternalServerError`，分享失败映射为 500 而非 400，因为是存储/网络问题）/ 404
+### POST `/session/{sessionId}/abort`
 
-### DELETE `/session/{sessionId}/share`
+**用途**：中止正在进行的 AI 处理。  
+**返回**：`boolean`（true）  
+**实现**：`promptSvc.cancel(sessionID)`。  
+**注意**：不检查会话是否存在，直接调用 cancel（cancel 可能是幂等的）。
 
-取消分享。
+---
 
-**响应** `200`: [`Session`](#session)
-
-**错误**: 500 / 404
-
-### GET `/session/{sessionId}/children`
-
-获取子会话列表（从指定会话 fork 出来的所有子会话）。
-
-**响应** `200`: `List<`[`Session`](#session)`>`
-
-### GET `/session/{sessionId}/todo`
-
-获取会话 Todo 列表（数据库 `TodoTable` 查询）。
-
-**响应** `200`: `List<`[`TodoItem`](#todoitem)`>`
-
-### POST `/session/{sessionId}/command`
-
-执行服务器端斜杠命令。
-
-**请求体**:
-```json
-{
-  "command": "init",
-  "arguments": "string (默认空)",
-  "agent": "string?",
-  "model": "string?",                       // ⚠️ 字符串格式 "providerID/modelID"
-  "variant": "string?",
-  "messageID": "string?",
-  "parts": [{ "type": "file", ... }]?        // 仅 file 类型附件
-}
-```
-
-**响应** `200`: [`MessageWithParts`](#messagewithparts)
-
-> ⚠️ **`model` 字段格式不一致**: command 的 model 是字符串 `"providerID/modelID"`，prompt 的 model 是对象 `{ providerID, modelID }`。
-
-### POST `/session/{sessionId}/shell`
-
-在会话中运行 shell 命令。
-
-**请求体**: [`ShellRequest`](#shellrequest)
-
-**响应** `200`: [`MessageWithParts`](#messagewithparts)
-
-**错误**: 400 / 404 / **409（`SessionBusyError`，shell 检查会话忙碌）**
-
-### POST `/session/{sessionId}/message`
-
-**同步发送消息**：阻塞等待整个 AI 响应循环完成后返回。
-
-**请求体**: [`PromptRequest`](#promptrequest)
-
-**响应** `200`: [`MessageWithParts`](#messagewithparts)（`application/json`）
-
-> **⚠️ 不是流式响应**（尽管 OpenAPI 描述为 streaming）: handler 用 `HttpServerResponse.stream(Stream.make(JSON.stringify(message)))` 包装，**只推送一个 JSON chunk**（最终消息）。真正的实时流式必须通过 SSE 事件监听（`session.*` / `message.*`）。
->
-> **客户端建议**: 需要实时反馈的场景应使用 `prompt_async` + SSE。
-
-### POST `/session/{sessionId}/prompt_async`
-
-异步发送 prompt（fire-and-forget）。
-
-**请求体**: [`PromptRequest`](#promptrequest)
-
-**响应** `204`
-
-> **⚠️ 错误是"静默"的**: 返回 204 后，后台任务可能失败。错误通过 `session.error` SSE 事件通知（error 为 `NamedError.Unknown`）。客户端**必须监听 SSE** 才能感知异步失败。
+---
 
 ### POST `/session/{sessionId}/init`
 
-初始化 AGENTS.md（分析当前应用并创建文件）。
+**用途**：分析当前应用并创建 AGENTS.md 文件。
 
-**请求体**:
-```json
-{
-  "modelID": "string",        // 必填
-  "providerID": "string",     // 必填
-  "messageID": "string"       // 必填
-}
-```
+**请求体**（`InitPayload`，必填）：
 
-**响应** `200`: `boolean`
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `modelID` | `ModelV2.ID` | 是 | 模型 ID |
+| `providerID` | `ProviderV2.ID` | 是 | 提供商 ID |
+| `messageID` | `MessageID` | 是 | 消息 ID |
 
-内部调用 `promptSvc.command()`，command 为 `"init"`，使用 `initialize.txt` 模板。
+**返回**：`boolean`（true）  
+**原理**：内部调用 `promptSvc.command()`，command 为 `Command.Default.INIT`（值为 `"init"`），使用 `initialize.txt` 模板。任何错误映射为 400。
+
+---
+
+---
+
+### POST `/session/{sessionId}/share`
+
+**返回**：`Session.Info`（含 `share.url`）  
+**错误**：500（`InternalServerError`）、404  
+**原理**：`SessionShare.Service.share()`，失败映射为 **500**（非 400），注释说明这是因为 share 失败可能是存储/网络问题。
+
+---
+
+---
+
+### DELETE `/session/{sessionId}/share`
+
+**返回**：`Session.Info`  
+**错误**：500、404  
+**原理**：`SessionShare.Service.unshare()`，同样映射为 500。
+
+---
+
+---
+
+### POST `/session/{sessionId}/summarize`
+
+**用途**：使用 AI 压缩保留关键信息，生成简洁摘要。
+
+**请求体**（`SummarizePayload`，必填）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `providerID` | `ProviderV2.ID` | 是 | 提供商 |
+| `modelID` | `ModelV2.ID` | 是 | 模型 |
+| `auto` | `boolean?` | 否 | 是否自动压缩（默认 `false`） |
+
+**返回**：`boolean`（true）  
+**原理**：
+1. `revertSvc.cleanup()` 清理回滚状态
+2. 获取所有消息
+3. **agent 选择逻辑**：找最后一条 `role === "user"` 的消息的 `info.agent`，找不到用 `defaultAgent`
+4. `compactSvc.create()` 创建压缩任务
+5. `promptSvc.loop()` 执行压缩循环
+6. 阻塞直到完成
+
+---
+
+---
+
+### POST `/session/{sessionId}/command`
+
+**用途**：发送预定义命令（如 init/review）给 AI。
+
+**请求体**（`CommandPayload` = `SessionPrompt.CommandInput` 去除 `sessionID`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `messageID` | `MessageID?` | 否 | 消息 ID |
+| `agent` | `string?` | 否 | agent |
+| `model` | `string?` | 否 | 模型（格式：`providerID/modelID`） |
+| `arguments` | `string` | 是 | 命令参数 |
+| `command` | `string` | 是 | 命令名（如 `"init"`、`"review"`） |
+| `variant` | `string?` | 否 | 变体 |
+| `parts` | `FilePartInput[]?` | 否 | 文件附件（仅 file 类型） |
+
+**返回**：`SessionV1.WithParts`  
+**注意**：`model` 是字符串格式（`"provider/model"`），与 PromptInput 的 `{ providerID, modelID }` 对象格式不同！
+
+---
+
+---
+
+### POST `/session/{sessionId}/shell`
+
+**请求体**（`ShellPayload` = `SessionPrompt.ShellInput` 去除 `sessionID`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `messageID` | `MessageID?` | 否 | 消息 ID |
+| `agent` | `string` | **是** | agent（必填，注意与 prompt 的可选不同） |
+| `model` | `{ providerID, modelID }?` | 否 | 模型 |
+| `command` | `string` | 是 | shell 命令 |
+
+**返回**：`SessionV1.WithParts`  
+**错误**：400、404、**409（`SessionBusyError`）** —— shell 会检查会话是否忙碌。
+
+---
+
+---
+
+### POST `/session/{sessionId}/revert`
+
+**用途**：回滚指定消息，**撤销文件变更**并恢复先前状态。
+
+**请求体**（`RevertPayload` = `SessionRevert.RevertInput` 去除 `sessionID`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `messageID` | `MessageID` | 是 | 回滚到此消息 |
+| `partID` | `PartID?` | 否 | 精确到 part 级别 |
+
+**返回**：`Session.Info`  
+**错误**：400、404、**409（忙碌）**
+
+---
+
+---
+
+### POST `/session/{sessionId}/unrevert`
+
+**用途**：恢复所有之前被回滚的消息。  
+**无请求体**  
+**返回**：`Session.Info`  
+**错误**：400、404、**409（忙碌）**
+
+---
+
 
 ---
 
 ## 10. Message 端点
 
+> 涵盖消息列表/详情/删除/发送（同步+异步）/Part 操作。详细分析见 [调研报告 1](opencode-api-deep-research/1-session-message.md)。
+> 共 7 个端点（全部来自调研报告 1）。
+
 ### GET `/session/{sessionId}/message`
 
-获取消息列表（含 user 和 assistant）。
+**用途**：获取会话中的所有消息（含 user 和 assistant）。
 
-| Query 参数 | 类型 | 说明 |
-|-----------|------|------|
-| `limit` | int ≥ 0 | 分页大小 |
-| `before` | string | 游标（base64url 编码的 `{id, time}`） |
+**Path 参数**：`sessionID`  
+**Query 参数**（`MessagesQuery`）：
 
-**响应** `200`: `List<`[`MessageWithParts`](#messagewithparts)`>`
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `directory` / `workspace` | 公共参数 | 否 | |
+| `limit` | `integer ≥ 0?` | 否 | 分页大小 |
+| `before` | `string?` | 否 | 游标（base64url 编码的 `{id, time}`） |
 
-**⚠️ 分页隐藏行为**（非标准 Header）:
-- 传 `before` 但没传 `limit` → **400**
-- `before` 解码失败 → **400**
-- `limit` 未传或为 0 → 返回全部消息（无分页）
-- `limit > 0` → 查询 `limit + 1` 条，按 `time_created DESC, id DESC` 排序后 `reverse()` 恢复时间正序
-- 有更多数据时响应包含额外 Header:
-  - `Link: <完整URL>; rel="next"`
-  - `X-Next-Cursor: <cursor>`
-  - `Access-Control-Expose-Headers: Link, X-Next-Cursor`
+**返回**：`SessionV1.WithParts[]`
 
-**游标格式**: `base64url(JSON.stringify({ id: MessageID, time: number }))`
+**⚠️ 分页行为（关键隐藏行为）**：
 
-### GET `/session/{sessionId}/message/{messageId}`
+1. 如果传了 `before` 但没传 `limit` → **400 BadRequest**
+2. 如果传了 `before` → 先尝试 `MessageV2.cursor.decode(before)`，解码失败 → **400**
+3. 如果 `limit` 未传或为 0 → 返回全部消息（无分页），普通 JSON 响应
+4. 如果 `limit > 0` → 分页模式：
+   - 查询 `limit + 1` 条，按 `time_created DESC, id DESC` 排序
+   - 结果 `reverse()` 恢复为时间正序
+   - 如果有更多数据（`rows.length > limit`），响应包含额外 header：
+     - `Link: <完整URL>; rel="next"`（URL 带 `limit` 和 `before=cursor` 参数）
+     - `X-Next-Cursor: <cursor>`（base64url 编码）
+     - `Access-Control-Expose-Headers: Link, X-Next-Cursor`
+   - 如果无更多数据 → 普通 JSON 响应（无额外 header）
+5. sessionID 不存在 → `NotFoundError` 映射为 404
 
-获取单条消息详情（`WHERE id = messageID AND session_id = sessionID`）。
+**游标格式**：`base64url(JSON.stringify({ id: MessageID, time: number }))`  
+**排序逻辑**：`older(cursor)` = `time < cursor.time OR (time == cursor.time AND id < cursor.id)`
 
-**响应** `200`: [`MessageWithParts`](#messagewithparts)
+---
 
-### DELETE `/session/{sessionId}/message/{messageId}`
+---
 
-永久删除消息及其所有 part。**不撤销文件变更**（与 revert 不同）。**检查会话忙碌状态**（忙碌 → 409）。
+### GET `/session/{sessionId}/message/{messageID}`
 
-**响应** `200`: `boolean`
+**Path 参数**：`sessionID`、`messageID`  
+**返回**：`SessionV1.WithParts`  
+**错误**：400、404（消息或会话不存在）  
+**数据来源**：`MessageV2.get()` → 数据库，WHERE `id = messageID AND session_id = sessionID`。
 
-### DELETE `/session/{sessionId}/message/{messageId}/part/{partId}`
+---
 
-删除消息中的某个 Part。**不检查忙碌状态**（与 deleteMessage 不同）。
+---
 
-**响应** `200`: `boolean`
+### POST `/session/{sessionId}/message`
 
-### PATCH `/session/{sessionId}/message/{messageId}/part/{partId}`
+> ⚠️ **路径冲突警告**：此端点（POST）与 [消息列表](#7-get-sessionsessionidmessage--获取消息列表)（GET）共享 `/session/{sessionId}/message` 路径，仅 HTTP 方法不同。
 
-更新 Part（全量替换）。
+**用途**：创建并发送新消息，**阻塞等待 AI 响应完成**后返回。
 
-**请求体**: 完整的 [`Part`](#part多态由-type-字段区分) 对象
+**请求体**（`PromptPayload` = `SessionPrompt.PromptInput` 去除 `sessionID`）：
 
-**响应** `200`: [`Part`](#part多态由-type-字段区分)
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `messageID` | `MessageID?` | 否 | 预生成的消息 ID |
+| `model` | `{ providerID, modelID }?` | 否 | 覆盖模型 |
+| `agent` | `string?` | 否 | 覆盖 agent |
+| `noReply` | `boolean?` | 否 | 不生成回复 |
+| `tools` | `Record<string, boolean>?` | 否 | **@deprecated** 工具开关（已合并到 permissions） |
+| `format` | `Format?` | 否 | 输出格式（text / json_schema） |
+| `system` | `string?` | 否 | 系统 prompt 覆盖 |
+| `variant` | `string?` | 否 | 模型变体 |
+| `parts` | `PartInput[]` | 是 | 消息内容（text/file/agent/subtask） |
 
-> **ID 一致性校验**: handler 验证三重 ID 匹配（`payload.id === partID`、`payload.messageID === messageID`、`payload.sessionID === sessionID`），任一不符返回 400。
+**parts 元素类型**（4 种联合，按 `type` 判别）：
+- `text`：`{ id?, type: "text", text, synthetic?, ignored?, time?, metadata? }`
+- `file`：`{ id?, type: "file", mime, url, filename?, source? }`
+- `agent`：`{ id?, type: "agent", name, source? }`
+- `subtask`：`{ id?, type: "subtask", prompt, description, agent, model?, command? }`
+
+**返回**：`SessionV1.WithParts`（`application/json`，包装在 Stream 中但**单次输出**）
+
+**⚠️ 关键行为**：
+- handler 先 `requireSession` 验证会话存在
+- 调用 `promptSvc.prompt()` —— **阻塞直到整个 AI 响应循环完成**
+- 返回值用 `HttpServerResponse.stream(Stream.make(JSON.stringify(message)))` 包装
+- 虽然是 stream 响应，但实际只推送**一个 JSON chunk**（最终消息），**不是流式响应**
+- 真正的实时流式响应通过 **SSE 事件**（`session.*` / `message.*` 事件）实现
+- 任何 prompt 错误映射为 **400 BadRequest**
+
+---
+
+---
+
+### POST `/session/{sessionId}/prompt_async`
+
+**用途**：异步发送消息，立即返回，AI 处理在后台进行。
+
+**请求体**：同 `PromptPayload`  
+**返回**：`204 No Content`
+
+**⚠️ 关键行为**：
+- 调用 `promptSvc.prompt()` 并用 `Effect.forkIn(scope, { startImmediately: true })` 在后台 fork
+- **错误处理**：fork 的 effect 用 `Effect.catchCause` 捕获所有错误：
+  - 记录日志 `Effect.logError`
+  - 发布 `Session.Event.Error` 事件（type: `"session.error"`），error 为 `NamedError.Unknown`
+  - **HTTP 响应始终是 204**，即使后台任务最终失败
+- 客户端必须通过 SSE 监听 `session.error` 事件来感知异步失败
+
+---
+
+---
+
+### DELETE `/session/{sessionId}/message/{messageID}`
+
+**用途**：永久删除消息及其所有 part，**不撤销文件变更**。
+
+**返回**：`boolean`  
+**错误**：400、404、**409（忙碌）**  
+**原理**：先 `requireSession`，再 `runState.assertNotBusy`（忙碌 → 409），再 `session.removeMessage()`。  
+**与 revert 的区别**：deleteMessage 不回滚文件，revert 会回滚。
+
+---
+
+---
+
+### DELETE `/session/{sessionId}/message/{messageID}/part/{partID}`
+
+**返回**：`boolean`  
+**错误**：400、404  
+**注意**：**不检查忙碌状态**（与 deleteMessage 不同）。
+
+---
+
+---
+
+### PATCH `/session/{sessionId}/message/{messageID}/part/{partID}`
+
+**请求体**：`SessionV1.Part`（完整的 Part 对象）  
+**返回**：`SessionV1.Part`
+
+**⚠️ ID 一致性校验**：handler 验证三重 ID 匹配，任一不符返回 400：
+- `payload.id === params.partID`
+- `payload.messageID === params.messageID`
+- `payload.sessionID === params.sessionID`
+
+---
+
+## Permission 路由组
+
 
 ---
 
