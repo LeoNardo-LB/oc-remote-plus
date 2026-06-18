@@ -64,7 +64,8 @@ import dev.minios.ocremote.ui.theme.SpacingTokens
 internal fun QuestionCard(
     question: SseEvent.QuestionAsked,
     onSubmit: (answers: List<List<String>>) -> Unit,
-    onReject: () -> Unit
+    onReject: () -> Unit,
+    positionLabel: String? = null
 ) {
     val isAmoled = isAmoledTheme()
     val isSingle = question.questions.size == 1 && question.questions[0].multiple != true
@@ -113,6 +114,14 @@ internal fun QuestionCard(
                     style = MaterialTheme.typography.titleSmall,
                     color = contentColor
                 )
+                if (positionLabel != null) {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = positionLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contentColor.copy(alpha = AlphaTokens.MUTED)
+                    )
+                }
             }
             // Sub-agent source label (shown when question comes from a child session)
             if (question.sourceSessionTitle != null) {

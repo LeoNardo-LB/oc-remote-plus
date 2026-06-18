@@ -256,6 +256,7 @@ fun ChatMessageList(
                         item(key = "question_${question.id}") {
                             QuestionCard(
                                 question = question,
+                                positionLabel = if (interaction.pendingQuestions.size > 1) "1/${interaction.pendingQuestions.size}" else null,
                                 onSubmit = { answers ->
                                     viewModel.replyToQuestion(question.id, answers)
                                     onForceScrollToBottom()
@@ -273,6 +274,7 @@ fun ChatMessageList(
                         item(key = "perm_${permission.id}") {
                             PermissionCard(
                                 permission = permission,
+                                positionLabel = if (interaction.pendingPermissions.size > 1) "1/${interaction.pendingPermissions.size}" else null,
                                 onOnce = {
                                     viewModel.replyToPermission(permission.id, "once")
                                     onForceScrollToBottom()

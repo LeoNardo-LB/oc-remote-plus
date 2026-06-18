@@ -225,7 +225,7 @@ internal fun MarkdownContent(
 
     val highlightsBuilder = remember { Highlights.Builder() }
 
-    val components = remember(wordWrap) {
+    val components = remember(wordWrap, codeFontSize, codeLineHeight) {
         markdownComponents(
             codeBlock = { model ->
                 OcCodeBlock(

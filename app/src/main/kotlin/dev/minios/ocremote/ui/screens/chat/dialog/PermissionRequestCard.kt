@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,7 +48,8 @@ internal fun PermissionCard(
     permission: SseEvent.PermissionAsked,
     onOnce: () -> Unit,
     onAlways: () -> Unit,
-    onReject: () -> Unit
+    onReject: () -> Unit,
+    positionLabel: String? = null
 ) {
     val isAmoled = isAmoledTheme()
     val hapticView = LocalView.current
@@ -88,6 +90,14 @@ internal fun PermissionCard(
                     style = MaterialTheme.typography.titleSmall,
                     color = contentColor
                 )
+                if (positionLabel != null) {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = positionLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contentColor.copy(alpha = AlphaTokens.MUTED)
+                    )
+                }
                 if (submitted) {
                     CircularProgressIndicator(
                         modifier = Modifier
