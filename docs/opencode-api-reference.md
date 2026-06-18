@@ -27,7 +27,7 @@
 - [14. TUI 端点](#14-tui-端点)（13 个）
 - [15. 控制平面基础端点](#15-控制平面基础端点)（3 个）
 - [16. Sync 端点](#16-sync-端点)（4 个）
-- [17. Experimental 端点](#17-experimental-端点)（12 个）
+- [17. Experimental 端点（实验性）](#17-experimental-端点实验性)（12 个）
 - [18. Instance / VCS / 元信息端点](#18-instance--vcs--元信息端点)（12 个）
 - [19. 跨项目控制平面端点](#19-跨项目控制平面端点)（1 个）
 - [20. File / Find 端点](#20-file--find-端点)（6 个）
@@ -1707,125 +1707,334 @@ http://{host}:{port}
 
 ## 13. PTY 端点
 
-> 路由：`groups/pty.ts` · 核心：`Pty.Service` + `PtyTicket.Service`
+> 路由：`groups/pty.ts` · Handler：`handlers/pty.ts`
+> 核心：`packages/core/src/pty.ts`（Service/Schema）+ `packages/core/src/pty/ticket.ts`（票据）+ `server/shared/pty-ticket.ts`（路径识别）
+> **中间件栈**：Instance → Workspace → Authorization（WebSocket 连接用专用 `PtyConnectAuthorization`）
+> **端点数**：8（7 个 HTTP + 1 个 WebSocket）
+
+### 核心机制：WebSocket 票据认证（三步流程）
+
+浏览器原生 `new WebSocket(url)` 无法设置 `Authorization` 头，OpenCode 通过一次性短时票据桥接认证：
+
+```
+客户端                                服务端
+  │                                     │
+  │── 1. POST /pty/:id/connect-token ──→│  需 Basic Auth + Origin 校验 + x-opencode-ticket:1 头
+  │                                     │  tickets.issue() → crypto.randomUUID(), 60s TTL
+  │←────── { ticket, expires_in:60 } ───│
+  │                                     │
+  │── 2. ws://.../pty/:id/connect ──────→│  URL 带 ?ticket=<uuid> → 跳过 Basic Auth
+  │         ?ticket=<uuid>&cursor=N      │  tickets.consume() → 原子校验+删除
+  │←────── HTTP 101 Switching ──────────│
+  │                                     │
+  │←── 3a. 历史缓冲回放 (≤64KB/帧) ──────│
+  │←── 3b. 控制帧 [0x00 + JSON{cursor}] │
+  │←──→ 4. 双向 PTY 数据流 ─────────────│
+```
+
+**票据生命周期**（来源：`core/pty/ticket.ts:40-54`）：
+
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| 格式 | `crypto.randomUUID()` | UUID v4 |
+| 默认 TTL | **60 秒** | `DEFAULT_TTL = Duration.seconds(60)`（ticket.ts:8） |
+| 容量上限 | **10,000** | `CAPACITY = 10_000`（ticket.ts:9），基于 effect `Cache` 的 LRU |
+| 绑定维度 | `(ptyID, directory, workspaceID)` | 消费时三元组必须完全匹配（ticket.ts:29-33） |
+| 消费模式 | **一次性** | `Cache.invalidateWhen` 原子删除，匹配后立即失效 |
+| 过期 | 自动 | effect Cache 内置 TTL 过期清理 |
+
+> **为什么需要票据**：WebSocket 升级请求由浏览器发起，`Authorization` 头无法在 `new WebSocket(url)` 中设置。OpenCode 让客户端先用普通 HTTP 获取一次性票据，再把票据放在 WebSocket URL 的 query string 中完成认证（`server/shared/pty-ticket.ts:13-15` 的 `hasPtyConnectTicketURL` 识别此模式，Auth 中间件据此跳过 Basic 校验）。
+>
+> **额外的 connect-token 请求头**：`POST /connect-token` 除了 Basic Auth 外，还要求请求头 `x-opencode-ticket: 1`（`PTY_CONNECT_TOKEN_HEADER`，pty-ticket.ts:2）+ 通过 CORS Origin 校验（`validOrigin()`，handlers/pty.ts:129）。两者缺一不可，否则 `403 PtyForbiddenError`。
+
+### PTY 数据模型
+
+**`Pty.Info`**（来源：`core/pty.ts:45-54`）— 所有返回 PTY 信息的端点共用，规范化定义见 [PtyInfo](#ptyinfo)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `PtyID`（`"pty"` 前缀 branded 字符串） | 会话 ID，格式如 `pty_01HZ...` |
+| `title` | `string` | 显示标题，默认 `Terminal <id后4位>` |
+| `command` | `string` | 实际执行的命令（如 `/bin/bash`） |
+| `args` | `string[]` | 命令参数数组 |
+| `cwd` | `string` | 工作目录 |
+| `status` | `"running" \| "exited"` | 进程状态 |
+| `pid` | `NonNegativeInt` | 子进程 PID。Windows ConPTY 异步分配，spawn 时可能为 `0` |
+
+**`Pty.CreateInput`**（`core/pty.ts:58-64`）— 所有字段可选，规范化定义见 [PtyCreateRequest](#ptycreaterequest)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `command` | `string?` | 命令，缺省取 `Shell.preferred(config.shell)` |
+| `args` | `string[]?` | 参数，若 shell 支持 login 模式自动追加 `-l` |
+| `cwd` | `string?` | 工作目录，缺省取实例目录 |
+| `title` | `string?` | 显示标题 |
+| `env` | `Record<string,string>?` | 额外环境变量（与 `process.env` + 插件 `shell.env` 合并） |
+
+**`Pty.UpdateInput`**（`core/pty.ts:76-84`），规范化定义见 [PtyUpdateRequest](#ptyupdaterequest)：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `title` | `string?` | 新标题 |
+| `size` | `{ rows: PositiveInt, cols: PositiveInt }?` | 终端尺寸，触发 `process.resize(cols, rows)` |
+
+### PTY WebSocket 协议详解
+
+**连接后服务端先发送的内容**（`core/pty.ts:262-303` 的 `connect` 实现）：
+
+1. **历史缓冲回放**（如果 `cursor` 有效）：
+   - 每个 PTY 会话维护 **2MB 环形缓冲区**（`BUFFER_LIMIT = 1024 * 1024 * 2`，pty.ts:11）
+   - 按 **64KB 分块**发送（`BUFFER_CHUNK = 64 * 1024`，pty.ts:12），避免单帧过大
+   - `cursor` 语义：缺省/`0` → 回放全部历史；正整数 → 从该字节偏移开始（`Math.max(0, cursor - start)`）；`-1` → 跳过历史（`from = end`）
+
+2. **控制帧（meta frame）**（pty.ts:36-43）：
+   - 格式：`[0x00, ...UTF-8 JSON bytes]`
+   - 内容：`{ "cursor": <当前总字节数> }`
+   - 用途：告知客户端当前游标位置，用于断线重连时传入新的 `cursor`。**客户端据此判断历史回放结束**，后续都是实时 PTY 输出
+
+3. **双向数据流**：
+   - 服务端 → 客户端：PTY 子进程 stdout/stderr 原始字节流（字符串 chunk）
+   - 客户端 → 服务端：键盘输入，支持 **string 或 ArrayBuffer/Uint8Array**（`input.ts:5-23`）。string 直接转发 `process.write(message)`；binary 经 UTF-8 解码后转发，解码失败静默丢弃（非致命）
+
+**连接生命周期事件**（`handlers/pty.ts:171-256`）：
+
+| 事件 | 行为 |
+|------|------|
+| PTY 不存在 | 返回 `404`（升级前检查，pty.ts:177-181） |
+| cursor query 非法 | 返回 `400`（pty.ts:183-184） |
+| 票据无效/Origin 不匹配 | 返回 `403`（pty.ts:186-190） |
+| 服务端正在关闭 | 发送 `CloseEvent(1001, "server closing")` 后断开（websocket-tracker.ts:4） |
+| PTY 会话在连接后消失 | 发送 `CloseEvent(4404, "session not found")`（pty.ts:234-236） |
+| 客户端断开 | `closed = true`，调用 `handler.onClose()` 清理订阅 |
+| 进程退出 | 自动触发 `Event.Exited`，清理会话，关闭所有订阅者 WebSocket |
+
+> **错误响应顺序是刻意的**（pty.ts:142-143 注释）：存在性检查（404）→ cursor 合法性（400）→ 票据校验（403），为保持既有的 empty-404 响应顺序。
+>
+> **服务端优雅关闭**（`websocket-tracker.ts`）：`WebSocketTracker` 维护所有活跃连接的 `Set`，`closeAll()` 在关闭时标记 `closing = true`，新连接注册返回 `false` → 立即关闭；关闭时并发向所有连接发送 `1001`，每连接超时 1 秒。
+>
+> **技术细节**：此端点用 `handleRaw` 绕过 Effect HttpApi 的编解码，手动处理 WebSocket 升级；用 `EffectBridge` 管理异步写入，避免 socket 写竞态。
 
 ### GET `/pty/shells`
 
-列出可用 shell。
+列出系统上可用的 shell，供用户选择创建 PTY 时使用。
 
-**响应** `200`: `List<`[`ShellInfo`](#shellinfo)`>`
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)（`directory?`, `workspace?`）
 
-**平台检测**:
-- Windows: `pwsh` → `powershell` → `git-bash` → `cmd.exe`
-- Unix: `/etc/shells`（失败回退 `["/bin/bash", "/bin/zsh", "/bin/sh"]`）
+**响应** `200`: `List<`[`ShellInfo`](#shellinfo)`>`（即 `ShellItem[]`）
 
-`fish`/`nu` 标记为 `acceptable: false`。
+**字段说明**（groups/pty.ts:23-27）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `path` | `string` | shell 完整路径（Windows 可能是 git-bash 路径） |
+| `name` | `string` | shell 基名小写（如 `bash`, `zsh`, `pwsh`） |
+| `acceptable` | `boolean` | 是否可接受。`fish`/`nu` 被标记为 `deny: true`（shell.ts:10-20） |
+
+**边界情况**：Windows 检测 `pwsh` → `powershell` → `git-bash` → `cmd.exe`；Unix 读 `/etc/shells`，失败回退 `["/bin/bash", "/bin/zsh", "/bin/sh"]`。每个候选经 `resolve()` 验证文件存在。
+
+**数据来源/原理**（`shell/shell.ts:210-213`）：`Shell.preferred()` 按平台枚举候选并验证。
+
+**建议用法**：创建 PTY 前调用此端点填充 shell 选择器；`acceptable: false` 的项应置灰或过滤。
 
 ### GET `/pty`
 
 列出当前实例管理的所有活跃 PTY 会话。
 
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
 **响应** `200`: `List<`[`PtyInfo`](#ptyinfo)`>`
+
+**数据来源/原理**（`core/pty.ts`）：`Pty.Service.list()` 遍历内存中 `sessions: Map<PtyID, Active>` 返回所有 `info`。**仅含未退出的会话**，进程退出后自动移除。
+
+**边界情况**：无活跃会话时返回空数组；跨工作区的会话通过 `directory`/`workspace` 路由隔离。
 
 ### POST `/pty`
 
-创建 PTY 终端。
+创建新的伪终端会话，启动 shell 进程。
 
-**请求体**: [`PtyCreateRequest`](#ptycreaterequest)（所有字段可选）
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)；Body [`PtyCreateRequest`](#ptycreaterequest)（即 `Pty.CreateInput`，所有字段可选）
 
-**响应** `200`: [`PtyInfo`](#ptyinfo)（含生成的 `id` 和 `pid`）
+**响应** `200`: [`PtyInfo`](#ptyinfo)（创建后的会话信息，含生成的 `id` 和 `pid`）
 
-**创建流程**:
-1. `PtyPreparation.prepareCreate()` 准备参数（command/args/cwd/env 合并）
-2. 生成 `PtyID.ascending()`（`pty_` 前缀升序 ULID）
-3. 底层 spawn（Bun 用 `bun-pty`，Node 用 `@lydell/node-pty`）
-4. 注册 `onData` → 广播给订阅者 + 追加到 2MB 环形缓冲区
-5. 注册 `onExit` → 标记 `status: "exited"` → 发布 `pty.exited` → 自动移除会话
-6. 发布 `pty.created`
+**边界情况**：`400 BadRequest`（参数校验失败）；Windows ConPTY 异步分配 PID，`pid` 可能为 `0`。
+
+**创建流程**（`handlers/pty.ts:62-75` + `pty-preparation.ts`）：
+1. `PtyPreparation.prepareCreate()` 准备参数：
+   - `command`：取 `input.command` 或配置 shell 或系统默认
+   - `args`：若 shell 支持 login（`META[shell].login === true`），自动追加 `-l`
+   - `cwd`：取 `input.cwd` 或实例目录
+   - 触发插件钩子 `"shell.env"` 获取额外环境变量
+   - 合并 env：`process.env` + `input.env` + 插件 env + `TERM=xterm-256color` + `OPENCODE_TERMINAL=1`；Windows 额外设置 `LC_ALL`/`LC_CTYPE`/`LANG = "C.UTF-8"`
+2. `Pty.Service.create()`：生成 `PtyID.ascending()`（`pty_` 前缀升序 ULID）→ 底层 `spawn()`（Bun 用 `bun-pty`，Node 用 `@lydell/node-pty`）→ 注册 `onData`（广播 + 追加缓冲区）→ 注册 `onExit`（标记 exited → 发布 `Event.Exited` → 自动移除）→ 发布 `Event.Created`
+
+**建议用法**：默认空 body 创建；移动端建议立即传 `size` 同步终端尺寸避免首帧错位。
 
 ### GET `/pty/{ptyId}`
 
-获取单个 PTY 会话信息。
+查询单个 PTY 会话的当前状态。
+
+**请求**: Path `ptyId`；Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
 
 **响应** `200`: [`PtyInfo`](#ptyinfo)
 
-**错误**: 404 `PtyNotFoundError`
+**边界情况**：`404 PtyNotFoundError`（`{ ptyID, message }`）— 会话不存在或已退出移除。
 
 ### PUT `/pty/{ptyId}`
 
-更新 PTY（标题/尺寸）。
+更新标题或调整终端尺寸。
 
-**请求体**: [`PtyUpdateRequest`](#ptyupdaterequest)
+**请求**: Path `ptyId`；Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)；Body [`PtyUpdateRequest`](#ptyupdaterequest)（即 `Pty.UpdateInput`）
 
-**响应** `200`: [`PtyInfo`](#ptyinfo)
+**响应** `200`: [`PtyInfo`](#ptyinfo)（更新后的信息）
 
-> `size` 提供时调用 `process.resize(cols, rows)`。
+**边界情况**：`404 PtyNotFoundError` / `400 BadRequest`。
+
+**数据来源/原理**（`core/pty.ts:244-250`）：`title` 非空 → 更新 `info.title`；`size` 提供 → 调用 `process.resize(cols, rows)`；发布 `Event.Updated`。
+
+**建议用法**：客户端窗口/方向变化时调用此端点同步 `size`，避免终端渲染错位。
 
 ### DELETE `/pty/{ptyId}`
 
 终止并移除 PTY 会话。
 
-**响应** `200`: `boolean`
+**请求**: Path `ptyId`；Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
 
-**行为**: `teardown()` → dispose 监听器 → `process.kill()` → 关闭所有 WebSocket 订阅者 → 发布 `pty.deleted`。
+**响应** `200`: `boolean`（恒为 `true`）
+
+**边界情况**：`404 PtyNotFoundError`。
+
+**数据来源/原理**（`core/pty.ts:155-168`）：`teardown()` → dispose 所有监听器 → `process.kill()` → 关闭所有 WebSocket 订阅者 → 发布 `Event.Deleted`。
 
 ### POST `/pty/{ptyId}/connect-token`
 
-获取 WebSocket 连接票据（**三步流程的第 1 步**）。
+为后续 WebSocket 连接申请一次性票据（**三步流程的第 1 步**）。
 
-**Headers**: **必需** `x-opencode-ticket: 1` + Basic Auth + 合法 CORS Origin
+**请求**: Path `ptyId`；Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
+**Headers**（**必需**）：`x-opencode-ticket: 1`（`PTY_CONNECT_TOKEN_HEADER`）+ Basic Auth + 合法 CORS Origin
 
 **响应** `200`:
 ```json
 { "ticket": "uuid-v4", "expires_in": 60 }
 ```
 
-**错误**: 403 `PtyForbiddenError`（Origin 不匹配或缺 `x-opencode-ticket` 头）/ 404
+**`ConnectToken` 字段**（`core/pty/ticket.ts:11-14`）：
 
-> **票据生命周期**: UUID v4，60 秒 TTL，容量上限 10,000（LRU），绑定 `(ptyID, directory, workspaceID)` 三元组，**一次性消费**。
->
-> **为什么需要票据**: WebSocket 升级请求由浏览器发起，`Authorization` 头无法在 `new WebSocket(url)` 中设置。客户端先用 HTTP 获取一次性票据，再放在 WebSocket URL query 中完成认证。
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `ticket` | `string` | UUID v4 票据 |
+| `expires_in` | `PositiveInt` | 过期秒数（默认 60），由 TTL 计算得出：`Math.max(1, round(TTL秒))` |
+
+**边界情况**：`403 PtyForbiddenError`（Origin 不匹配或缺 `x-opencode-ticket` 头）；`404 PtyNotFoundError`。
+
+**建议用法**：
+```typescript
+// 1. 获取票据（必须带 x-opencode-ticket 头）
+const { ticket } = await fetch(`/pty/${ptyID}/connect-token`, {
+  method: "POST",
+  headers: { "x-opencode-ticket": "1", "Authorization": "Basic ..." }
+}).then(r => r.json())
+
+// 2. 建立 WebSocket（无需 Auth 头，60s 内有效、一次性）
+const ws = new WebSocket(`/pty/${ptyID}/connect?ticket=${ticket}&cursor=-1`)
+```
 
 ### GET `/pty/{ptyId}/connect`（WebSocket）
 
-WebSocket 连接 PTY 终端。
+建立 WebSocket 连接，实时交互 PTY 输入输出（**三步流程的第 2 步起**）。
 
 **URL**: `ws(s)://host:port/pty/{ptyId}/connect?ticket={uuid}&cursor={int}`
 
 | Query 参数 | 类型 | 默认 | 说明 |
 |-----------|------|------|------|
-| `ticket` | string | — | connect-token 获取的票据。提供时跳过 Basic Auth |
-| `cursor` | int | — | 历史回放起始字节偏移。`-1` = 跳过历史；非整数或 `< -1` → 400 |
+| `ticket` | string | — | connect-token 获取的票据。提供时跳过 Basic Auth（Origin 仍需校验） |
+| `cursor` | int | — | 历史回放起始字节偏移。`-1` = 跳过历史；缺省/`0` = 回放全部；非整数或 `< -1` → `400` |
 | `directory` | string | — | 工作区路由 |
 | `workspace` | string | — | 工作区 ID |
 
-**认证**: 特殊 `PtyConnectAuthorization` — 有 ticket 跳过 Basic Auth，无 ticket 则需 Basic Auth。
+**认证**：特殊 `PtyConnectAuthorization` 中间件 — 有 ticket 跳过 Basic Auth，无 ticket 则需 Basic Auth。
 
-**连接后服务端发送**:
-1. **历史缓冲回放**（如果 cursor 有效）: 每个 PTY 维护 2MB 环形缓冲区，按 64KB 分块发送
-   - `cursor` 缺省/0: 回放全部历史
-   - `cursor` 为正整数: 从该偏移回放
-   - `cursor = -1`: 跳过历史
-2. **控制帧（meta frame）**: `[0x00, ...UTF-8 JSON bytes]`，内容 `{ "cursor": <当前总字节数> }`，告知客户端当前游标位置
-3. **双向数据流**:
-   - 服务端 → 客户端: PTY 子进程 stdout/stderr 原始字节流
-   - 客户端 → 服务端: string 或 ArrayBuffer/Uint8Array（UTF-8 解码后转发，解码失败静默丢弃）
+**返回**：HTTP 101（WebSocket 升级），无 JSON body。
 
-**关闭事件**:
+**连接后数据流**（详见 [PTY WebSocket 协议详解](#pty-websocket-协议详解)）：历史缓冲回放（≤64KB/帧）→ 控制帧 `[0x00 + JSON{cursor}]` → 双向 PTY 数据流。
+
+**关闭事件**：
+
 | 事件 | 行为 |
 |------|------|
-| PTY 不存在 | 404（升级前检查） |
-| cursor 非法 | 400 |
-| 票据无效/Origin 不匹配 | 403 |
+| PTY 不存在 | `404`（升级前检查） |
+| cursor 非法 | `400` |
+| 票据无效/Origin 不匹配 | `403` |
 | 服务端正在关闭 | `CloseEvent(1001, "server closing")` |
 | PTY 会话连接后消失 | `CloseEvent(4404, "session not found")` |
+
+**客户端实现要点**：
+1. 收到的第一类数据是**历史回放**（0 或多个 binary/text 帧）
+2. 收到的 `[0x00 + JSON]` 帧是**控制帧**，解析 `cursor` 值并保存
+3. 之后的所有数据都是**实时 PTY 输出**
+4. 发送数据时用 `string` 或 `ArrayBuffer`（UTF-8 编码）；binary 解码失败静默丢弃
+5. 断线重连时用上次保存的 `cursor` 值作为新连接的 `cursor` 参数，避免重复回放
+
+**建议用法**：首次连接传 `cursor=-1` 跳过历史（移动端省流量）；重连时传上次控制帧的 `cursor` 做增量恢复。
 
 ---
 
 ## 14. TUI 端点
 
-> 路由：`groups/tui.ts` · 核心：`server/tui-event.ts` + `server/shared/tui-control.ts`
-> **双通道架构**: 通道 A（事件推送，fire-and-forget）+ 通道 B（请求-响应队列）
+> 路由：`groups/tui.ts` · Handler：`handlers/tui.ts`
+> 核心：`server/tui-event.ts`（事件定义）+ `server/shared/tui-control.ts`（请求-响应队列）
+> **中间件栈**：Instance → Workspace → Authorization
+> **端点数**：13（通道 A 事件推送 10 个 + 通道 B 请求-响应队列 2 个 + 1 个 select-session 归入通道 A）
+
+### 核心机制：双通道控制架构
+
+OpenCode 的 TUI（Terminal User Interface）控制有**两条独立通道**，分别适配 fire-and-forget 推送与同步请求-响应两种交互模式：
+
+```
+┌─────────────────────────────┐         ┌──────────────────┐
+│  外部进程（如 oc-remote App）│         │   OpenCode TUI   │
+└──────────────┬──────────────┘         └────────┬─────────┘
+               │                                 │
+    ┌──────────┴──────────┐          ┌───────────┴────────────┐
+    │ 通道 A：事件推送     │          │ 通道 B：请求-响应队列   │
+    │ （单向，fire-and-    │          │ （双向，同步等待）      │
+    │  forget）            │          │                        │
+    │                      │  EventV2 │                        │
+    │ POST /tui/append-    │──Bus──→  │ GET  /tui/control/next │
+    │   prompt             │          │   ← TUI 消费请求        │
+    │ POST /tui/open-help  │          │                        │
+    │ POST /tui/show-toast │          │ POST /tui/control/     │
+    │ POST /tui/publish    │          │   response             │
+    │ POST /tui/select-    │          │   → 外部提交响应        │
+    │   session            │          │                        │
+    │ ... (10 个端点)      │          │ AsyncQueue<TuiRequest> │
+    └─────────────────────┘          └────────────────────────┘
+```
+
+**通道 A：事件推送**（`handlers/tui.ts:27-105`）— 通过 `EventV2Bridge.Service.publish()` 发布事件到内部事件总线，TUI 订阅执行对应 UI 操作。**fire-and-forget**：不等待 TUI 响应，立即返回 `true`。
+
+**通道 B：请求-响应队列**（`server/shared/tui-control.ts`）— 两个全局 `AsyncQueue`：`request`（外部→TUI）和 `response`（TUI→外部）。`GET /tui/control/next` 让 TUI 端长轮询阻塞等待请求；`POST /tui/control/response` 让 TUI 提交处理结果。用途：让 TUI 作为"执行器"，处理外部进程通过 HTTP 发来的命令并返回结果。
+
+> ⚠️ **通道 B 并发限制**：`request` 和 `response` 是两个独立的全局单例 AsyncQueue（tui-control.ts:11-12），**无请求 ID 关联**。多个并发请求-响应对可能交叉错配，仅适合单请求-单响应的串行场景。
+
+### TuiEvent 事件定义
+
+所有事件通过 `EventV2.define()` 定义（`server/tui-event.ts`）：
+
+| 事件类型 | type 字符串 | data schema |
+|----------|-------------|-------------|
+| `PromptAppend` | `tui.prompt.append` | `{ text: string }` |
+| `CommandExecute` | `tui.command.execute` | `{ command: string \| known-literal }` |
+| `ToastShow` | `tui.toast.show` | `{ title?: string, message: string, variant: "info"\|"success"\|"warning"\|"error", duration: PositiveInt }` |
+| `SessionSelect` | `tui.session.select` | `{ sessionID: SessionID }` |
+
+**`CommandExecute` 的已知命令字面量**（tui-event.ts:13-31）：
+```
+session.list, session.new, session.share, session.interrupt, session.compact,
+session.page.up, session.page.down, session.line.up, session.line.down,
+session.half.page.up, session.half.page.down, session.first, session.last,
+prompt.clear, prompt.submit, agent.cycle
+```
 
 ### 通道 A：事件推送端点（10 个）
 
@@ -1833,39 +2042,75 @@ WebSocket 连接 PTY 终端。
 
 #### POST `/tui/append-prompt`
 
-追加提示文本（**追加非替换**，不自动提交）。
+追加提示文本到 TUI 输入框（**追加非替换**，不自动提交）。
 
 **请求体**: `{ "text": "string" }`
 
+**响应** `200`: `boolean`
+
+**边界情况**：`400 BadRequest`（缺 `text`）。
+
+**数据来源/原理**（`handlers/tui.ts`）：发布 `TuiEvent.PromptAppend`，TUI 收到后将 `text` 追加到输入框。
+
 #### POST `/tui/open-help`
 
-打开帮助对话框。发布 `CommandExecute { command: "help.show" }`。
+打开帮助对话框。
+
+**响应** `200`: `boolean` · **请求体**: 无
+
+**数据来源/原理**：发布 `CommandExecute { command: "help.show" }`。
 
 #### POST `/tui/open-sessions`
 
-打开会话列表对话框。发布 `CommandExecute { command: "session.list" }`。
+打开会话列表对话框。
+
+**响应** `200`: `boolean` · **请求体**: 无
+
+**数据来源/原理**：发布 `CommandExecute { command: "session.list" }`。
 
 #### POST `/tui/open-themes`
 
-打开主题对话框。**⚠️ 源码 bug**: 发布的是 `session.list`（与 `open-sessions` 相同，疑似源码笔误）。
+打开主题对话框。
+
+**响应** `200`: `boolean` · **请求体**: 无
+
+> ⚠️ **源码 bug**（`handlers/tui.ts:51-54`）：发布的是 `session.list`（与 `open-sessions` 相同），而非 `theme.list`。主题对话框和会话对话框会触发相同行为，疑似源码笔误。
 
 #### POST `/tui/open-models`
 
-打开模型选择对话框。发布 `CommandExecute { command: "model.list" }`。
+打开模型选择对话框。
+
+**响应** `200`: `boolean` · **请求体**: 无
+
+**数据来源/原理**：发布 `CommandExecute { command: "model.list" }`。
 
 #### POST `/tui/submit-prompt`
 
-提交当前输入框内容。发布 `CommandExecute { command: "prompt.submit" }`。
+提交当前输入框内容。
+
+**响应** `200`: `boolean` · **请求体**: 无
+
+**数据来源/原理**：发布 `CommandExecute { command: "prompt.submit" }`。
 
 #### POST `/tui/clear-prompt`
 
-清空提示输入。发布 `CommandExecute { command: "prompt.clear" }`。
+清空提示输入。
+
+**响应** `200`: `boolean` · **请求体**: 无
+
+**数据来源/原理**：发布 `CommandExecute { command: "prompt.clear" }`。
 
 #### POST `/tui/execute-command`
 
-执行 TUI 命令（**遗留别名映射**，未知命令映射为 `undefined` 静默失败）。
+执行 TUI 命令（**遗留别名映射**）。
 
 **请求体**: `{ "command": "string" }`
+
+**响应** `200`: `boolean`
+
+**边界情况**：`400 BadRequest`；**未知命令映射为 `undefined` 静默失败**（不报错）。
+
+**别名映射表**（`handlers/tui.ts:11-25`）：
 
 | 输入（旧名） | 映射到（新名） |
 |-------------|---------------|
@@ -1873,39 +2118,64 @@ WebSocket 连接 PTY 终端。
 | `session_share` | `session.share` |
 | `session_interrupt` | `session.interrupt` |
 | `session_compact` | `session.compact` |
-| `messages_page_up/down` | `session.page.up/down` |
-| `messages_line_up/down` | `session.line.up/down` |
-| `messages_half_page_up/down` | `session.half.page.up/down` |
-| `messages_first/last` | `session.first/last` |
+| `messages_page_up` | `session.page.up` |
+| `messages_page_down` | `session.page.down` |
+| `messages_line_up` | `session.line.up` |
+| `messages_line_down` | `session.line.down` |
+| `messages_half_page_up` | `session.half.page.up` |
+| `messages_half_page_down` | `session.half.page.down` |
+| `messages_first` | `session.first` |
+| `messages_last` | `session.last` |
 | `agent_cycle` | `agent.cycle` |
 
-> **建议**: 新代码用 `/tui/publish` 直接发送 `CommandExecute` 事件。
+**建议用法**：新代码应直接使用 `/tui/publish` 端点发送 `CommandExecute` 事件，避免别名层的限制。
 
 #### POST `/tui/show-toast`
 
 显示 Toast 通知。
 
-**请求体**:
+**请求体**（`ToastShow.data`）:
 ```json
 {
-  "title": "string?",
-  "message": "string",                          // 必填
-  "variant": "info | success | warning | error",
-  "duration": 5000                              // PositiveInt，默认 5000ms
+  "title": "string?",                             // 可选标题
+  "message": "string",                            // 必填正文
+  "variant": "info | success | warning | error",  // 样式变体
+  "duration": 5000                                // PositiveInt，默认 5000ms
 }
 ```
 
+**响应** `200`: `boolean`
+
+**字段说明**：
+
+| 字段 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `title` | `string?` | — | 标题（可选） |
+| `message` | `string` | 必填 | 正文 |
+| `variant` | `"info"\|"success"\|"warning"\|"error"` | 必填 | 样式变体 |
+| `duration` | `PositiveInt` | **5000** | 显示毫秒数 |
+
 #### POST `/tui/publish`
 
-**最通用的 TUI 控制端点**，一个请求可触发任何 TUI 事件。
+**最通用的 TUI 控制端点**，一个请求可触发任何类型的 TUI 事件。
 
-**请求体**（4 种事件联合，按 `type` 判别）:
+**请求体**（`TuiPublishPayload`，4 种事件判别联合，按 `type` 区分，`groups/tui.ts:29-34`）:
 ```jsonc
+// 类型 1：追加提示
 { "type": "tui.prompt.append", "properties": { "text": "..." } }
+// 类型 2：执行命令（支持任意 string 命令，不受别名限制）
 { "type": "tui.command.execute", "properties": { "command": "session.new" } }
+// 类型 3：显示 Toast
 { "type": "tui.toast.show", "properties": { "message": "...", "variant": "info" } }
+// 类型 4：选择会话
 { "type": "tui.session.select", "properties": { "sessionID": "ses_..." } }
 ```
+
+**响应** `200`: `boolean`
+
+**边界情况**：`400 BadRequest`（`type` 或 `properties` 不匹配联合类型）。
+
+**建议用法**：优先用此端点替代多个专用端点，减少请求往返；尤其推荐用于发送自定义命令（避开 `execute-command` 的别名限制）。
 
 #### POST `/tui/select-session`
 
@@ -1913,7 +2183,11 @@ WebSocket 连接 PTY 终端。
 
 **请求体**: `{ "sessionID": "ses_..." }`
 
-**错误**: 400（sessionID 不以 `"ses"` 开头）/ 404（会话不存在）
+**响应** `200`: `boolean`
+
+**边界情况**：`400 BadRequest`（sessionID 不以 `"ses"` 开头）/ `404 NotFound`（会话不存在）。
+
+**校验逻辑**（`handlers/tui.ts:98-105`）：`sessionID` 必须以 `"ses"` 开头（SessionID 前缀）→ 通过 `Session.Service.get()` 验证会话存在 → 发布 `TuiEvent.SessionSelect`，TUI 导航到该会话。
 
 ### 通道 B：请求-响应队列端点（2 个）
 
@@ -1923,10 +2197,22 @@ WebSocket 连接 PTY 终端。
 
 TUI 端长轮询，阻塞等待外部进程通过队列发来的请求。
 
-**响应** `200`: `TuiRequest`
+**响应** `200`: `TuiRequest`（阻塞直到有请求）
+
 ```json
 { "path": "/sync/replay", "body": {} }
 ```
+
+**`TuiRequest` 字段**（`tui-control.ts:4-7`）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `path` | `string` | 请求路径（如 `/sync/replay`） |
+| `body` | `unknown` | 请求体（任意 JSON） |
+
+**数据来源/原理**：调用 `nextTuiRequest()` → `request.next()`（AsyncQueue 出队）。
+
+**建议用法**：TUI 进程在事件循环中反复调用此端点，获取外部通过通道 B 发来的操作请求，本地执行后通过 `/tui/control/response` 返回结果。
 
 #### POST `/tui/control/response`
 
@@ -1934,19 +2220,27 @@ TUI 处理完请求后提交响应。
 
 **请求体**: 任意 JSON（`Schema.Unknown`）
 
-**响应** `200`: `boolean`
+**响应** `200`: `boolean`（恒 `true`）
+
+**数据来源/原理**：调用 `submitTuiResponse(payload)` → `response.push(payload)`（入队）。
+
+**配对用法**：外部进程发请求 → TUI 通过 `next` 取出 → 本地处理 → 通过 `response` 提交结果 → 外部进程从 `response` 队列取出结果。
 
 ---
 
 ## 15. 控制平面基础端点
 
-> 路由：`groups/control.ts` · 注册在 `RootHttpApi`，**不经过** Instance/Workspace/Authorization 中间件
+> 路由：`groups/control.ts` · Handler：`handlers/control.ts`
+> **重要**：这组端点注册在 `RootHttpApi`（非实例级 `InstanceHttpApi`），**不经过** Instance/Workspace/Authorization 中间件。
+> **端点数**：3
 
 ### PUT `/auth/{providerID}`
 
 设置认证凭据。
 
-**请求体**: `AuthInfo`（OAuth/API Key/WellKnown 联合）
+**请求**: Path `providerID`（`ProviderV2.ID`）
+
+**请求体**: `AuthInfo`（`Auth.Info`，OAuth/API Key/WellKnown 三种认证方式联合类型，`auth/index.ts:34`）
 ```jsonc
 // OAuth
 { "type": "oauth", "client_id": "...", "client_secret": "...", "authorization_url": "...", "token_url": "..." }
@@ -1956,19 +2250,39 @@ TUI 处理完请求后提交响应。
 { "type": "well_known", "url": "..." }
 ```
 
+**字段说明**：
+
+| 变体 | `type` | 关键字段 |
+|------|--------|----------|
+| OAuth | `"oauth"` | `client_id`, `client_secret?`, `authorization_url`, `token_url`, ... |
+| API Key | `"api_key"` | `api_key`, `headers?` |
+| WellKnown | `"well_known"` | `url`（OpenID Connect well-known 配置端点） |
+
 **响应** `200`: `boolean`
+
+**边界情况**：`400 BadRequest`（payload 不匹配联合类型）。
+
+**数据来源/原理**（`handlers/control.ts`）：`Auth.Service.set(providerID, credentials)` 持久化到本地认证存储。
 
 ### DELETE `/auth/{providerID}`
 
 移除认证凭据。
 
+**请求**: Path `providerID`（`ProviderV2.ID`）
+
 **响应** `200`: `boolean`
+
+**边界情况**：`400 BadRequest`。
+
+**数据来源/原理**：`Auth.Service.remove(providerID)` 从本地存储删除。
 
 ### POST `/log`
 
-写入服务端日志（让客户端把自身日志写入 OpenCode 服务端统一日志流，便于调试）。
+写入服务端日志。让客户端（如 SDK、IDE 插件）把自身日志写入 OpenCode 服务端统一日志流，便于调试。
 
-**请求体**:
+**请求**: Query `LogQuery { directory?: string, workspace?: string }`
+
+**请求体**（`LogInput`，`groups/control.ts:17-29`）:
 ```json
 {
   "service": "string",                          // 服务名（标注用）
@@ -1978,28 +2292,78 @@ TUI 处理完请求后提交响应。
 }
 ```
 
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `service` | `string` | 服务名称（标注用） |
+| `level` | `"debug"\|"info"\|"warn"\|"error"` | 日志级别 |
+| `message` | `string` | 日志消息 |
+| `extra` | `Record<string, unknown>?` | 额外元数据（作为 Effect 日志标注） |
+
 **响应** `200`: `boolean`
+
+**数据来源/原理**（`handlers/control.ts:28-39`）：映射到 Effect 的日志函数（`Effect.logDebug/logInfo/logWarning/logError`），`extra` 通过 `Effect.annotateLogs()` 附加为结构化标注。
+
+**建议用法**：客户端发生异常时，将自身日志通过此端点汇入服务端日志流，与服务端日志一并排查。
 
 ---
 
 ## 16. Sync 端点
 
-> 路由：`groups/sync.ts` · 核心：`EventV2` 事件系统 + `EventTable`（SQLite 持久化）
-> **事件溯源（Event Sourcing）同步模式**
+> 路由：`groups/sync.ts` · Handler：`handlers/sync.ts`
+> 核心：`EventV2` 事件系统 + `EventTable`（SQLite 持久化）
+> **中间件栈**：Instance → Workspace → Authorization
+> **端点数**：4
+
+### 核心机制：EventV2 事件溯源同步
+
+OpenCode 的多工作区协作基于**事件溯源（Event Sourcing）**模式：
+
+```
+工作区 A（本地）                     工作区 B（远程）
+    │                                    │
+    │  用户操作产生 EventV2 事件          │
+    │  → 写入本地 SQLite EventTable       │
+    │  → 通过 sync 连接转发给 B           │
+    │                                    │
+    │                    ┌───────────────┤
+    │                    │ /sync/replay   │ ← B 接收事件序列
+    │                    │ 验证+回放到本地 │
+    │                    │ EventTable     │
+    │                    └───────────────┤
+    │                                    │
+    │  /sync/history ← B 查询增量事件     │
+    │  /sync/start  ← B 启动持续同步      │
+    │  /sync/steal  ← B 将会话纳入本工作区 │
+```
+
+**EventV2 结构**（`core/event`）：每个事件有 `id`（唯一）、`aggregateID`（聚合根，如 session ID）、`seq`（单调递增序列号）、`type`（事件类型字符串）、`data`（事件负载）。
+
+**同步语义**：
+- **增量同步**：客户端记录每个 aggregate 的最后已知 `seq`，只请求 `seq > 已知值` 的事件
+- **全量回放**：`/sync/replay` 接收完整事件序列，验证后应用到本地
+- **所有权校验**：replay 时设置 `strictOwner: true`，确保事件归属正确的工作区
 
 ### POST `/sync/start`
 
 为当前项目中所有有活跃会话的工作区启动同步循环。
 
-**响应** `200`: `boolean`
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
 
-> 用 `Effect.ignore` + `Effect.forkIn(scope)` 在请求作用域内 fork 后台任务，同步循环生命周期绑定到实例 scope。
+**响应** `200`: `boolean`（恒 `true`）
+
+**数据来源/原理**（`handlers/sync.ts:27-32`）：`Workspace.Service.startWorkspaceSyncing(projectID)` — fork 一个后台 Effect 持续运行同步循环。使用 `Effect.ignore` + `Effect.forkIn(scope)` 在请求作用域内 fork 后台任务，即使同步循环失败也不影响 HTTP 响应。**同步循环的生命周期绑定到实例 scope**。
+
+**边界情况**：无活跃会话时静默返回 `true`（无可同步内容）。
 
 ### POST `/sync/replay`
 
-验证并回放完整事件历史到本地 EventTable。
+验证并回放完整的事件历史到本地 EventTable。
 
-**请求体**:
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
+**请求体**（`ReplayPayload`，`groups/sync.ts:19-22`）:
 ```json
 {
   "directory": "/source/workspace",
@@ -2015,27 +2379,58 @@ TUI 处理完请求后提交响应。
 }
 ```
 
-> `events` 至少 1 个，按 seq 升序。`aggregateID`（驼峰命名）。
+**`ReplayPayload` 字段**：
 
-**响应** `200`: `{ "sessionID": "string" }`（以第一个事件的 aggregateID 作为会话标识）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `directory` | `string` | 源工作区目录 |
+| `events` | `NonEmptyArray<ReplayEvent>` | 至少 1 个事件，按 seq 升序 |
 
-**处理**: 设置 `strictOwner: true` 验证事件归属后写入。
+**`ReplayEvent` 字段**（注意 `aggregateID` 为**驼峰**）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `EventV2.ID` | 事件唯一 ID |
+| `aggregateID` | `string` | 聚合根 ID（驼峰命名） |
+| `seq` | `NonNegativeInt` | 序列号 |
+| `type` | `string` | 事件类型 |
+| `data` | `Record<string, unknown>` | 事件负载 |
+
+**响应** `200`: `{ "sessionID": "string" }`（以第一个事件的 `aggregateID` 作为会话标识）
+
+**边界情况**：`400 BadRequest`（`events` 为空或非升序）。
+
+**处理流程**（`handlers/sync.ts:34-59`）：
+1. 提取 `source = events[0].aggregateID`（以第一个事件的 aggregateID 作为会话标识）
+2. 获取当前工作区的 `ownerID`
+3. 调用 `events.replayAll(payload, { ownerID, strictOwner: true })` — 逐个验证并写入
+4. 返回 `{ sessionID: source }`
+
+> 请求开始和完成时各记录一条 `logInfo`，包含事件数、首尾 seq、目录。
 
 ### POST `/sync/steal`
 
-将会话"窃取"到当前工作区（更新会话归属）。
+将会话"窃取"到当前工作区（通过事件系统更新会话归属）。
 
-**请求体**: `{ "sessionID": "ses_..." }`
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)；Body `{ "sessionID": "ses_..." }`（`SessionPayload`）
 
 **响应** `200`: `{ "sessionID": "ses_..." }`（原样返回）
 
-**错误**: 400（无 workspaceID 时）
+**边界情况**：`400 BadRequest`（无 workspaceID 时）。
+
+**数据来源/原理**（`handlers/sync.ts:61-70`）：获取当前工作区的 `workspaceID` → `Session.Service.setWorkspace({ sessionID, workspaceID })` 更新会话的工作区归属。这会通过事件系统传播，让其他工作区感知到归属变更。
+
+**"窃取"语义**：当一个会话需要在多个工作区间转移时，目标工作区调用此端点声明所有权。配合 `/sync/replay` 可以迁移完整会话历史。
 
 ### POST `/sync/history`
 
-增量查询事件历史。
+增量查询事件历史，获取客户端未知的新事件。
 
-**请求体**: `Record<aggregateID, lastKnownSeq>`
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
+**请求体**（`HistoryPayload`，`groups/sync.ts:29`）: `Record<aggregateID, lastKnownSeq>`
+- **key**：aggregateID（客户端已知）
+- **value**：该 aggregate 客户端最后已知的 seq（`NonNegativeInt`）
 
 **响应** `200`: `List<HistoryEvent>`（按 seq 升序）
 
@@ -2049,21 +2444,51 @@ TUI 处理完请求后提交响应。
 }
 ```
 
-**查询逻辑**: 排除所有 `(aggregate_id = key AND seq <= value)`，返回其他所有事件（包括未在 payload 中列出的 aggregate 的全部历史）。
+**`HistoryEvent` 字段**（注意 `aggregate_id` 为**蛇形**）：
 
-> ⚠️ **命名不一致**: `ReplayEvent.aggregateID`（驼峰，API 输入）vs `HistoryEvent.aggregate_id`（蛇形，SQLite 列映射）。客户端需做字段名映射。
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `EventV2.ID` | 事件 ID |
+| `aggregate_id` | `string` | 聚合根 ID（蛇形命名，映射自 SQLite `EventTable` 列名） |
+| `seq` | `NonNegativeInt` | 序列号 |
+| `type` | `string` | 事件类型 |
+| `data` | `Record<string, unknown>` | 负载 |
+
+**边界情况**：`400 BadRequest`。
+
+**查询逻辑**（`handlers/sync.ts:72-85`）：排除所有 `(aggregate_id = key AND seq <= value)` 的事件，返回所有其他事件（包括未在 payload 中列出的 aggregate 的全部历史）。SQL 等价：`WHERE NOT (aggregate_id IN (...) AND seq <= ...)`，`ORDER BY seq ASC`。
+
+> ⚠️ **命名不一致**：`ReplayEvent.aggregateID`（驼峰，API 输入）vs `HistoryEvent.aggregate_id`（蛇形，SQLite 列映射）。客户端需做字段名映射。
+
+**建议用法**（增量同步循环）：
+```typescript
+// 1. 维护本地已知状态：{ [aggregateID]: lastSeq }
+// 2. 轮询获取增量（注意用蛇形 aggregate_id 读结果）
+const newEvents = await POST("/sync/history", localKnownState)
+// 3. 应用 newEvents 到本地，更新 localKnownState
+for (const ev of newEvents) {
+  applyEvent(ev)
+  localKnownState[ev.aggregate_id] = Math.max(localKnownState[ev.aggregate_id] ?? 0, ev.seq)
+}
+```
 
 ---
 
-## 17. Experimental 端点
+## 17. Experimental 端点（实验性）
 
-> 路由：`groups/experimental.ts` · 路径前缀 `/experimental`
+> 路由：`groups/experimental.ts` · Handler：`handlers/experimental.ts` · 路径前缀：`/experimental`
+> **中间件栈**：Instance → Workspace → Authorization
+> **端点数**：12
 
-### GET `/experimental/console`
+> ⚠️ **实验性警告**：本组端点均为实验性质，API 契约可能在未来版本变更或移除，生产环境慎用。部分端点受运行时标志门控（见各端点说明）。
 
-获取 Console 组织状态。
+### GET `/experimental/console`（实验性）
 
-**响应** `200`:
+获取当前活跃的 Console 组织名及其管理的 provider 集合。
+
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
+**响应** `200`（`ConsoleStateResponse`，`groups/experimental.ts:22-26`）:
 ```json
 {
   "consoleManagedProviders": ["providerId"],
@@ -2072,110 +2497,167 @@ TUI 处理完请求后提交响应。
 }
 ```
 
-### GET `/experimental/console/orgs`
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `consoleManagedProviders` | `string[]` | 当前 Console 组织管理的 provider ID 列表 |
+| `activeOrgName` | `string?` | 活跃组织名（可选，无活跃组织时不出现） |
+| `switchableOrgCount` | `NonNegativeInt` | 可切换的组织总数（所有 account 的 org 数之和） |
+
+**边界情况**：`500 InternalServerError`（获取组织列表失败时）。
+
+### GET `/experimental/console/orgs`（实验性）
 
 列出可切换的 Console 组织。
 
 **响应** `200`: `{ "orgs": List<ConsoleOrgOption> }`
 
-```json
-{
-  "accountID": "string",
-  "accountEmail": "string",
-  "accountUrl": "string",
-  "orgID": "string",
-  "orgName": "string",
-  "active": true
-}
-```
+**`ConsoleOrgOption` 字段**（`groups/experimental.ts:28-35`）：
 
-### POST `/experimental/console/switch`
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `accountID` | `string` | 账户 ID |
+| `accountEmail` | `string` | 账户邮箱 |
+| `accountUrl` | `string` | 账户 URL |
+| `orgID` | `string` | 组织 ID |
+| `orgName` | `string` | 组织名 |
+| `active` | `boolean` | 是否为当前活跃组织 |
+
+**边界情况**：`500 InternalServerError`。
+
+### POST `/experimental/console/switch`（实验性）
 
 切换活跃 Console 组织。
 
-**请求体**: `{ "accountID": "string", "orgID": "string" }`
+**请求体**（`ConsoleSwitchPayload`）: `{ "accountID": "string", "orgID": "string" }`
 
 **响应** `200`: `boolean`
 
-### GET `/experimental/tool`
+**边界情况**：`400 BadRequest`（切换失败时）。
+
+**数据来源/原理**（`handlers/experimental.ts`）：`Account.Service.use(accountID, Some(orgID))` 持久化新的活跃选择。
+
+### GET `/experimental/tool`（实验性）
 
 列出工具（含参数 schema）。
 
+**请求**: Query `ToolListQuery`（`groups/experimental.ts:53-57`）
+
 | Query 参数 | 类型 | 说明 |
 |-----------|------|------|
-| `provider` | string | **必填** provider ID |
-| `model` | string | **必填** model ID |
+| `provider` | `ProviderV2.ID` | **必填** provider ID |
+| `model` | `ModelV2.ID` | **必填** model ID |
+| `directory?`, `workspace?` | — | 工作区路由 |
 
-**响应** `200`: `List<{ id, description, parameters }>`（parameters 是 JSON Schema）
+**响应** `200`: `List<{ id, description, parameters }>`（parameters 是 JSON Schema，`ToolJsonSchema.fromTool()`）
 
-### GET `/experimental/tool/ids`
+**边界情况**：`400 BadRequest`（缺必填 query）。
+
+**数据来源/原理**：根据 provider + model 组合获取可用工具列表（不同模型可能暴露不同工具集）。
+
+### GET `/experimental/tool/ids`（实验性）
 
 列出所有已注册工具 ID（内置 + 动态注册）。
 
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
 **响应** `200`: `string[]`
 
-### GET `/experimental/worktree`
+**数据来源/原理**（`handlers/experimental.ts`）：`ToolRegistry.Service.ids()` 返回所有已注册工具的 ID。
+
+### GET `/experimental/worktree`（实验性）
 
 列出当前项目的所有工作树目录。
 
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
 **响应** `200`: `string[]`
 
-### POST `/experimental/worktree`
+### POST `/experimental/worktree`（实验性）
 
 创建 git worktree 并运行启动脚本（**允许空 body**）。
 
-**请求体**: `{ "name": "string?", "startCommand": "string?" }?`
+**请求体**（`Worktree.CreateInput`，`worktree/index.ts:44-49`，可空）: `{ "name"?: "string", "startCommand"?: "string" }`
 
 **响应** `200`: [`WorktreeInfo`](#worktreeinfo)
 
-### DELETE `/experimental/worktree`
+**特殊设计**（`groups/experimental.ts:172-184`）：`disableCodecs: true` + payload 联合 `[NoContent, Worktree.CreateInput]`，允许客户端发空 body 创建默认工作树（`disableCodecodes: true`）。
+
+### DELETE `/experimental/worktree`（实验性）
 
 删除 git worktree 及其分支。
 
-**请求体**: `{ "directory": "string" }`
+**请求体**（`Worktree.RemoveInput`）: `{ "directory": "string" }`
 
 **响应** `200`: `boolean`
 
-> 删除后还调用 `project.removeSandbox(projectID, directory)` 清理项目元数据。
+**附加行为**（`handlers/experimental.ts:118-125`）：删除后还调用 `project.removeSandbox(projectID, directory)` 清理项目元数据。
 
-### POST `/experimental/worktree/reset`
+### POST `/experimental/worktree/reset`（实验性）
 
 重置 worktree 分支到主分支。
 
-**请求体**: `{ "directory": "string" }`
+**请求体**（`Worktree.ResetInput`）: `{ "directory": "string" }`
 
 **响应** `200`: `boolean`
 
-**Worktree 错误**（`WorktreeApiError` HTTP 400）: `WorktreeNotGitError` / `WorktreeNameGenerationFailedError` / `WorktreeCreateFailedError` / `WorktreeStartCommandFailedError` / `WorktreeRemoveFailedError` / `WorktreeResetFailedError` / `WorktreeListFailedError`
+**Worktree 错误**（`WorktreeApiError`，`groups/experimental.ts:69-75`，HTTP 400）: `WorktreeNotGitError` / `WorktreeNameGenerationFailedError` / `WorktreeCreateFailedError` / `WorktreeStartCommandFailedError` / `WorktreeRemoveFailedError` / `WorktreeResetFailedError` / `WorktreeListFailedError`
 
-### GET `/experimental/session`
+**`Worktree.Info` 字段**（`worktree/index.ts:37-41`，规范化定义见 [WorktreeInfo](#worktreeinfo)）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `name` | `string` | 工作树名称 |
+| `branch` | `string?` | 分支名 |
+| `directory` | `string` | 目录路径 |
+
+### GET `/experimental/session`（实验性）
 
 跨项目列出所有 OpenCode 会话（按更新时间排序）。
 
+**请求**: Query `SessionListQuery`（`groups/experimental.ts:76-84`）
+
 | Query 参数 | 类型 | 默认 | 说明 |
 |-----------|------|------|------|
-| `roots` | bool | — | 只返回根会话 |
-| `start` | number | — | 起始偏移 |
-| `cursor` | number | — | 分页游标（时间戳） |
-| `search` | string | — | 搜索关键词 |
-| `limit` | number | 100 | 每页数量（实际请求 `limit+1` 判断是否有更多） |
-| `archived` | bool | — | 是否包含归档会话（默认排除） |
+| `roots` | `boolean?` | — | 只返回根会话 |
+| `start` | `number?` | — | 起始偏移 |
+| `cursor` | `number?` | — | 分页游标（时间戳） |
+| `search` | `string?` | — | 搜索关键词 |
+| `limit` | `number?` | **100** | 每页数量（实际请求 `limit+1` 判断是否有更多） |
+| `archived` | `boolean?` | — | 是否包含归档会话（默认排除） |
+| `directory?`, `workspace?` | — | — | 工作区路由 |
 
 **响应** `200`: `List<Session.GlobalInfo>` + 可选 `x-next-cursor` 响应头
 
-### POST `/experimental/session/{sessionId}/background`
+**分页机制**（`handlers/experimental.ts:134-152`）：请求 `limit + 1` 条，若返回超过 `limit` 条则截断并通过 `x-next-cursor` 响应头返回下一页游标（最后一条的 `time.updated` 值）。
+
+### POST `/experimental/session/{sessionId}/background`（实验性）
 
 将阻塞当前会话的同步子代理转为后台运行。
 
+**请求**: Path `sessionId`（`SessionID`）
+
 **响应** `200`: `boolean`（是否有任务被提升为后台）
 
-> **门控**: 需运行时标志 `experimentalBackgroundSubagents` 开启，否则恒返回 `false`。
+**边界情况**：`400 BadRequest`。
 
-### GET `/experimental/resource`
+**门控**：需运行时标志 `experimentalBackgroundSubagents` 开启，否则恒返回 `false`。
+
+**数据来源/原理**（`handlers/experimental.ts:154-167`）：
+1. 过滤 `BackgroundJob` 列表：`type === "task"` && `status === "running"` && `parentSessionId === sessionID` && `background !== true`
+2. 对每个匹配任务调用 `background.promote(jobID)` 提升为后台
+3. 返回是否有至少一个任务被成功提升
+
+### GET `/experimental/resource`（实验性）
 
 获取所有已连接 MCP 服务器的资源列表。
 
-**响应** `200`: `Record<string, MCP.Resource>`
+**请求**: Query [`WorkspaceRoutingQuery`](#workspaceroutingquery)
+
+**响应** `200`: `Record<string, MCP.Resource>`（key 为资源名）
+
+**数据来源/原理**（`handlers/experimental.ts`）：`MCP.Service.resources()` 汇总所有 MCP 服务器的资源。
 
 ---
 
