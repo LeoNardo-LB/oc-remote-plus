@@ -463,5 +463,21 @@ fun NavGraph(
                 startInTerminalMode = params.openTerminal
             )
         }
+
+        // ============ Workspace Screen (placeholder — Task 12) ============
+        composable(
+            route = WorkspaceNav.routePattern,
+            arguments = WorkspaceNav.navArguments
+        ) {
+            androidx.compose.material3.Text("Workspace placeholder (Task 12)")
+        }
+
+        // ============ File Viewer Screen (placeholder — Task 15) ============
+        composable(
+            route = FileViewerNav.routePattern,
+            arguments = FileViewerNav.navArguments
+        ) {
+            androidx.compose.material3.Text("FileViewer placeholder (Task 15)")
+        }
     }
 }

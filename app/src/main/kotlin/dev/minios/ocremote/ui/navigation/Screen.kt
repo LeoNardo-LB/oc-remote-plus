@@ -14,4 +14,6 @@ sealed class Screen(val route: String) {
     data object ServerModelFilter : Screen("server_model_filter")
     data object Settings : Screen("settings")
     data object About : Screen("about")
+    data object Workspace : Screen("workspace")
+    data object FileViewer : Screen("file_viewer")
 }
