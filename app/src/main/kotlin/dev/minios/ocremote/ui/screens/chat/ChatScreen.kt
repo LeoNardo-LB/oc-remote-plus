@@ -453,10 +453,11 @@ fun ChatScreen(
     )
     val attachments = attachmentHandler.attachments
 
-    // Show errors as snackbar when messages are already loaded
+    // Show errors as snackbar when messages are already loaded + scroll to bottom
     LaunchedEffect(interaction.error) {
         val error = interaction.error
         if (error != null && messageState.messages.isNotEmpty()) {
+            listState.snapToBottom()
             snackbarHostState.showSnackbar(
                 message = error,
                 duration = SnackbarDuration.Short

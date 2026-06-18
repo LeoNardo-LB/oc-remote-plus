@@ -251,42 +251,39 @@ fun ChatMessageList(
                         }
                     }
 
-                    // Pending questions — declared after banners so they render
-                    // just below the newest messages (closest to the input bar).
-                    items(
-                        interaction.pendingQuestions.reversed(),
-                        key = { "question_${it.id}" }
-                    ) { question ->
-                        QuestionCard(
-                            question = question,
-                            onSubmit = { answers ->
-                                viewModel.replyToQuestion(question.id, answers)
-                                onForceScrollToBottom()
-                            },
-                            onReject = {
-                                viewModel.rejectQuestion(question.id)
-                                onForceScrollToBottom()
-                            }
-                        )
+                    // Pending questions — show one at a time (oldest first)
+                    interaction.pendingQuestions.firstOrNull()?.let { question ->
+                        item(key = "question_${question.id}") {
+                            QuestionCard(
+                                question = question,
+                                onSubmit = { answers ->
+                                    viewModel.replyToQuestion(question.id, answers)
+                                    onForceScrollToBottom()
+                                },
+                                onReject = {
+                                    viewModel.rejectQuestion(question.id)
+                                    onForceScrollToBottom()
+                                }
+                            )
+                        }
                     }
 
-                    // Pending permissions
-                    items(
-                        interaction.pendingPermissions.reversed(),
-                        key = { "perm_${it.id}" }
-                    ) { permission ->
-                        PermissionCard(
-                            permission = permission,
-                            onOnce = {
-                                viewModel.replyToPermission(permission.id, "once")
-                                onForceScrollToBottom()
-                            },
-                            onAlways = { showAlwaysDialog = permission },
-                            onReject = {
-                                viewModel.replyToPermission(permission.id, "reject")
-                                onForceScrollToBottom()
-                            }
-                        )
+                    // Pending permissions — show one at a time (oldest first)
+                    interaction.pendingPermissions.firstOrNull()?.let { permission ->
+                        item(key = "perm_${permission.id}") {
+                            PermissionCard(
+                                permission = permission,
+                                onOnce = {
+                                    viewModel.replyToPermission(permission.id, "once")
+                                    onForceScrollToBottom()
+                                },
+                                onAlways = { showAlwaysDialog = permission },
+                                onReject = {
+                                    viewModel.replyToPermission(permission.id, "reject")
+                                    onForceScrollToBottom()
+                                }
+                            )
+                        }
                     }
 
                     // Chat messages: displayItems is already newest-first (descending).
