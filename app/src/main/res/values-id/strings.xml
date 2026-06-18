@@ -267,6 +267,10 @@
     <string name="notification_response_ready">Respons siap</string>
     <string name="notification_new_session">Sesi baru</string>
     <string name="notification_new_message">Pesan baru</string>
+    <string name="notification_tag_ready">Siap</string>
+    <string name="notification_tag_permission">Izin</string>
+    <string name="notification_tag_question">Pertanyaan</string>
+    <string name="notification_tag_error">Error</string>
     <string name="notification_needs_permission_project">%1$s di %2$s membutuhkan izin</string>
     <string name="notification_needs_permission">%1$s membutuhkan izin</string>
     <string name="notification_permission_required">Izin diperlukan</string>

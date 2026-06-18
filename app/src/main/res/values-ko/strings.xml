@@ -291,6 +291,10 @@
     <string name="notification_response_ready">응답 준비됨</string>
     <string name="notification_new_session">새 세션</string>
     <string name="notification_new_message">새 메시지</string>
+    <string name="notification_tag_ready">준비</string>
+    <string name="notification_tag_permission">권한</string>
+    <string name="notification_tag_question">질문</string>
+    <string name="notification_tag_error">오류</string>
     <string name="notification_needs_permission_project">%2$s의 %1$s이(가) 권한 필요</string>
     <string name="notification_needs_permission">%1$s이(가) 권한 필요</string>
     <string name="notification_has_question_project">%2$s의 %1$s이(가) 질문함</string>

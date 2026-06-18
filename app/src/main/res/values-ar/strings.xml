@@ -291,6 +291,10 @@
     <string name="notification_response_ready">الرد جاهز</string>
     <string name="notification_new_session">جلسة جديدة</string>
     <string name="notification_new_message">رسالة جديدة</string>
+    <string name="notification_tag_ready">جاهز</string>
+    <string name="notification_tag_permission">إذن</string>
+    <string name="notification_tag_question">سؤال</string>
+    <string name="notification_tag_error">خطأ</string>
     <string name="notification_needs_permission_project">%1$s في %2$s يحتاج إذنًا</string>
     <string name="notification_needs_permission">%1$s يحتاج إذنًا</string>
     <string name="notification_has_question_project">%1$s في %2$s لديه سؤال</string>

@@ -291,6 +291,10 @@
     <string name="notification_response_ready">応答準備完了</string>
     <string name="notification_new_session">新規セッション</string>
     <string name="notification_new_message">新しいメッセージ</string>
+    <string name="notification_tag_ready">準備完了</string>
+    <string name="notification_tag_permission">権限</string>
+    <string name="notification_tag_question">質問</string>
+    <string name="notification_tag_error">エラー</string>
     <string name="notification_needs_permission_project">%2$sの%1$sが権限を必要としています</string>
     <string name="notification_needs_permission">%1$sが権限を必要としています</string>
     <string name="notification_has_question_project">%2$sの%1$sが質問しています</string>

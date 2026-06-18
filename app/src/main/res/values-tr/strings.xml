@@ -291,6 +291,10 @@
     <string name="notification_response_ready">Cevap hazır</string>
     <string name="notification_new_session">Yeni oturum</string>
     <string name="notification_new_message">Yeni mesaj</string>
+    <string name="notification_tag_ready">Hazır</string>
+    <string name="notification_tag_permission">İzin</string>
+    <string name="notification_tag_question">Soru</string>
+    <string name="notification_tag_error">Hata</string>
     <string name="notification_needs_permission_project">%2$s içinde %1$s izin istiyor</string>
     <string name="notification_needs_permission">%1$s izin istiyor</string>
     <string name="notification_has_question_project">%2$s içinde %1$s soru sordu</string>

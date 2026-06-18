@@ -291,6 +291,10 @@
     <string name="notification_response_ready">Resposta pronta</string>
     <string name="notification_new_session">Nova sessão</string>
     <string name="notification_new_message">Nova mensagem</string>
+    <string name="notification_tag_ready">Pronto</string>
+    <string name="notification_tag_permission">Permissão</string>
+    <string name="notification_tag_question">Pergunta</string>
+    <string name="notification_tag_error">Erro</string>
     <string name="notification_needs_permission_project">%1$s em %2$s precisa de permissão</string>
     <string name="notification_needs_permission">%1$s precisa de permissão</string>
     <string name="notification_has_question_project">%1$s em %2$s tem uma pergunta</string>

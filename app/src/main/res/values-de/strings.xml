@@ -291,6 +291,10 @@
     <string name="notification_response_ready">Antwort bereit</string>
     <string name="notification_new_session">Neue Sitzung</string>
     <string name="notification_new_message">Neue Nachricht</string>
+    <string name="notification_tag_ready">Bereit</string>
+    <string name="notification_tag_permission">Berechtigung</string>
+    <string name="notification_tag_question">Permiso</string>
+    <string name="notification_tag_error">Fehler</string>
     <string name="notification_needs_permission_project">%1$s in %2$s benötigt Berechtigung</string>
     <string name="notification_needs_permission">%1$s benötigt Berechtigung</string>
     <string name="notification_has_question_project">%1$s in %2$s hat eine Frage</string>
