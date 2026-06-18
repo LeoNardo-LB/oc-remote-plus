@@ -1171,6 +1171,12 @@ http://{host}:{port}
 **数据来源**：`Session.Service.list()` → 数据库查询。  
 **注意**：`roots` 参数使用自定义 `QueryBoolean`（接受 `"true"`/`"false"` 字符串），而非原生 boolean。
 
+**错误码**：400（参数校验失败，如 `limit`/`start` 非数字、`scope` 非 `"project"`）；认证缺失 → 401。
+
+**字段说明**：`Session.Info[]` 按 `time.updated` 倒序。关键字段：`id`（`ses_` 前缀）、`parentID`（fork 关系，根会话为 `undefined`）、`time.archived`（归档时间戳，未归档则无）、`share.url`（已分享时有值）。完整 JSON 示例见 [§ Session](#session)。
+
+**建议用法**：列表页用 `limit` + `search` 过滤；构建 fork 树时按 `parentID` 组装父子关系；归档过滤看 `time.archived` 是否存在。
+
 ---
 
 ---
@@ -1186,6 +1192,12 @@ http://{host}:{port}
 **数据来源**：`SessionStatus.Service.list()` → 内存中的 `InstanceState`（Map）。  
 **原理**：状态不持久化，纯内存维护。idle 状态的会话不会出现在 map 中（handler 用 `Object.fromEntries` 转换，缺失的会话默认为 idle）。
 
+**错误码**：400（参数校验）；认证缺失 → 401。
+
+**字段说明**：`Record<sessionID, SessionStatus.Info>`，`type` 三种判别：`idle`/`busy`（无额外字段）、`retry`（含 `attempt`、`next` 时间戳、`action.{reason,provider,title,message,link?}`）。响应中**缺失的 sessionID 视为 idle**。
+
+**建议用法**：UI 状态指示器轮询此端点（建议 1-2s 间隔）；`busy` 时禁用发送按钮；`retry` 时显示倒计时（`next - now`）与 `action.reason`；不要假定响应包含所有会话。
+
 ---
 
 ---
@@ -1200,6 +1212,10 @@ http://{host}:{port}
 **数据来源**：`Session.Service.get(sessionID)` → 数据库。  
 **原理**：handler 通过 `mapStorageNotFound` 将底层 `NotFoundError` 映射为 `ApiNotFoundError`（404）。
 
+**字段说明**：单个 `Session.Info`。注意 `revert` 字段仅在此会话处于回滚状态时存在（`{ messageID, partID?, snapshot?, diff? }`）；`summary` 字段含累计 add/delete 行数与文件列表。
+
+**建议用法**：进入会话详情页时获取；若 `revert` 有值，UI 应提示"当前处于回滚状态"并提供 unrevert 入口；`time.archived` 有值时显示归档标识。
+
 ---
 
 ---
@@ -1209,9 +1225,14 @@ http://{host}:{port}
 **用途**：获取从指定会话 fork 出来的所有子会话。
 
 **Path 参数**：`sessionID`  
+**Query 参数**：`WorkspaceRoutingQuery`（公共参数）  
 **返回**：`Session.Info[]`  
 **错误**：400、404（父会话不存在）  
 **注意**：先 `requireSession` 验证父会话存在，再调用 `session.children()`。
+
+**字段说明**：返回的每个 `Session.Info` 其 `parentID` 等于当前 sessionID。
+
+**建议用法**：渲染 fork 历史树；显示"分叉自 #N 条消息"；与 `GET /session/{id}` 配合还原完整 fork 链。
 
 ---
 
@@ -1219,9 +1240,17 @@ http://{host}:{port}
 
 ### GET `/session/{sessionID}/todo`
 
+**用途**：获取 AI 在会话中维护的 Todo 任务清单（由 AI 通过工具调用增删改）。
+
 **Path 参数**：`sessionID`  
+**Query 参数**：`WorkspaceRoutingQuery`  
 **返回**：`Todo.Info[]`  
+**错误**：400（参数校验）、404（会话不存在）  
 **数据来源**：`Todo.Service.get()` → 数据库 `TodoTable` 查询（drizzle ORM）。
+
+**字段说明**：每个 `Todo.Info` 含 `content`（任务描述）、`status`（`pending`/`in_progress`/`completed`/`cancelled`）、`priority`（`high`/`medium`/`low`）。
+
+**建议用法**：渲染 TodoList 卡片；用 `status` 控制勾选状态与样式；按 `priority` 排序（high > medium > low）；此端点为只读——增删改由 AI 通过工具自动维护。
 
 ---
 
@@ -1242,6 +1271,12 @@ http://{host}:{port}
 **返回**：`Snapshot.FileDiff[]`  
 **数据来源**：`SessionSummary.Service.diff()` → git diff 计算。  
 **注意**：此端点**不验证 sessionID 是否存在**（无 `requireSession` 调用），直接传给 summary 服务。
+
+**错误码**：400（参数校验）；**不返回 404**——即使 sessionID 不存在也返回空数组或当前 git diff（见上述注意）；认证缺失 → 401。
+
+**字段说明**：每个 `Snapshot.FileDiff` 含 `file`（相对路径）、`patch`（unified diff 文本）、`additions`/`deletions`（行数）、`status`（`added`/`deleted`/`modified`）。`file`/`patch` 可能为 `null`（legacy 数据）。
+
+**建议用法**：渲染 Diff 卡片；按 `status` 配色（added=绿、deleted=红、modified=黄）；总变更行数 = Σ(additions + deletions)；`messageID` 指定时返回单条消息的增量 diff，不指定则返回整个会话的累计 diff。
 
 ---
 
@@ -1273,6 +1308,12 @@ http://{host}:{port}
 
 **数据来源**：`SessionShare.Service.create()`（注意：是 share 服务，非直接 Session.create）。
 
+**错误码**：400（请求体非 JSON、Schema 解码失败，见上述 Raw handler 行为）；认证缺失 → 401。
+
+**字段说明**：返回新建的 `Session.Info`。`id` 服务端生成（`ses_` 前缀）；`time.created`/`time.updated` 为当前时间戳；`version` 为当前 opencode 版本；`slug` 由标题自动派生。
+
+**建议用法**：开新会话时调用——空 body 即创建默认会话；指定 `parentID` 配合 fork 流程；通过 `metadata` 存储自定义业务字段（如来源、标签）；指定 `agent`/`model` 覆盖用户默认配置。
+
 ---
 
 ---
@@ -1291,9 +1332,17 @@ http://{host}:{port}
 
 ### DELETE `/session/{sessionID}`
 
+**用途**：永久删除会话及其所有关联数据（消息、历史、Todo、快照）。
+
+**Path 参数**：`sessionID`（必填）  
+**Query 参数**：`WorkspaceRoutingQuery`  
 **返回**：`boolean`（true）  
 **行为**：永久删除会话及所有关联数据（消息、历史）。  
 **注意**：不检查会话是否忙碌。
+
+**错误码**：400（参数校验）；404（会话不存在）；**不返回 409**——不检查忙碌状态（见上述注意）；认证缺失 → 401。
+
+**建议用法**：UI 删除按钮二次确认后调用；删除后从本地缓存清理该 sessionID；删除处于 `busy` 状态的会话前建议先 `abort`（非强制，但避免遗留内存状态）。
 
 ---
 
@@ -1317,6 +1366,10 @@ http://{host}:{port}
 - `permission`：调用 `Permission.merge(current.permission ?? [], newPermission)` —— **合并而非替换**！这是隐藏行为，客户端如果期望替换会踩坑
 - 执行顺序：title → metadata → permission → archived，最后重新查询返回
 
+**错误码**：400（参数校验、请求体非法）；404（会话不存在）；认证缺失 → 401。
+
+**建议用法**：归档/取消归档传 `time.archived: Date.now()` / `null`；**修改权限时务必先 GET 当前权限再合并提交**（permission 是合并语义）；改 title/metadata 可直接覆盖；触发条件：用户改标题、归档会话、调整工具权限。
+
 ---
 
 ---
@@ -1335,6 +1388,12 @@ http://{host}:{port}
 **行为**：Raw handler（`forkRaw`），空 body 等同不传 messageID。  
 **标题规则**：fork 出的会话标题为 `原标题 (fork #N)`，N 递增。
 
+**错误码**：400（请求体非法）；404（源会话不存在）；认证缺失 → 401。
+
+**字段说明**：新会话 `Session.Info` 的 `parentID` 指向源 sessionID；`time.created` 为 fork 时刻；消息历史从源会话复制到 `messageID`（含）为止。
+
+**建议用法**：用户在某条消息处"分叉探索新方向"时调用；fork 后跳转到新 sessionID；fork 不修改源会话，源会话仍可继续；构建 fork 树时通过 `parentID` 关联。
+
 ---
 
 ---
@@ -1342,10 +1401,14 @@ http://{host}:{port}
 ### POST `/session/{sessionID}/abort`
 
 **用途**：中止正在进行的 AI 处理。  
-**请求**: Path `sessionID`（必填）· Body 无
+**请求**: Path `sessionID`（必填）· Body 无  
 **返回**：`boolean`（true）  
 **实现**：`promptSvc.cancel(sessionID)`。  
 **注意**：不检查会话是否存在，直接调用 cancel（cancel 可能是幂等的）。
+
+**错误码**：400（参数校验）；**不返回 404**——不检查会话存在；**不返回 409**——cancel 是幂等操作，对 idle 会话调用也返回 `true`。
+
+**建议用法**：用户点"停止"按钮时调用；调用后通过 SSE 监听 `session.status` 确认状态变为 `idle`；可安全重复调用（幂等）；即使会话已完成，调用也无副作用。
 
 ---
 
@@ -1366,16 +1429,25 @@ http://{host}:{port}
 **返回**：`boolean`（true）  
 **原理**：内部调用 `promptSvc.command()`，command 为 `Command.Default.INIT`（值为 `"init"`），使用 `initialize.txt` 模板。任何错误映射为 400。
 
+**错误码**：400（参数缺失、provider/model 无效、会话不存在时也映射为 400 而非 404——见上述原理）；认证缺失 → 401。
+
+**建议用法**：UI"初始化 AGENTS.md"按钮触发；调用前需让用户选好 `providerID`/`modelID`；调用后通过 SSE 监听 `message.part.updated` 等待 AI 生成完成；生成的 AGENTS.md 文件会写入会话工作目录。
+
 ---
 
 ---
 
 ### POST `/session/{sessionID}/share`
 
-**请求**: Path `sessionID`（必填）· Body 无
+**用途**：生成分享链接，将会话发布到 opencode 分享服务（公开可访问）。  
+**请求**: Path `sessionID`（必填）· Body 无  
 **返回**：`Session.Info`（含 `share.url`）  
 **错误**：500（`InternalServerError`）、404  
 **原理**：`SessionShare.Service.share()`，失败映射为 **500**（非 400），注释说明这是因为 share 失败可能是存储/网络问题。
+
+**字段说明**：返回更新后的 `Session.Info`，新增 `share.url` 字段（公开访问 URL）。
+
+**建议用法**：用户点"分享"按钮调用；成功后将 `share.url` 复制到剪贴板并展示；失败时区分 500（服务端存储/网络问题，建议重试）与 404（会话不存在）。
 
 ---
 
@@ -1383,9 +1455,14 @@ http://{host}:{port}
 
 ### DELETE `/session/{sessionID}/share`
 
+**用途**：取消分享，撤回公开访问链接。  
 **返回**：`Session.Info`  
 **错误**：500、404  
 **原理**：`SessionShare.Service.unshare()`，同样映射为 500。
+
+**字段说明**：返回更新后的 `Session.Info`，`share` 字段被清除（变为 `undefined`）。
+
+**建议用法**：用户点"取消分享"按钮调用；调用后从 UI 移除分享链接；幂等——对未分享的会话调用也返回 200；外部已缓存的 URL 可能在一段时间内仍可访问（取决于分享服务 TTL）。
 
 ---
 
@@ -1412,6 +1489,10 @@ http://{host}:{port}
 5. `promptSvc.loop()` 执行压缩循环
 6. 阻塞直到完成
 
+**错误码**：400（参数缺失、provider/model 不存在）；404（会话不存在）；**注意阻塞调用**——长会话可能触发客户端超时（504 由代理层返回，非服务端主动）。
+
+**建议用法**：会话上下文接近 token 上限时手动触发；`auto: true` 用于服务端自动压缩流程（客户端通常传 `false`）；调用期间 UI 显示 loading；完成后通过 SSE 接收 `session.compaction` 事件感知压缩结果。
+
 ---
 
 ---
@@ -1435,12 +1516,21 @@ http://{host}:{port}
 **返回**：`SessionV1.WithParts`  
 **注意**：`model` 是字符串格式（`"provider/model"`），与 PromptInput 的 `{ providerID, modelID }` 对象格式不同！
 
+**错误码**：400（参数校验、未知 `command` 值）；404（会话不存在）；409（会话忙碌，与 prompt 不同——command 会检查 busy 状态）；认证缺失 → 401。
+
+**字段说明**：返回 `SessionV1.WithParts`（含 user 消息和 AI 响应消息）；`command` 字段值如 `"init"`（初始化 AGENTS.md）、`"review"`（代码审查），具体可用值取决于服务端配置。
+
+**建议用法**：实现"自定义斜杠命令"菜单时调用；**注意 `model` 用 `"providerID/modelID"` 字符串格式**（与 prompt 的对象格式不同，易踩坑）；`arguments` 是必填的命令参数字符串；调用后建议监听 SSE 获取实时进度。
+
 ---
 
 ---
 
 ### POST `/session/{sessionID}/shell`
 
+**用途**：在 AI 上下文中执行 shell 命令（AI 解析命令输出并响应），等同于用户输入 `/sh <cmd>`。
+
+**Path 参数**：`sessionID`（必填）  
 **请求体**（`ShellPayload` = `SessionPrompt.ShellInput` 去除 `sessionID`）：
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1452,6 +1542,8 @@ http://{host}:{port}
 
 **返回**：`SessionV1.WithParts`  
 **错误**：400、404、**409（`SessionBusyError`）** —— shell 会检查会话是否忙碌。
+
+**建议用法**：用户输入 `/sh <cmd>` 时调用；调用前检查会话状态（busy 时返回 409，需先等待或 abort）；**`agent` 字段必填**——与 prompt 的可选 agent 不同；执行结果通过 AI 解析后返回，非原始 stdout。
 
 ---
 
@@ -1471,6 +1563,10 @@ http://{host}:{port}
 **返回**：`Session.Info`  
 **错误**：400、404、**409（忙碌）**
 
+**字段说明**：返回更新后的 `Session.Info`，`revert` 字段被填充：`{ messageID, partID?, snapshot?, diff? }`，记录回滚点信息。
+
+**建议用法**：用户右键某条消息选"回滚到此"时调用；调用后 UI 标记 `messageID` 之后的消息为灰色（已回滚）；可通过 `unrevert` 恢复；**回滚会实际撤销文件变更**（git 层面），非仅视觉隐藏；若指定 `partID` 则精确到 part 级别回滚。
+
 ---
 
 ---
@@ -1481,6 +1577,10 @@ http://{host}:{port}
 **无请求体**  
 **返回**：`Session.Info`  
 **错误**：400、404、**409（忙碌）**
+
+**字段说明**：返回更新后的 `Session.Info`，`revert` 字段被清除（变为 `undefined`）。
+
+**建议用法**：用户点"撤销回滚"按钮时调用；前提是会话当前有 revert 状态（可通过 `GET /session/{id}` 检查 `revert` 字段是否存在）；unrevert 后**文件变更恢复**（git 层面）；UI 应同步取消灰色标记。
 
 ---
 
@@ -1525,16 +1625,29 @@ http://{host}:{port}
 **游标格式**：`base64url(JSON.stringify({ id: MessageID, time: number }))`  
 **排序逻辑**：`older(cursor)` = `time < cursor.time OR (time == cursor.time AND id < cursor.id)`
 
+**错误码**：400（`before` 无 `limit`、`before` 解码失败）；404（sessionID 不存在）；认证缺失 → 401。
+
+**字段说明**：返回 `SessionV1.WithParts[]`，每个元素 `{ info, parts }`。`info.role` 为 `"user"` 或 `"assistant"`；按时间正序排列；assistant 消息的 `info.error` 可能含 7 种错误类型之一。
+
+**建议用法**：首次加载不传 `limit` 获取全部消息；分页加载用 `limit=50` + 上次响应的 `X-Next-Cursor` 作为下次请求的 `before`；**必须解析 `Link`/`X-Next-Cursor` 响应头**而非 body 字段判断是否有更多数据；旧消息在前，新消息在后。
+
 ---
 
 ---
 
 ### GET `/session/{sessionID}/message/{messageID}`
 
+**用途**：获取单条消息（含所有 part）。
+
 **Path 参数**：`sessionID`、`messageID`  
+**Query 参数**：`WorkspaceRoutingQuery`  
 **返回**：`SessionV1.WithParts`  
 **错误**：400、404（消息或会话不存在）  
 **数据来源**：`MessageV2.get()` → 数据库，WHERE `id = messageID AND session_id = sessionID`。
+
+**字段说明**：单个 `SessionV1.WithParts`。若消息是 assistant 类型，`info.error` 可能含 7 种错误类型之一（`abort`/`length`/`content_filter`/`context`/`price`/`network`/`unknown`）；`info.tokens`/`info.cost` 仅 assistant 消息有。
+
+**建议用法**：从消息列表跳转到详情页时调用；调试失败消息时检查 `info.error` 字段定位失败原因；消息已删除时返回 404。
 
 ---
 
@@ -1576,6 +1689,12 @@ http://{host}:{port}
 - 真正的实时流式响应通过 **SSE 事件**（`session.*` / `message.*` 事件）实现
 - 任何 prompt 错误映射为 **400 BadRequest**
 
+**错误码**：400（参数校验、prompt 内部错误）；404（会话不存在，`requireSession` 失败）；认证缺失 → 401。
+
+**字段说明**：返回最终的 `SessionV1.WithParts`（**单次 JSON 输出**，非流式）。
+
+**建议用法**：**需要实时反馈的场景改用 `POST /prompt_async` + SSE**（见关键行为第 5 条）；本端点适合"发送后等待完整结果"的批处理场景；长任务可能触发客户端超时——超时后 AI 仍在服务端继续执行，需通过 SSE 或 `GET /session/{id}/message` 拉取最终结果。
+
 ---
 
 ---
@@ -1595,6 +1714,10 @@ http://{host}:{port}
   - **HTTP 响应始终是 204**，即使后台任务最终失败
 - 客户端必须通过 SSE 监听 `session.error` 事件来感知异步失败
 
+**错误码**：400（参数校验、会话不存在）；**HTTP 层始终返回 204**——业务错误通过 `session.error` SSE 事件通知（见上述关键行为）。
+
+**建议用法**：**推荐用法**——立即返回 204 后通过 SSE 监听 `message.part.updated`、`session.status`、`tool.*` 等事件实时渲染 UI；**必须监听 `session.error` 捕获异步失败**（不监听则完全无感知）；适合所有需要实时反馈的聊天场景。
+
 ---
 
 ---
@@ -1603,10 +1726,13 @@ http://{host}:{port}
 
 **用途**：永久删除消息及其所有 part，**不撤销文件变更**。
 
+**Path 参数**：`sessionID`、`messageID`（均必填）  
 **返回**：`boolean`  
 **错误**：400、404、**409（忙碌）**  
 **原理**：先 `requireSession`，再 `runState.assertNotBusy`（忙碌 → 409），再 `session.removeMessage()`。  
 **与 revert 的区别**：deleteMessage 不回滚文件，revert 会回滚。
+
+**建议用法**：用户删除单条消息时调用；**不回滚文件变更**——若需撤销文件改动用 `POST /session/{id}/revert`；忙碌会话返回 409，需先 `abort` 或等待 idle；删除后消息从列表消失，但 AI 已写入的文件改动保留。
 
 ---
 
@@ -1614,9 +1740,14 @@ http://{host}:{port}
 
 ### DELETE `/session/{sessionID}/message/{messageID}/part/{partID}`
 
+**用途**：删除消息中的单个 Part（如某段文本、工具调用结果、文件附件）。
+
+**Path 参数**：`sessionID`、`messageID`、`partID`（均必填）  
 **返回**：`boolean`  
 **错误**：400、404  
 **注意**：**不检查忙碌状态**（与 deleteMessage 不同）。
+
+**建议用法**：用户编辑已发送消息时删除某个 part；**比 deleteMessage 宽松**——不检查 busy 状态，可在 AI 处理中调用；删除后消息剩余 parts 仍可正常渲染；适合"消息编辑"高级功能。
 
 ---
 
@@ -1624,6 +1755,9 @@ http://{host}:{port}
 
 ### PATCH `/session/{sessionID}/message/{messageID}/part/{partID}`
 
+**用途**：更新消息中的单个 Part（如编辑文本内容、修改工具调用元数据）。
+
+**Path 参数**：`sessionID`、`messageID`、`partID`（均必填）  
 **请求体**：`SessionV1.Part`（完整的 Part 对象）  
 **返回**：`SessionV1.Part`
 
@@ -1631,6 +1765,10 @@ http://{host}:{port}
 - `payload.id === params.partID`
 - `payload.messageID === params.messageID`
 - `payload.sessionID === params.sessionID`
+
+**错误码**：400（ID 不一致、Part schema 校验失败）；404（消息或 part 不存在）；认证缺失 → 401。
+
+**建议用法**：用户编辑已发送消息文本时调用；**body 中的 `id`/`messageID`/`sessionID` 必须与 path 参数一致**，否则返回 400；典型流程：先 `GET /message/{id}` 拿到 part → 修改 `text` 字段 → PATCH 整体回写；仅修改 `text`/`metadata` 等可变字段，`type` 不应改变。
 
 ---
 
