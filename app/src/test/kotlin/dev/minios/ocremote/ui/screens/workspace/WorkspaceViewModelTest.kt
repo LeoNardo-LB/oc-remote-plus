@@ -1,0 +1,287 @@
+package dev.minios.ocremote.ui.screens.workspace
+
+import androidx.lifecycle.SavedStateHandle
+import dev.minios.ocremote.domain.model.FileNode
+import dev.minios.ocremote.domain.model.FileType
+import dev.minios.ocremote.domain.model.VcsChange
+import dev.minios.ocremote.domain.model.VcsStatus
+import dev.minios.ocremote.domain.usecase.GetVcsStatusUseCase
+import dev.minios.ocremote.domain.usecase.ListDirectoryUseCase
+import dev.minios.ocremote.ui.navigation.routes.ServerRouteParams
+import dev.minios.ocremote.ui.navigation.routes.WorkspaceNav
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import java.net.URLEncoder
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class WorkspaceViewModelTest {
+
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val listDirectory = mockk<ListDirectoryUseCase>()
+    private val getVcsStatus = mockk<GetVcsStatusUseCase>()
+
+    private val serverId = "srv-abc123"
+    private val directory = "/home/user/project"
+    private val encodedDirectory = URLEncoder.encode(directory, "UTF-8")
+
+    private fun savedStateHandle(id: String = serverId, dir: String = encodedDirectory) =
+        SavedStateHandle(
+            mapOf(
+                ServerRouteParams.PARAM_SERVER_ID to id,
+                WorkspaceNav.PARAM_DIRECTORY to dir
+            )
+        )
+
+    // --- Realistic test data (D7-003) ---
+
+    private val sampleFileNodes = listOf(
+        FileNode("src", "src", "/home/user/project/src", FileType.DIRECTORY, false),
+        FileNode("build.gradle.kts", "build.gradle.kts", "/home/user/project/build.gradle.kts", FileType.FILE, false),
+        FileNode("settings.gradle.kts", "settings.gradle.kts", "/home/user/project/settings.gradle.kts", FileType.FILE, false),
+        FileNode("OpenCodeApi.kt", "OpenCodeApi.kt", "/home/user/project/OpenCodeApi.kt", FileType.FILE, false),
+        FileNode("README.md", "README.md", "/home/user/project/README.md", FileType.FILE, false),
+        FileNode(".gitignore", ".gitignore", "/home/user/project/.gitignore", FileType.FILE, true)
+    )
+
+    private val sampleGitChanges = listOf(
+        VcsChange("src/main/kotlin/MainActivity.kt", 24, 3, VcsStatus.MODIFIED),
+        VcsChange("build.gradle.kts", 5, 1, VcsStatus.MODIFIED),
+        VcsChange("docs/api-reference.md", 42, 0, VcsStatus.ADDED),
+        VcsChange("legacy/DeprecatedUtils.kt", 0, 88, VcsStatus.DELETED)
+    )
+
+    @Before
+    fun setup() {
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    // ===== Test 1: init triggers root load + git prefetch =====
+    @Test
+    fun `init triggers root load + git prefetch`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        coVerify { listDirectory(serverId, directory, "") }
+        coVerify { getVcsStatus(serverId, directory) }
+    }
+
+    // ===== Test 2: loadDirectory success =====
+    @Test
+    fun `loadDirectory success`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        val state = vm.uiState.value
+        assert(!state.rootLoading) { "rootLoading should be false after success" }
+        assert(state.rootError == null) { "rootError should be null on success" }
+        assert(state.rootNodes.isNotEmpty()) { "rootNodes should be populated" }
+        // Directories first, then files sorted by name lowercase
+        val names = state.rootNodes.map { it.node.name }
+        assert(names.first() == "src") { "First node should be directory 'src', was '${names.first()}'" }
+    }
+
+    // ===== Test 3: loadDirectory cache hit =====
+    @Test
+    fun `loadDirectory cache hit same path twice equals one API call`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        vm.loadDirectory("") // second call — should hit cache
+
+        coVerify(exactly = 1) { listDirectory(serverId, directory, "") }
+    }
+
+    // ===== Test 4: loadDirectory failure sets rootError =====
+    @Test
+    fun `loadDirectory failure sets rootError`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.failure(
+            RuntimeException("Connection refused: port 4096")
+        )
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        val state = vm.uiState.value
+        assert(!state.rootLoading) { "rootLoading should be false after failure" }
+        assert(state.rootError == "Connection refused: port 4096") {
+            "rootError should be 'Connection refused: port 4096', was '${state.rootError}'"
+        }
+    }
+
+    // ===== Test 5: refreshRoot clears cache + reloads =====
+    @Test
+    fun `refreshRoot clears cache and reloads`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        vm.refreshRoot()
+
+        // init + refresh = 2 calls
+        coVerify(exactly = 2) { listDirectory(serverId, directory, "") }
+    }
+
+    // ===== Test 6: switchPanel GIT triggers getStatus if not loaded =====
+    @Test
+    fun `switchPanel GIT triggers getStatus if not loaded`() = runTest {
+        // Prefetch succeeded but gitChanges list is empty (prefetch only sets count)
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(emptyList())
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        // prefetch sets gitChangeCount = 0, but switchPanel checks gitChanges.isEmpty()
+        vm.switchPanel(WorkspacePanel.GIT_CHANGES)
+
+        // init prefetch + switchPanel loadGitChanges = 2 calls
+        coVerify(exactly = 2) { getVcsStatus(serverId, directory) }
+    }
+
+    // ===== Test 7: switchPanel GIT non-git sets isNonGit =====
+    @Test
+    fun `switchPanel GIT non-git sets isNonGit`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        // Prefetch fails with non-git message
+        coEvery { getVcsStatus(serverId, directory) } returns Result.failure(
+            RuntimeException("fatal: not a git repository (or any parent): .git")
+        )
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        // switchPanel triggers loadGitChanges since gitChanges is empty and not loading
+        vm.switchPanel(WorkspacePanel.GIT_CHANGES)
+
+        val state = vm.uiState.value
+        assert(state.isNonGit) { "isNonGit should be true for 'not a git' error" }
+    }
+
+    // ===== Test 8: switchPanel FILE_TREE no reload =====
+    @Test
+    fun `switchPanel FILE_TREE no reload`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        // Switch to GIT then back to FILE_TREE
+        vm.switchPanel(WorkspacePanel.GIT_CHANGES)
+        vm.switchPanel(WorkspacePanel.FILE_TREE)
+
+        // listDirectory should still be called only once (init call)
+        coVerify(exactly = 1) { listDirectory(serverId, directory, "") }
+    }
+
+    // ===== Test 9: toggleShowIgnored =====
+    @Test
+    fun `toggleShowIgnored`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        assert(!vm.uiState.value.showIgnored) { "showIgnored should default to false" }
+
+        vm.toggleShowIgnored()
+        assert(vm.uiState.value.showIgnored) { "showIgnored should be true after toggle" }
+
+        vm.toggleShowIgnored()
+        assert(!vm.uiState.value.showIgnored) { "showIgnored should be false after second toggle" }
+    }
+
+    // ===== Test 10: git prefetch failure leaves count null =====
+    @Test
+    fun `git prefetch failure leaves count null`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.failure(
+            RuntimeException("Timeout after 30s")
+        )
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        val state = vm.uiState.value
+        assert(state.gitChangeCount == null) {
+            "gitChangeCount should be null when prefetch fails, was ${state.gitChangeCount}"
+        }
+    }
+
+    // ===== Test 11: loadDirectory during refreshRoot cancels stale =====
+    @Test
+    fun `loadDirectory during refreshRoot cancels stale`() = runTest {
+        var callCount = 0
+        coEvery { listDirectory(serverId, directory, "src") } coAnswers {
+            callCount++
+            Result.success(sampleFileNodes)
+        }
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        // Start loading a subdirectory
+        vm.loadDirectory("src")
+        // Then call refreshRoot which cancels all jobs + clears cache
+        vm.refreshRoot()
+
+        // loadDirectory("src") was called once before refresh, then cache cleared
+        // After refreshRoot, loadDirectory("") fires but "src" is not re-loaded
+        // So listDirectory for "src" should be called exactly 1 time
+        coVerify(exactly = 1) { listDirectory(serverId, directory, "src") }
+    }
+
+    // ===== Test 12: rapid duplicate loadDirectory debounced =====
+    @Test
+    fun `rapid duplicate loadDirectory debounced`() = runTest {
+        var callCount = 0
+        coEvery { listDirectory(serverId, directory, "src") } coAnswers {
+            callCount++
+            Result.success(sampleFileNodes)
+        }
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+
+        // Rapid duplicate calls — second cancels first, only one completes
+        vm.loadDirectory("src")
+        vm.loadDirectory("src")
+
+        coVerify(exactly = 1) { listDirectory(serverId, directory, "src") }
+    }
+
+    // ===== Test 13: blank serverId sets rootError without calling useCase =====
+    @Test
+    fun `blank serverId sets rootError without calling useCase`() = runTest {
+        val vm = WorkspaceViewModel(savedStateHandle(id = ""), listDirectory, getVcsStatus)
+
+        val state = vm.uiState.value
+        assert(state.rootError == "服务器配置缺失") {
+            "rootError should be '服务器配置缺失', was '${state.rootError}'"
+        }
+        assert(!state.rootLoading) { "rootLoading should be false" }
+
+        coVerify(exactly = 0) { listDirectory(any(), any(), any()) }
+        coVerify(exactly = 0) { getVcsStatus(any(), any()) }
+    }
+}
