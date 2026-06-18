@@ -1,7 +1,7 @@
 # OpenCode Server API Reference
 
 > 基于 opencode 源码（`packages/opencode` + `packages/core`，2026-06 版本）深度调研验证。
-> 覆盖 **140+ HTTP/WebSocket 端点** + **89 种 SSE 事件类型**。
+> 覆盖 **129 个 HTTP/WebSocket 端点**（128 REST + 1 WebSocket）+ **89 种 SSE 事件类型**。
 > 每个描述均有源码证据；不确定的标注 `[待确认]`。
 >
 > 配套深度调研报告（按功能组）：`docs/opencode-api-deep-research/1~5-*.md`。
@@ -28,12 +28,12 @@
 - [15. 控制平面基础端点](#15-控制平面基础端点)（3 个）
 - [16. Sync 端点](#16-sync-端点)（4 个）
 - [17. Experimental 端点（实验性）](#17-experimental-端点实验性)（12 个）
-- [18. Instance / VCS / 元信息端点](#18-instance--vcs--元信息端点)（12 个）
+- [18. Instance VCS 元信息端点](#18-instance-vcs-元信息端点)（12 个）
 - [19. 跨项目控制平面端点](#19-跨项目控制平面端点)（1 个）
-- [20. File / Find 端点](#20-file--find-端点)（6 个）
+- [20. File Find 端点](#20-file-find-端点)（6 个）
 - [21. SSE 事件体系](#21-sse-事件体系)（89 种）
 - [22. 数据模型](#22-数据模型)
-- [23. Token / Context Usage](#23-token--context-usage)
+- [23. Token Context Usage](#23-token-context-usage)
 - [端点总览](#端点总览)
 
 ---
@@ -198,6 +198,7 @@ http://{host}:{port}
 
 **用途**：清理并销毁所有 OpenCode 实例，释放资源。
 
+**请求体**: 无（Path 无参数，Query 仅通用 `directory`/`workspace`）
 **返回** `200`: `boolean`（恒 `true`）。
 **认证**：**无**。
 **原理**：**同步**执行 `disposeAllInstancesAndEmitGlobalDisposed()`，阻塞直到完成（与 `PATCH /global/config` 触发的异步销毁不同，这里是显式同步调用）。
@@ -1189,7 +1190,7 @@ http://{host}:{port}
 
 ---
 
-### GET `/session/{sessionId}`
+### GET `/session/{sessionID}`
 
 **Path 参数**：`sessionID: SessionID`  
 **Query 参数**：`WorkspaceRoutingQuery`  
@@ -1203,7 +1204,7 @@ http://{host}:{port}
 
 ---
 
-### GET `/session/{sessionId}/children`
+### GET `/session/{sessionID}/children`
 
 **用途**：获取从指定会话 fork 出来的所有子会话。
 
@@ -1216,7 +1217,7 @@ http://{host}:{port}
 
 ---
 
-### GET `/session/{sessionId}/todo`
+### GET `/session/{sessionID}/todo`
 
 **Path 参数**：`sessionID`  
 **返回**：`Todo.Info[]`  
@@ -1226,7 +1227,7 @@ http://{host}:{port}
 
 ---
 
-### GET `/session/{sessionId}/diff`
+### GET `/session/{sessionID}/diff`
 
 **用途**：获取指定消息产生的文件变更。
 
@@ -1284,10 +1285,11 @@ http://{host}:{port}
 
 **响应** `200`: [`Session`](#session)
 
-> 此端点不在调研报告 1 中，保留原说明。
+> ⚠️ **`[待确认]`**：此端点不在调研报告 1 中，且 D3 外部事实核查未在源码 `groups/session.ts` 中找到对应的 `HttpApiEndpoint.post("import", ...)` 注册。保留原说明以待二次核查——可能已废弃、或在其他路由文件中注册。
+
 ---
 
-### DELETE `/session/{sessionId}`
+### DELETE `/session/{sessionID}`
 
 **返回**：`boolean`（true）  
 **行为**：永久删除会话及所有关联数据（消息、历史）。  
@@ -1297,7 +1299,7 @@ http://{host}:{port}
 
 ---
 
-### PATCH `/session/{sessionId}`
+### PATCH `/session/{sessionID}`
 
 **请求体**（`UpdatePayload`，所有字段可选）：
 
@@ -1319,7 +1321,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/fork`
+### POST `/session/{sessionID}/fork`
 
 **用途**：在指定消息处分叉出新会话。
 
@@ -1337,9 +1339,10 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/abort`
+### POST `/session/{sessionID}/abort`
 
 **用途**：中止正在进行的 AI 处理。  
+**请求**: Path `sessionID`（必填）· Body 无
 **返回**：`boolean`（true）  
 **实现**：`promptSvc.cancel(sessionID)`。  
 **注意**：不检查会话是否存在，直接调用 cancel（cancel 可能是幂等的）。
@@ -1348,7 +1351,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/init`
+### POST `/session/{sessionID}/init`
 
 **用途**：分析当前应用并创建 AGENTS.md 文件。
 
@@ -1367,8 +1370,9 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/share`
+### POST `/session/{sessionID}/share`
 
+**请求**: Path `sessionID`（必填）· Body 无
 **返回**：`Session.Info`（含 `share.url`）  
 **错误**：500（`InternalServerError`）、404  
 **原理**：`SessionShare.Service.share()`，失败映射为 **500**（非 400），注释说明这是因为 share 失败可能是存储/网络问题。
@@ -1377,7 +1381,7 @@ http://{host}:{port}
 
 ---
 
-### DELETE `/session/{sessionId}/share`
+### DELETE `/session/{sessionID}/share`
 
 **返回**：`Session.Info`  
 **错误**：500、404  
@@ -1387,7 +1391,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/summarize`
+### POST `/session/{sessionID}/summarize`
 
 **用途**：使用 AI 压缩保留关键信息，生成简洁摘要。
 
@@ -1412,7 +1416,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/command`
+### POST `/session/{sessionID}/command`
 
 **用途**：发送预定义命令（如 init/review）给 AI。
 
@@ -1435,7 +1439,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/shell`
+### POST `/session/{sessionID}/shell`
 
 **请求体**（`ShellPayload` = `SessionPrompt.ShellInput` 去除 `sessionID`）：
 
@@ -1453,7 +1457,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/revert`
+### POST `/session/{sessionID}/revert`
 
 **用途**：回滚指定消息，**撤销文件变更**并恢复先前状态。
 
@@ -1471,7 +1475,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/unrevert`
+### POST `/session/{sessionID}/unrevert`
 
 **用途**：恢复所有之前被回滚的消息。  
 **无请求体**  
@@ -1488,7 +1492,7 @@ http://{host}:{port}
 > 涵盖消息列表/详情/删除/发送（同步+异步）/Part 操作。详细分析见 [调研报告 1](opencode-api-deep-research/1-session-message.md)。
 > 共 7 个端点（全部来自调研报告 1）。
 
-### GET `/session/{sessionId}/message`
+### GET `/session/{sessionID}/message`
 
 **用途**：获取会话中的所有消息（含 user 和 assistant）。
 
@@ -1525,7 +1529,7 @@ http://{host}:{port}
 
 ---
 
-### GET `/session/{sessionId}/message/{messageID}`
+### GET `/session/{sessionID}/message/{messageID}`
 
 **Path 参数**：`sessionID`、`messageID`  
 **返回**：`SessionV1.WithParts`  
@@ -1536,9 +1540,9 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/message`
+### POST `/session/{sessionID}/message`
 
-> ⚠️ **路径冲突警告**：此端点（POST）与 [消息列表](#7-get-sessionsessionidmessage--获取消息列表)（GET）共享 `/session/{sessionId}/message` 路径，仅 HTTP 方法不同。
+> ⚠️ **路径冲突警告**：此端点（POST）与 [消息列表](#7-get-sessionsessionidmessage--获取消息列表)（GET）共享 `/session/{sessionID}/message` 路径，仅 HTTP 方法不同。
 
 **用途**：创建并发送新消息，**阻塞等待 AI 响应完成**后返回。
 
@@ -1576,7 +1580,7 @@ http://{host}:{port}
 
 ---
 
-### POST `/session/{sessionId}/prompt_async`
+### POST `/session/{sessionID}/prompt_async`
 
 **用途**：异步发送消息，立即返回，AI 处理在后台进行。
 
@@ -1595,7 +1599,7 @@ http://{host}:{port}
 
 ---
 
-### DELETE `/session/{sessionId}/message/{messageID}`
+### DELETE `/session/{sessionID}/message/{messageID}`
 
 **用途**：永久删除消息及其所有 part，**不撤销文件变更**。
 
@@ -1608,7 +1612,7 @@ http://{host}:{port}
 
 ---
 
-### DELETE `/session/{sessionId}/message/{messageID}/part/{partID}`
+### DELETE `/session/{sessionID}/message/{messageID}/part/{partID}`
 
 **返回**：`boolean`  
 **错误**：400、404  
@@ -1618,7 +1622,7 @@ http://{host}:{port}
 
 ---
 
-### PATCH `/session/{sessionId}/message/{messageID}/part/{partID}`
+### PATCH `/session/{sessionID}/message/{messageID}/part/{partID}`
 
 **请求体**：`SessionV1.Part`（完整的 Part 对象）  
 **返回**：`SessionV1.Part`
@@ -1627,11 +1631,6 @@ http://{host}:{port}
 - `payload.id === params.partID`
 - `payload.messageID === params.messageID`
 - `payload.sessionID === params.sessionID`
-
----
-
-## Permission 路由组
-
 
 ---
 
@@ -1659,7 +1658,7 @@ http://{host}:{port}
 
 **错误**: 400 / `PermissionNotFoundError`（404）
 
-### POST `/session/{sessionId}/permissions/{permissionID}`（**已废弃**）
+### POST `/session/{sessionID}/permissions/{permissionID}`（**已废弃**）
 
 > ⚠️ **DEPRECATED**: OpenAPI 标注 `deprecated: true`。新接口为上面的 `POST /permission/:requestID/reply`。
 
@@ -2632,7 +2631,7 @@ for (const ev of newEvents) {
 
 **分页机制**（`handlers/experimental.ts:134-152`）：请求 `limit + 1` 条，若返回超过 `limit` 条则截断并通过 `x-next-cursor` 响应头返回下一页游标（最后一条的 `time.updated` 值）。
 
-### POST `/experimental/session/{sessionId}/background`（实验性）
+### POST `/experimental/session/{sessionID}/background`（实验性）
 
 将阻塞当前会话的同步子代理转为后台运行。
 
@@ -2661,7 +2660,7 @@ for (const ev of newEvents) {
 
 ---
 
-## 18. Instance / VCS / 元信息端点
+## 18. Instance VCS 元信息端点
 
 > 路由：`groups/instance.ts`
 
@@ -2669,6 +2668,7 @@ for (const ev of newEvents) {
 
 标记当前实例为待销毁（非阻塞，实际清理由生命周期管理器异步执行）。
 
+**请求**: Body 无
 **响应** `200`: `boolean`
 
 ### GET `/path`
@@ -2781,7 +2781,7 @@ for (const ev of newEvents) {
 
 ---
 
-## 20. File / Find 端点
+## 20. File Find 端点
 
 > 路由：`groups/file.ts` · Handler：`handlers/file.ts`
 > 核心：`@opencode-ai/core/filesystem` + `ripgrep` + `Search` + `LSP`
@@ -4352,7 +4352,7 @@ OpenCode 事件体系正在从 v1（粗粒度）向 v2（细粒度）迁移。**
 
 ---
 
-## 23. Token / Context Usage
+## 23. Token Context Usage
 
 ### 概述
 
@@ -4519,7 +4519,7 @@ Provider: opencode-go (OpenCode Go)
 
 ## 端点总览
 
-> 共 **140+ HTTP/WebSocket 端点**（含实验性）
+> 共 **129 个 HTTP/WebSocket 端点**（128 REST + 1 WebSocket，含实验性）
 
 ### 1. Global（6 个）
 
@@ -4621,16 +4621,16 @@ Provider: opencode-go (OpenCode Go)
 | GET | `/session/{id}/todo` | Todo 列表 |
 | POST | `/session/{id}/command` | 执行命令（model 字符串格式） |
 | POST | `/session/{id}/shell` | Shell 命令（检查忙碌） |
-| POST | `/session/{id}/message` | **同步发送消息**（非流式，阻塞等完整响应） |
-| POST | `/session/{id}/prompt_async` | 异步发送（fire-and-forget） |
 | POST | `/session/{id}/init` | 初始化 AGENTS.md |
 
-### 10. Message（6 个）
+### 10. Message（7 个）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/session/{id}/message` | 消息列表（非标准分页 Header） |
 | GET | `/session/{id}/message/{mid}` | 消息详情 |
+| POST | `/session/{id}/message` | **同步发送消息**（非流式，阻塞等完整响应） |
+| POST | `/session/{id}/prompt_async` | 异步发送（fire-and-forget） |
 | DELETE | `/session/{id}/message/{mid}` | 删除消息（检查忙碌，不撤销文件） |
 | DELETE | `/session/{id}/message/{mid}/part/{pid}` | 删除 Part（不检查忙碌） |
 | PATCH | `/session/{id}/message/{mid}/part/{pid}` | 更新 Part（三重 ID 校验） |
@@ -4716,7 +4716,7 @@ Provider: opencode-go (OpenCode Go)
 | POST | `/experimental/session/{id}/background` | 后台化子代理（需 feature flag） |
 | GET | `/experimental/resource` | MCP 资源 |
 
-### 18. Instance / VCS / 元信息（12 个）
+### 18. Instance VCS 元信息（12 个）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -4739,7 +4739,7 @@ Provider: opencode-go (OpenCode Go)
 |------|------|------|
 | POST | `/experimental/control-plane/move-session` | 跨目录迁移会话（可选转移变更） |
 
-### 20. File / Find（6 个）
+### 20. File Find（6 个）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
