@@ -1,5 +1,7 @@
 package dev.minios.ocremote.domain.repository
 
+import dev.minios.ocremote.data.api.ServerConnection
+
 /**
  * Aggregate repository interface for server management.
  * Split into 4 sub-interfaces following ISP:
@@ -12,4 +14,12 @@ interface ServerRepository :
     ServerConfigRepository,
     ServerConnectionRepository,
     LocalServerRepository,
-    ProviderRepository
+    ProviderRepository {
+
+    /**
+     * Resolve server config to a [ServerConnection] for API calls.
+     * Reused by other repositories (e.g. FileRepository) to avoid duplicating
+     * the serverId→connection lookup logic.
+     */
+    suspend fun resolveConnection(serverId: String): ServerConnection
+}
