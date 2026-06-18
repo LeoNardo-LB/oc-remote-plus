@@ -14,6 +14,7 @@ data class FileTreeNode(
 
 data class WorkspaceUiState(
     val currentPanel: WorkspacePanel = WorkspacePanel.FILE_TREE,
+    val directory: String = "",
     val rootNodes: List<FileTreeNode> = emptyList(),
     val rootLoading: Boolean = true,
     val rootError: String? = null,

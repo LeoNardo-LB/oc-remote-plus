@@ -34,7 +34,7 @@ class WorkspaceViewModel @Inject constructor(
         savedStateHandle.get<String>(WorkspaceNav.PARAM_DIRECTORY).orEmpty(), "UTF-8"
     )
 
-    private val _uiState = MutableStateFlow(WorkspaceUiState())
+    private val _uiState = MutableStateFlow(WorkspaceUiState(directory = directory))
     val uiState: StateFlow<WorkspaceUiState> = _uiState.asStateFlow()
 
     private val dirCache = mutableMapOf<String, List<FileNode>>()

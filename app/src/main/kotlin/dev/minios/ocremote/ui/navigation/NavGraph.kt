@@ -32,6 +32,7 @@ import dev.minios.ocremote.ui.screens.server.ServerProvidersRoute
 import dev.minios.ocremote.ui.screens.server.ServerSettingsRoute
 import dev.minios.ocremote.ui.screens.settings.SettingsRoute
 import dev.minios.ocremote.ui.screens.webview.WebViewScreen
+import dev.minios.ocremote.ui.screens.workspace.WorkspaceRoute
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -464,12 +465,45 @@ fun NavGraph(
             )
         }
 
-        // ============ Workspace Screen (placeholder — Task 12) ============
+        // ============ Workspace Screen ============
         composable(
             route = WorkspaceNav.routePattern,
             arguments = WorkspaceNav.navArguments
-        ) {
-            androidx.compose.material3.Text("Workspace placeholder (Task 12)")
+        ) { entry ->
+            val p = WorkspaceNav.fromEntry(entry)
+            WorkspaceRoute(
+                onBack = { navController.popBackStack() },
+                onOpenFile = { filePath ->
+                    navController.navigate(
+                        FileViewerNav.createRoute(
+                            serverUrl = p.server.serverUrl,
+                            username = p.server.username,
+                            password = p.server.password,
+                            serverName = p.server.serverName,
+                            serverId = p.server.serverId,
+                            sessionId = p.sessionId,
+                            filePath = filePath,
+                            source = FileViewerNav.Source.LIVE,
+                            directory = p.directory
+                        )
+                    )
+                },
+                onOpenGitDiff = { filePath ->
+                    navController.navigate(
+                        FileViewerNav.createRoute(
+                            serverUrl = p.server.serverUrl,
+                            username = p.server.username,
+                            password = p.server.password,
+                            serverName = p.server.serverName,
+                            serverId = p.server.serverId,
+                            sessionId = p.sessionId,
+                            filePath = filePath,
+                            source = FileViewerNav.Source.GIT_DIFF,
+                            directory = p.directory
+                        )
+                    )
+                }
+            )
         }
 
         // ============ File Viewer Screen (placeholder — Task 15) ============
