@@ -189,8 +189,7 @@ class AppNotificationManager @Inject constructor(
         val displayName = sessionTitle?.takeIf { it.isNotBlank() }
             ?: context.getString(R.string.notification_new_session)
 
-        // Type label prefix preserves "Response ready" semantic in title
-        val typeLabel = context.getString(R.string.notification_response_ready)
+        val typeLabel = context.getString(R.string.notification_tag_ready)
         val title = "$typeLabel · $displayName"
 
         // Latest user message as content text (single line, truncated)
@@ -229,21 +228,18 @@ class AppNotificationManager @Inject constructor(
         sessionId: String,
         permission: String
     ) {
-        val (sessionTitle, directory) = getSessionInfo(sessionId)
-        val displayTitle = sessionTitle ?: context.getString(R.string.notification_new_session)
-        val projectName = getProjectName(directory)
-        val body = if (projectName != null) {
-            context.getString(R.string.notification_needs_permission_project, displayTitle, projectName)
-        } else {
-            context.getString(R.string.notification_needs_permission, displayTitle)
-        }
+        val (sessionTitle, _) = getSessionInfo(sessionId)
+        val displayName = sessionTitle?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.notification_new_session)
+        val title = "${context.getString(R.string.notification_tag_permission)} · $displayName"
+        val contentText = permission.ifBlank { context.getString(R.string.notification_permission_required) }
 
         val notifId = eventNotificationId(server.id, sessionId, 1000)
         val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)
 
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_PERMISSIONS_ID)
-            .setContentTitle(context.getString(R.string.notification_permission_required))
-            .setContentText(body)
+            .setContentTitle(title)
+            .setContentText(contentText)
             .setSubText(server.displayName)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
@@ -265,21 +261,18 @@ class AppNotificationManager @Inject constructor(
         sessionId: String,
         questionText: String
     ) {
-        val (sessionTitle, directory) = getSessionInfo(sessionId)
-        val displayTitle = sessionTitle ?: context.getString(R.string.notification_new_session)
-        val projectName = getProjectName(directory)
-        val body = if (projectName != null) {
-            context.getString(R.string.notification_has_question_project, displayTitle, projectName)
-        } else {
-            context.getString(R.string.notification_has_question, displayTitle)
-        }
+        val (sessionTitle, _) = getSessionInfo(sessionId)
+        val displayName = sessionTitle?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.notification_new_session)
+        val title = "${context.getString(R.string.notification_tag_question)} · $displayName"
+        val contentText = questionText.ifBlank { context.getString(R.string.notification_question) }
 
         val notifId = eventNotificationId(server.id, sessionId, 2000)
         val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)
 
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_PERMISSIONS_ID)
-            .setContentTitle(context.getString(R.string.notification_question))
-            .setContentText(body)
+            .setContentTitle(title)
+            .setContentText(contentText)
             .setSubText(server.displayName)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
@@ -301,19 +294,18 @@ class AppNotificationManager @Inject constructor(
         sessionId: String?,
         error: String
     ) {
-        val body = if (sessionId != null) {
-            val (sessionTitle, _) = getSessionInfo(sessionId)
-            sessionTitle ?: error.ifBlank { context.getString(R.string.error_unknown) }
-        } else {
-            error.ifBlank { context.getString(R.string.error_unknown) }
-        }
+        val (sessionTitle, _) = if (sessionId != null) getSessionInfo(sessionId) else Pair(null, null)
+        val displayName = sessionTitle?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.notification_new_session)
+        val title = "${context.getString(R.string.notification_tag_error)} · $displayName"
+        val contentText = error.ifBlank { context.getString(R.string.error_unknown) }
 
         val notifId = eventNotificationId(server.id, sessionId ?: "error", 3000)
         val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)
 
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_TASKS_ID)
-            .setContentTitle(context.getString(R.string.notification_session_error))
-            .setContentText(body)
+            .setContentTitle(title)
+            .setContentText(contentText)
             .setSubText(server.displayName)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
