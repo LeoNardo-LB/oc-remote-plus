@@ -971,7 +971,7 @@ class OpenCodeApi @Inject constructor(
 
     // ============ Files ============
 
-    suspend fun searchText(conn: ServerConnection, pattern: String): List<SearchMatch> {
+    suspend fun searchText(conn: ServerConnection, pattern: String): List<SearchMatchDto> {
         return httpClient.get("${conn.baseUrl}/find") {
             conn.authHeader?.let { header("Authorization", it) }
             parameter("pattern", pattern)
@@ -989,7 +989,7 @@ class OpenCodeApi @Inject constructor(
         }.body()
     }
 
-    suspend fun readFile(conn: ServerConnection, path: String): FileContent {
+    suspend fun readFile(conn: ServerConnection, path: String): FileContentDto {
         return httpClient.get("${conn.baseUrl}/file/content") {
             conn.authHeader?.let { header("Authorization", it) }
             parameter("path", path)
@@ -1009,7 +1009,7 @@ class OpenCodeApi @Inject constructor(
         return response.status.isSuccess()
     }
 
-    suspend fun listDirectory(conn: ServerConnection, path: String = "", directory: String? = null): List<FileNode> {
+    suspend fun listDirectory(conn: ServerConnection, path: String = "", directory: String? = null): List<FileNodeDto> {
         val response = httpClient.get("${conn.baseUrl}/file") {
             conn.authHeader?.let { header("Authorization", it) }
             directoryHeader(directory)

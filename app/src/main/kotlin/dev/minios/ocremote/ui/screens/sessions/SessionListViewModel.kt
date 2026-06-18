@@ -9,7 +9,7 @@ import dev.minios.ocremote.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.data.dto.response.FileNode
+import dev.minios.ocremote.data.dto.response.FileNodeDto
 import dev.minios.ocremote.data.dto.response.ServerPaths
 import dev.minios.ocremote.data.api.OpenCodeApi
 import dev.minios.ocremote.data.api.ServerConnection
@@ -545,14 +545,14 @@ class SessionListViewModel @Inject constructor(
     suspend fun getHomeDirectory(): String = getServerPaths().home.ifBlank { "/" }
 
     /** List available Windows drives by probing drive letters in parallel. */
-    suspend fun listWindowsDrives(): List<FileNode> = coroutineScope {
+    suspend fun listWindowsDrives(): List<FileNodeDto> = coroutineScope {
         ('C'..'Z').map { letter ->
             async {
                 val drivePath = "$letter:\\"
                 try {
                     val response = api.probeDirectory(conn, drivePath)
                     if (response) {
-                        FileNode(
+                        FileNodeDto(
                             name = "$letter:",
                             path = drivePath,
                             type = "directory",
@@ -569,7 +569,7 @@ class SessionListViewModel @Inject constructor(
     }
 
     /** List directories in a given path on the server. */
-    suspend fun listDirectories(directory: String): List<FileNode> {
+    suspend fun listDirectories(directory: String): List<FileNodeDto> {
         return try {
             val nodes = api.listDirectory(conn, path = "", directory = directory)
             nodes.filter { it.type == "directory" }
