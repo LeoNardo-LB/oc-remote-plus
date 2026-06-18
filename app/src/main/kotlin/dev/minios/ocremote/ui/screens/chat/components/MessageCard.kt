@@ -413,9 +413,10 @@ private fun MessageCardAssistant(
                 }
 
                 if (stepFinishes.isNotEmpty()) {
-                    val totalInput = stepFinishes.sumOf { it.tokens?.input ?: 0 }
-                    val totalOutput = stepFinishes.sumOf { it.tokens?.output ?: 0 }
-                    val hasTokenStats = stepFinishes.any { (it.tokens?.input ?: 0) > 0 || (it.tokens?.output ?: 0) > 0 }
+                    val lastTokens = stepFinishes.lastOrNull()?.tokens
+                    val totalInput = lastTokens?.input ?: 0
+                    val totalOutput = lastTokens?.output ?: 0
+                    val hasTokenStats = totalInput > 0 || totalOutput > 0
 
                     val durationMs = if (isTurnLast && orderedTurnMessages != null) {
                         val first = orderedTurnMessages.firstOrNull()?.message

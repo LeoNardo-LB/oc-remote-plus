@@ -50,7 +50,7 @@ fun TokenUsageCard(
                 Text(
                     text = stringResource(
                         R.string.chat_token_usage_total,
-                        inputTokens + outputTokens + reasoningTokens
+                        inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
                     ),
                     style = MaterialTheme.typography.labelMedium
                 )
