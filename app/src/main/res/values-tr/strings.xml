@@ -568,6 +568,7 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_download">İndir</string>
     <string name="a11y_icon_copy">Kopyala</string>
     <string name="a11y_icon_open_in_browser">Tarayıcıda aç</string>
+    <string name="a11y_icon_open_file">Dosyayı aç</string>
     <string name="a11y_icon_search">Ara</string>
     <string name="a11y_icon_warning">Uyarı</string>
     <string name="a11y_icon_navigate_forward">İleri git</string>

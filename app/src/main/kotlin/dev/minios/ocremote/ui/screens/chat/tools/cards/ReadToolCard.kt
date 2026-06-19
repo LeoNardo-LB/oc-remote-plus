@@ -47,7 +47,8 @@ import dev.minios.ocremote.ui.theme.AlphaTokens
 internal fun ReadToolCard(
     tool: Part.Tool,
     isExpanded: Boolean,
-    onToggleExpand: () -> Unit
+    onToggleExpand: () -> Unit,
+    onOpenFile: ((filePath: String) -> Unit)? = null
 ) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
@@ -84,7 +85,12 @@ internal fun ReadToolCard(
         isRunning = isRunning,
         hasContent = hasContent,
         isAmoled = isAmoled,
-        onToggleExpand = onToggleExpand
+        onToggleExpand = onToggleExpand,
+        rightSideExtras = {
+            if (filePath.isNotBlank() && onOpenFile != null) {
+                OpenFileIconButton(onClick = { onOpenFile.invoke(filePath) })
+            }
+        }
     ) {
         val halfScreenHeight = halfScreenHeight()
         val scrollState = rememberScrollState()

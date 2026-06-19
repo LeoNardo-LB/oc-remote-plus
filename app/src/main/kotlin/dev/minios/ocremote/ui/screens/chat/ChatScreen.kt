@@ -263,6 +263,7 @@ fun ChatScreen(
     onNavigateToChildSession: (String) -> Unit = {},
     onOpenInWebView: () -> Unit = {},
     onOpenWorkspace: () -> Unit = {},
+    onOpenFile: (filePath: String) -> Unit = {},
     initialSharedImages: List<Uri> = emptyList(),
     onSharedImagesConsumed: () -> Unit = {},
     startInTerminalMode: Boolean = false,
@@ -379,6 +380,16 @@ fun ChatScreen(
             offset = listState.firstVisibleItemScrollOffset
         )
         onNavigateToChildSession(childSessionId)
+    }
+
+    // Save scroll position before opening a file in the viewer so the chat
+    // restores to the same position when the user returns.
+    val onOpenFileWithSave: (String) -> Unit = { filePath ->
+        viewModel.saveScrollPosition(
+            lazyIndex = listState.firstVisibleItemIndex,
+            offset = listState.firstVisibleItemScrollOffset
+        )
+        onOpenFile(filePath)
     }
 
     var showModelPicker by remember { mutableStateOf(false) }
@@ -1013,6 +1024,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                onOpenFile = onOpenFileWithSave,
                                 onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 
@@ -1037,6 +1049,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = navigateToChildSessionWithSave,
+                                onOpenFile = onOpenFileWithSave,
                                 onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 

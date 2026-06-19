@@ -43,7 +43,8 @@ internal fun PartContent(
     textColor: Color,
     isUser: Boolean = false,
     onViewSubSession: ((String) -> Unit)? = null,
-    turnAgentName: String? = null
+    turnAgentName: String? = null,
+    onOpenFile: ((filePath: String) -> Unit)? = null
 ) {
     when (part) {
         is Part.Text -> {
@@ -102,7 +103,8 @@ internal fun PartContent(
                     isExpanded = expanded,
                     onToggleExpand = toggleExpand,
                     onViewSubSession = onViewSubSession,
-                    turnAgentName = turnAgentName
+                    turnAgentName = turnAgentName,
+                    onOpenFile = onOpenFile
                 )
 
                 if (resolved != null) {

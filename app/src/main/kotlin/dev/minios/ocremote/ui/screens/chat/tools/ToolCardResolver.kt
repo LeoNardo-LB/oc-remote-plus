@@ -17,6 +17,7 @@ interface ToolCardResolver {
         isExpanded: Boolean,
         onToggleExpand: () -> Unit,
         onViewSubSession: ((String) -> Unit)?,
-        turnAgentName: String?
+        turnAgentName: String?,
+        onOpenFile: ((filePath: String) -> Unit)? = null,
     ): (@Composable () -> Unit)?
 }

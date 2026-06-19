@@ -568,6 +568,7 @@
     <string name="a11y_icon_download">다운로드</string>
     <string name="a11y_icon_copy">복사</string>
     <string name="a11y_icon_open_in_browser">브라우저에서 열기</string>
+    <string name="a11y_icon_open_file">파일 열기</string>
     <string name="a11y_icon_search">검색</string>
     <string name="a11y_icon_warning">경고</string>
     <string name="a11y_icon_navigate_forward">앞으로 이동</string>

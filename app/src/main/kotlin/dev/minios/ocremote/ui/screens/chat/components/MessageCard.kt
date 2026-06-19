@@ -72,6 +72,7 @@ internal fun MessageCard(
     currentMessage: ChatMessage,
     isQueued: Boolean = false,
     onViewSubSession: ((String) -> Unit)? = null,
+    onOpenFile: ((String) -> Unit)? = null,
     onRevert: (() -> Unit)? = null,
     onCopyText: (() -> Unit)? = null,
     copyText: String? = null,
@@ -91,6 +92,7 @@ internal fun MessageCard(
             turnMessages = turnMessages,
             currentMessage = currentMessage,
             onViewSubSession = onViewSubSession,
+            onOpenFile = onOpenFile,
             onCopyText = onCopyText,
             copyText = copyText,
             isAmoled = isAmoled,
@@ -322,6 +324,7 @@ private fun MessageCardAssistant(
     turnMessages: List<ChatMessage>?,
     currentMessage: ChatMessage,
     onViewSubSession: ((String) -> Unit)?,
+    onOpenFile: ((String) -> Unit)?,
     onCopyText: (() -> Unit)?,
     copyText: String?,
     isAmoled: Boolean,
@@ -385,6 +388,7 @@ private fun MessageCardAssistant(
                             textColor = textColor,
                             isUser = false,
                             onViewSubSession = onViewSubSession,
+                            onOpenFile = onOpenFile,
                             turnAgentName = if (part is Part.Tool && part.tool == "task") {
                                 val agentParts = orderedTurnMessages?.flatMap { it.parts }
                                     ?.filterIsInstance<Part.Agent>()

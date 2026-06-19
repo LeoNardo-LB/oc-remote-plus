@@ -568,6 +568,7 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_download">Descargar</string>
     <string name="a11y_icon_copy">Copiar</string>
     <string name="a11y_icon_open_in_browser">Abrir en navegador</string>
+    <string name="a11y_icon_open_file">Abrir archivo</string>
     <string name="a11y_icon_search">Buscar</string>
     <string name="a11y_icon_warning">Advertencia</string>
     <string name="a11y_icon_navigate_forward">Navegar adelante</string>

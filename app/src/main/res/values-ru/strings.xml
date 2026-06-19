@@ -569,6 +569,7 @@
     <string name="a11y_icon_download">Загрузить</string>
     <string name="a11y_icon_copy">Копировать</string>
     <string name="a11y_icon_open_in_browser">Открыть в браузере</string>
+    <string name="a11y_icon_open_file">Открыть файл</string>
     <string name="a11y_icon_search">Поиск</string>
     <string name="a11y_icon_warning">Предупреждение</string>
     <string name="a11y_icon_navigate_forward">Перейти вперёд</string>

@@ -568,6 +568,7 @@
     <string name="a11y_icon_download">تنزيل</string>
     <string name="a11y_icon_copy">نسخ</string>
     <string name="a11y_icon_open_in_browser">فتح في المتصفح</string>
+    <string name="a11y_icon_open_file">فتح ملف</string>
     <string name="a11y_icon_search">بحث</string>
     <string name="a11y_icon_warning">تحذير</string>
     <string name="a11y_icon_navigate_forward">التقدم للأمام</string>

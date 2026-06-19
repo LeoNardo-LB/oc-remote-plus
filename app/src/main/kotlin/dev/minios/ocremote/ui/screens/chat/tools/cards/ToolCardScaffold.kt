@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -182,5 +184,30 @@ internal fun ToolCardScaffold(
                 expandedContent()
             }
         }
+    }
+}
+
+/**
+ * Open-file icon button for tool cards that reference a file.
+ * Mirrors the copy button's size/tint so it sits consistently beside it.
+ * Place inside a card's [ToolCardScaffold.rightSideExtras] slot.
+ */
+@Composable
+internal fun RowScope.OpenFileIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(22.dp)
+            .testTag("tool_card_open_file")
+    ) {
+        Icon(
+            imageVector = Icons.Default.OpenInNew,
+            contentDescription = stringResource(R.string.a11y_icon_open_file),
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED)
+        )
     }
 }

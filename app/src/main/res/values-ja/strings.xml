@@ -568,6 +568,7 @@
     <string name="a11y_icon_download">ダウンロード</string>
     <string name="a11y_icon_copy">コピー</string>
     <string name="a11y_icon_open_in_browser">ブラウザで開く</string>
+    <string name="a11y_icon_open_file">ファイルを開く</string>
     <string name="a11y_icon_search">検索</string>
     <string name="a11y_icon_warning">警告</string>
     <string name="a11y_icon_navigate_forward">進む</string>

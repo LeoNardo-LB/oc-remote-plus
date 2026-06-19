@@ -566,6 +566,7 @@
     <string name="a11y_icon_download">Télécharger</string>
     <string name="a11y_icon_copy">Copier</string>
     <string name="a11y_icon_open_in_browser">Ouvrir dans le navigateur</string>
+    <string name="a11y_icon_open_file">Ouvrir le fichier</string>
     <string name="a11y_icon_search">Rechercher</string>
     <string name="a11y_icon_warning">Avertissement</string>
     <string name="a11y_icon_navigate_forward">Naviguer en avant</string>

@@ -571,6 +571,7 @@
     <string name="a11y_icon_download">下载</string>
     <string name="a11y_icon_copy">复制</string>
     <string name="a11y_icon_open_in_browser">在浏览器中打开</string>
+    <string name="a11y_icon_open_file">打开文件</string>
     <string name="a11y_icon_search">搜索</string>
     <string name="a11y_icon_warning">警告</string>
     <string name="a11y_icon_navigate_forward">向前导航</string>

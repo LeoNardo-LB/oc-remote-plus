@@ -474,6 +474,21 @@ fun NavGraph(
                         ) { launchSingleTop = true }
                     }
                 },
+                onOpenFile = { filePath ->
+                    navController.navigate(
+                        FileViewerNav.createRoute(
+                            serverUrl = params.server.serverUrl,
+                            username = params.server.username,
+                            password = params.server.password,
+                            serverName = params.server.serverName,
+                            serverId = params.server.serverId,
+                            sessionId = params.sessionId,
+                            filePath = filePath,
+                            source = FileViewerNav.Source.LIVE,
+                            directory = params.directory
+                        )
+                    )
+                },
                 initialSharedImages = imagesForThisSession,
                 onSharedImagesConsumed = {
                     pendingShareUris = emptyList()

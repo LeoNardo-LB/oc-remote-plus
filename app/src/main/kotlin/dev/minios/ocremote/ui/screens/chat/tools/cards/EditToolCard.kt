@@ -52,7 +52,8 @@ import dev.minios.ocremote.ui.theme.AlphaTokens
 internal fun EditToolCard(
     tool: Part.Tool,
     isExpanded: Boolean,
-    onToggleExpand: () -> Unit
+    onToggleExpand: () -> Unit,
+    onOpenFile: ((filePath: String) -> Unit)? = null
 ) {
     val isAmoled = isAmoledTheme()
     val input = extractToolInput(tool)
@@ -100,6 +101,9 @@ internal fun EditToolCard(
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
         rightSideExtras = {
+            if (filePath.isNotBlank() && onOpenFile != null) {
+                OpenFileIconButton(onClick = { onOpenFile.invoke(filePath) })
+            }
             if (additions > 0 || deletions > 0) {
                 DiffChangesInline(additions = additions, deletions = deletions)
             }

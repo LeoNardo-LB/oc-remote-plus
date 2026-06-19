@@ -27,49 +27,50 @@ class DefaultToolCardResolver @Inject constructor() : ToolCardResolver {
         isExpanded: Boolean,
         onToggleExpand: () -> Unit,
         onViewSubSession: ((String) -> Unit)?,
-        turnAgentName: String?
+        turnAgentName: String?,
+        onOpenFile: ((filePath: String) -> Unit)?
     ) -> @Composable () -> Unit> = mapOf(
-        "bash" to { tool, expanded, toggle, _, _ ->
+        "bash" to { tool, expanded, toggle, _, _, _ ->
             { BashToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "edit" to { tool, expanded, toggle, _, _ ->
-            { EditToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
+        "edit" to { tool, expanded, toggle, _, _, openFile ->
+            { EditToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle, onOpenFile = openFile) }
         },
-        "multiedit" to { tool, expanded, toggle, _, _ ->
-            { EditToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
+        "multiedit" to { tool, expanded, toggle, _, _, openFile ->
+            { EditToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle, onOpenFile = openFile) }
         },
-        "read" to { tool, expanded, toggle, _, _ ->
-            { ReadToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
+        "read" to { tool, expanded, toggle, _, _, openFile ->
+            { ReadToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle, onOpenFile = openFile) }
         },
-        "write" to { tool, expanded, toggle, _, _ ->
-            { WriteToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
+        "write" to { tool, expanded, toggle, _, _, openFile ->
+            { WriteToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle, onOpenFile = openFile) }
         },
-        "glob" to { tool, expanded, toggle, _, _ ->
+        "glob" to { tool, expanded, toggle, _, _, _ ->
             { GlobToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "grep" to { tool, expanded, toggle, _, _ ->
+        "grep" to { tool, expanded, toggle, _, _, _ ->
             { SearchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "search" to { tool, expanded, toggle, _, _ ->
+        "search" to { tool, expanded, toggle, _, _, _ ->
             { SearchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "task" to { tool, expanded, toggle, viewSub, agentName ->
+        "task" to { tool, expanded, toggle, viewSub, agentName, _ ->
             { TaskToolCard(tool = tool, onViewSubSession = viewSub, turnAgentName = agentName, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "webfetch" to { tool, expanded, toggle, _, _ ->
+        "webfetch" to { tool, expanded, toggle, _, _, _ ->
             { WebFetchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "web_fetch" to { tool, expanded, toggle, _, _ ->
+        "web_fetch" to { tool, expanded, toggle, _, _, _ ->
             { WebFetchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "websearch" to { tool, expanded, toggle, _, _ ->
+        "websearch" to { tool, expanded, toggle, _, _, _ ->
             { WebSearchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "web_search" to { tool, expanded, toggle, _, _ ->
+        "web_search" to { tool, expanded, toggle, _, _, _ ->
             { WebSearchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
         },
-        "apply_patch" to { tool, expanded, toggle, _, _ ->
-            { ApplyPatchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle) }
+        "apply_patch" to { tool, expanded, toggle, _, _, openFile ->
+            { ApplyPatchToolCard(tool = tool, isExpanded = expanded, onToggleExpand = toggle, onOpenFile = openFile) }
         },
     )
 
@@ -78,9 +79,10 @@ class DefaultToolCardResolver @Inject constructor() : ToolCardResolver {
         isExpanded: Boolean,
         onToggleExpand: () -> Unit,
         onViewSubSession: ((String) -> Unit)?,
-        turnAgentName: String?
+        turnAgentName: String?,
+        onOpenFile: ((filePath: String) -> Unit)?
     ): (@Composable () -> Unit)? {
         val factory = cardMap[tool.tool.lowercase()] ?: return null
-        return factory(tool, isExpanded, onToggleExpand, onViewSubSession, turnAgentName)
+        return factory(tool, isExpanded, onToggleExpand, onViewSubSession, turnAgentName, onOpenFile)
     }
 }
