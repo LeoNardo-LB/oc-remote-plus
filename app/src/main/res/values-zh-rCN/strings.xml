@@ -640,6 +640,8 @@
     <string name="workspace_git_stats">%1$d 个变更（%2$d M，%3$d A，%4$d D）</string>
     <string name="workspace_git_not_a_repo">当前项目不是 Git 仓库</string>
     <string name="workspace_git_working_tree_clean">工作区干净，无变更</string>
+    <string name="workspace_error_server_config_missing">服务器配置缺失</string>
+    <string name="workspace_error_load_failed">加载失败</string>
     <string name="sessions_view_folders">文件夹</string>
     <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">清除搜索</string>
@@ -666,6 +668,7 @@
     <string name="viewer_binary_mime">MIME类型：%1$s</string>
     <string name="viewer_empty_file">文件为空</string>
     <string name="viewer_truncated">大文件 — 显示前5000行</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">工具快照视图在 Phase 2 实现</string>
     <string name="a11y_icon_hunk_previous">上一个差异块</string>
     <string name="a11y_icon_hunk_next">下一个差异块</string>
 </resources>

@@ -635,6 +635,8 @@
     <string name="workspace_git_stats">%1$d modifications (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Pas un dépôt Git</string>
     <string name="workspace_git_working_tree_clean">Arborescence propre</string>
+    <string name="workspace_error_server_config_missing">Configuration du serveur manquante</string>
+    <string name="workspace_error_load_failed">Échec du chargement</string>
     <string name="sessions_view_folders">Dossiers</string>
     <string name="sessions_view_recent">Récents</string>
     <string name="sessions_clear_search">Effacer la recherche</string>
@@ -664,6 +666,7 @@
     <string name="viewer_binary_mime">Type MIME : %1$s</string>
     <string name="viewer_empty_file">Le fichier est vide</string>
     <string name="viewer_truncated">Fichier volumineux — affichage des 5 000 premières lignes</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">Vue d\'instantané d\'outil disponible en Phase 2</string>
     <string name="a11y_icon_hunk_previous">Bloc précédent</string>
     <string name="a11y_icon_hunk_next">Bloc suivant</string>
 </resources>

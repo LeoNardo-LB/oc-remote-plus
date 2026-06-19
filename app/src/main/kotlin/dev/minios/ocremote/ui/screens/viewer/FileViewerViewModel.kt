@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.ContentType
 import dev.minios.ocremote.domain.model.VcsDiffMode
 import dev.minios.ocremote.domain.usecase.GetFileContentUseCase
@@ -37,7 +38,7 @@ class FileViewerViewModel @Inject constructor(
             FileViewerNav.Source.LIVE -> loadLive()
             FileViewerNav.Source.GIT_DIFF -> loadGitDiff()
             FileViewerNav.Source.TOOL_SNAPSHOT, FileViewerNav.Source.TOOL_SNAPSHOT_DIFF ->
-                _uiState.update { it.copy(isLoading = false, error = "工具快照视图在 Phase 2 实现") }
+                _uiState.update { it.copy(isLoading = false, error = R.string.fileviewer_error_tool_snapshot_unsupported) }
         }
     }
 
@@ -53,7 +54,7 @@ class FileViewerViewModel @Inject constructor(
                         _uiState.update { it.copy(isLoading = false, content = visible, isEmpty = visible.isBlank(), isTruncated = truncated) }
                     }
                 }
-                .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = e.message ?: "加载失败") } }
+                .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = R.string.workspace_error_load_failed) } }
         }
     }
 
@@ -66,7 +67,7 @@ class FileViewerViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, mode = FileViewerMode.DIFF, diff = target, hunks = hunks,
                         currentHunkIndex = 0, isEmpty = hunks.isEmpty()) }
                 }
-                .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = e.message ?: "加载失败") } }
+                .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = R.string.workspace_error_load_failed) } }
         }
     }
 

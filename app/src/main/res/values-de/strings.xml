@@ -637,6 +637,8 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_git_stats">%1$d Änderungen (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Kein Git-Repository</string>
     <string name="workspace_git_working_tree_clean">Arbeitsverzeichnis sauber</string>
+    <string name="workspace_error_server_config_missing">Serverkonfiguration fehlt</string>
+    <string name="workspace_error_load_failed">Laden fehlgeschlagen</string>
     <string name="sessions_view_folders">Ordner</string>
     <string name="sessions_view_recent">Letzte</string>
     <string name="sessions_clear_search">Suche löschen</string>
@@ -666,6 +668,7 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_binary_mime">MIME-Typ: %1$s</string>
     <string name="viewer_empty_file">Datei ist leer</string>
     <string name="viewer_truncated">Große Datei — zeigt die ersten 5.000 Zeilen</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">Tool-Snapshot-Ansicht in Phase 2 verfügbar</string>
     <string name="a11y_icon_hunk_previous">Vorheriger Änderungsblock</string>
     <string name="a11y_icon_hunk_next">Nächster Änderungsblock</string>
 </resources>

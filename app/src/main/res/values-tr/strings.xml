@@ -637,6 +637,8 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_git_stats">%1$d değişiklik (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Bir Git deposu değil</string>
     <string name="workspace_git_working_tree_clean">Çalışma ağacı temiz</string>
+    <string name="workspace_error_server_config_missing">Sunucu yapılandırması eksik</string>
+    <string name="workspace_error_load_failed">Yükleme başarısız</string>
     <string name="sessions_view_folders">Klasörler</string>
     <string name="sessions_view_recent">Son</string>
     <string name="sessions_clear_search">Aramayı temizle</string>
@@ -666,6 +668,7 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_binary_mime">MIME türü: %1$s</string>
     <string name="viewer_empty_file">Dosya boş</string>
     <string name="viewer_truncated">Büyük dosya — ilk 5.000 satır gösteriliyor</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">Araç anlık görüntü görünümü Aşama 2\'de kullanıma sunulacaktır</string>
     <string name="a11y_icon_hunk_previous">Önceki değişiklik bloğu</string>
     <string name="a11y_icon_hunk_next">Sonraki değişiklik bloğu</string>
 </resources>

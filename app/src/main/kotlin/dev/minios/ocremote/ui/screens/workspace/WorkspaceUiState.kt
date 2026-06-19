@@ -17,11 +17,11 @@ data class WorkspaceUiState(
     val directory: String = "",
     val rootNodes: List<FileTreeNode> = emptyList(),
     val rootLoading: Boolean = true,
-    val rootError: String? = null,
+    val rootError: Int? = null,
     val showIgnored: Boolean = false,
     val gitChanges: List<VcsChange> = emptyList(),
     val gitLoading: Boolean = false,
-    val gitError: String? = null,
+    val gitError: Int? = null,
     val isNonGit: Boolean = false,
     val gitChangeCount: Int? = null
 )

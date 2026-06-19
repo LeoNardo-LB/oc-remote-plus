@@ -643,6 +643,8 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_git_stats">%1$d perubahan (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Bukan repositori Git</string>
     <string name="workspace_git_working_tree_clean">Pohon kerja bersih</string>
+    <string name="workspace_error_server_config_missing">Konfigurasi server tidak ditemukan</string>
+    <string name="workspace_error_load_failed">Gagal memuat</string>
     <string name="sessions_view_folders">Folder</string>
     <string name="sessions_view_recent">Terbaru</string>
     <string name="sessions_clear_search">Hapus pencarian</string>
@@ -672,6 +674,7 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_binary_mime">Tipe MIME: %1$s</string>
     <string name="viewer_empty_file">Berkas kosong</string>
     <string name="viewer_truncated">Berkas besar — menampilkan 5.000 baris pertama</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">Tampilan snapshot alat tersedia di Fase 2</string>
     <string name="a11y_icon_hunk_previous">Blok sebelumnya</string>
     <string name="a11y_icon_hunk_next">Blok berikutnya</string>
 </resources>

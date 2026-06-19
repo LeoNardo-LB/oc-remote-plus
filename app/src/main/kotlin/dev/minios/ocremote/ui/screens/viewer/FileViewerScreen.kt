@@ -110,13 +110,13 @@ private fun LoadingState() {
 }
 
 @Composable
-private fun ErrorState(message: String) {
+private fun ErrorState(message: Int) {
     Box(
         modifier = Modifier.fillMaxSize().padding(SpacingTokens.LG.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = message,
+            text = stringResource(message),
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center
         )

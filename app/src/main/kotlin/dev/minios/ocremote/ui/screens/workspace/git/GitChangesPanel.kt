@@ -130,7 +130,7 @@ private fun GitChangesEmptyState(message: String) {
 
 @Composable
 private fun GitChangesErrorState(
-    error: String,
+    error: Int,
     onRetry: () -> Unit
 ) {
     Box(
@@ -142,7 +142,7 @@ private fun GitChangesErrorState(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.MD.dp)
         ) {
             Text(
-                text = error,
+                text = stringResource(error),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )

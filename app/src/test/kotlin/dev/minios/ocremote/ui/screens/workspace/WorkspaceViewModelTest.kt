@@ -1,6 +1,7 @@
 package dev.minios.ocremote.ui.screens.workspace
 
 import androidx.lifecycle.SavedStateHandle
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.FileNode
 import dev.minios.ocremote.domain.model.FileType
 import dev.minios.ocremote.domain.model.VcsChange
@@ -127,8 +128,8 @@ class WorkspaceViewModelTest {
 
         val state = vm.uiState.value
         assert(!state.rootLoading) { "rootLoading should be false after failure" }
-        assert(state.rootError == "Connection refused: port 4096") {
-            "rootError should be 'Connection refused: port 4096', was '${state.rootError}'"
+        assert(state.rootError == R.string.workspace_error_load_failed) {
+            "rootError should be load failed resource, was '${state.rootError}'"
         }
     }
 
@@ -313,8 +314,8 @@ class WorkspaceViewModelTest {
         val vm = WorkspaceViewModel(savedStateHandle(id = ""), listDirectory, getVcsStatus)
 
         val state = vm.uiState.value
-        assert(state.rootError == "服务器配置缺失") {
-            "rootError should be '服务器配置缺失', was '${state.rootError}'"
+        assert(state.rootError == R.string.workspace_error_server_config_missing) {
+            "rootError should be server config missing resource, was '${state.rootError}'"
         }
         assert(!state.rootLoading) { "rootLoading should be false" }
 

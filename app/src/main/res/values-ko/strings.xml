@@ -637,6 +637,8 @@
     <string name="workspace_git_stats">%1$d개 변경 (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Git 저장소가 아닙니다</string>
     <string name="workspace_git_working_tree_clean">작업 트리가 깨끗합니다</string>
+    <string name="workspace_error_server_config_missing">서버 설정이 없습니다</string>
+    <string name="workspace_error_load_failed">로드에 실패했습니다</string>
     <string name="sessions_view_folders">폴더</string>
     <string name="sessions_view_recent">최근</string>
     <string name="sessions_clear_search">검색 지우기</string>
@@ -666,6 +668,7 @@
     <string name="viewer_binary_mime">MIME 유형: %1$s</string>
     <string name="viewer_empty_file">파일이 비어 있습니다.</string>
     <string name="viewer_truncated">대용량 파일 — 처음 5,000줄 표시</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">도구 스냅샷 보기는 2단계에서 제공됩니다</string>
     <string name="a11y_icon_hunk_previous">이전 변경 부분</string>
     <string name="a11y_icon_hunk_next">다음 변경 부분</string>
 </resources>

@@ -638,6 +638,8 @@
     <string name="workspace_git_stats">%1$d изменений (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Не Git-репозиторий</string>
     <string name="workspace_git_working_tree_clean">Рабочее дерево чистое</string>
+    <string name="workspace_error_server_config_missing">Конфигурация сервера отсутствует</string>
+    <string name="workspace_error_load_failed">Ошибка загрузки</string>
     <string name="sessions_view_folders">Папки</string>
     <string name="sessions_view_recent">Недавние</string>
     <string name="sessions_clear_search">Очистить поиск</string>
@@ -667,6 +669,7 @@
     <string name="viewer_binary_mime">MIME-тип: %1$s</string>
     <string name="viewer_empty_file">Файл пуст</string>
     <string name="viewer_truncated">Большой файл — показаны первые 5 000 строк</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">Просмотр снимка инструмента будет доступен в Фазе 2</string>
     <string name="a11y_icon_hunk_previous">Предыдущий блок изменений</string>
     <string name="a11y_icon_hunk_next">Следующий блок изменений</string>
 </resources>

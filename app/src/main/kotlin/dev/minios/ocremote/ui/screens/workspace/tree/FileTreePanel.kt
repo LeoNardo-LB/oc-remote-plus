@@ -159,7 +159,7 @@ fun FileTreeItem(
 
 @Composable
 private fun FileTreeErrorState(
-    error: String,
+    error: Int,
     onRetry: () -> Unit
 ) {
     Box(
@@ -171,7 +171,7 @@ private fun FileTreeErrorState(
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.MD.dp)
         ) {
             Text(
-                text = error,
+                text = stringResource(error),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )

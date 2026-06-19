@@ -637,6 +637,8 @@
     <string name="workspace_git_stats">%1$d 件の変更 (%2$d M, %3$d A, %4$d D)</string>
     <string name="workspace_git_not_a_repo">Git リポジトリではありません</string>
     <string name="workspace_git_working_tree_clean">ワーキングツリーはクリーンです</string>
+    <string name="workspace_error_server_config_missing">サーバー設定が見つかりません</string>
+    <string name="workspace_error_load_failed">読み込みに失敗しました</string>
     <string name="sessions_view_folders">フォルダ</string>
     <string name="sessions_view_recent">最近</string>
     <string name="sessions_clear_search">検索をクリア</string>
@@ -666,6 +668,7 @@
     <string name="viewer_binary_mime">MIMEタイプ: %1$s</string>
     <string name="viewer_empty_file">ファイルは空です</string>
     <string name="viewer_truncated">大きなファイル — 先頭5,000行を表示</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">ツールスナップショットビューはフェーズ2で利用可能です</string>
     <string name="a11y_icon_hunk_previous">前の差分ブロック</string>
     <string name="a11y_icon_hunk_next">次の差分ブロック</string>
 </resources>

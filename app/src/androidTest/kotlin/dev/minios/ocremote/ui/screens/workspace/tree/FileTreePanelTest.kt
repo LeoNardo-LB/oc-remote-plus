@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.FileNode
 import dev.minios.ocremote.domain.model.FileType
 import dev.minios.ocremote.ui.screens.workspace.FileTreeNode
@@ -47,7 +48,7 @@ class FileTreePanelTest {
             FileTreePanel(
                 uiState = WorkspaceUiState(
                     rootLoading = false,
-                    rootError = "连接失败",
+                    rootError = R.string.workspace_error_load_failed,
                     rootNodes = emptyList()
                 ),
                 onRefreshRoot = {},
@@ -55,7 +56,9 @@ class FileTreePanelTest {
                 onOpenFile = {}
             )
         }
-        composeTestRule.onNodeWithText("连接失败").assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            composeTestRule.activity.getString(R.string.workspace_error_load_failed)
+        ).assertIsDisplayed()
         composeTestRule.onNodeWithText("重试").assertIsDisplayed()
     }
 

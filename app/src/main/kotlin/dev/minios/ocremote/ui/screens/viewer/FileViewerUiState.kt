@@ -20,7 +20,7 @@ data class FileViewerUiState(
     val content: String = "",
     val isBinary: Boolean = false,
     val mimeType: String? = null,
-    val error: String? = null,
+    val error: Int? = null,
     val isEmpty: Boolean = false,
     val isTruncated: Boolean = false,
     val diff: VcsFileDiff? = null,

@@ -696,6 +696,10 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="workspace_git_not_a_repo">Not a git repository</string>
     <string name="workspace_git_working_tree_clean">Working tree clean</string>
 
+    <!-- Workspace errors -->
+    <string name="workspace_error_server_config_missing">Server configuration missing</string>
+    <string name="workspace_error_load_failed">Failed to load</string>
+
     <!-- Session List view mode toggle -->
     <string name="sessions_view_folders">Folders</string>
     <string name="sessions_view_recent">Recent</string>
@@ -721,6 +725,7 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_binary_mime">MIME type: %1$s</string>
     <string name="viewer_empty_file">File is empty</string>
     <string name="viewer_truncated">Large file — showing first 5,000 lines</string>
+    <string name="fileviewer_error_tool_snapshot_unsupported">Tool snapshot view is available in Phase 2</string>
     <string name="a11y_icon_hunk_previous">Previous hunk</string>
     <string name="a11y_icon_hunk_next">Next hunk</string>
 </resources>

@@ -1,6 +1,7 @@
 package dev.minios.ocremote.ui.screens.viewer
 
 import androidx.lifecycle.SavedStateHandle
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.ContentType
 import dev.minios.ocremote.domain.model.FileContent
 import dev.minios.ocremote.domain.model.VcsDiffMode
@@ -164,8 +165,8 @@ class FileViewerViewModelTest {
         val state = vm.uiState.value
         assert(!state.isLoading) { "isLoading should be false" }
         assert(state.error != null) { "error should be set for unsupported source" }
-        assert(state.error!!.contains("Phase 2")) {
-            "error should mention Phase 2, was: ${state.error}"
+        assert(state.error == R.string.fileviewer_error_tool_snapshot_unsupported) {
+            "error should be tool snapshot unsupported resource, was: ${state.error}"
         }
 
         // Verify no use case was called (not silent downgrade)
@@ -184,8 +185,8 @@ class FileViewerViewModelTest {
 
         val state = vm.uiState.value
         assert(!state.isLoading) { "isLoading should be false after failure" }
-        assert(state.error == "Connection refused: port 4096") {
-            "error should match, was: ${state.error}"
+        assert(state.error == R.string.workspace_error_load_failed) {
+            "error should be load failed resource, was: ${state.error}"
         }
     }
 

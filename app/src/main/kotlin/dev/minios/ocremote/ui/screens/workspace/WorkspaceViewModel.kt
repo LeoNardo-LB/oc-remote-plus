@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.minios.ocremote.R
 import dev.minios.ocremote.domain.model.FileNode
 import dev.minios.ocremote.domain.model.isDirectory
 import dev.minios.ocremote.domain.usecase.GetVcsStatusUseCase
@@ -45,7 +46,7 @@ class WorkspaceViewModel @Inject constructor(
 
     init {
         if (serverId.isBlank()) {
-            _uiState.update { it.copy(rootError = "服务器配置缺失", rootLoading = false) }
+            _uiState.update { it.copy(rootError = R.string.workspace_error_server_config_missing, rootLoading = false) }
         } else {
             loadDirectory("")
             prefetchGitCount()
@@ -68,11 +69,10 @@ class WorkspaceViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    val msg = e.message ?: "加载失败"
                     if (path.isEmpty()) {
-                        _uiState.update { it.copy(rootLoading = false, rootError = msg) }
+                        _uiState.update { it.copy(rootLoading = false, rootError = R.string.workspace_error_load_failed) }
                     } else {
-                        _dirLoadEvents.tryEmit(DirectoryLoadResult(path, emptyList(), msg))
+                        _dirLoadEvents.tryEmit(DirectoryLoadResult(path, emptyList(), e.message))
                     }
                 }
         }
@@ -109,7 +109,7 @@ class WorkspaceViewModel @Inject constructor(
                     val msg = e.message.orEmpty()
                     val nonGit = msg.contains("non-git", true) || msg.contains("not a git", true)
                     _uiState.update {
-                        it.copy(gitLoading = false, isNonGit = nonGit, gitError = if (nonGit) null else msg)
+                        it.copy(gitLoading = false, isNonGit = nonGit, gitError = if (nonGit) null else R.string.workspace_error_load_failed)
                     }
                 }
         }
