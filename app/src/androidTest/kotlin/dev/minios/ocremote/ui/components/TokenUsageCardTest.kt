@@ -23,8 +23,7 @@ class TokenUsageCardTest {
                 reasoningTokens = 200,
                 cacheReadTokens = 0,
                 cacheWriteTokens = 0,
-                totalCost = 0.05,
-                contextWindow = 200000
+                totalCost = 0.05
             )
         }
         composeTestRule.onNodeWithText("1,000").assertIsDisplayed()
@@ -39,8 +38,7 @@ class TokenUsageCardTest {
                 reasoningTokens = 0,
                 cacheReadTokens = 0,
                 cacheWriteTokens = 0,
-                totalCost = 0.0,
-                contextWindow = 200000
+                totalCost = 0.0
             )
         }
         // Should render without crashing even with zero values.

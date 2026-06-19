@@ -20,7 +20,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 0, outputTokens = 0, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 128000
+                totalCost = 0.0
             )
         }
         composeTestRule.onNodeWithText("0 tokens").assertIsDisplayed()
@@ -32,7 +32,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 1000, outputTokens = 0, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 128000
+                totalCost = 0.0
             )
         }
         composeTestRule.onNodeWithText("1,000 tokens").assertIsDisplayed()
@@ -45,7 +45,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 1000, outputTokens = 500, reasoningTokens = 200,
                 cacheReadTokens = 300, cacheWriteTokens = 100,
-                totalCost = 0.05, contextWindow = 128000
+                totalCost = 0.05
             )
         }
         composeTestRule.onNodeWithText("1,700 tokens").assertIsDisplayed()
@@ -63,7 +63,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 100, outputTokens = 0, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 0
+                totalCost = 0.0
             )
         }
         composeTestRule.onAllNodesWithText("$").assertCountEquals(0)
@@ -75,7 +75,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 100, outputTokens = 0, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0001, contextWindow = 0
+                totalCost = 0.0001
             )
         }
         composeTestRule.onNodeWithText("$0.0001").assertIsDisplayed()
@@ -87,7 +87,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 100, outputTokens = 0, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 999.99, contextWindow = 0
+                totalCost = 999.99
             )
         }
         composeTestRule.onNodeWithText("$999.9900").assertIsDisplayed()
@@ -99,7 +99,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 1000, outputTokens = 500, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.01, contextWindow = 0
+                totalCost = 0.01
             )
         }
         composeTestRule.onAllNodesWithText("128,000 context").assertCountEquals(0)
@@ -111,7 +111,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 32000, outputTokens = 32000, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 128000
+                totalCost = 0.0
             )
         }
         composeTestRule.onNodeWithText("64,000 / 128,000 context").assertIsDisplayed()
@@ -123,7 +123,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 63000, outputTokens = 63000, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 128000
+                totalCost = 0.0
             )
         }
         composeTestRule.onNodeWithText("126,000 / 128,000 context").assertIsDisplayed()
@@ -135,7 +135,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 100000, outputTokens = 50000, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 128000
+                totalCost = 0.0
             )
         }
         composeTestRule.onNodeWithText("150,000 / 128,000 context").assertIsDisplayed()
@@ -147,7 +147,7 @@ class TokenUsageCardBranchTest {
             TokenUsageCard(
                 inputTokens = 1000, outputTokens = 500, reasoningTokens = 0,
                 cacheReadTokens = 0, cacheWriteTokens = 0,
-                totalCost = 0.0, contextWindow = 0
+                totalCost = 0.0
             )
         }
         composeTestRule.onAllNodesWithText("Reasoning").assertCountEquals(0)

@@ -5,7 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
-import dev.minios.ocremote.data.repository.handler.CompactionStateInfo
+import dev.minios.ocremote.domain.model.CompactionStateInfo
 import dev.minios.ocremote.ui.screens.chat.components.CompactionBanner
 import org.junit.Rule
 import org.junit.Test

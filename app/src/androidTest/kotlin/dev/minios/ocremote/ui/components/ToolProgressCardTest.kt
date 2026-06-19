@@ -3,7 +3,7 @@ package dev.minios.ocremote.ui.components
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import dev.minios.ocremote.data.repository.handler.ToolProgressInfo
+import dev.minios.ocremote.domain.model.ToolProgressInfo
 import dev.minios.ocremote.ui.screens.chat.components.ToolProgressCard
 import org.junit.Rule
 import org.junit.Test
