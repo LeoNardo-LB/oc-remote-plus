@@ -458,17 +458,21 @@ fun NavGraph(
                     }
                 },
                 onOpenWorkspace = {
-                    navController.navigate(
-                        WorkspaceNav.createRoute(
-                            serverUrl = params.server.serverUrl,
-                            username = params.server.username,
-                            password = params.server.password,
-                            serverName = params.server.serverName,
-                            serverId = params.server.serverId,
-                            sessionId = params.sessionId,
-                            directory = params.directory
-                        )
-                    ) { launchSingleTop = true }
+                    scope.launch {
+                        val session = sessionRepository.getSession(params.server.serverId, params.sessionId).getOrNull()
+                        val dir = session?.directory ?: params.directory
+                        navController.navigate(
+                            WorkspaceNav.createRoute(
+                                serverUrl = params.server.serverUrl,
+                                username = params.server.username,
+                                password = params.server.password,
+                                serverName = params.server.serverName,
+                                serverId = params.server.serverId,
+                                sessionId = params.sessionId,
+                                directory = dir
+                            )
+                        ) { launchSingleTop = true }
+                    }
                 },
                 initialSharedImages = imagesForThisSession,
                 onSharedImagesConsumed = {
