@@ -366,25 +366,36 @@ Diff 视图**不支持标注**（纯只读）。
 
 ### 7.2 内容渲染（统一源码视图）
 
-所有文件（含 md）默认走**源码视图**：基于 `Highlights` 库做语法高亮，渲染成单个 `Text(AnnotatedString)`：
+所有文件（含 md）默认走**源码视图**：基于 `Highlights` 库做语法高亮，渲染成逐行 `LazyColumn`（**(updated)** 实际实现用 `LazyColumn` + 每行一个 `Row` item 的懒加载方式，而非早期设想的 `Column + verticalScroll` 整体急加载，以保证大文件的滚动性能与内存占用）：
 
 ```kotlin
-val annotated = remember(content, language, annotations) {
-    buildAnnotatedString {
-        applyHighlights(content, language)  // 语法高亮
-        annotations.forEach { ann ->         // 叠加标注高亮
-            addStyle(SpanStyle(background = annotationColor(ann.index)), ann.startChar, ann.endChar)
+// 逐行构建 AnnotatedString（每行一个 LazyColumn item）
+val lineAnnotatedList = remember(content, language, annotations) {
+    val lines = content.split('\n')
+    lines.mapIndexed { idx, line ->
+        val base = buildAnnotatedString { applyHighlights(line, language) }  // 单行语法高亮
+        // 叠加本行命中的标注高亮（需将全局 char offset 映射到行内 offset）
+        buildAnnotatedString {
+            append(base)
+            annotationsForLine(idx).forEach { ann ->
+                addStyle(SpanStyle(background = annotationColor(ann.index)),
+                         ann.lineStartOffset, ann.lineEndOffset)
+            }
         }
     }
 }
 SelectionContainer(textToolbar = CustomAnnotationToolbar(...)) {
-    Text(annotated, ...)
+    LazyColumn(state = listState) {
+        itemsIndexed(lineAnnotatedList) { idx, lineAnnotated ->
+            Row { Text("${idx + 1}") /* gutter 行号 */; Text(lineAnnotated) }
+        }
+    }
 }
 ```
 
 - 代码文件：按扩展名映射语言（kotlin/java/xml/json/yaml/md/sh/...），Highlights 着色
-- 纯文本/md：无语法着色，仍走单 Text（保证标注能叠加）
-- 左侧 gutter 显示行号
+- 纯文本/md：无语法着色，仍走逐行 LazyColumn（保证标注能叠加）
+- 左侧 gutter 显示行号（每行 `Row` 内的首个 `Text`，对齐方式见实际实现）
 - 长行：水平滚动（复用 `codeHorizontalScroll`）
 - 大文件：>256KB 或 >5000 行 → 截断警告 + 渲染前 N 行 + [加载更多]
 
@@ -561,27 +572,31 @@ sealed class FileViewerSource {
 }
 ```
 
-`FileDiff` 项目已有（GET /session/{id}/diff 用），复用。
+~~`FileDiff` 项目已有（GET /session/{id}/diff 用），复用。~~
+
+> **(updated)** 实际实现新建了 `VcsFileDiff`（含 `patch: String?` 字段），不复用现有 `FileDiff`。原因：`SseEvent.kt` 中的 `FileDiff` 含 `before/after` 字段，与 REST API `/vcs/diff` 返回的 `patch` 格式不兼容，强行复用会导致语义混乱。
 
 ### 8.2 Domain Repository 接口（新增）
 
 ```kotlin
 // domain/repository/FileRepository.kt
 interface FileRepository {
-    suspend fun listDirectory(conn: ServerConnection, path: String): List<FileNode>
-    suspend fun getFileContent(conn: ServerConnection, path: String): FileContent
-    suspend fun findFiles(conn: ServerConnection, query: String, limit: Int = 50): List<String>
+    suspend fun listDirectory(serverId: String, directory: String, path: String): List<FileNode>
+    suspend fun getFileContent(serverId: String, directory: String, path: String): FileContent
+    suspend fun findFiles(serverId: String, directory: String, query: String, limit: Int = 50): List<String>
 }
 
 // domain/repository/VcsRepository.kt
 interface VcsRepository {
-    suspend fun getBranch(conn: ServerConnection): VcsBranchInfo
-    suspend fun getStatus(conn: ServerConnection): List<VcsChange>
-    suspend fun getDiff(conn: ServerConnection, mode: VcsDiffMode, context: Int = 3): List<FileDiff>
+    suspend fun getBranch(serverId: String, directory: String): VcsBranchInfo
+    suspend fun getStatus(serverId: String, directory: String): List<VcsChange>
+    suspend fun getDiff(serverId: String, directory: String, mode: VcsDiffMode, context: Int = 3): List<VcsFileDiff>
 }
 data class VcsBranchInfo(val branch: String?, val defaultBranch: String?)
 enum class VcsDiffMode { GIT, BRANCH }
 ```
+
+> **(updated)** 实际实现采用 `serverId: String + directory: String` 参数模式（而非 `conn: ServerConnection`）。Repository 内部调用 `serverRepository.resolveConnection(serverId)` 获取连接对象。这样 Repository 接口不依赖 `ServerConnection`，降低耦合。`ServerConnection` 已迁移至 `domain.model.ServerConnection`（原属 data 层，迁移为解决跨层依赖问题）。`getDiff` 返回 `List<VcsFileDiff>` 而非 `List<FileDiff>`（见 8.1 说明）。
 
 ### 8.3 Data 层：OpenCodeApi 扩展
 
@@ -597,12 +612,14 @@ suspend fun getVcsStatus(conn: ServerConnection): List<VcsChangeDto>
 suspend fun getVcsDiff(conn: ServerConnection, mode: String, context: Int = 3): List<FileDiffDto>
 ```
 
+> **(updated)** Repository 层用 `serverId + directory` 签名（见 8.2），内部 `serverRepository.resolveConnection(serverId)` 解析出 `ServerConnection` 后再调 OpenCodeApi（OpenCodeApi 层仍接收 `conn: ServerConnection`，保持底层 HTTP 接口稳定）。`ServerConnection` 已迁移至 `domain.model` 包。
+
 DTO + Mapper（按项目现有 `dto/response/` + `mapper/` 模式）：
 - `FileNodeDto` + `FileNodeMapper`
 - `FileContentDto` + `FileContentMapper`
 - `VcsChangeDto` + `VcsChangeMapper`
 - `VcsBranchDto` + mapper
-- `FileDiffDto` + mapper（若与现有 session diff 的 FileDiff 共用，则复用）
+- `FileDiffDto` + `VcsFileDiffMapper`（**(updated)** 新建独立模型 `VcsFileDiff`（含 `patch` 字段），不复用 SSE 的 `FileDiff`（含 `before/after` 字段，语义不同））
 
 Repository Impl：`FileRepositoryImpl` / `VcsRepositoryImpl`。
 
