@@ -34,7 +34,7 @@
 - Test: `app/src/test/kotlin/dev/minios/ocremote/ui/screens/chat/util/PartGroupingTest.kt`
 
 **Interfaces:**
-- Consumes: `dev.minios.ocremote.domain.model.Part`（现有 sealed class，`Part.Tool` 有 `tool: String`）
+- Consumes: `dev.leonardo.ocremotev2.domain.model.Part`（现有 sealed class，`Part.Tool` 有 `tool: String`）
 - Produces: `PartRenderUnit`（sealed）、`groupContextTools(parts): List<PartRenderUnit>`、`ContextToolSummary`、`contextToolSummary(tools): ContextToolSummary`、`CONTEXT_GROUP_TOOLS: Set<String>`
 
 - [ ] **Step 1: 写失败测试**
@@ -42,10 +42,10 @@
 `app/src/test/kotlin/dev/minios/ocremote/ui/screens/chat/util/PartGroupingTest.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.util
+package dev.leonardo.ocremotev2.ui.screens.chat.util
 
-import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.ToolState
+import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.ToolState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -128,9 +128,9 @@ Expected: FAIL（`groupContextTools` 未定义）
 `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/util/PartGrouping.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.util
+package dev.leonardo.ocremotev2.ui.screens.chat.util
 
-import dev.minios.ocremote.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.Part
 
 /** 探查类工具集合 —— 连续出现时聚合展示。对齐 opencode CONTEXT_GROUP_TOOLS。 */
 val CONTEXT_GROUP_TOOLS: Set<String> = setOf("read", "glob", "grep", "list")
@@ -261,7 +261,7 @@ Run: `lokit`（项目根目录，按 `lokit.yaml` 同步 15 locales）
 `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/components/ContextToolGroupCard.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.components
+package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -290,17 +290,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.R
-import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.ToolState
-import dev.minios.ocremote.ui.screens.chat.util.LocalCollapseTools
-import dev.minios.ocremote.ui.screens.chat.util.LocalOnToggleToolExpanded
-import dev.minios.ocremote.ui.screens.chat.util.LocalToolCardResolver
-import dev.minios.ocremote.ui.screens.chat.util.LocalToolExpandedStates
-import dev.minios.ocremote.ui.screens.chat.util.contextToolSummary
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.ShapeTokens
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.ToolState
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCollapseTools
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnToggleToolExpanded
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalToolCardResolver
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalToolExpandedStates
+import dev.leonardo.ocremotev2.ui.screens.chat.util.contextToolSummary
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
 @Composable
 internal fun ContextToolGroupCard(
@@ -484,8 +484,8 @@ for ((renderableParts, errorPair) in allContent) {
 
 `AssistantTurnBubble.kt` 顶部添加：
 ```kotlin
-import dev.minios.ocremote.ui.screens.chat.util.PartRenderUnit
-import dev.minios.ocremote.ui.screens.chat.util.groupContextTools
+import dev.leonardo.ocremotev2.ui.screens.chat.util.PartRenderUnit
+import dev.leonardo.ocremotev2.ui.screens.chat.util.groupContextTools
 ```
 
 - [ ] **Step 3: 编译检查**
@@ -527,11 +527,11 @@ git commit -m "feat(chat): aggregate consecutive context tools in AssistantTurnB
 `app/src/test/kotlin/dev/minios/ocremote/ui/screens/chat/util/ContextStatsTest.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.util
+package dev.leonardo.ocremotev2.ui.screens.chat.util
 
-import dev.minios.ocremote.domain.model.Message
-import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.ToolState
+import dev.leonardo.ocremotev2.domain.model.Message
+import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.ToolState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -539,7 +539,7 @@ class ContextStatsTest {
 
     private fun userMsg(id: String, textLen: Int) = MessageWithParts(
         Message.User(id = id, role = "user", content = emptyList(),
-            time = dev.minios.ocremote.domain.model.Message.User.Time(created = 0)),
+            time = dev.leonardo.ocremotev2.domain.model.Message.User.Time(created = 0)),
         listOf(Part.Text("p-$id", "s", id, "x".repeat(textLen)))
     )
 
@@ -608,12 +608,12 @@ Expected: FAIL（符号未定义）
 `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/util/ContextStats.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.util
+package dev.leonardo.ocremotev2.ui.screens.chat.util
 
-import dev.minios.ocremote.domain.model.Message
-import dev.minios.ocremote.domain.model.MessageWithParts
-import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.ToolState
+import dev.leonardo.ocremotev2.domain.model.Message
+import dev.leonardo.ocremotev2.domain.model.MessageWithParts
+import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.ToolState
 import kotlin.math.ceil
 
 enum class BreakdownRole { USER, ASSISTANT, TOOL, OTHER }
@@ -790,7 +790,7 @@ git commit -m "i18n(chat): add context detail dialog strings"
 - [ ] **Step 1: 写组件**
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.components
+package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -800,15 +800,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.components.DialogButtonRole
-import dev.minios.ocremote.ui.components.DialogButtons
-import dev.minios.ocremote.ui.components.amoledDialogParams
-import dev.minios.ocremote.ui.screens.chat.util.BreakdownRole
-import dev.minios.ocremote.ui.screens.chat.util.ContextDetailState
-import dev.minios.ocremote.ui.screens.chat.util.formatTokenCount
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.ui.components.DialogButtonRole
+import dev.leonardo.ocremotev2.ui.components.DialogButtons
+import dev.leonardo.ocremotev2.ui.components.amoledDialogParams
+import dev.leonardo.ocremotev2.ui.screens.chat.util.BreakdownRole
+import dev.leonardo.ocremotev2.ui.screens.chat.util.ContextDetailState
+import dev.leonardo.ocremotev2.ui.screens.chat.util.formatTokenCount
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1027,7 +1027,7 @@ if (totalInput > 0 || totalOutput > 0) {
 - [ ] **Step 2: 添加 import（若未有）**
 
 ```kotlin
-import dev.minios.ocremote.ui.screens.chat.util.formatTokenCount
+import dev.leonardo.ocremotev2.ui.screens.chat.util.formatTokenCount
 ```
 
 - [ ] **Step 3: 编译检查 + Commit**

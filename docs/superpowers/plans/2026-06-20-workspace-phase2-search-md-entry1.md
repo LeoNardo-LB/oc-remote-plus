@@ -36,7 +36,7 @@
 
 ### 继承自 Phase 1
 
-- **路径与包名**：源码 `app/src/main/kotlin/`，测试 `app/src/test/kotlin/`，androidTest `app/src/androidTest/kotlin/`；包名前缀 `dev.minios.ocremote.`
+- **路径与包名**：源码 `app/src/main/kotlin/`，测试 `app/src/test/kotlin/`，androidTest `app/src/androidTest/kotlin/`；包名前缀 `dev.leonardo.ocremotev2.`
 - **Gradle 命令带 flavor**：`compileDevDebugKotlin`（120s）、`testDevDebugUnitTest --rerun`（180s）
 - **Material 3 First**：用 `MaterialTheme.colorScheme` 语义色，不自定义 Canvas
 - **Alpha tokens**：`AlphaTokens.SELECTED(0.12) / DIFF_BG(0.10) / FAINT(0.35) / MUTED(0.50) / MEDIUM(0.70) / HIGH(0.80) / AMOLED(0.92)`
@@ -296,9 +296,9 @@ override suspend fun findFiles(serverId: String, directory: String, query: Strin
 
 ```kotlin
 // domain/usecase/FindFilesUseCase.kt
-package dev.minios.ocremote.domain.usecase
+package dev.leonardo.ocremotev2.domain.usecase
 
-import dev.minios.ocremote.domain.repository.FileRepository
+import dev.leonardo.ocremotev2.domain.repository.FileRepository
 import javax.inject.Inject
 
 class FindFilesUseCase @Inject constructor(
@@ -595,7 +595,7 @@ git commit -m "feat: WorkspaceViewModel search state (debounce 300ms, cancel sta
 
 ```kotlin
 // workspace/search/SearchTopBar.kt
-package dev.minios.ocremote.ui.screens.workspace.search
+package dev.leonardo.ocremotev2.ui.screens.workspace.search
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
@@ -621,7 +621,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import dev.minios.ocremote.R
+import dev.leonardo.ocremotev2.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -693,7 +693,7 @@ fun SearchTopBar(
 
 ```kotlin
 // workspace/search/SearchOverlay.kt
-package dev.minios.ocremote.ui/screens.workspace.search
+package dev.leonardo.ocremotev2.ui/screens.workspace.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -719,15 +719,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.R
-import dev.minios.ocremote.domain.model.VcsChange
-import dev.minios.ocremote.domain.model.VcsStatus
-import dev.minios.ocremote.ui.screens.workspace.WorkspacePanel
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.DiffAdded
-import dev.minios.ocremote.ui.theme.DiffRemoved
-import dev.minios.ocremote.ui.theme.ShapeTokens
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.domain.model.VcsChange
+import dev.leonardo.ocremotev2.domain.model.VcsStatus
+import dev.leonardo.ocremotev2.ui.screens.workspace.WorkspacePanel
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.ui.theme.DiffAdded
+import dev.leonardo.ocremotev2.ui.theme.DiffRemoved
+import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import androidx.compose.material3.Surface
 
 @Composable
@@ -1098,7 +1098,7 @@ git commit -m "feat: WorkspaceScreen search integration (Crossfade TopBar, 🔍 
 
 ```kotlin
 // viewer/MarkdownPreview.kt
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -1110,9 +1110,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.ui.theme.AlphaTokens
-import dev.minios.ocremote.ui.theme.CodeTypography
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.ui.theme.CodeTypography
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -1860,10 +1860,10 @@ class ToolSnapshotGrouperTest {
 
 ```kotlin
 // chat/tools/ToolSnapshotGrouper.kt
-package dev.minios.ocremote.ui.screens.chat.tools
+package dev.leonardo.ocremotev2.ui.screens.chat.tools
 
-import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.ToolState
+import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.ToolState
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -2043,7 +2043,7 @@ git commit -m "feat: ToolSnapshotGrouper (same-message same-path grouping, cumul
 
 ```kotlin
 // domain/repository/ToolSnapshotCache.kt
-package dev.minios.ocremote.domain.repository
+package dev.leonardo.ocremotev2.domain.repository
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -2691,7 +2691,7 @@ lokit
 
 ```yaml
 # 22-workspace-search.yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 
 - runFlow: ../e2e-verify/06-chat-screen.yaml
@@ -2752,7 +2752,7 @@ appId: dev.minios.ocremote.dev
 
 ```yaml
 # 24-tool-card-view.yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 
 # 前置：需在 chat 中让 AI 调用 Edit/Read/Write（人工准备）
@@ -2791,7 +2791,7 @@ appId: dev.minios.ocremote.dev
 
 ```yaml
 # 25-md-preview-toggle.yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 
 - runFlow: ../e2e-verify/06-chat-screen.yaml

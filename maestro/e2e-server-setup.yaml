@@ -1,4 +1,4 @@
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 name: E2E - Server Setup (Real OpenCode Server)
 tags:
   - e2e

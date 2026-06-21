@@ -100,7 +100,7 @@ git commit -m "chore: add lifecycle-process dependency and notification_new_mess
 创建 `app/src/test/kotlin/dev/minios/ocremote/service/SessionFocusHolderTest.kt`：
 
 ```kotlin
-package dev.minios.ocremote.service
+package dev.leonardo.ocremotev2.service
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -168,7 +168,7 @@ class SessionFocusHolderTest {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.minios.ocremote.service.SessionFocusHolderTest" --rerun`
+Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.service.SessionFocusHolderTest" --rerun`
 Expected: FAIL（SessionFocusHolder 类不存在）
 
 - [ ] **Step 3: 实现 SessionFocusHolder**
@@ -176,7 +176,7 @@ Expected: FAIL（SessionFocusHolder 类不存在）
 创建 `app/src/main/kotlin/dev/minios/ocremote/service/SessionFocusHolder.kt`：
 
 ```kotlin
-package dev.minios.ocremote.service
+package dev.leonardo.ocremotev2.service
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -229,7 +229,7 @@ class SessionFocusHolder @Inject constructor() {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.minios.ocremote.service.SessionFocusHolderTest" --rerun`
+Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.service.SessionFocusHolderTest" --rerun`
 Expected: PASS（7 个测试）
 
 - [ ] **Step 5: Commit**
@@ -252,13 +252,13 @@ git commit -m "feat: add SessionFocusHolder for foreground/session tracking"
 创建 `app/src/test/kotlin/dev/minios/ocremote/service/FindUserMessagesTest.kt`：
 
 ```kotlin
-package dev.minios.ocremote.service
+package dev.leonardo.ocremotev2.service
 
-import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.SettingsDataStore
-import dev.minios.ocremote.domain.model.Message
-import dev.minios.ocremote.domain.model.Part
-import dev.minios.ocremote.domain.model.TimeInfo
+import dev.leonardo.ocremotev2.data.repository.EventDispatcher
+import dev.leonardo.ocremotev2.data.repository.SettingsDataStore
+import dev.leonardo.ocremotev2.domain.model.Message
+import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.domain.model.TimeInfo
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -390,7 +390,7 @@ class FindUserMessagesTest {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.minios.ocremote.service.FindUserMessagesTest" --rerun`
+Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.service.FindUserMessagesTest" --rerun`
 Expected: FAIL（findLatestUserMessages 方法不存在）
 
 - [ ] **Step 3: 实现 findLatestUserMessages + UserMessagePreview**
@@ -439,7 +439,7 @@ data class UserMessagePreview(
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.minios.ocremote.service.FindUserMessagesTest" --rerun`
+Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.service.FindUserMessagesTest" --rerun`
 Expected: PASS（7 个测试）
 
 - [ ] **Step 5: Commit**
@@ -462,11 +462,11 @@ git commit -m "feat: add findLatestUserMessages for notification content extract
 创建 `app/src/test/kotlin/dev/minios/ocremote/service/CancelSessionNotificationsTest.kt`：
 
 ```kotlin
-package dev.minios.ocremote.service
+package dev.leonardo.ocremotev2.service
 
 import android.app.NotificationManager
-import dev.minios.ocremote.data.repository.EventDispatcher
-import dev.minios.ocremote.data.repository.SettingsDataStore
+import dev.leonardo.ocremotev2.data.repository.EventDispatcher
+import dev.leonardo.ocremotev2.data.repository.SettingsDataStore
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -511,7 +511,7 @@ class CancelSessionNotificationsTest {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.minios.ocremote.service.CancelSessionNotificationsTest" --rerun`
+Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.service.CancelSessionNotificationsTest" --rerun`
 Expected: FAIL（cancelSessionNotifications 方法不存在）
 
 - [ ] **Step 3: 实现 cancelSessionNotifications**
@@ -537,7 +537,7 @@ Expected: FAIL（cancelSessionNotifications 方法不存在）
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.minios.ocremote.service.CancelSessionNotificationsTest" --rerun`
+Run: `.\gradlew.bat :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.service.CancelSessionNotificationsTest" --rerun`
 Expected: PASS（2 个测试）
 
 - [ ] **Step 5: Commit**
@@ -727,8 +727,8 @@ val serverId: String = URLDecoder.decode(
 ```kotlin
 import android.app.NotificationManager
 import android.content.Context
-import dev.minios.ocremote.service.SessionFocusHolder
-import dev.minios.ocremote.service.AppNotificationManager
+import dev.leonardo.ocremotev2.service.SessionFocusHolder
+import dev.leonardo.ocremotev2.service.AppNotificationManager
 ```
 
 - [ ] **Step 3: 添加 onSessionFocused / onSessionUnfocused 方法**
@@ -839,7 +839,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import dev.minios.ocremote.service.SessionFocusHolder
+import dev.leonardo.ocremotev2.service.SessionFocusHolder
 ```
 
 2. 在 `onCreate()` 方法末尾（return 之前），添加：

@@ -100,10 +100,10 @@ git commit -m "feat(workspace): add expandedDirs and loadingDirs to WorkspaceUiS
 创建测试文件 `app/src/test/kotlin/dev/minios/ocremote/ui/screens/workspace/FileTreeUtilsTest.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.workspace
+package dev.leonardo.ocremotev2.ui.screens.workspace
 
-import dev.minios.ocremote.domain.model.FileNode
-import dev.minios.ocremote.domain.model.FileType
+import dev.leonardo.ocremotev2.domain.model.FileNode
+import dev.leonardo.ocremotev2.domain.model.FileType
 import org.junit.Test
 
 class FileTreeUtilsTest {
@@ -290,9 +290,9 @@ Expected: COMPILATION ERROR（`flattenTree` / `withChildren` unresolved referenc
 创建文件 `app/src/main/kotlin/dev/minios/ocremote/ui/screens/workspace/FileTreeUtils.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.workspace
+package dev.leonardo.ocremotev2.ui.screens.workspace
 
-import dev.minios.ocremote.domain.model.isDirectory
+import dev.leonardo.ocremotev2.domain.model.isDirectory
 
 /**
  * Flattens the file tree into a (node, depth) list for [LazyColumn] rendering.
@@ -618,7 +618,7 @@ git commit -m "feat(workspace): add toggleExpand and lazy-load subdirectory chil
 将 `FileTreePanel.kt` 全文替换为以下内容（改动点：import 新增箭头图标、`flattenTree` 替代 `flatten`、`FileTreePanel` 签名新增 `onToggleExpand`、`FileTreeItem` 新增 `isExpanded`/`isLoading`/`onToggleExpand` 参数 + 展开箭头 UI、移除旧 private `flatten` 函数）：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.workspace.tree
+package dev.leonardo.ocremotev2.ui.screens.workspace.tree
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -654,12 +654,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.R
-import dev.minios.ocremote.domain.model.isDirectory
-import dev.minios.ocremote.ui.screens.workspace.FileTreeNode
-import dev.minios.ocremote.ui.screens.workspace.WorkspaceUiState
-import dev.minios.ocremote.ui.screens.workspace.flattenTree
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.domain.model.isDirectory
+import dev.leonardo.ocremotev2.ui.screens.workspace.FileTreeNode
+import dev.leonardo.ocremotev2.ui.screens.workspace.WorkspaceUiState
+import dev.leonardo.ocremotev2.ui.screens.workspace.flattenTree
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
 /**
  * File tree panel: renders the workspace as a flattened, depth-indented list.

@@ -335,7 +335,7 @@ A throwaway screen that does exactly these three things is the cheapest way to s
 Create `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/TermlibPocScreen.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -442,7 +442,7 @@ fun TermlibPocScreen(
 Create `app/src/main/kotlin/dev/minios/ocremote/ui/navigation/routes/TermlibPocRoute.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.navigation.routes
+package dev.leonardo.ocremotev2.ui.navigation.routes
 
 import kotlinx.serialization.Serializable
 
@@ -465,8 +465,8 @@ Read `app/src/main/kotlin/dev/minios/ocremote/ui/navigation/NavGraph.kt`. Find a
 
 Add the necessary imports at the top of `NavGraph.kt`:
 ```kotlin
-import dev.minios.ocremote.ui.navigation.routes.TermlibPocRoute
-import dev.minios.ocremote.ui.screens.chat.terminal.TermlibPocScreen
+import dev.leonardo.ocremotev2.ui.navigation.routes.TermlibPocRoute
+import dev.leonardo.ocremotev2.ui.screens.chat.terminal.TermlibPocScreen
 ```
 
 Also add a temporary entry point: in whichever screen has the dev tools / debug menu (search for `BuildConfig.DEBUG` usage to locate), add a button that navigates to `TermlibPocRoute`. If no debug menu exists, add the navigation trigger to the About screen (`ui/screens/about/`) under a `if (BuildConfig.DEBUG)` guard. The exact insertion point is not load-bearing — pick the least invasive spot.
@@ -517,7 +517,7 @@ git commit -m "feat: termlib POC screen verifying public API
 
 **Interfaces:**
 - Consumes:
-  - `dev.minios.ocremote.data.dto.common.PtySocket` — existing class with `suspend fun send(input: String)`, `suspend fun close()`, `suspend fun readLoop(onText: suspend (String) -> Unit)`.
+  - `dev.leonardo.ocremotev2.data.dto.common.PtySocket` — existing class with `suspend fun send(input: String)`, `suspend fun close()`, `suspend fun readLoop(onText: suspend (String) -> Unit)`.
   - `org.connectbot.terminal.TerminalEmulator` — interface with `fun writeInput(data: ByteArray, offset: Int, length: Int)`, `fun resize(newRows: Int, newCols: Int)`, `fun clearScreen()`.
   - `org.connectbot.terminal.TerminalEmulatorFactory.create(...)`.
 - Produces:
@@ -538,7 +538,7 @@ git commit -m "feat: termlib POC screen verifying public API
 Create `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/TerminalEmulatorHolder.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -577,10 +577,10 @@ class TerminalEmulatorHolder(
 Create `app/src/test/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/PtyToTermlibAdapterTest.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import app.cash.turbine.test
-import dev.minios.ocremote.data.dto.common.PtySocket
+import dev.leonardo.ocremotev2.data.dto.common.PtySocket
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -761,7 +761,7 @@ Note: `FakePtySocket` extends `PtySocket(session = mockk(...))` because `PtySock
 
 Run:
 ```powershell
-.\gradlew :app:testDevDebugUnitTest --tests "dev.minios.ocremote.ui.screens.chat.terminal.PtyToTermlibAdapterTest" --rerun
+.\gradlew :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.ui.screens.chat.terminal.PtyToTermlibAdapterTest" --rerun
 ```
 Expected: compilation failure (`Unresolved reference: PtyToTermlibAdapter`). This is the TDD red state.
 
@@ -770,10 +770,10 @@ Expected: compilation failure (`Unresolved reference: PtyToTermlibAdapter`). Thi
 Create `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/PtyToTermlibAdapter.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import android.util.Log
-import dev.minios.ocremote.data.dto.common.PtySocket
+import dev.leonardo.ocremotev2.data.dto.common.PtySocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -919,7 +919,7 @@ class PtyToTermlibAdapter(
 
 Run:
 ```powershell
-.\gradlew :app:testDevDebugUnitTest --tests "dev.minios.ocremote.ui.screens.chat.terminal.PtyToTermlibAdapterTest" --rerun
+.\gradlew :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.ui.screens.chat.terminal.PtyToTermlibAdapterTest" --rerun
 ```
 Expected: all 5 tests pass. If `FakePtySocket` fails to extend `PtySocket` because the latter is final, apply the `open` modifier per the note in Step 2.
 
@@ -1293,11 +1293,11 @@ At the top of `ServerTerminalWorkspace.kt`, replace the import of the old emulat
 
 Remove:
 ```kotlin
-// (no explicit import — TerminalEmulator is in the same package dev.minios.ocremote.ui.screens.chat)
+// (no explicit import — TerminalEmulator is in the same package dev.leonardo.ocremotev2.ui.screens.chat)
 ```
 Add:
 ```kotlin
-import dev.minios.ocremote.ui.screens.chat.terminal.PtyToTermlibAdapter
+import dev.leonardo.ocremotev2.ui.screens.chat.terminal.PtyToTermlibAdapter
 import org.connectbot.terminal.TerminalEmulatorFactory
 ```
 
@@ -1321,7 +1321,7 @@ Expected: `BUILD SUCCESSFUL`. Common failures:
 
 Run:
 ```powershell
-.\gradlew :app:testDevDebugUnitTest --tests "dev.minios.ocremote.data.repository.TerminalRepositoryImplTest" --rerun
+.\gradlew :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.data.repository.TerminalRepositoryImplTest" --rerun
 ```
 Expected: pass. If `TerminalRepositoryImplTest` references the old `TerminalEmulator`, update the type references to `org.connectbot.terminal.TerminalEmulator`. Do not change test assertions — they should still hold.
 
@@ -1367,7 +1367,7 @@ git commit -m "refactor: ServerTerminalWorkspace uses termlib via PtyToTermlibAd
 Create `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/TermlibModifierManager.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1424,7 +1424,7 @@ class TermlibModifierManager : ModifierManager {
 Create `app/src/test/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/TermlibModifierManagerTest.kt`:
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -1470,7 +1470,7 @@ class TermlibModifierManagerTest {
 
 Run:
 ```powershell
-.\gradlew :app:testDevDebugUnitTest --tests "dev.minios.ocremote.ui.screens.chat.terminal.TermlibModifierManagerTest" --rerun
+.\gradlew :app:testDevDebugUnitTest --tests "dev.leonardo.ocremotev2.ui.screens.chat.terminal.TermlibModifierManagerTest" --rerun
 ```
 Expected: all 3 tests pass.
 
@@ -1483,7 +1483,7 @@ Read `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/SessionTe
 Replace the entire file content with the following. The public signature is preserved; the body collapses from 583 lines to ~120.
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.chat.terminal
+package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.layout.Box
@@ -1503,8 +1503,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.minios.ocremote.BuildConfig
-import dev.minios.ocremote.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.BuildConfig
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import org.connectbot.terminal.RightAltMode
 import org.connectbot.terminal.Terminal
 import org.connectbot.terminal.TerminalEmulator
@@ -1517,7 +1517,7 @@ private const val TAG = "SessionTerminalInline"
  *
  * Public signature intentionally matches the previous hand-rolled version so
  * that ChatTerminalView.kt continues to compile — only the `emulator` parameter
- * type changed from the old dev.minios.ocremote...TerminalEmulator to
+ * type changed from the old dev.leonardo.ocremotev2...TerminalEmulator to
  * org.connectbot.terminal.TerminalEmulator.
  *
  * What this composable no longer does (handled by termlib internally):
@@ -1711,7 +1711,7 @@ Read `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/terminal/ChatTermi
 
 However, `ChatTerminalView.kt` imports the old `TerminalEmulator` type. Search for the import line:
 ```kotlin
-import dev.minios.ocremote.ui.screens.chat.TerminalEmulator
+import dev.leonardo.ocremotev2.ui.screens.chat.TerminalEmulator
 ```
 Remove it. If any other code in the file references the type by simple name, either:
 - Replace with the fully-qualified `org.connectbot.terminal.TerminalEmulator`, or
@@ -1737,8 +1737,8 @@ In `app/src/main/kotlin/dev/minios/ocremote/ui/navigation/NavGraph.kt`, delete t
 ```
 And delete the two imports:
 ```kotlin
-import dev.minios.ocremote.ui.navigation.routes.TermlibPocRoute
-import dev.minios.ocremote.ui.screens.chat.terminal.TermlibPocScreen
+import dev.leonardo.ocremotev2.ui.navigation.routes.TermlibPocRoute
+import dev.leonardo.ocremotev2.ui.screens.chat.terminal.TermlibPocScreen
 ```
 Also delete the temporary debug-menu entry point you added in Task 2 Step 3.
 
@@ -1805,13 +1805,13 @@ git commit -m "refactor: wire ChatTerminalView and ChatViewModel to termlib type
 
 **Files:**
 - Delete: `app/src/main/kotlin/dev/minios/ocremote/ui/screens/chat/TerminalEmulator.kt` (1226 lines)
-- Modify: any file that still references `dev.minios.ocremote.ui.screens.chat.TerminalEmulator` (search and update)
+- Modify: any file that still references `dev.leonardo.ocremotev2.ui.screens.chat.TerminalEmulator` (search and update)
 
 **Interfaces:**
 - Consumes: all prior tasks completed — no production code references the old type.
 - Produces: a tree with no orphaned hand-rolled ANSI parser.
 
-**Risk:** the old `TerminalEmulator` class is in package `dev.minios.ocremote.ui.screens.chat`, which is the same package as `ServerTerminalWorkspace.kt`. References may be unqualified (no import). A grep for `TerminalEmulator` across the codebase is mandatory before deletion.
+**Risk:** the old `TerminalEmulator` class is in package `dev.leonardo.ocremotev2.ui.screens.chat`, which is the same package as `ServerTerminalWorkspace.kt`. References may be unqualified (no import). A grep for `TerminalEmulator` across the codebase is mandatory before deletion.
 
 - [ ] **Step 1: Grep for all remaining references**
 
@@ -1821,7 +1821,7 @@ rg -n "TerminalEmulator" app/src/main/kotlin app/src/test/kotlin
 ```
 Filter the output mentally:
 - `org.connectbot.terminal.TerminalEmulator` → keep (termlib)
-- `dev.minios.ocremote.ui.screens.chat.TerminalEmulator` → must be removed
+- `dev.leonardo.ocremotev2.ui.screens.chat.TerminalEmulator` → must be removed
 - Bare `TerminalEmulator` in files under `dev/minios/ocremote/ui/screens/chat/` → ambiguous; open the file and check the import block
 
 If any file still references the old type, update it now. Common spots:
@@ -1898,7 +1898,7 @@ If no server is available, this task can still create the YAML, but the "Run the
 Create `maestro/terminal-smoke.yaml`:
 
 ```yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 # Prerequisites:
 #   - OpenCode server running and reachable from the emulator (10.0.2.2:4096)

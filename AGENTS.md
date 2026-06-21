@@ -26,8 +26,8 @@ Unofficial OpenCode Android client. Jetpack Compose + Kotlin + Hilt + Ktor.
 
 | Flavor | applicationId | Purpose |
 |--------|---------------|---------|
-| `dev` | `dev.minios.ocremote.dev` | Development build, coexists with beta |
-| `beta` | `dev.minios.ocremote` | Production release |
+| `dev` | `dev.leonardo.ocremotev2.dev` | Development build, coexists with beta |
+| `beta` | `dev.leonardo.ocremotev2` | Production release |
 
 Always specify the flavor in gradle tasks: `assembleDevRelease`, `assembleBetaDebug`, etc. The CI workflow only builds `assembleRelease` (no flavor — needs updating).
 

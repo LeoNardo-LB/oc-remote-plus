@@ -31,7 +31,7 @@
 
 ### 继承自 Phase 1-3
 
-- **路径与包名**：源码 `app/src/main/kotlin/`，测试 `app/src/test/kotlin/`；包名前缀 `dev.minios.ocremote.`
+- **路径与包名**：源码 `app/src/main/kotlin/`，测试 `app/src/test/kotlin/`；包名前缀 `dev.leonardo.ocremotev2.`
 - **Gradle 命令带 flavor**：`compileDevDebugKotlin`（120s）、`testDevDebugUnitTest --rerun`（180s）
 - **Material 3 First / Alpha tokens / Spacing tokens**
 - **测试 isReturnDefaultValues=true + 真实样本**
@@ -208,7 +208,7 @@ data class FileViewerUiState(
 
 ```kotlin
 private val largeKotlinContent = buildString {
-    append("package dev.minios.ocremote\n\n")
+    append("package dev.leonardo.ocremotev2\n\n")
     append("class LargeFile {\n")
     for (i in 1..2000) {
         append("    fun method$i(): Int = $i\n")
@@ -925,7 +925,7 @@ git commit -m "feat: annotations survive rotation via SavedStateHandle (Annotati
 
 ```yaml
 # 26-large-file-pagination.yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 
 - runFlow: ../e2e-verify/06-chat-screen.yaml
@@ -986,7 +986,7 @@ appId: dev.minios.ocremote.dev
 
 ```yaml
 # 27-rotation-restoration.yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 
 # 前置：此 flow 需在 tablet config 或开启自动旋转的 emulator 上运行

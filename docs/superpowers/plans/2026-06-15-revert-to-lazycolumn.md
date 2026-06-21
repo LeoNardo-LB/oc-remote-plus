@@ -62,8 +62,8 @@ Edit ChatMessageList.kt:
 
 old:
 ```kotlin
-import dev.minios.ocremote.ui.components.AnchoredLazyColumn
-import dev.minios.ocremote.ui.components.AnchoredLazyListState
+import dev.leonardo.ocremotev2.ui.components.AnchoredLazyColumn
+import dev.leonardo.ocremotev2.ui.components.AnchoredLazyListState
 ```
 
 new:
@@ -148,7 +148,7 @@ private suspend fun AnchoredLazyListState.snapToBottom() {
 
 old:
 ```kotlin
-import dev.minios.ocremote.ui.components.AnchoredLazyListState
+import dev.leonardo.ocremotev2.ui.components.AnchoredLazyListState
 ```
 
 new:

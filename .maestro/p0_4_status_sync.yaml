@@ -1,4 +1,4 @@
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 name: P0-4 Session Status Sync Check
 ---
 # This flow verifies that the app is running without crashes

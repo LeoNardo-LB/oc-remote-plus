@@ -35,7 +35,7 @@
 
 ### 继承自 Phase 1
 
-- **路径与包名**：源码 `app/src/main/kotlin/`，测试 `app/src/test/kotlin/`，包名前缀 `dev.minios.ocremote.`
+- **路径与包名**：源码 `app/src/main/kotlin/`，测试 `app/src/test/kotlin/`，包名前缀 `dev.leonardo.ocremotev2.`
 - **Gradle 命令带 flavor**：`compileDevDebugKotlin`（120s）、`testDevDebugUnitTest --rerun`（180s）
 - **Material 3 First**：用 `MaterialTheme.colorScheme` 语义色，不自定义 Canvas
 - **Alpha tokens**：`AlphaTokens.SELECTED(0.12) / DIFF_BG(0.10) / FAINT(0.35) / MUTED(0.50) / MEDIUM(0.70) / HIGH(0.80) / AMOLED(0.92)`
@@ -153,7 +153,7 @@ CodeSourceView 已用 `Highlights` 库生成语法高亮 `AnnotatedString`（Pha
 创建 `OffsetConverterTest.kt`：
 
 ```kotlin
-package dev.minios.ocremote.domain.model
+package dev.leonardo.ocremotev2.domain.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -162,7 +162,7 @@ class OffsetConverterTest {
 
     // 真实样本：OpenCodeApi.kt 前几行
     private val sampleKotlin = """
-        package dev.minios.ocremote
+        package dev.leonardo.ocremotev2
 
         import io.ktor.client.HttpClient
         import io.ktor.client.request.get
@@ -263,7 +263,7 @@ Expected: FAIL — `OffsetConverter` unresolved reference.
 创建 `Annotation.kt`：
 
 ```kotlin
-package dev.minios.ocremote.domain.model
+package dev.leonardo.ocremotev2.domain.model
 
 /**
  * A user annotation on a code selection in the FileViewer source view.
@@ -371,9 +371,9 @@ git commit -m "feat: Annotation domain model + OffsetConverter (handles LF/CRLF/
 创建 `AnnotationManagerTest.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
-import dev.minios.ocremote.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.Annotation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -384,7 +384,7 @@ class AnnotationManagerTest {
     private lateinit var manager: AnnotationManager
 
     private val sampleContent = """
-        package dev.minios.ocremote
+        package dev.leonardo.ocremotev2
 
         import android.os.Bundle
         import androidx.appcompat.app.AppCompatActivity
@@ -521,10 +521,10 @@ Expected: FAIL.
 创建 `AnnotationManager.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
-import dev.minios.ocremote.domain.model.Annotation
-import dev.minios.ocremote.domain.model.OffsetConverter
+import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.OffsetConverter
 import java.util.UUID
 
 /**
@@ -607,9 +607,9 @@ git commit -m "feat: AnnotationManager (add/delete/update + renumber, line inter
 - [ ] **Step 1: 写失败测试**
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
-import dev.minios.ocremote.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.Annotation
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -687,9 +687,9 @@ class AnnotationPromptBuilderTest {
 - [ ] **Step 3: 实现 AnnotationPromptBuilder**
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
-import dev.minios.ocremote.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.Annotation
 import java.io.File
 
 /**
@@ -763,12 +763,12 @@ git commit -m "feat: AnnotationPromptBuilder (structured text, path resolution, 
 - [ ] **Step 1: 写失败测试**
 
 ```kotlin
-package dev.minios.ocremote.domain.usecase
+package dev.leonardo.ocremotev2.domain.usecase
 
-import dev.minios.ocremote.domain.model.Annotation
-import dev.minios.ocremote.domain.model.PromptPart
-import dev.minios.ocremote.domain.repository.ChatRepository
-import dev.minios.ocremote.ui.screens.viewer.AnnotationPromptBuilder
+import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.PromptPart
+import dev.leonardo.ocremotev2.domain.repository.ChatRepository
+import dev.leonardo.ocremotev2.ui.screens.viewer.AnnotationPromptBuilder
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -824,12 +824,12 @@ class SubmitAnnotationsUseCaseTest {
 - [ ] **Step 3: 实现 SubmitAnnotationsUseCase**
 
 ```kotlin
-package dev.minios.ocremote.domain.usecase
+package dev.leonardo.ocremotev2.domain.usecase
 
-import dev.minios.ocremote.domain.model.Annotation
-import dev.minios.ocremote.domain.model.PromptPart
-import dev.minios.ocremote.domain.repository.ChatRepository
-import dev.minios.ocremote.ui.screens.viewer.AnnotationPromptBuilder
+import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.PromptPart
+import dev.leonardo.ocremotev2.domain.repository.ChatRepository
+import dev.leonardo.ocremotev2.ui.screens.viewer.AnnotationPromptBuilder
 import javax.inject.Inject
 
 /**
@@ -891,7 +891,7 @@ git commit -m "feat: SubmitAnnotationsUseCase (builds prompt + delegates to Chat
 在 `FileViewerUiState.kt` 的 data class 中添加：
 
 ```kotlin
-import dev.minios.ocremote.domain.model.Annotation
+import dev.leonardo.ocremotev2.domain.model.Annotation
 
 // ... existing fields ...
     val currentHunkIndex: Int = 0,
@@ -905,20 +905,20 @@ import dev.minios.ocremote.domain.model.Annotation
 完整修改 `FileViewerViewModel.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.minios.ocremote.R
-import dev.minios.ocremote.domain.model.ContentType
-import dev.minios.ocremote.domain.model.VcsDiffMode
-import dev.minios.ocremote.domain.usecase.GetFileContentUseCase
-import dev.minios.ocremote.domain.usecase.GetFileDiffUseCase
-import dev.minios.ocremote.domain.usecase.SubmitAnnotationsUseCase
-import dev.minios.ocremote.ui.navigation.routes.FileViewerNav
-import dev.minios.ocremote.ui.navigation.routes.ServerRouteParams
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.domain.model.ContentType
+import dev.leonardo.ocremotev2.domain.model.VcsDiffMode
+import dev.leonardo.ocremotev2.domain.usecase.GetFileContentUseCase
+import dev.leonardo.ocremotev2.domain.usecase.GetFileDiffUseCase
+import dev.leonardo.ocremotev2.domain.usecase.SubmitAnnotationsUseCase
+import dev.leonardo.ocremotev2.ui.navigation.routes.FileViewerNav
+import dev.leonardo.ocremotev2.ui.navigation.routes.ServerRouteParams
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -1034,7 +1034,7 @@ class FileViewerViewModel @Inject constructor(
 
 ```kotlin
 // 添加 import
-import dev.minios.ocremote.domain.usecase.SubmitAnnotationsUseCase
+import dev.leonardo.ocremotev2.domain.usecase.SubmitAnnotationsUseCase
 import org.junit.Assert.assertEquals
 
 // 添加字段
@@ -1137,7 +1137,7 @@ git commit -m "feat: FileViewerViewModel annotation state (add/delete/update/sub
 创建 `AnnotationContextMenu.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
@@ -1227,7 +1227,7 @@ git commit -m "feat: annotation context menu via appendTextContextMenuComponents
 创建 `AnnotationInputSheet.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -1256,8 +1256,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.R
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import kotlinx.coroutines.launch
 
 /**
@@ -1353,7 +1353,7 @@ fun AnnotationInputSheet(
 创建 `AnnotationDetailDialog.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -1376,9 +1376,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.minios.ocremote.R
-import dev.minios.ocremote.domain.model.Annotation
-import dev.minios.ocremote.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
 /**
  * Dialog showing annotation details when user taps an existing highlight.
@@ -1512,8 +1512,8 @@ git commit -m "feat: AnnotationInputSheet (bottom sheet) + AnnotationDetailDialo
 ```kotlin
 // === 新增 import ===
 import androidx.compose.foundation.text.selection.SelectionContainer
-import dev.minios.ocremote.domain.model.Annotation
-import dev.minios.ocremote.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 
 // === 修改函数签名 ===
 @Composable
@@ -1919,7 +1919,7 @@ private fun AnnotationSubmitDialog(
 完整修改 `FileViewerRoute.kt`：
 
 ```kotlin
-package dev.minios.ocremote.ui.screens.viewer
+package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import android.content.Intent
 import androidx.compose.material3.SnackbarHostState
@@ -1934,7 +1934,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.minios.ocremote.R
+import dev.leonardo.ocremotev2.R
 import kotlinx.coroutines.launch
 
 @Composable
@@ -2115,7 +2115,7 @@ grep -rn "testTag.*annotation_toolbar_annotate\|testTag.*annotation_input_note\|
 创建 `maestro/e2e-file-viewer-annotation.yaml`：
 
 ```yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 name: E2E - File Viewer Annotation (Real OpenCode Server)
 tags:
   - e2e

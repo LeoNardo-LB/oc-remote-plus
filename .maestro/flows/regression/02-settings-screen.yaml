@@ -1,4 +1,4 @@
-appId: dev.minios.ocremote
+appId: dev.leonardo.ocremotev2
 name: "回归: 设置页面 (Switch颜色)"
 tags: [regression, color-cleanup]
 ---

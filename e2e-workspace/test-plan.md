@@ -6,7 +6,7 @@
 | 生成时间 | 2026-06-19 12:30 |
 | 平台 | Android (emulator-5554, 1080x2400) |
 | 目标版本 | 2.0.0-beta.173 (VERSION_CODE=373) |
-| 应用包名 | dev.minios.ocremote.dev (dev flavor) |
+| 应用包名 | dev.leonardo.ocremotev2.dev (dev flavor) |
 | 测试范围 | Workspace 文件树 / Git 变更 / FileViewer / DiffView / 导航入口 |
 | 服务器 | http://10.0.2.2:4096 (opencode) |
 

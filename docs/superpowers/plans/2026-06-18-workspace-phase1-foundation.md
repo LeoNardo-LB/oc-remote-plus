@@ -45,7 +45,7 @@
 ### 路径与包名
 
 - 源码：`app/src/main/kotlin/`（非 `java/`）；测试：`app/src/test/kotlin/`；androidTest：`app/src/androidTest/kotlin/`
-- 包名前缀：`dev.minios.ocremote.`
+- 包名前缀：`dev.leonardo.ocremotev2.`
 - 资源：`app/src/main/res/values/strings.xml` + 15 个 `values-*` locale
 
 ### 构建环境（D6 修正：前置依赖必须显式化）
@@ -66,7 +66,7 @@
 ### 项目规范
 
 - **Material 3 First**：用 `MaterialTheme.colorScheme` 语义色，不自定义 Canvas
-- **Alpha tokens**：`dev.minios.ocremote.ui.theme.AlphaTokens`（SELECTED=0.12 / DIFF_BG=0.10 / FAINT=0.35 / MUTED=0.50 / MEDIUM=0.70 / HIGH=0.80 / AMOLED=0.92）
+- **Alpha tokens**：`dev.leonardo.ocremotev2.ui.theme.AlphaTokens`（SELECTED=0.12 / DIFF_BG=0.10 / FAINT=0.35 / MUTED=0.50 / MEDIUM=0.70 / HIGH=0.80 / AMOLED=0.92）
 - **Spacing tokens**：`SpacingTokens.XS(4)/SM(8)/MD(12)/LG(16)/XL(24)/XXL(32).dp`
 - **Shape tokens**：`ShapeTokens.none/extraSmall/smallMedium/small/mediumSmall/medium/large/largeMedium/extraLarge`（⚠️ **无 XS/SM/MD 简写**，D3-004 修正）
 - **颜色**：`DiffAdded`(0xFF4CAF50 绿) / `DiffRemoved`(0xFFE53935 红) 是仅有的 Diff 色（⚠️ **无 DiffAddedBg/DiffAddedFg**，用 `.copy(alpha=AlphaTokens.DIFF_BG)` 派生，D3-005 修正）
@@ -165,7 +165,7 @@ API：`Highlights.Builder().code(content).language(lang).build()` → `highlight
 
 `FileResponses.kt` 改为：
 ```kotlin
-package dev.minios.ocremote.data.dto.response
+package dev.leonardo.ocremotev2.data.dto.response
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -267,7 +267,7 @@ data class FileDiffDto(
 
 `domain/model/FileNode.kt`:
 ```kotlin
-package dev.minios.ocremote.domain.model
+package dev.leonardo.ocremotev2.domain.model
 data class FileNode(val name: String, val path: String, val absolute: String,
     val type: FileType, val ignored: Boolean, val size: Long? = null, val modified: Long? = null)
 enum class FileType { FILE, DIRECTORY }
@@ -276,14 +276,14 @@ fun FileNode.isDirectory() = type == FileType.DIRECTORY
 
 `domain/model/FileContent.kt`:
 ```kotlin
-package dev.minios.ocremote.domain.model
+package dev.leonardo.ocremotev2.domain.model
 data class FileContent(val path: String, val type: ContentType, val content: String, val mimeType: String? = null)
 enum class ContentType { TEXT, BINARY }
 ```
 
 `domain/model/Vcs.kt`:
 ```kotlin
-package dev.minios.ocremote.domain.model
+package dev.leonardo.ocremotev2.domain.model
 data class VcsChange(val file: String, val additions: Int, val deletions: Int, val status: VcsStatus)
 enum class VcsStatus { ADDED, DELETED, MODIFIED }
 data class VcsBranchInfo(val branch: String?, val defaultBranch: String?)
@@ -292,7 +292,7 @@ enum class VcsDiffMode(val apiValue: String) { GIT("git"), BRANCH("branch") }
 
 `domain/model/VcsFileDiff.kt`（⚠️ **新建，不复用 FileDiff**，D2-002 修正）:
 ```kotlin
-package dev.minios.ocremote.domain.model
+package dev.leonardo.ocremotev2.domain.model
 /** GET /vcs/diff 返回项。与既有 FileDiff(before/after, SSE 用) 不同——本类含 unified diff patch。 */
 data class VcsFileDiff(
     val file: String,
@@ -335,7 +335,7 @@ data class VcsFileDiff(
 - [ ] **Step 3: 实现 FileMapper**
 
 ```kotlin
-package dev.minios.ocremote.data.mapper
+package dev.leonardo.ocremotev2.data.mapper
 // imports...
 fun FileNodeDto.toDomain(): FileNode = FileNode(name, path, absolute ?: "",
     type = when(type) { "directory" -> FileType.DIRECTORY; "file" -> FileType.FILE
@@ -1296,7 +1296,7 @@ onOpenWorkspace = {
 - [ ] **Step 3: flow 20（文件树）**
 
 ```yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 - runFlow: ../e2e-verify/06-chat-screen.yaml
 - tapOn:
@@ -1316,7 +1316,7 @@ appId: dev.minios.ocremote.dev
 - [ ] **Step 4: flow 21（Git 变更）**
 
 ```yaml
-appId: dev.minios.ocremote.dev
+appId: dev.leonardo.ocremotev2.dev
 ---
 - runFlow: ../e2e-verify/06-chat-screen.yaml
 - tapOn:
