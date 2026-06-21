@@ -24,7 +24,11 @@ import dev.minios.ocremote.domain.model.Session
 import dev.minios.ocremote.ui.navigation.routes.*
 import kotlinx.coroutines.launch
 import dev.minios.ocremote.ui.screens.about.AboutScreen
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.hilt.navigation.compose.hiltViewModel
 import dev.minios.ocremote.ui.screens.chat.ChatScreen
+import dev.minios.ocremote.ui.screens.chat.ChatViewModel
+import dev.minios.ocremote.ui.screens.chat.util.LocalOnViewTool
 import dev.minios.ocremote.ui.screens.home.HomeRoute
 import dev.minios.ocremote.ui.screens.sessions.SessionListRoute
 import dev.minios.ocremote.ui.screens.server.ServerModelFilterRoute
@@ -406,8 +410,33 @@ fun NavGraph(
                 emptyList()
             }
 
-            ChatScreen(
-                onNavigateBack = {
+            val chatViewModel = hiltViewModel<ChatViewModel>()
+            CompositionLocalProvider(
+                LocalOnViewTool provides { request ->
+                    chatViewModel.cacheToolPart(request.part)
+                    scope.launch {
+                        val session = sessionRepository.getSession(params.server.serverId, params.sessionId).getOrNull()
+                        val dir = session?.directory ?: params.directory
+                        navController.navigate(
+                            FileViewerNav.createRoute(
+                                serverUrl = params.server.serverUrl,
+                                username = params.server.username,
+                                password = params.server.password,
+                                serverName = params.server.serverName,
+                                serverId = params.server.serverId,
+                                sessionId = params.sessionId,
+                                filePath = request.filePath,
+                                source = request.source,
+                                toolPartIds = request.part.id,
+                                directory = dir
+                            )
+                        )
+                    }
+                }
+            ) {
+                ChatScreen(
+                    viewModel = chatViewModel,
+                    onNavigateBack = {
                     navController.popBackStack()
                 },
                 onNavigateToSession = { newSessionId ->
@@ -500,6 +529,7 @@ fun NavGraph(
                 },
                 startInTerminalMode = params.openTerminal
             )
+            }
         }
 
         // ============ Workspace Screen ============

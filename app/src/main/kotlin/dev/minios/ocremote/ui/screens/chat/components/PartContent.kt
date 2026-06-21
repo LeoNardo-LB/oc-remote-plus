@@ -111,7 +111,7 @@ internal fun PartContent(
                     { filePath ->
                         val source = if (isDiffTool) FileViewerNav.Source.TOOL_SNAPSHOT_DIFF
                         else FileViewerNav.Source.TOOL_SNAPSHOT
-                        viewTool(ViewToolRequest(filePath, source, listOf(part.id)))
+                        viewTool(ViewToolRequest(filePath, source, part))
                     }
                 } else onOpenFile
 
