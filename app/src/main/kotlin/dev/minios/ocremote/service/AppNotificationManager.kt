@@ -310,8 +310,9 @@ class AppNotificationManager @Inject constructor(
         val displayName = sessionTitle?.takeIf { it.isNotBlank() }
             ?: context.getString(R.string.notification_new_session)
         val title = "${context.getString(R.string.notification_tag_error)} · $displayName"
+        val safeError = error.trim().let { if (it.startsWith("{") || it.startsWith("[")) "" else it }
         val contentText = (sessionId?.let { findLatestUserMessages(it, 1).firstOrNull()?.text })
-            ?: error.ifBlank { context.getString(R.string.notification_new_message) }
+            ?: safeError.ifBlank { context.getString(R.string.notification_new_message) }
 
         val notifId = eventNotificationId(server.id, sessionId ?: "error", 3000)
         val pendingIntent = createSessionPendingIntent(context, server, sessionId, notifId)

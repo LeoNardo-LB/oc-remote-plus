@@ -736,22 +736,42 @@ class SseEventParserTest {
     }
 
     @Test
-    fun `str handles JsonObject without message field by toString`() {
+    fun `str handles JsonObject without message field by returning default`() {
         val innerObj = buildJsonObject {
             put("code", 500)
             put("detail", "Internal")
         }
         val obj = buildJsonObject { put("data", innerObj) }
-        val result = obj.str("data")
-        assertTrue(result.contains("500"))
+        assertEquals("", obj.str("data"))
+        assertEquals("fallback", obj.str("data", "fallback"))
     }
 
     @Test
-    fun `str handles JsonArray value by toString`() {
+    fun `str extracts type field from JsonObject when message absent`() {
+        val innerObj = buildJsonObject {
+            put("type", "context_overflow")
+            put("tokens", 12345)
+        }
+        val obj = buildJsonObject { put("error", innerObj) }
+        assertEquals("context_overflow", obj.str("error"))
+    }
+
+    @Test
+    fun `str extracts error field from JsonObject when message and type absent`() {
+        val innerObj = buildJsonObject {
+            put("error", "Something failed")
+            put("code", 42)
+        }
+        val obj = buildJsonObject { put("data", innerObj) }
+        assertEquals("Something failed", obj.str("data"))
+    }
+
+    @Test
+    fun `str handles JsonArray value by returning default`() {
         val arr = kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive("a"), JsonPrimitive("b")))
         val obj = buildJsonObject { put("items", arr) }
-        val result = obj.str("items")
-        assertTrue(result.contains("a"))
+        assertEquals("", obj.str("items"))
+        assertEquals("fallback", obj.str("items", "fallback"))
     }
 
     @Test

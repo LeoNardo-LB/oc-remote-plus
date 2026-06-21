@@ -85,7 +85,8 @@ class SessionListViewModelPaginationTest {
             manageSessionUseCase = manageSessionUseCase,
             deleteSessionUseCase = deleteSessionUseCase,
             draftRepository = mockk(relaxed = true),
-            mcpRepository = mockk(relaxed = true)
+            mcpRepository = mockk(relaxed = true),
+            scrollSignal = SessionScrollSignal()
         )
     }
 }

@@ -15,6 +15,7 @@ import dev.minios.ocremote.domain.repository.SessionRepository
 import dev.minios.ocremote.domain.repository.SettingsRepository
 import dev.minios.ocremote.domain.usecase.*
 import dev.minios.ocremote.domain.tracker.TokenStatsTracker
+import dev.minios.ocremote.ui.screens.sessions.SessionScrollSignal
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -157,6 +158,7 @@ class ChatViewModelSendTest {
             sseClient = mockk(relaxed = true),
             sessionStatusManager = sessionStatusManager,
             sessionFocusHolder = sessionFocusHolder,
+            scrollSignal = SessionScrollSignal(),
             appNotificationManager = appNotificationManager
         )
     }
