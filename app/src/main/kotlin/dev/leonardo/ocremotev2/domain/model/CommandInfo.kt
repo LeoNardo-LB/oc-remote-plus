@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 
 /**
  * Domain model for a command (mirrors data.dto.response.CommandInfo fields).

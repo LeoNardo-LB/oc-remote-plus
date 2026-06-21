@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.viewer
+﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.tools
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.tools
 
 import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.domain.model.ToolState

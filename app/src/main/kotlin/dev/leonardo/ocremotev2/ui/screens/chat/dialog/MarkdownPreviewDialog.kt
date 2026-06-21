@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.dialog
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.dialog
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.animateContentSize

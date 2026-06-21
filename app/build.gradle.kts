@@ -1,4 +1,4 @@
-import java.io.FileInputStream
+﻿import java.io.FileInputStream
 import java.util.Properties
 
 // Single source of truth for version — read from version.properties

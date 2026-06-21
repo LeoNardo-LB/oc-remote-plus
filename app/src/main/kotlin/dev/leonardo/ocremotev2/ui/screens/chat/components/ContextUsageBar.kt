@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.components
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

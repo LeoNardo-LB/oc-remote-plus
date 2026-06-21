@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.dto.common.ModelSelection as DtoModelSelection

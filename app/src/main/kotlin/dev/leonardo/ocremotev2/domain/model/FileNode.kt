@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 data class FileNode(val name: String, val path: String, val absolute: String,
     val type: FileType, val ignored: Boolean, val size: Long? = null, val modified: Long? = null)
 enum class FileType { FILE, DIRECTORY }

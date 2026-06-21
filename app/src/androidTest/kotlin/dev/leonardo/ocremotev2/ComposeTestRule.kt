@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2
+﻿package dev.leonardo.ocremotev2
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import org.junit.Rule

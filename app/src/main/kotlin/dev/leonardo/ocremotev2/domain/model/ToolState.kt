@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable

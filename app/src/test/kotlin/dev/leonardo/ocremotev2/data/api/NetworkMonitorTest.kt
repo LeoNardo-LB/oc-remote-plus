@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api
+﻿package dev.leonardo.ocremotev2.data.api
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

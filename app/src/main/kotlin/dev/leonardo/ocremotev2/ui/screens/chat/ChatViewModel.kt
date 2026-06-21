@@ -9,6 +9,9 @@ import androidx.compose.runtime.setValue
 import dev.leonardo.ocremotev2.BuildConfig
 import dev.leonardo.ocremotev2.R
 import androidx.lifecycle.SavedStateHandle
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -240,7 +243,38 @@ class ChatViewModel @Inject constructor(
     private val sessionStatusManager: SessionStatusManager,
     private val sessionFocusHolder: dev.leonardo.ocremotev2.service.SessionFocusHolder,
     private val appNotificationManager: dev.leonardo.ocremotev2.service.AppNotificationManager,
+    private val toolSnapshotCache: dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache,
 ) : ViewModel() {
+
+    // ============ Phase 2 Task 9: Tool snapshot cache ============
+
+    fun cacheToolPart(part: dev.leonardo.ocremotev2.domain.model.Part.Tool) {
+        val state = part.state
+        val input = when (state) {
+            is dev.leonardo.ocremotev2.domain.model.ToolState.Completed -> state.input
+            is dev.leonardo.ocremotev2.domain.model.ToolState.Running -> state.input
+            is dev.leonardo.ocremotev2.domain.model.ToolState.Pending -> state.input
+            is dev.leonardo.ocremotev2.domain.model.ToolState.Error -> state.input
+        }
+        val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
+            ?: input["path"]?.jsonPrimitive?.contentOrNull ?: return
+        val metadata = (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.metadata
+        val filediff = metadata?.get("filediff") as? JsonObject
+        val before = filediff?.get("before")?.jsonPrimitive?.contentOrNull
+        val after = filediff?.get("after")?.jsonPrimitive?.contentOrNull
+        val content = when (part.tool.lowercase()) {
+            "read" -> (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.output
+            "write" -> input["content"]?.jsonPrimitive?.contentOrNull
+            "edit" -> after
+            else -> null
+        }
+        toolSnapshotCache.put(
+            part.id,
+            dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache.Snapshot(
+                filePath = filePath, content = content, before = before, after = after, toolName = part.tool
+            )
+        )
+    }
 
     /** Snapshot of message IDs at the time of revert. Used to distinguish
      *  old messages (should be hidden) from new messages (should be shown). */

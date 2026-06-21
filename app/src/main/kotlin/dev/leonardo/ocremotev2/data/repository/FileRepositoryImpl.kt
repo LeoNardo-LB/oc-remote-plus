@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.repository
+﻿package dev.leonardo.ocremotev2.data.repository
 
 import dev.leonardo.ocremotev2.data.api.OpenCodeApi
 import dev.leonardo.ocremotev2.data.mapper.FileMapper
@@ -25,5 +25,11 @@ class FileRepositoryImpl @Inject constructor(
         runCatching {
             val conn = serverRepository.resolveConnection(serverId)
             FileMapper.toDomain(api.readFile(conn, path, directory), path)
+        }
+
+    override suspend fun findFiles(serverId: String, directory: String, query: String, limit: Int): Result<List<String>> =
+        runCatching {
+            val conn = serverRepository.resolveConnection(serverId)
+            api.findFiles(conn, query = query, type = "file", directory = directory, limit = limit, dirs = null)
         }
 }

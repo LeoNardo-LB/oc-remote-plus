@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.service
+﻿package dev.leonardo.ocremotev2.service
 
 import android.app.NotificationManager
 import android.app.Service

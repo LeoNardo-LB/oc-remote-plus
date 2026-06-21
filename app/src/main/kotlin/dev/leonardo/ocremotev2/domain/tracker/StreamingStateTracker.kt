@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.tracker
+﻿package dev.leonardo.ocremotev2.domain.tracker
 
 /**
  * Streaming state for a single part (text or reasoning).

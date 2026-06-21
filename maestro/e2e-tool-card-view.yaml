@@ -1,0 +1,25 @@
+# Flow 24: Entry1 — tool card view (Read/Write/Edit → FileViewer snapshot)
+appId: dev.minios.ocremote.dev
+---
+# Prerequisite: chat must have Read/Write/Edit tool cards (requires AI interaction)
+- runFlow: e2e-chat-flow.yaml
+
+# Wait for an Edit tool card to appear
+- extendedWaitUntil:
+    visible: ".*Edit.*"
+    timeout: 60000
+    optional: true
+
+# Tap the open-file button on the first tool card
+- tapOn:
+    id: "tool_card_open_file"
+    index: 0
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+    optional: true
+- takeScreenshot: e2e_entry1_snapshot_view
+
+# Back to chat
+- tapOn:
+    id: "back_button"

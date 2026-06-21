@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 
 import io.ktor.http.*
 import org.junit.Assert.assertEquals

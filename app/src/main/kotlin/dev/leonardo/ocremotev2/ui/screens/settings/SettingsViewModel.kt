@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.settings
+﻿package dev.leonardo.ocremotev2.ui.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions.components
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions.components
 
 import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.domain.model.SessionStatus

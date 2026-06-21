@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.viewer
+﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.tools
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.tools
 
 import org.junit.Assert.*
 import org.junit.Test

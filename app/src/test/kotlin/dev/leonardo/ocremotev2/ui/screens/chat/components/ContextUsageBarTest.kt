@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.components
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import dev.leonardo.ocremotev2.domain.model.Part
 import org.junit.Assert.assertEquals

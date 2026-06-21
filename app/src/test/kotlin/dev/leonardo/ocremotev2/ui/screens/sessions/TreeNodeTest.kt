@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions
 
 import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.ui.screens.sessions.components.TreeNode

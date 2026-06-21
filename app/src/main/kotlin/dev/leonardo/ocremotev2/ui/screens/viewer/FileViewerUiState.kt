@@ -1,8 +1,11 @@
-package dev.leonardo.ocremotev2.ui.screens.viewer
+﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
+import dev.leonardo.ocremotev2.domain.model.Annotation
 import dev.leonardo.ocremotev2.domain.model.VcsFileDiff
 
 enum class FileViewerMode { SOURCE, DIFF }
+
+enum class FileViewerRenderMode { SOURCE, RENDER_PREVIEW }
 
 enum class DiffHunkType { ADDED, REMOVED, MODIFIED }
 
@@ -22,8 +25,22 @@ data class FileViewerUiState(
     val mimeType: String? = null,
     val error: Int? = null,
     val isEmpty: Boolean = false,
-    val isTruncated: Boolean = false,
+    // Phase 4: pagination replaces Phase 1 isTruncated
+    val totalLineCount: Int = 0,
+    val visibleLineCount: Int = 0,
+    val isFullyLoaded: Boolean = false,
+    val isExtremelyLarge: Boolean = false,
     val diff: VcsFileDiff? = null,
     val hunks: List<DiffHunk> = emptyList(),
-    val currentHunkIndex: Int = 0
+    val currentHunkIndex: Int = 0,
+    // Phase 2: Markdown render toggle
+    val renderMode: FileViewerRenderMode = FileViewerRenderMode.SOURCE,
+    val isMarkdown: Boolean = false,
+    // Phase 2 Task 9: Tool snapshot
+    val isToolSnapshot: Boolean = false,
+    val toolSnapshotBefore: String? = null,
+    val toolSnapshotAfter: String? = null,
+    val toolSnapshotContent: String? = null,
+    // Phase 3: Annotation state
+    val annotations: List<Annotation> = emptyList()
 )

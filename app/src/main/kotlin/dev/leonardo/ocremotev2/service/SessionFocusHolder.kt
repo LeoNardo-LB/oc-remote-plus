@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.service
+﻿package dev.leonardo.ocremotev2.service
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

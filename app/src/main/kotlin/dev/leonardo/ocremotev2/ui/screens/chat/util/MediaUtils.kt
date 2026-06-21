@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.util
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.util
 
 import android.content.ContentResolver
 import android.graphics.Bitmap

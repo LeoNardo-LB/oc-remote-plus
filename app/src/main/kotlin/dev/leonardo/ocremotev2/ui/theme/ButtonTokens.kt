@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.theme
+﻿package dev.leonardo.ocremotev2.ui.theme
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues

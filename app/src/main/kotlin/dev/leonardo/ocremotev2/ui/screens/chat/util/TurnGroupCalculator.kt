@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.util
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.util
 
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatMessage
 

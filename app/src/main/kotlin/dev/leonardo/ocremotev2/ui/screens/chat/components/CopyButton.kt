@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.components
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy

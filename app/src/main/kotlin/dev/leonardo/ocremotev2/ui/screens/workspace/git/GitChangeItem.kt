@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.workspace.git
+﻿package dev.leonardo.ocremotev2.ui.screens.workspace.git
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box

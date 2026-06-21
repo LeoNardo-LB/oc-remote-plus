@@ -1,5 +1,6 @@
-package dev.leonardo.ocremotev2.ui.screens.viewer
+﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,12 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -25,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.CodeTypography
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import dev.snipme.highlights.Highlights
@@ -32,6 +40,16 @@ import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
 import dev.snipme.highlights.model.SyntaxThemes
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 private const val ALPHA_MASK = 0xFF000000.toInt()
 
@@ -39,7 +57,15 @@ private const val ALPHA_MASK = 0xFF000000.toInt()
 fun CodeSourceView(
     content: String,
     filePath: String,
-    modifier: Modifier = Modifier
+    annotations: List<Annotation> = emptyList(),
+    onAnnotate: ((selectedText: String) -> Unit)? = null,
+    onTapAnnotation: ((Annotation) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    lazyListState: LazyListState = rememberLazyListState(),
+    // Phase 4: pagination — null means render all lines (backward compatible)
+    visibleLineCount: Int? = null,
+    totalLineCount: Int? = null,
+    onLoadMore: (() -> Unit)? = null
 ) {
     if (content.isEmpty()) return
 
@@ -60,6 +86,29 @@ fun CodeSourceView(
             add(0)
             content.forEachIndexed { i, c -> if (c == '\n') add(i + 1) }
         }.toIntArray()
+    }
+    val highlightColor = MaterialTheme.colorScheme.primary
+    val lineAnnotations = remember(annotations, content, lineCount) {
+        val map = mutableMapOf<Int, MutableList<Triple<Int, Int, Int>>>()
+        annotations.forEach { ann ->
+            val annStartLine = ann.startLine - 1
+            val annEndLine = ann.endLine - 1
+            for (lineIdx in annStartLine..annEndLine) {
+                if (lineIdx < 0 || lineIdx >= lineCount) continue
+                val lineStart = lineOffsets[lineIdx]
+                val lineEnd = if (lineIdx + 1 < lineOffsets.size) lineOffsets[lineIdx + 1] - 1 else content.length
+                val relStart = (ann.startChar - lineStart).coerceAtLeast(0)
+                val relEnd = (ann.endChar - lineStart).coerceAtMost(lineEnd - lineStart)
+                if (relStart < relEnd) {
+                    map.getOrPut(lineIdx) { mutableListOf() }
+                      .add(Triple(relStart, relEnd, ann.index + 1))
+                }
+            }
+        }
+        map
+    }
+    val annotationByIndex = remember(annotations) {
+        annotations.associateBy { it.index }
     }
     val maxChars = remember(content) {
         var max = 0
@@ -89,45 +138,100 @@ fun CodeSourceView(
             gutterWidth + maxCodeWidthPx.toDp() + SpacingTokens.SM.dp + SpacingTokens.LG.dp
         }
     }
-    val hScroll = rememberScrollState()
+    val hScroll = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+    val annotationEnabled = onAnnotate != null
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = SpacingTokens.SM.dp)
-    ) {
-        items(
-            count = lineCount,
-            key = { it }
-        ) { index ->
-            val start = lineOffsets[index]
-            val endExclusive = if (index + 1 < lineOffsets.size)
-                lineOffsets[index + 1] - 1
-            else
-                content.length
-            val lineAnnotated = annotated.subSequence(start, endExclusive)
+    // Phase 4: pagination — trigger loadMore when user scrolls near the bottom
+    val visLines = visibleLineCount
+    val totalLines = totalLineCount
+    val hasMore = visLines != null && totalLines != null && visLines < totalLines
+    if (onLoadMore != null && hasMore) {
+        LaunchedEffect(lazyListState, visLines, totalLines) {
+            snapshotFlow {
+                val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                lastVisible >= visLines - 50
+            }
+                .filter { it }
+                .distinctUntilChanged()
+                .collect { onLoadMore() }
+        }
+    }
 
-            Row(
-                modifier = Modifier
-                    .defaultMinSize(minWidth = maxRowWidth)
-                    .horizontalScroll(hScroll)
-            ) {
-                Text(
-                    text = "${index + 1}",
-                    style = CodeTypography,
-                    color = gutterColor,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(gutterWidth)
-                )
-                Text(
-                    text = lineAnnotated,
-                    style = CodeTypography,
-                    modifier = Modifier.padding(
-                        start = SpacingTokens.SM.dp,
-                        end = SpacingTokens.LG.dp
+    val lazyContent: @Composable (Modifier) -> Unit = { m ->
+        LazyColumn(
+            state = lazyListState,
+            modifier = m.fillMaxSize(),
+            contentPadding = PaddingValues(vertical = SpacingTokens.SM.dp)
+        ) {
+            items(
+                count = visLines ?: lineCount,
+                key = { it }
+            ) { index ->
+                val start = lineOffsets[index]
+                val endExclusive = if (index + 1 < lineOffsets.size)
+                    lineOffsets[index + 1] - 1
+                else
+                    content.length
+                val baseLine = annotated.subSequence(start, endExclusive)
+                val lineAnnotated = if (lineAnnotations.containsKey(index)) {
+                    buildAnnotatedLineWithAnnotations(baseLine, lineAnnotations[index]!!, highlightColor)
+                } else {
+                    baseLine
+                }
+
+                val tapModifier: Modifier = onTapAnnotation?.let { callback ->
+                    lineAnnotations[index]?.firstOrNull()?.third?.let { displayIdx ->
+                        annotationByIndex[displayIdx - 1]
+                    }?.let { ann ->
+                        Modifier.clickable { callback(ann) }
+                    }
+                } ?: Modifier
+
+                Row(
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = maxRowWidth)
+                        .horizontalScroll(hScroll)
+                        .then(tapModifier)
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = CodeTypography,
+                        color = gutterColor,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(gutterWidth)
                     )
-                )
+                    Text(
+                        text = lineAnnotated,
+                        style = CodeTypography,
+                        modifier = Modifier.padding(
+                            start = SpacingTokens.SM.dp,
+                            end = SpacingTokens.LG.dp
+                        )
+                    )
+                }
+            }
+            // Phase 4: load-more indicator
+            if (hasMore) {
+                item(key = "load_more") {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(SpacingTokens.LG.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).testTag("viewer_load_more_indicator")
+                        )
+                    }
+                }
             }
         }
+    }
+
+    if (annotationEnabled && onAnnotate != null) {
+        SelectionContainer {
+            lazyContent(modifier.annotationContextMenu(onAnnotate))
+        }
+    } else {
+        lazyContent(modifier)
     }
 }
 
@@ -186,5 +290,23 @@ private fun rememberLanguage(filePath: String): SyntaxLanguage {
         "coffee" -> SyntaxLanguage.COFFEESCRIPT
         "sh", "bash", "zsh", "fish" -> SyntaxLanguage.SHELL
         else -> SyntaxLanguage.DEFAULT
+    }
+}
+
+/**
+ * Build a per-line AnnotatedString with annotation highlights overlaid on the base syntax-highlighted line.
+ */
+private fun buildAnnotatedLineWithAnnotations(
+    baseLine: AnnotatedString,
+    annotations: List<Triple<Int, Int, Int>>,
+    baseColor: Color
+): AnnotatedString = buildAnnotatedString {
+    append(baseLine)
+    annotations.forEach { (relStart, relEnd, _) ->
+        addStyle(
+            SpanStyle(background = baseColor.copy(alpha = AlphaTokens.SELECTED)),
+            relStart.coerceIn(0, length),
+            relEnd.coerceIn(0, length)
+        )
     }
 }

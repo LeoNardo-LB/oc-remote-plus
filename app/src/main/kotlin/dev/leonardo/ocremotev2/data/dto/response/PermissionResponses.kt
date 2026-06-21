@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.dto.response
+﻿package dev.leonardo.ocremotev2.data.dto.response
 
 import dev.leonardo.ocremotev2.domain.model.ToolRef
 import kotlinx.serialization.SerialName

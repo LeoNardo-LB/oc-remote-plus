@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.workspace.git
+﻿package dev.leonardo.ocremotev2.ui.screens.workspace.git
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed

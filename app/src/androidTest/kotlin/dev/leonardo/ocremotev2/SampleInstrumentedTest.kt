@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2
+﻿package dev.leonardo.ocremotev2
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry

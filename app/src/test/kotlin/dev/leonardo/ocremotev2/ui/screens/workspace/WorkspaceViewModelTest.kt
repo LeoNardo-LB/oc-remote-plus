@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.workspace
+﻿package dev.leonardo.ocremotev2.ui.screens.workspace
 
 import androidx.lifecycle.SavedStateHandle
 import dev.leonardo.ocremotev2.R
@@ -6,6 +6,7 @@ import dev.leonardo.ocremotev2.domain.model.FileNode
 import dev.leonardo.ocremotev2.domain.model.FileType
 import dev.leonardo.ocremotev2.domain.model.VcsChange
 import dev.leonardo.ocremotev2.domain.model.VcsStatus
+import dev.leonardo.ocremotev2.domain.usecase.FindFilesUseCase
 import dev.leonardo.ocremotev2.domain.usecase.GetVcsStatusUseCase
 import dev.leonardo.ocremotev2.domain.usecase.ListDirectoryUseCase
 import dev.leonardo.ocremotev2.ui.navigation.routes.ServerRouteParams
@@ -18,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -33,6 +35,7 @@ class WorkspaceViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val listDirectory = mockk<ListDirectoryUseCase>()
     private val getVcsStatus = mockk<GetVcsStatusUseCase>()
+    private val findFiles = mockk<FindFilesUseCase>()
 
     private val serverId = "srv-abc123"
     private val directory = "/home/user/project"
@@ -80,7 +83,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         coVerify { listDirectory(serverId, directory, "") }
         coVerify { getVcsStatus(serverId, directory) }
@@ -92,7 +95,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         val state = vm.uiState.value
         assert(!state.rootLoading) { "rootLoading should be false after success" }
@@ -109,7 +112,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         vm.loadDirectory("") // second call — should hit cache
 
@@ -124,7 +127,7 @@ class WorkspaceViewModelTest {
         )
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         val state = vm.uiState.value
         assert(!state.rootLoading) { "rootLoading should be false after failure" }
@@ -139,7 +142,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         vm.refreshRoot()
 
@@ -154,7 +157,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(emptyList())
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         // prefetch sets gitChangeCount = 0, but switchPanel checks gitChanges.isEmpty()
         vm.switchPanel(WorkspacePanel.GIT_CHANGES)
@@ -172,7 +175,7 @@ class WorkspaceViewModelTest {
             RuntimeException("fatal: not a git repository (or any parent): .git")
         )
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         // switchPanel triggers loadGitChanges since gitChanges is empty and not loading
         vm.switchPanel(WorkspacePanel.GIT_CHANGES)
@@ -187,7 +190,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         // Switch to GIT then back to FILE_TREE
         vm.switchPanel(WorkspacePanel.GIT_CHANGES)
@@ -203,7 +206,7 @@ class WorkspaceViewModelTest {
         coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
         coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         assert(!vm.uiState.value.showIgnored) { "showIgnored should default to false" }
 
@@ -222,7 +225,7 @@ class WorkspaceViewModelTest {
             RuntimeException("Timeout after 30s")
         )
 
-        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
         val state = vm.uiState.value
         assert(state.gitChangeCount == null) {
@@ -247,7 +250,7 @@ class WorkspaceViewModelTest {
             coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
             coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-            val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+            val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
             // "src" job launches but is suspended at delay(60s)
             vm.loadDirectory("src")
@@ -288,7 +291,7 @@ class WorkspaceViewModelTest {
             coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
             coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
 
-            val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus)
+            val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
 
             // First call launches job, suspended at delay
             vm.loadDirectory("src")
@@ -311,7 +314,7 @@ class WorkspaceViewModelTest {
     // ===== Test 13: blank serverId sets rootError without calling useCase =====
     @Test
     fun `blank serverId sets rootError without calling useCase`() = runTest {
-        val vm = WorkspaceViewModel(savedStateHandle(id = ""), listDirectory, getVcsStatus)
+        val vm = WorkspaceViewModel(savedStateHandle(id = ""), listDirectory, getVcsStatus, findFiles)
 
         val state = vm.uiState.value
         assert(state.rootError == R.string.workspace_error_server_config_missing) {
@@ -321,5 +324,134 @@ class WorkspaceViewModelTest {
 
         coVerify(exactly = 0) { listDirectory(any(), any(), any()) }
         coVerify(exactly = 0) { getVcsStatus(any(), any()) }
+    }
+
+    // ===== Phase 2: Search tests =====
+
+    @Test
+    fun `enterSearch sets isSearchMode true and clears query`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+
+        vm.enterSearch()
+
+        assert(vm.uiState.value.isSearchMode) { "isSearchMode should be true" }
+        assert(vm.uiState.value.searchQuery.isEmpty()) { "searchQuery should be cleared" }
+    }
+
+    @Test
+    fun `exitSearch clears search state and keeps panel data`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+        coEvery { findFiles(any(), any(), any(), any()) } returns Result.success(listOf("a.kt"))
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        vm.enterSearch()
+        vm.searchFiles("test")
+        advanceTimeBy(400)
+        vm.exitSearch()
+
+        assert(!vm.uiState.value.isSearchMode) { "isSearchMode should be false" }
+        assert(vm.uiState.value.searchQuery.isEmpty()) { "searchQuery should be cleared" }
+        assert(vm.uiState.value.fileSearchResults.isEmpty()) { "results should be cleared" }
+        assert(!vm.uiState.value.hasSearched) { "hasSearched should be false" }
+    }
+
+    @Test
+    fun `searchFiles with blank query does not call useCase`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        vm.enterSearch()
+        vm.searchFiles("   ")
+        advanceTimeBy(400)
+
+        coVerify(exactly = 0) { findFiles(any(), any(), any(), any()) }
+        assert(!vm.uiState.value.hasSearched) { "hasSearched should be false for blank query" }
+    }
+
+    @Test
+    fun `searchFiles debounces 300ms before calling useCase`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+        coEvery { findFiles(any(), any(), any(), any()) } returns Result.success(listOf("a.kt"))
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        vm.enterSearch()
+        vm.searchFiles("User")
+        advanceTimeBy(200)
+        coVerify(exactly = 0) { findFiles(any(), any(), any(), any()) }
+        advanceTimeBy(150)
+        coVerify(exactly = 1) { findFiles(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `searchFiles success updates results and hasSearched`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+        val paths = listOf("app/User.kt", "docs/user.md")
+        coEvery { findFiles(any(), any(), any(), any()) } returns Result.success(paths)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        vm.enterSearch()
+        vm.searchFiles("User")
+        advanceTimeBy(400)
+
+        assert(vm.uiState.value.fileSearchResults == paths) { "results should match" }
+        assert(vm.uiState.value.hasSearched) { "hasSearched should be true" }
+        assert(!vm.uiState.value.searchLoading) { "searchLoading should be false" }
+        assert(vm.uiState.value.searchError == null) { "searchError should be null" }
+    }
+
+    @Test
+    fun `searchFiles failure sets searchError`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+        coEvery { findFiles(any(), any(), any(), any()) } returns Result.failure(RuntimeException("503"))
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        vm.enterSearch()
+        vm.searchFiles("User")
+        advanceTimeBy(400)
+
+        assert(vm.uiState.value.searchError != null) { "searchError should be set" }
+        assert(vm.uiState.value.fileSearchResults.isEmpty()) { "results should be empty on failure" }
+    }
+
+    @Test
+    fun `rapid query changes cancel previous search job`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+        coEvery { findFiles(any(), any(), any(), any()) } returns Result.success(listOf("b"))
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        vm.enterSearch()
+        vm.searchFiles("Us")
+        advanceTimeBy(200)
+        vm.searchFiles("User")
+        advanceTimeBy(400)
+
+        coVerify(exactly = 1) { findFiles(any(), any(), any(), any()) }
+        assert(vm.uiState.value.fileSearchResults == listOf("b")) { "should have last query results" }
+    }
+
+    @Test
+    fun `filterGitChanges filters loaded gitChanges by query case insensitive`() = runTest {
+        coEvery { listDirectory(serverId, directory, "") } returns Result.success(sampleFileNodes)
+        coEvery { getVcsStatus(serverId, directory) } returns Result.success(sampleGitChanges)
+
+        val vm = WorkspaceViewModel(savedStateHandle(), listDirectory, getVcsStatus, findFiles)
+        // loadGitChanges fills uiState.gitChanges from getVcsStatus mock
+        vm.loadGitChanges()
+
+        val filtered = vm.filterGitChanges("main")
+
+        assert(filtered.size == 1) { "expected 1 match for 'main', got ${filtered.size}" }
+        assert(filtered[0].file == "src/main/kotlin/MainActivity.kt") {
+            "expected MainActivity.kt, got ${filtered[0].file}"
+        }
     }
 }

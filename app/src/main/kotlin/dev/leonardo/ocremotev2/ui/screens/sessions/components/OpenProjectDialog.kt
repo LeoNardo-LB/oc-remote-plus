@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions.components
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions.components
 
 import android.util.Log
 import android.widget.Toast

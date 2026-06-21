@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.settings
+﻿package dev.leonardo.ocremotev2.ui.screens.settings
 
 import android.os.Build
 import androidx.compose.foundation.clickable

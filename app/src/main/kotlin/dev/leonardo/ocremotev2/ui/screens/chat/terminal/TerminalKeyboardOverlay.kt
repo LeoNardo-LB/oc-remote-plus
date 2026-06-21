@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.terminal
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background

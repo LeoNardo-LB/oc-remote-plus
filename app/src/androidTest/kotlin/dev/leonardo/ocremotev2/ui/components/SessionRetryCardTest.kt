@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.components
+﻿package dev.leonardo.ocremotev2.ui.components
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule

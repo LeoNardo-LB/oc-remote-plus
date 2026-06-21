@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api.sse.parsers
+﻿package dev.leonardo.ocremotev2.data.api.sse.parsers
 
 import kotlinx.serialization.json.*
 

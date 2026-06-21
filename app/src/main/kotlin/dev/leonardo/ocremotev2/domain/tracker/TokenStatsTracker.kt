@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.tracker
+﻿package dev.leonardo.ocremotev2.domain.tracker
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

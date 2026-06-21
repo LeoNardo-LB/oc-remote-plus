@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.components.indicators
+﻿package dev.leonardo.ocremotev2.ui.components.indicators
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat

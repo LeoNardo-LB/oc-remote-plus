@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding

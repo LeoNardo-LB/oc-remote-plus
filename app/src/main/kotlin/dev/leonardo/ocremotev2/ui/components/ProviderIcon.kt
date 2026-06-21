@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.components
+﻿package dev.leonardo.ocremotev2.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image

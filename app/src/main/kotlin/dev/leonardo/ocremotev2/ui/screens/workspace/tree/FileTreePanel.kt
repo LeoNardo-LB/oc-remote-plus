@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.workspace.tree
+﻿package dev.leonardo.ocremotev2.ui.screens.workspace.tree
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

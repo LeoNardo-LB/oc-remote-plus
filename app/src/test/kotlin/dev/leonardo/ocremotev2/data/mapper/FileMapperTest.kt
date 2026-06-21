@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.mapper
+﻿package dev.leonardo.ocremotev2.data.mapper
 
 import dev.leonardo.ocremotev2.data.dto.response.FileContentDto
 import dev.leonardo.ocremotev2.data.dto.response.FileNodeDto

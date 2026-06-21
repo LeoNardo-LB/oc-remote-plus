@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.verification
+﻿package dev.leonardo.ocremotev2.verification
 
 import dev.leonardo.ocremotev2.data.api.RetryPolicy
 import dev.leonardo.ocremotev2.data.api.SseClientDefaults

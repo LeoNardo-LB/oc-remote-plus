@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.theme
+﻿package dev.leonardo.ocremotev2.ui.theme
 
 /**
  * Semantic spacing tokens based on a 4dp grid.

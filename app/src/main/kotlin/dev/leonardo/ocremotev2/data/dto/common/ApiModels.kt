@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.dto.common
+﻿package dev.leonardo.ocremotev2.data.dto.common
 
 import io.ktor.client.plugins.websocket.ClientWebSocketSession
 import io.ktor.websocket.CloseReason

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.home
+﻿package dev.leonardo.ocremotev2.ui.screens.home
 
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.workspace
+﻿package dev.leonardo.ocremotev2.ui.screens.workspace
 
 import dev.leonardo.ocremotev2.domain.model.FileNode
 import dev.leonardo.ocremotev2.domain.model.VcsChange
@@ -23,7 +23,14 @@ data class WorkspaceUiState(
     val gitLoading: Boolean = false,
     val gitError: Int? = null,
     val isNonGit: Boolean = false,
-    val gitChangeCount: Int? = null
+    val gitChangeCount: Int? = null,
+    // Phase 2: Search
+    val isSearchMode: Boolean = false,
+    val searchQuery: String = "",
+    val fileSearchResults: List<String> = emptyList(),
+    val searchLoading: Boolean = false,
+    val searchError: Int? = null,
+    val hasSearched: Boolean = false
 )
 
 data class DirectoryLoadResult(

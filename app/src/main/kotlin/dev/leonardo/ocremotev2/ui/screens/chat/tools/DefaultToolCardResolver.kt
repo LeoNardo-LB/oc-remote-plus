@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.tools
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.tools
 
 import androidx.compose.runtime.Composable
 import dev.leonardo.ocremotev2.domain.model.Part

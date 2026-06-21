@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.repository
+﻿package dev.leonardo.ocremotev2.domain.repository
 
 import dev.leonardo.ocremotev2.domain.model.ServerConfig
 import kotlinx.coroutines.flow.Flow

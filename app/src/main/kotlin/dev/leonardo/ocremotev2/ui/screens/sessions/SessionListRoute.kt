@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel

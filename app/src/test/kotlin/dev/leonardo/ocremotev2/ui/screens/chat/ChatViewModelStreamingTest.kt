@@ -1,5 +1,6 @@
-package dev.leonardo.ocremotev2.ui.screens.chat
+﻿package dev.leonardo.ocremotev2.ui.screens.chat
 
+import dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
@@ -59,6 +60,7 @@ class ChatViewModelStreamingTest {
     private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
     private val sessionFocusHolder = mockk<SessionFocusHolder>(relaxed = true)
     private val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
+    private val toolSnapshotCache = ToolSnapshotCache()
 
     private val messagesFlow = MutableStateFlow<List<Message>>(emptyList())
     private val partsFlow = MutableStateFlow<Map<String, List<dev.leonardo.ocremotev2.domain.model.Part>>>(emptyMap())
@@ -215,7 +217,8 @@ class ChatViewModelStreamingTest {
             sessionStatusManager = sessionStatusManager,
             sessionFocusHolder = sessionFocusHolder,
             scrollSignal = SessionScrollSignal(),
-            appNotificationManager = appNotificationManager
+            appNotificationManager = appNotificationManager,
+            toolSnapshotCache = toolSnapshotCache
         )
     }
 

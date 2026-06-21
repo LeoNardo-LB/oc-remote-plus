@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.home.components
+﻿package dev.leonardo.ocremotev2.ui.screens.home.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

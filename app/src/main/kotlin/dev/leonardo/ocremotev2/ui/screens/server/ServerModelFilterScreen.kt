@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.server
+﻿package dev.leonardo.ocremotev2.ui.screens.server
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

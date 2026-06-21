@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.repository
+﻿package dev.leonardo.ocremotev2.data.repository
 
 import dev.leonardo.ocremotev2.data.api.OpenCodeApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection

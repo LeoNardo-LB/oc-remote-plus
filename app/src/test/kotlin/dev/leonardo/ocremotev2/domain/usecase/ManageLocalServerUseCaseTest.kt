@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.usecase
+﻿package dev.leonardo.ocremotev2.domain.usecase
 
 import dev.leonardo.ocremotev2.domain.model.LocalServerState
 import dev.leonardo.ocremotev2.domain.repository.ServerRepository

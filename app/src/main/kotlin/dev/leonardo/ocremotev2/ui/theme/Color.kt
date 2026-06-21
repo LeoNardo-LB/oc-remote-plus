@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.theme
+﻿package dev.leonardo.ocremotev2.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

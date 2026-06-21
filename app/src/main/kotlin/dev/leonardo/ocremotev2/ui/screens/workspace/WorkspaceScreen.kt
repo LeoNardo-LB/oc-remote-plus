@@ -1,5 +1,6 @@
-package dev.leonardo.ocremotev2.ui.screens.workspace
+﻿package dev.leonardo.ocremotev2.ui.screens.workspace
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +31,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.ui.screens.workspace.git.GitChangesPanel
+import dev.leonardo.ocremotev2.ui.screens.workspace.search.SearchOverlay
+import dev.leonardo.ocremotev2.ui.screens.workspace.search.SearchTopBar
 import dev.leonardo.ocremotev2.ui.screens.workspace.tree.FileTreePanel
 
 @Composable
@@ -47,7 +51,11 @@ fun WorkspaceRoute(
         onToggleShowIgnored = viewModel::toggleShowIgnored,
         onRefreshGit = viewModel::loadGitChanges,
         onOpenFile = onOpenFile,
-        onOpenGitDiff = onOpenGitDiff
+        onOpenGitDiff = onOpenGitDiff,
+        // Phase 2: Search
+        onEnterSearch = viewModel::enterSearch,
+        onExitSearch = viewModel::exitSearch,
+        onSearchQueryChange = viewModel::updateSearchQuery
     )
 }
 
@@ -61,27 +69,67 @@ fun WorkspaceScreen(
     onToggleShowIgnored: () -> Unit,
     onRefreshGit: () -> Unit,
     onOpenFile: (String) -> Unit,
-    onOpenGitDiff: (String) -> Unit
+    onOpenGitDiff: (String) -> Unit,
+    // Phase 2: Search
+    onEnterSearch: () -> Unit,
+    onExitSearch: () -> Unit,
+    onSearchQueryChange: (String) -> Unit
 ) {
     Scaffold(
         topBar = {
-            WorkspaceTopBar(uiState = uiState, onBack = onBack, onSwitchPanel = onSwitchPanel)
+            Crossfade(targetState = uiState.isSearchMode, label = "search_topbar") { isSearch ->
+                if (isSearch) {
+                    SearchTopBar(
+                        query = uiState.searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                        onBack = onExitSearch,
+                        onClear = { onSearchQueryChange("") }
+                    )
+                } else {
+                    WorkspaceTopBar(
+                        uiState = uiState,
+                        onBack = onBack,
+                        onSwitchPanel = onSwitchPanel,
+                        onSearch = onEnterSearch
+                    )
+                }
+            }
         }
     ) { padding ->
-        when (uiState.currentPanel) {
-            WorkspacePanel.FILE_TREE -> FileTreePanel(
-                uiState = uiState,
-                onRefreshRoot = onRefreshRoot,
-                onToggleShowIgnored = onToggleShowIgnored,
-                onOpenFile = onOpenFile,
+        if (uiState.isSearchMode) {
+            val filteredGitChanges = if (uiState.currentPanel == WorkspacePanel.GIT_CHANGES) {
+                uiState.gitChanges.filter {
+                    uiState.searchQuery.isBlank() || it.file.contains(uiState.searchQuery, ignoreCase = true)
+                }
+            } else emptyList()
+            SearchOverlay(
+                activePanel = uiState.currentPanel,
+                query = uiState.searchQuery,
+                fileResults = uiState.fileSearchResults,
+                gitChanges = filteredGitChanges,
+                isLoading = uiState.searchLoading,
+                hasSearched = uiState.hasSearched,
+                errorMessageRes = uiState.searchError,
+                onOpenFile = { onOpenFile(it); onExitSearch() },
+                onOpenGitDiff = { onOpenGitDiff(it); onExitSearch() },
                 modifier = Modifier.padding(padding)
             )
-            WorkspacePanel.GIT_CHANGES -> GitChangesPanel(
-                uiState = uiState,
-                onRefresh = onRefreshGit,
-                onOpenDiff = onOpenGitDiff,
-                modifier = Modifier.padding(padding)
-            )
+        } else {
+            when (uiState.currentPanel) {
+                WorkspacePanel.FILE_TREE -> FileTreePanel(
+                    uiState = uiState,
+                    onRefreshRoot = onRefreshRoot,
+                    onToggleShowIgnored = onToggleShowIgnored,
+                    onOpenFile = onOpenFile,
+                    modifier = Modifier.padding(padding)
+                )
+                WorkspacePanel.GIT_CHANGES -> GitChangesPanel(
+                    uiState = uiState,
+                    onRefresh = onRefreshGit,
+                    onOpenDiff = onOpenGitDiff,
+                    modifier = Modifier.padding(padding)
+                )
+            }
         }
     }
 }
@@ -91,7 +139,8 @@ fun WorkspaceScreen(
 private fun WorkspaceTopBar(
     uiState: WorkspaceUiState,
     onBack: () -> Unit,
-    onSwitchPanel: (WorkspacePanel) -> Unit
+    onSwitchPanel: (WorkspacePanel) -> Unit,
+    onSearch: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -125,6 +174,17 @@ private fun WorkspaceTopBar(
             }
         },
         actions = {
+            // Phase 2: 🔍 search button (spec §6.1 order: [🔍][📁][🔀])
+            IconButton(
+                onClick = onSearch,
+                modifier = Modifier.testTag("workspace_search_button")
+            ) {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = stringResource(R.string.a11y_icon_search),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             IconButton(
                 onClick = { onSwitchPanel(WorkspacePanel.FILE_TREE) },
                 modifier = Modifier.testTag("panel_file_tree")

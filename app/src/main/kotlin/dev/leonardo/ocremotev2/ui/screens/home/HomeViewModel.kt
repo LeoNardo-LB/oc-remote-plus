@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.home
+﻿package dev.leonardo.ocremotev2.ui.screens.home
 
 import android.app.Application
 import android.content.ComponentName

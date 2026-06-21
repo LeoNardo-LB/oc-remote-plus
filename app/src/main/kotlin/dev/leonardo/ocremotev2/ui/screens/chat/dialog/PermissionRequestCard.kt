@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.dialog
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.dialog
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2
+﻿package dev.leonardo.ocremotev2
 
 import android.app.Application
 import android.os.Build

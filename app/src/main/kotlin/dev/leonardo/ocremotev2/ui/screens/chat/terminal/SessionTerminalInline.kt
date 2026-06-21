@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.terminal
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat

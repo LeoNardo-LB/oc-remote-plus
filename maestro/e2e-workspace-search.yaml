@@ -1,0 +1,53 @@
+# Flow 22: Workspace file search (file tree + git changes)
+appId: dev.minios.ocremote.dev
+---
+- runFlow: e2e-chat-flow.yaml
+
+# Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    id: "menu_open_workspace"
+
+# File tree search
+- tapOn:
+    id: "workspace_search_button"
+- tapOn:
+    id: "workspace_search_input"
+- inputText: "Workspace"
+- extendedWaitUntil:
+    visible: ".*Workspace.*"
+    timeout: 8000
+    optional: true
+- takeScreenshot: e2e_search_file_results
+- tapOn:
+    id: "workspace_search_result"
+    index: 0
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 5000
+    optional: true
+- takeScreenshot: e2e_search_opened_file
+
+# Back to workspace
+- tapOn:
+    id: "back_button"
+- tapOn:
+    id: "back_button"
+
+# Git changes search
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    id: "menu_open_workspace"
+- tapOn:
+    id: "panel_git_changes"
+- tapOn:
+    id: "workspace_search_button"
+- tapOn:
+    id: "workspace_search_input"
+- inputText: ".kt"
+- takeScreenshot: e2e_search_git_filter
+- tapOn:
+    id: "workspace_search_clear"
+- takeScreenshot: e2e_search_cleared

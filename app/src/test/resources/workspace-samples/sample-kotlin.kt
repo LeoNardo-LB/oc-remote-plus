@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api
+﻿package dev.leonardo.ocremotev2.data.api
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get

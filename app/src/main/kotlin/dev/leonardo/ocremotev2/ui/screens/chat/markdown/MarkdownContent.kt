@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.markdown
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.markdown
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme

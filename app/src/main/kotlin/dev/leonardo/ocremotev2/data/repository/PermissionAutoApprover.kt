@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.repository
+﻿package dev.leonardo.ocremotev2.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences

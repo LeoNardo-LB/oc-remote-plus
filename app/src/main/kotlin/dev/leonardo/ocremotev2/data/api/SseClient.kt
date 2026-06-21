@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api
+﻿package dev.leonardo.ocremotev2.data.api
 
 import android.util.Log
 import dev.leonardo.ocremotev2.BuildConfig

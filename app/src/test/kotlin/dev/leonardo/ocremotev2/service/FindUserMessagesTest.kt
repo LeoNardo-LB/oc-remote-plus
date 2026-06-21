@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.service
+﻿package dev.leonardo.ocremotev2.service
 
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
 import dev.leonardo.ocremotev2.data.repository.SettingsDataStore

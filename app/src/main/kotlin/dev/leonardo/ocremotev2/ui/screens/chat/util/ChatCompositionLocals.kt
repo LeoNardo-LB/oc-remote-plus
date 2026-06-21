@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.util
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.util
 
 import androidx.compose.runtime.compositionLocalOf
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.DefaultToolCardResolver

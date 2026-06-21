@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api
+﻿package dev.leonardo.ocremotev2.data.api
 
 import dev.leonardo.ocremotev2.domain.model.ApiError
 import io.mockk.coEvery

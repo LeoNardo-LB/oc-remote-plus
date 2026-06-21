@@ -1,5 +1,6 @@
-package dev.leonardo.ocremotev2.ui.screens.chat
+﻿package dev.leonardo.ocremotev2.ui.screens.chat
 
+import dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache
 import android.util.Log
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
 import io.ktor.client.HttpClient
@@ -77,6 +78,7 @@ class ChatViewModelQueuedTest {
     private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
     private val sessionFocusHolder = mockk<SessionFocusHolder>(relaxed = true)
     private val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
+    private val toolSnapshotCache = ToolSnapshotCache()
 
     private val testSessionId = "test-session-1"
     private val testServerId = "test-server-1"
@@ -282,7 +284,8 @@ class ChatViewModelQueuedTest {
             sessionStatusManager = sessionStatusManager,
             sessionFocusHolder = sessionFocusHolder,
             scrollSignal = SessionScrollSignal(),
-            appNotificationManager = appNotificationManager
+            appNotificationManager = appNotificationManager,
+            toolSnapshotCache = toolSnapshotCache
         )
     }
 

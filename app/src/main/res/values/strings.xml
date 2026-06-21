@@ -726,7 +726,42 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_binary_mime">MIME type: %1$s</string>
     <string name="viewer_empty_file">File is empty</string>
     <string name="viewer_truncated">Large file — showing first 5,000 lines</string>
+    <string name="viewer_loading_progress">Loading: %1$d / %2$d lines</string>
+    <string name="viewer_large_file_warning">Large file (%1$d lines) — performance may be affected</string>
     <string name="fileviewer_error_tool_snapshot_unsupported">Tool snapshot view is available in Phase 2</string>
     <string name="a11y_icon_hunk_previous">Previous hunk</string>
     <string name="a11y_icon_hunk_next">Next hunk</string>
+
+    <!-- Workspace search -->
+    <string name="workspace_search_hint">Type to search files</string>
+    <string name="workspace_search_no_results">No matching files</string>
+    <string name="workspace_search_no_git_match">No matching changes</string>
+
+    <!-- File Viewer markdown toggle -->
+    <string name="viewer_md_show_render">Show rendered preview</string>
+    <string name="viewer_md_show_source">Show source code</string>
+
+    <!-- File Viewer tool snapshot -->
+    <string name="fileviewer_error_tool_snapshot_missing">Tool snapshot data not found</string>
+
+    <!-- Tool card grouping -->
+    <string name="tool_card_group_count">%1$d edits in this turn</string>
+
+    <!-- Phase 3: Annotation -->
+    <string name="annotation_input_title">Add annotation</string>
+    <string name="annotation_input_hint">Modification note</string>
+    <string name="annotation_input_confirm">Confirm</string>
+    <string name="annotation_detail_title">Annotation #%1$d</string>
+    <string name="annotation_detail_selected">Selected code</string>
+    <string name="annotation_detail_save">Save</string>
+    <string name="annotation_detail_edit">Edit</string>
+    <string name="annotation_detail_delete">Delete</string>
+    <string name="annotation_submit">Submit</string>
+    <string name="annotation_submit_dialog_title">Submit %1$d annotations?</string>
+    <string name="annotation_submit_overall_note">Overall note (optional)</string>
+    <string name="annotation_submit_summary">Summary:</string>
+    <string name="annotation_submit_send">Send</string>
+    <string name="annotation_submitted_toast">Annotations submitted to session</string>
+    <string name="annotation_submit_failed">Failed to submit annotations</string>
+    <string name="annotation_context_annotate">Annotate</string>
 </resources>

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions.components
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions.components
 
 import androidx.compose.runtime.Composable
 import dev.leonardo.ocremotev2.ui.theme.LocalAmoledMode

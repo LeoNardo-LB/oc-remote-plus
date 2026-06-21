@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 
 /**
  * Layer 2 Activity — derived state, only meaningful when Core = Busy.

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.components
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable

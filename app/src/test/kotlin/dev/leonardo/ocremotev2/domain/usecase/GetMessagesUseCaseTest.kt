@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.usecase
+﻿package dev.leonardo.ocremotev2.domain.usecase
 
 import app.cash.turbine.test
 import dev.leonardo.ocremotev2.domain.model.Message

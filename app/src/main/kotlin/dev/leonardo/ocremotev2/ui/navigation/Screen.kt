@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.navigation
+﻿package dev.leonardo.ocremotev2.ui.navigation
 
 /**
  * Navigation route constants.

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.tracker
+﻿package dev.leonardo.ocremotev2.domain.tracker
 
 import org.junit.Assert.*
 import org.junit.Before

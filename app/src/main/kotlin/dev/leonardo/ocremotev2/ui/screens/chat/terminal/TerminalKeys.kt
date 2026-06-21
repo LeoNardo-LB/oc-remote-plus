@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.terminal
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.terminal
 
 internal data class FnBindingResult(
     val output: String,

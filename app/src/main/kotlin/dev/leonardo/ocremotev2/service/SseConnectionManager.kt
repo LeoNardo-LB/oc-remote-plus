@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.service
+﻿package dev.leonardo.ocremotev2.service
 
 import android.util.Log
 import java.util.concurrent.ConcurrentHashMap

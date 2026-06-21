@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions.components
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable

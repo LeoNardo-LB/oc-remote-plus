@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.settings.components
+﻿package dev.leonardo.ocremotev2.ui.screens.settings.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource

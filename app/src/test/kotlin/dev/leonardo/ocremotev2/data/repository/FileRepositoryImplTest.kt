@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.repository
+﻿package dev.leonardo.ocremotev2.data.repository
 
 import dev.leonardo.ocremotev2.data.api.OpenCodeApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
@@ -9,6 +9,7 @@ import dev.leonardo.ocremotev2.domain.model.FileNode
 import dev.leonardo.ocremotev2.domain.repository.FileRepository
 import dev.leonardo.ocremotev2.domain.repository.ServerRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -97,5 +98,45 @@ class FileRepositoryImplTest {
 
         assertFalse(result.isSuccess)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("read failed"))
+    }
+
+    @Test
+    fun `findFiles success passes query limit directory and returns string list`() = runTest {
+        val expectedPaths = listOf(
+            "app/src/main/kotlin/dev/minios/ocremote/ui/screens/workspace/WorkspaceScreen.kt",
+            "app/src/main/kotlin/dev/minios/ocremote/ui/screens/viewer/FileViewerScreen.kt",
+            "docs/superpowers/specs/2026-06-18-workspace-file-viewer-design.md"
+        )
+        coEvery {
+            api.findFiles(testConn, query = "Screen", type = any(), directory = any(), limit = any(), dirs = any())
+        } returns expectedPaths
+
+        val result = sut.findFiles(serverId, "/home/user/oc-remote", "Screen", 50)
+
+        assertTrue(result.isSuccess)
+        assertEquals(expectedPaths, result.getOrNull())
+        coVerify {
+            api.findFiles(testConn, query = "Screen", type = "file", directory = "/home/user/oc-remote", limit = 50, dirs = null)
+        }
+    }
+
+    @Test
+    fun `findFiles wraps exception as failure`() = runTest {
+        coEvery { api.findFiles(any(), any(), any(), any(), any(), any()) } throws RuntimeException("network error")
+
+        val result = sut.findFiles(serverId, "/dir", "query", 30)
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("network error"))
+    }
+
+    @Test
+    fun `findFiles with empty query still delegates to api`() = runTest {
+        coEvery { api.findFiles(any(), any(), any(), any(), any(), any()) } returns emptyList()
+
+        val result = sut.findFiles(serverId, "/dir", "", 50)
+
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrNull()!!.isEmpty())
     }
 }

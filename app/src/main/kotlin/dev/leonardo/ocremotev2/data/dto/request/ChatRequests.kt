@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.dto.request
+﻿package dev.leonardo.ocremotev2.data.dto.request
 
 import dev.leonardo.ocremotev2.data.dto.common.ModelSelection
 import dev.leonardo.ocremotev2.data.dto.common.OutputFormat

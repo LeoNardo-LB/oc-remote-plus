@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 
 import dev.leonardo.ocremotev2.domain.model.SseEvent
 import dev.leonardo.ocremotev2.domain.model.ToolRef

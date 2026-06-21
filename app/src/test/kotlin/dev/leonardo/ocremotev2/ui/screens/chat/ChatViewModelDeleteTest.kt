@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat
+﻿package dev.leonardo.ocremotev2.ui.screens.chat
 
 import android.util.Log
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
@@ -23,6 +23,7 @@ import dev.leonardo.ocremotev2.ui.screens.sessions.SessionScrollSignal
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
@@ -63,6 +64,7 @@ class ChatViewModelDeleteTest {
     private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
     private val sessionFocusHolder = mockk<SessionFocusHolder>(relaxed = true)
     private val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
+    private val toolSnapshotCache = ToolSnapshotCache()
 
     private val testSessionId = "session-123"
     private val testServerId = "server-1"
@@ -235,7 +237,8 @@ class ChatViewModelDeleteTest {
             sessionStatusManager = sessionStatusManager,
             sessionFocusHolder = sessionFocusHolder,
             scrollSignal = SessionScrollSignal(),
-            appNotificationManager = appNotificationManager
+            appNotificationManager = appNotificationManager,
+            toolSnapshotCache = toolSnapshotCache
         )
     }
 

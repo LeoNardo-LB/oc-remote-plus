@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.navigation.routes
+﻿package dev.leonardo.ocremotev2.ui.navigation.routes
 
 import io.mockk.every
 import io.mockk.mockk

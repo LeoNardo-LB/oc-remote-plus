@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.input
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.input
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image

@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.theme
+﻿package dev.leonardo.ocremotev2.ui.theme
 
 /**
  * Semantic alpha tokens for consistent content emphasis across the app.

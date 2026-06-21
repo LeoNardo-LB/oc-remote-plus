@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.util
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.util
 
 import android.view.HapticFeedbackConstants
 import android.view.View

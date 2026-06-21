@@ -1,0 +1,44 @@
+# Flow 25: Markdown preview toggle (source ↔ rendered)
+appId: dev.minios.ocremote.dev
+---
+- runFlow: e2e-chat-flow.yaml
+
+# Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    id: "menu_open_workspace"
+
+# Search for a markdown file
+- tapOn:
+    id: "workspace_search_button"
+- tapOn:
+    id: "workspace_search_input"
+- inputText: "README.md"
+- tapOn:
+    id: "workspace_search_result"
+    index: 0
+
+# Verify source view + render button visible
+- extendedWaitUntil:
+    visible: ".*viewer_md_render_button.*"
+    timeout: 5000
+    optional: true
+- takeScreenshot: e2e_md_source_view
+
+# Switch to rendered preview
+- tapOn:
+    id: "viewer_md_render_button"
+- extendedWaitUntil:
+    visible: ".*#.*"
+    timeout: 5000
+    optional: true
+- takeScreenshot: e2e_md_render_preview
+
+# Switch back to source
+- tapOn:
+    id: "viewer_md_render_button"
+- takeScreenshot: e2e_md_back_to_source
+
+- tapOn:
+    id: "back_button"

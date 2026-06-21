@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api
+﻿package dev.leonardo.ocremotev2.data.api
 
 import dev.leonardo.ocremotev2.data.dto.common.*
 import dev.leonardo.ocremotev2.data.dto.request.*

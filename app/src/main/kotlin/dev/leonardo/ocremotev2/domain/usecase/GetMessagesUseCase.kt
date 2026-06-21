@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.usecase
+﻿package dev.leonardo.ocremotev2.domain.usecase
 
 import dev.leonardo.ocremotev2.domain.model.Message
 import dev.leonardo.ocremotev2.domain.repository.ChatRepository

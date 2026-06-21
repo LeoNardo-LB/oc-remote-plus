@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.api.sse.parsers
+﻿package dev.leonardo.ocremotev2.data.api.sse.parsers
 
 import android.util.Log
 import dev.leonardo.ocremotev2.domain.model.SessionNextEvent

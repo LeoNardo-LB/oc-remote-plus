@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.tools.cards
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.tools.cards
 
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.extractFileName
 import androidx.compose.foundation.layout.fillMaxWidth

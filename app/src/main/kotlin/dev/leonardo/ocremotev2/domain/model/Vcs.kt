@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.domain.model
+﻿package dev.leonardo.ocremotev2.domain.model
 data class VcsChange(val file: String, val additions: Int, val deletions: Int, val status: VcsStatus)
 enum class VcsStatus { ADDED, DELETED, MODIFIED }
 data class VcsBranchInfo(val branch: String?, val defaultBranch: String?)

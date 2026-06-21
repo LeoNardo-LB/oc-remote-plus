@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat
+﻿package dev.leonardo.ocremotev2.ui.screens.chat
 
 import android.util.Log
 import dev.leonardo.ocremotev2.BuildConfig

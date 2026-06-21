@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.components
+﻿package dev.leonardo.ocremotev2.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

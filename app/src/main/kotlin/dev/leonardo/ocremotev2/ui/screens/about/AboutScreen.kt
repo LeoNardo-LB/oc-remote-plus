@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.about
+﻿package dev.leonardo.ocremotev2.ui.screens.about
 
 import android.content.Intent
 import android.net.Uri

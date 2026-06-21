@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions.components
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions.components
 
 /**
  * Value object representing a browsable directory path in the file browser.

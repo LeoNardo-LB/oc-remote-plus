@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.webview
+﻿package dev.leonardo.ocremotev2.ui.screens.webview
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap

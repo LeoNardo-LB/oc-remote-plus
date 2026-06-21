@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat
+﻿package dev.leonardo.ocremotev2.ui.screens.chat
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString

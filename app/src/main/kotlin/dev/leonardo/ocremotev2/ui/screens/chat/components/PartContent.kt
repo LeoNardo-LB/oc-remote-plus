@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.components
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -26,6 +26,9 @@ import dev.leonardo.ocremotev2.domain.model.Part
 import androidx.compose.foundation.text.selection.SelectionContainer
 import dev.leonardo.ocremotev2.ui.screens.chat.markdown.MarkdownContent
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCallCard
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.ViewToolRequest
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnViewTool
+import dev.leonardo.ocremotev2.ui.navigation.routes.FileViewerNav
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.cards.PatchCard
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.cards.TodoListCard
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCollapseTools
@@ -44,7 +47,8 @@ internal fun PartContent(
     isUser: Boolean = false,
     onViewSubSession: ((String) -> Unit)? = null,
     turnAgentName: String? = null,
-    onOpenFile: ((filePath: String) -> Unit)? = null
+    onOpenFile: ((filePath: String) -> Unit)? = null,
+    onViewTool: ((ViewToolRequest) -> Unit)? = null
 ) {
     when (part) {
         is Part.Text -> {
@@ -98,13 +102,26 @@ internal fun PartContent(
                 val expanded = toolExpandedStates[part.id] ?: autoExpand
                 val toggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
 
+                // Phase 2: intercept onOpenFile for Read/Write/Edit → TOOL_SNAPSHOT
+                val viewTool = onViewTool ?: LocalOnViewTool.current
+                val toolName = part.tool.lowercase()
+                val isFileTool = toolName in setOf("read", "write", "edit", "multiedit")
+                val isDiffTool = toolName in setOf("edit", "multiedit")
+                val effectiveOnOpenFile: ((String) -> Unit)? = if (viewTool != null && isFileTool) {
+                    { filePath ->
+                        val source = if (isDiffTool) FileViewerNav.Source.TOOL_SNAPSHOT_DIFF
+                        else FileViewerNav.Source.TOOL_SNAPSHOT
+                        viewTool(ViewToolRequest(filePath, source, part))
+                    }
+                } else onOpenFile
+
                 val resolved = LocalToolCardResolver.current.resolve(
                     tool = part,
                     isExpanded = expanded,
                     onToggleExpand = toggleExpand,
                     onViewSubSession = onViewSubSession,
                     turnAgentName = turnAgentName,
-                    onOpenFile = onOpenFile
+                    onOpenFile = effectiveOnOpenFile
                 )
 
                 if (resolved != null) {

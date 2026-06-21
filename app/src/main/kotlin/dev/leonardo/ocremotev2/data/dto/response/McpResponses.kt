@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.data.dto.response
+﻿package dev.leonardo.ocremotev2.data.dto.response
 
 import kotlinx.serialization.Serializable
 

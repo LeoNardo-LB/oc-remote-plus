@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.sessions
+﻿package dev.leonardo.ocremotev2.ui.screens.sessions
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border

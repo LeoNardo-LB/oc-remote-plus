@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.screens.chat.input
+﻿package dev.leonardo.ocremotev2.ui.screens.chat.input
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

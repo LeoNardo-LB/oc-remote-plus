@@ -1,4 +1,4 @@
-package dev.leonardo.ocremotev2.ui.navigation
+﻿package dev.leonardo.ocremotev2.ui.navigation
 
 import android.net.Uri
 import android.util.Log
@@ -24,7 +24,11 @@ import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.ui.navigation.routes.*
 import kotlinx.coroutines.launch
 import dev.leonardo.ocremotev2.ui.screens.about.AboutScreen
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.hilt.navigation.compose.hiltViewModel
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatScreen
+import dev.leonardo.ocremotev2.ui.screens.chat.ChatViewModel
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnViewTool
 import dev.leonardo.ocremotev2.ui.screens.home.HomeRoute
 import dev.leonardo.ocremotev2.ui.screens.sessions.SessionListRoute
 import dev.leonardo.ocremotev2.ui.screens.server.ServerModelFilterRoute
@@ -406,8 +410,33 @@ fun NavGraph(
                 emptyList()
             }
 
-            ChatScreen(
-                onNavigateBack = {
+            val chatViewModel = hiltViewModel<ChatViewModel>()
+            CompositionLocalProvider(
+                LocalOnViewTool provides { request ->
+                    chatViewModel.cacheToolPart(request.part)
+                    scope.launch {
+                        val session = sessionRepository.getSession(params.server.serverId, params.sessionId).getOrNull()
+                        val dir = session?.directory ?: params.directory
+                        navController.navigate(
+                            FileViewerNav.createRoute(
+                                serverUrl = params.server.serverUrl,
+                                username = params.server.username,
+                                password = params.server.password,
+                                serverName = params.server.serverName,
+                                serverId = params.server.serverId,
+                                sessionId = params.sessionId,
+                                filePath = request.filePath,
+                                source = request.source,
+                                toolPartIds = request.part.id,
+                                directory = dir
+                            )
+                        )
+                    }
+                }
+            ) {
+                ChatScreen(
+                    viewModel = chatViewModel,
+                    onNavigateBack = {
                     navController.popBackStack()
                 },
                 onNavigateToSession = { newSessionId ->
@@ -500,6 +529,7 @@ fun NavGraph(
                 },
                 startInTerminalMode = params.openTerminal
             )
+            }
         }
 
         // ============ Workspace Screen ============
@@ -549,7 +579,8 @@ fun NavGraph(
             arguments = FileViewerNav.navArguments
         ) {
             FileViewerRoute(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onSubmitted = { navController.popBackStack() }
             )
         }
     }
