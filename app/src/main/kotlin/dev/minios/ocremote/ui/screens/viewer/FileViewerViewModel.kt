@@ -43,6 +43,16 @@ class FileViewerViewModel @Inject constructor(
     private val diffParser = DiffParser()
     private var annotationManager: AnnotationManager? = null
 
+    // Phase 4: pagination — cache full content for loadMore slicing
+    private var fullContentCache: String = ""
+
+    private companion object {
+        const val INITIAL_PAGE_SIZE = 500
+        const val PAGE_SIZE = 200
+        const val EXTREMELY_LARGE_THRESHOLD = 100_000
+        const val EXTREMELY_LARGE_INITIAL = 10_000
+    }
+
     init {
         when (source) {
             FileViewerNav.Source.LIVE -> loadLive()
@@ -58,24 +68,65 @@ class FileViewerViewModel @Inject constructor(
                 .onSuccess { c ->
                     if (c.type == ContentType.BINARY) _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }
                     else {
-                        val lines = c.content.split('\n')
-                        val truncated = lines.size > 5000
-                        val visible = if (truncated) lines.take(5000).joinToString("\n") else c.content
-                        annotationManager = AnnotationManager(visible)
+                        fullContentCache = c.content
+                        val totalLines = if (c.content.isEmpty()) 0
+                                         else c.content.count { it == '\n' } + if (c.content.endsWith('\n')) 0 else 1
+                        val extremelyLarge = totalLines > EXTREMELY_LARGE_THRESHOLD
+                        val initialVisible = if (extremelyLarge) EXTREMELY_LARGE_INITIAL
+                                             else minOf(totalLines, INITIAL_PAGE_SIZE)
+                        val visible = takeFirstLines(c.content, initialVisible)
+                        // AnnotationManager uses full content so line numbers stay correct after loadMore
+                        annotationManager = AnnotationManager(fullContentCache)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
                                 content = visible,
                                 isEmpty = visible.isBlank(),
-                                isTruncated = truncated,
                                 isMarkdown = isMarkdownFile(filePath),
-                                renderMode = FileViewerRenderMode.SOURCE
+                                renderMode = FileViewerRenderMode.SOURCE,
+                                totalLineCount = totalLines,
+                                visibleLineCount = initialVisible,
+                                isFullyLoaded = initialVisible >= totalLines,
+                                isExtremelyLarge = extremelyLarge
                             )
                         }
                     }
                 }
                 .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = R.string.workspace_error_load_failed) } }
         }
+    }
+
+    /**
+     * Phase 4: Append PAGE_SIZE more lines to the visible content. No-op when fully loaded.
+     * Slices from [fullContentCache] — cheap, no network round-trip.
+     */
+    fun loadMoreLines() {
+        val current = _uiState.value
+        if (current.isFullyLoaded) return
+        val newSize = (current.visibleLineCount + PAGE_SIZE).coerceAtMost(current.totalLineCount)
+        val newContent = takeFirstLines(fullContentCache, newSize)
+        _uiState.update {
+            it.copy(
+                content = newContent,
+                visibleLineCount = newSize,
+                isFullyLoaded = newSize >= it.totalLineCount
+            )
+        }
+    }
+
+    /** Return the first [lineCount] lines of [content] (inclusive of the trailing newline of the last line). */
+    private fun takeFirstLines(content: String, lineCount: Int): String {
+        if (lineCount <= 0 || content.isEmpty()) return ""
+        var seen = 0
+        val sb = StringBuilder()
+        for (i in content.indices) {
+            sb.append(content[i])
+            if (content[i] == '\n') {
+                seen++
+                if (seen >= lineCount) break
+            }
+        }
+        return sb.toString()
     }
 
     private fun loadGitDiff() {

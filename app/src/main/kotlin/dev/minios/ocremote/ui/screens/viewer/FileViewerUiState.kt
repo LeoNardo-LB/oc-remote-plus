@@ -25,7 +25,11 @@ data class FileViewerUiState(
     val mimeType: String? = null,
     val error: Int? = null,
     val isEmpty: Boolean = false,
-    val isTruncated: Boolean = false,
+    // Phase 4: pagination replaces Phase 1 isTruncated
+    val totalLineCount: Int = 0,
+    val visibleLineCount: Int = 0,
+    val isFullyLoaded: Boolean = false,
+    val isExtremelyLarge: Boolean = false,
     val diff: VcsFileDiff? = null,
     val hunks: List<DiffHunk> = emptyList(),
     val currentHunkIndex: Int = 0,

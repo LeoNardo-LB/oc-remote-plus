@@ -143,7 +143,7 @@ fun FileViewerScreen(
                         sourceScrollFraction = lastSourceFraction
                     )
                 }
-                uiState.isTruncated -> Column(Modifier.fillMaxSize()) {
+                !uiState.isFullyLoaded -> Column(Modifier.fillMaxSize()) {
                     TruncationBanner()
                     CodeSourceView(
                         content = uiState.content,

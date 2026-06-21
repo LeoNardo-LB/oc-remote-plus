@@ -538,4 +538,96 @@ class FileViewerViewModelTest {
         vm.submitAnnotations("note")
         assertEquals(1, vm.uiState.value.annotations.size)
     }
+
+    // ===== Phase 4: Pagination tests =====
+
+    @Test
+    fun `loadLive paginates content - initial visibleLineCount is 500 for large files`() = runTest {
+        val largeContent = buildString {
+            append("package dev.minios.ocremote\n\n")
+            append("class LargeFile {\n")
+            for (i in 1..2000) append("    fun method$i(): Int = $i\n")
+            append("}\n")
+        }
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            FileContent(path = filePath, type = ContentType.TEXT, content = largeContent)
+        )
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        val total = largeContent.count { it == '\n' } + if (largeContent.endsWith('\n')) 0 else 1
+        assertEquals(500, vm.uiState.value.visibleLineCount)
+        assertEquals(total, vm.uiState.value.totalLineCount)
+        assertEquals(false, vm.uiState.value.isFullyLoaded)
+        assertEquals(false, vm.uiState.value.isExtremelyLarge)
+    }
+
+    @Test
+    fun `loadLive marks isExtremelyLarge for files over 100000 lines`() = runTest {
+        val hugeContent = (1..100001).joinToString("\n") { "line $it" }
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            FileContent(path = filePath, type = ContentType.TEXT, content = hugeContent)
+        )
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        assertEquals(true, vm.uiState.value.isExtremelyLarge)
+        assertEquals(10000, vm.uiState.value.visibleLineCount)
+    }
+
+    @Test
+    fun `loadLive for small file sets isFullyLoaded true and visibleLineCount equals total`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        val total = sampleKotlinSource.count { it == '\n' } + if (sampleKotlinSource.endsWith('\n')) 0 else 1
+        assertEquals(total, vm.uiState.value.visibleLineCount)
+        assertEquals(true, vm.uiState.value.isFullyLoaded)
+    }
+
+    @Test
+    fun `loadMoreLines increases visibleLineCount by 200 and respects totalLineCount`() = runTest {
+        val largeContent = buildString {
+            append("package dev.minios.ocremote\n\n")
+            append("class LargeFile {\n")
+            for (i in 1..2000) append("    fun method$i(): Int = $i\n")
+            append("}\n")
+        }
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            FileContent(path = filePath, type = ContentType.TEXT, content = largeContent)
+        )
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        val initialVisible = vm.uiState.value.visibleLineCount
+        vm.loadMoreLines()
+        assertEquals(initialVisible + 200, vm.uiState.value.visibleLineCount)
+        assertEquals(false, vm.uiState.value.isFullyLoaded)
+    }
+
+    @Test
+    fun `loadMoreLines clamps to totalLineCount and sets isFullyLoaded`() = runTest {
+        val mediumContent = (1..600).joinToString("\n") { "line $it" }
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            FileContent(path = filePath, type = ContentType.TEXT, content = mediumContent)
+        )
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        vm.loadMoreLines()
+        assertEquals(600, vm.uiState.value.visibleLineCount)
+        assertEquals(true, vm.uiState.value.isFullyLoaded)
+    }
+
+    @Test
+    fun `loadMoreLines is no-op when isFullyLoaded`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        val before = vm.uiState.value.visibleLineCount
+        vm.loadMoreLines()
+        assertEquals(before, vm.uiState.value.visibleLineCount)
+    }
+
+    @Test
+    fun `loadMoreLines for extremely large file starts at 10000 not 500`() = runTest {
+        val hugeContent = (1..150000).joinToString("\n") { "line $it" }
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            FileContent(path = filePath, type = ContentType.TEXT, content = hugeContent)
+        )
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        assertEquals(10000, vm.uiState.value.visibleLineCount)
+        vm.loadMoreLines()
+        assertEquals(10200, vm.uiState.value.visibleLineCount)
+    }
 }
