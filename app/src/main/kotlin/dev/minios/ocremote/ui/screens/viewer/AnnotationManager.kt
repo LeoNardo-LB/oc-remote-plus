@@ -42,6 +42,15 @@ class AnnotationManager(private val content: String) {
 
     fun getAll(): List<Annotation> = annotations.sortedBy { it.index }
 
+    /**
+     * Phase 4: Replace all annotations with [list] without re-calculating
+     * id/index/line-col. Used to restore from SavedStateHandle after rotation.
+     */
+    fun restore(list: List<Annotation>) {
+        annotations.clear()
+        annotations.addAll(list)
+    }
+
     /** Get annotations intersecting 0-based [lineIndex]. */
     fun getForLine(lineIndex: Int): List<Annotation> {
         val target = lineIndex + 1

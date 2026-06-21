@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.minios.ocremote.R
+import dev.minios.ocremote.domain.model.Annotation
 import dev.minios.ocremote.domain.model.ContentType
 import dev.minios.ocremote.domain.model.VcsDiffMode
 import dev.minios.ocremote.domain.model.VcsFileDiff
@@ -24,7 +25,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class FileViewerViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val getFileContent: GetFileContentUseCase,
     private val getFileDiff: GetFileDiffUseCase,
     private val toolSnapshotCache: ToolSnapshotCache,
@@ -77,6 +78,9 @@ class FileViewerViewModel @Inject constructor(
                         val visible = takeFirstLines(c.content, initialVisible)
                         // AnnotationManager uses full content so line numbers stay correct after loadMore
                         annotationManager = AnnotationManager(fullContentCache)
+                        // Phase 4: restore annotations from SavedStateHandle (rotation survival)
+                        val restored = restoreAnnotationsFromHandle()
+                        if (restored.isNotEmpty()) annotationManager?.restore(restored)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -87,7 +91,8 @@ class FileViewerViewModel @Inject constructor(
                                 totalLineCount = totalLines,
                                 visibleLineCount = initialVisible,
                                 isFullyLoaded = initialVisible >= totalLines,
-                                isExtremelyLarge = extremelyLarge
+                                isExtremelyLarge = extremelyLarge,
+                                annotations = annotationManager?.getAll() ?: emptyList()
                             )
                         }
                     }
@@ -151,19 +156,25 @@ class FileViewerViewModel @Inject constructor(
         val manager = annotationManager ?: return
         if (_uiState.value.mode != FileViewerMode.SOURCE) return
         manager.add(selectedText, startChar, endChar, note)
-        _uiState.update { it.copy(annotations = manager.getAll()) }
+        val all = manager.getAll()
+        _uiState.update { it.copy(annotations = all) }
+        saveAnnotationsToHandle(all)
     }
 
     fun deleteAnnotation(id: String) {
         val manager = annotationManager ?: return
         manager.delete(id)
-        _uiState.update { it.copy(annotations = manager.getAll()) }
+        val all = manager.getAll()
+        _uiState.update { it.copy(annotations = all) }
+        saveAnnotationsToHandle(all)
     }
 
     fun updateAnnotation(id: String, note: String) {
         val manager = annotationManager ?: return
         manager.update(id, note)
-        _uiState.update { it.copy(annotations = manager.getAll()) }
+        val all = manager.getAll()
+        _uiState.update { it.copy(annotations = all) }
+        saveAnnotationsToHandle(all)
     }
 
     suspend fun submitAnnotations(overallNote: String): Result<Unit> {
@@ -174,8 +185,40 @@ class FileViewerViewModel @Inject constructor(
         if (result.isSuccess) {
             manager.clear()
             _uiState.update { it.copy(annotations = emptyList()) }
+            saveAnnotationsToHandle(emptyList())
         }
         return result
+    }
+
+    // ============ Phase 4: Annotation SavedStateHandle persistence ============
+
+    private fun saveAnnotationsToHandle(annotations: List<Annotation>) {
+        if (annotations.isEmpty()) {
+            savedStateHandle.remove<Any>("annotations_flat")
+            return
+        }
+        val flat = ArrayList<Any>(annotations.size * 11)
+        annotations.forEach { ann ->
+            flat.add(ann.id); flat.add(ann.index); flat.add(ann.startChar); flat.add(ann.endChar)
+            flat.add(ann.startLine); flat.add(ann.startCol); flat.add(ann.endLine); flat.add(ann.endCol)
+            flat.add(ann.selectedText); flat.add(ann.note); flat.add(ann.createdAt)
+        }
+        savedStateHandle["annotations_flat"] = flat
+    }
+
+    private fun restoreAnnotationsFromHandle(): List<Annotation> {
+        val raw = savedStateHandle.get<ArrayList<*>>("annotations_flat") ?: return emptyList()
+        if (raw.isEmpty()) return emptyList()
+        return raw.chunked(11).map { items ->
+            Annotation(
+                id = items[0] as String, index = items[1] as Int,
+                startChar = items[2] as Int, endChar = items[3] as Int,
+                startLine = items[4] as Int, startCol = items[5] as Int,
+                endLine = items[6] as Int, endCol = items[7] as Int,
+                selectedText = items[8] as String, note = items[9] as String,
+                createdAt = items[10] as Long
+            )
+        }
     }
 
     // ============ Phase 2: Markdown render toggle ============

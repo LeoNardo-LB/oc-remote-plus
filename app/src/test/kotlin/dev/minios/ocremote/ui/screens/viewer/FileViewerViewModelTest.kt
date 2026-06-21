@@ -630,4 +630,20 @@ class FileViewerViewModelTest {
         vm.loadMoreLines()
         assertEquals(10200, vm.uiState.value.visibleLineCount)
     }
+
+    // ===== Phase 4: Annotation rotation survival =====
+
+    @Test
+    fun `annotations survive ViewModel recreation via SavedStateHandle`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        val handle = savedStateHandle()
+        val vm1 = FileViewerViewModel(handle, getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        vm1.addAnnotation("import", 0, 6, "note1")
+        vm1.addAnnotation("class", 10, 15, "note2")
+        // Recreate ViewModel with the same SavedStateHandle (simulates rotation)
+        val vm2 = FileViewerViewModel(handle, getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        assertEquals(2, vm2.uiState.value.annotations.size)
+        assertEquals("note1", vm2.uiState.value.annotations[0].note)
+        assertEquals("note2", vm2.uiState.value.annotations[1].note)
+    }
 }
