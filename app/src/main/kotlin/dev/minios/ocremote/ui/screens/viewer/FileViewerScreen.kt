@@ -1,6 +1,7 @@
 package dev.minios.ocremote.ui.screens.viewer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,9 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.RemoveRedEye
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -26,10 +32,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -39,6 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.theme.SpacingTokens
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -50,16 +60,35 @@ fun FileViewerScreen(
     onPrevHunk: () -> Unit,
     onCopyPath: () -> Unit,
     onShare: () -> Unit,
-    onCopyAllContent: () -> Unit
+    onCopyAllContent: () -> Unit,
+    onToggleRenderMode: () -> Unit
 ) {
     var showLongPressMenu by remember { mutableStateOf(false) }
+    // Phase 2: source scroll state + fraction anchor for md render toggle
+    val sourceLazyListState = rememberLazyListState()
+    var lastSourceFraction by remember { mutableStateOf(0f) }
+    val sourceLineCount = remember(uiState.content) {
+        if (uiState.content.isEmpty()) 1
+        else uiState.content.count { it == '\n' } + 1
+    }
+
+    val toggleWithAnchor: () -> Unit = {
+        if (uiState.isMarkdown && uiState.renderMode == FileViewerRenderMode.SOURCE) {
+            lastSourceFraction = if (sourceLineCount > 0 && sourceLazyListState.layoutInfo.totalItemsCount > 0) {
+                sourceLazyListState.firstVisibleItemIndex.toFloat() / sourceLineCount
+            } else 0f
+        }
+        onToggleRenderMode()
+    }
+
     Scaffold(
         topBar = {
             FileViewerTopBar(
                 uiState = uiState,
                 onBack = onBack,
                 onCopyPath = onCopyPath,
-                onShare = onShare
+                onShare = onShare,
+                onToggleRenderMode = toggleWithAnchor
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -86,17 +115,26 @@ fun FileViewerScreen(
                     onPrevHunk = onPrevHunk
                 )
                 uiState.isEmpty -> MessageState(message = stringResource(R.string.viewer_empty_file))
+                // Phase 2: markdown render preview (before truncation check — preview shows full)
+                uiState.isMarkdown && uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW -> {
+                    MarkdownPreviewWithScrollAnchor(
+                        markdown = uiState.content,
+                        sourceScrollFraction = lastSourceFraction
+                    )
+                }
                 uiState.isTruncated -> Column(Modifier.fillMaxSize()) {
                     TruncationBanner()
                     CodeSourceView(
                         content = uiState.content,
                         filePath = uiState.filePath,
+                        lazyListState = sourceLazyListState,
                         modifier = Modifier.weight(1f)
                     )
                 }
                 else -> CodeSourceView(
                     content = uiState.content,
                     filePath = uiState.filePath,
+                    lazyListState = sourceLazyListState,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -125,7 +163,8 @@ private fun FileViewerTopBar(
     uiState: FileViewerUiState,
     onBack: () -> Unit,
     onCopyPath: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onToggleRenderMode: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -147,6 +186,22 @@ private fun FileViewerTopBar(
             }
         },
         actions = {
+            // Phase 2: md render toggle (only for markdown in SOURCE mode)
+            if (uiState.isMarkdown && uiState.mode != FileViewerMode.DIFF) {
+                val isRender = uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW
+                IconButton(
+                    onClick = onToggleRenderMode,
+                    modifier = Modifier.testTag("viewer_md_render_button")
+                ) {
+                    Icon(
+                        imageVector = if (isRender) Icons.Default.Description else Icons.Default.RemoveRedEye,
+                        contentDescription = if (isRender) stringResource(R.string.viewer_md_show_source)
+                        else stringResource(R.string.viewer_md_show_render),
+                        tint = if (isRender) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             IconButton(onClick = onCopyPath) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
@@ -160,6 +215,28 @@ private fun FileViewerTopBar(
                 )
             }
         }
+    )
+}
+
+/**
+ * Markdown preview that scrolls to [sourceScrollFraction] of its max scroll range,
+ * waiting for first non-zero maxValue (async rendering).
+ */
+@Composable
+private fun MarkdownPreviewWithScrollAnchor(
+    markdown: String,
+    sourceScrollFraction: Float
+) {
+    val renderScrollState = rememberScrollState()
+    LaunchedEffect(sourceScrollFraction) {
+        snapshotFlow { renderScrollState.maxValue }
+            .filter { it > 0 }
+            .first()
+        renderScrollState.scrollTo((renderScrollState.maxValue * sourceScrollFraction).toInt())
+    }
+    MarkdownPreview(
+        markdown = markdown,
+        scrollState = renderScrollState
     )
 }
 

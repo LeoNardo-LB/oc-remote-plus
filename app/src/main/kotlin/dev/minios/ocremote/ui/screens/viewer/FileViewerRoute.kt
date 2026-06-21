@@ -47,6 +47,7 @@ fun FileViewerRoute(
         onCopyAllContent = {
             clipboard.setText(AnnotatedString(uiState.content))
             scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.menu_copied_to_clipboard)) }
-        }
+        },
+        onToggleRenderMode = viewModel::toggleRenderMode
     )
 }
