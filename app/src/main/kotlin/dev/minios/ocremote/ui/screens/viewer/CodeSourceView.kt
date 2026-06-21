@@ -37,6 +37,16 @@ import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
 import dev.snipme.highlights.model.SyntaxThemes
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 private const val ALPHA_MASK = 0xFF000000.toInt()
 
@@ -48,7 +58,11 @@ fun CodeSourceView(
     onAnnotate: ((selectedText: String) -> Unit)? = null,
     onTapAnnotation: ((Annotation) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    lazyListState: LazyListState = rememberLazyListState()
+    lazyListState: LazyListState = rememberLazyListState(),
+    // Phase 4: pagination — null means render all lines (backward compatible)
+    visibleLineCount: Int? = null,
+    totalLineCount: Int? = null,
+    onLoadMore: (() -> Unit)? = null
 ) {
     if (content.isEmpty()) return
 
@@ -121,6 +135,22 @@ fun CodeSourceView(
     val hScroll = rememberScrollState()
     val annotationEnabled = onAnnotate != null
 
+    // Phase 4: pagination — trigger loadMore when user scrolls near the bottom
+    val visLines = visibleLineCount
+    val totalLines = totalLineCount
+    val hasMore = visLines != null && totalLines != null && visLines < totalLines
+    if (onLoadMore != null && hasMore) {
+        LaunchedEffect(lazyListState, visLines, totalLines) {
+            snapshotFlow {
+                val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                lastVisible >= visLines - 50
+            }
+                .filter { it }
+                .distinctUntilChanged()
+                .collect { onLoadMore() }
+        }
+    }
+
     val lazyContent: @Composable (Modifier) -> Unit = { m ->
         LazyColumn(
             state = lazyListState,
@@ -128,7 +158,7 @@ fun CodeSourceView(
             contentPadding = PaddingValues(vertical = SpacingTokens.SM.dp)
         ) {
             items(
-                count = lineCount,
+                count = visLines ?: lineCount,
                 key = { it }
             ) { index ->
                 val start = lineOffsets[index]
@@ -163,6 +193,19 @@ fun CodeSourceView(
                             end = SpacingTokens.LG.dp
                         )
                     )
+                }
+            }
+            // Phase 4: load-more indicator
+            if (hasMore) {
+                item(key = "load_more") {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(SpacingTokens.LG.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).testTag("viewer_load_more_indicator")
+                        )
+                    }
                 }
             }
         }

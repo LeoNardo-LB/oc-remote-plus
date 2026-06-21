@@ -76,7 +76,9 @@ fun FileViewerScreen(
     onAddAnnotation: (selectedText: String, note: String) -> Unit,
     onDeleteAnnotation: (id: String) -> Unit,
     onUpdateAnnotation: (id: String, note: String) -> Unit,
-    onSubmitAnnotations: (overallNote: String) -> Unit
+    onSubmitAnnotations: (overallNote: String) -> Unit,
+    // Phase 4: pagination
+    onLoadMoreLines: () -> Unit
 ) {
     var showLongPressMenu by remember { mutableStateOf(false) }
     // Phase 3: Annotation UI state
@@ -143,12 +145,36 @@ fun FileViewerScreen(
                         sourceScrollFraction = lastSourceFraction
                     )
                 }
-                !uiState.isFullyLoaded -> Column(Modifier.fillMaxSize()) {
-                    TruncationBanner()
+                uiState.isExtremelyLarge -> Column(Modifier.fillMaxSize()) {
+                    LargeFileWarningBanner(lineCount = uiState.totalLineCount)
                     CodeSourceView(
                         content = uiState.content,
                         filePath = uiState.filePath,
+                        annotations = uiState.annotations,
+                        onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
+                        onTapAnnotation = { ann -> detailAnnotation = ann },
                         lazyListState = sourceLazyListState,
+                        visibleLineCount = uiState.visibleLineCount,
+                        totalLineCount = uiState.totalLineCount,
+                        onLoadMore = onLoadMoreLines,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                !uiState.isFullyLoaded -> Column(Modifier.fillMaxSize()) {
+                    TruncationBanner(
+                        loadedLines = uiState.visibleLineCount,
+                        totalLines = uiState.totalLineCount
+                    )
+                    CodeSourceView(
+                        content = uiState.content,
+                        filePath = uiState.filePath,
+                        annotations = uiState.annotations,
+                        onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
+                        onTapAnnotation = { ann -> detailAnnotation = ann },
+                        lazyListState = sourceLazyListState,
+                        visibleLineCount = uiState.visibleLineCount,
+                        totalLineCount = uiState.totalLineCount,
+                        onLoadMore = onLoadMoreLines,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -374,15 +400,33 @@ private fun MessageState(
 }
 
 @Composable
-private fun TruncationBanner() {
+private fun TruncationBanner(loadedLines: Int, totalLines: Int) {
     Surface(
         color = MaterialTheme.colorScheme.tertiaryContainer,
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
-            text = stringResource(R.string.viewer_truncated),
+            text = stringResource(R.string.viewer_loading_progress, loadedLines, totalLines),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
+            modifier = Modifier.padding(
+                horizontal = SpacingTokens.LG.dp,
+                vertical = SpacingTokens.SM.dp
+            )
+        )
+    }
+}
+
+@Composable
+private fun LargeFileWarningBanner(lineCount: Int) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = stringResource(R.string.viewer_large_file_warning, lineCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier.padding(
                 horizontal = SpacingTokens.LG.dp,
                 vertical = SpacingTokens.SM.dp

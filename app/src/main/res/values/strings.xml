@@ -726,6 +726,8 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="viewer_binary_mime">MIME type: %1$s</string>
     <string name="viewer_empty_file">File is empty</string>
     <string name="viewer_truncated">Large file — showing first 5,000 lines</string>
+    <string name="viewer_loading_progress">Loading: %1$d / %2$d lines</string>
+    <string name="viewer_large_file_warning">Large file (%1$d lines) — performance may be affected</string>
     <string name="fileviewer_error_tool_snapshot_unsupported">Tool snapshot view is available in Phase 2</string>
     <string name="a11y_icon_hunk_previous">Previous hunk</string>
     <string name="a11y_icon_hunk_next">Next hunk</string>

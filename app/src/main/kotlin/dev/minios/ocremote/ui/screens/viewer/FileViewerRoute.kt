@@ -63,6 +63,7 @@ fun FileViewerRoute(
         },
         onDeleteAnnotation = viewModel::deleteAnnotation,
         onUpdateAnnotation = viewModel::updateAnnotation,
+        onLoadMoreLines = viewModel::loadMoreLines,
         onSubmitAnnotations = { overallNote ->
             if (!isSubmitting) {
                 isSubmitting = true
