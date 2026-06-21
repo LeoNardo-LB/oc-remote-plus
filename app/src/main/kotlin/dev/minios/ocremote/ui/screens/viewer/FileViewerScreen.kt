@@ -45,6 +45,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import dev.minios.ocremote.domain.model.Annotation
 import dev.minios.ocremote.R
 import dev.minios.ocremote.ui.theme.SpacingTokens
 import kotlinx.coroutines.flow.filter
@@ -61,9 +70,19 @@ fun FileViewerScreen(
     onCopyPath: () -> Unit,
     onShare: () -> Unit,
     onCopyAllContent: () -> Unit,
-    onToggleRenderMode: () -> Unit
+    onToggleRenderMode: () -> Unit,
+    // Phase 3: Annotation callbacks
+    onAnnotateSelection: (selectedText: String) -> Unit,
+    onAddAnnotation: (selectedText: String, note: String) -> Unit,
+    onDeleteAnnotation: (id: String) -> Unit,
+    onUpdateAnnotation: (id: String, note: String) -> Unit,
+    onSubmitAnnotations: (overallNote: String) -> Unit
 ) {
     var showLongPressMenu by remember { mutableStateOf(false) }
+    // Phase 3: Annotation UI state
+    var pendingAnnotationText by remember { mutableStateOf<String?>(null) }
+    var detailAnnotation by remember { mutableStateOf<Annotation?>(null) }
+    var showSubmitDialog by remember { mutableStateOf(false) }
     // Phase 2: source scroll state + fraction anchor for md render toggle
     val sourceLazyListState = rememberLazyListState()
     var lastSourceFraction by remember { mutableStateOf(0f) }
@@ -88,7 +107,9 @@ fun FileViewerScreen(
                 onBack = onBack,
                 onCopyPath = onCopyPath,
                 onShare = onShare,
-                onToggleRenderMode = toggleWithAnchor
+                onToggleRenderMode = toggleWithAnchor,
+                annotationCount = uiState.annotations.size,
+                onSubmitClick = { showSubmitDialog = true }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -134,6 +155,9 @@ fun FileViewerScreen(
                 else -> CodeSourceView(
                     content = uiState.content,
                     filePath = uiState.filePath,
+                    annotations = uiState.annotations,
+                    onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
+                    onTapAnnotation = { ann -> detailAnnotation = ann },
                     lazyListState = sourceLazyListState,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -155,6 +179,41 @@ fun FileViewerScreen(
             }
         }
     }
+
+    // Phase 3: Annotation Input Sheet
+    pendingAnnotationText?.let { selectedText ->
+        AnnotationInputSheet(
+            selectedText = selectedText,
+            onConfirm = { note ->
+                onAddAnnotation(selectedText, note)
+                pendingAnnotationText = null
+            },
+            onDismiss = { pendingAnnotationText = null }
+        )
+    }
+
+    // Phase 3: Annotation Detail Dialog
+    detailAnnotation?.let { ann ->
+        AnnotationDetailDialog(
+            annotation = ann,
+            onEdit = { newNote -> onUpdateAnnotation(ann.id, newNote) },
+            onDelete = { onDeleteAnnotation(ann.id) },
+            onDismiss = { detailAnnotation = null }
+        )
+    }
+
+    // Phase 3: Submit Dialog
+    if (showSubmitDialog && uiState.annotations.isNotEmpty()) {
+        AnnotationSubmitDialog(
+            annotationCount = uiState.annotations.size,
+            annotations = uiState.annotations,
+            onSubmit = { overallNote ->
+                onSubmitAnnotations(overallNote)
+                showSubmitDialog = false
+            },
+            onDismiss = { showSubmitDialog = false }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -164,15 +223,23 @@ private fun FileViewerTopBar(
     onBack: () -> Unit,
     onCopyPath: () -> Unit,
     onShare: () -> Unit,
-    onToggleRenderMode: () -> Unit
+    onToggleRenderMode: () -> Unit,
+    annotationCount: Int = 0,
+    onSubmitClick: () -> Unit = {}
 ) {
     TopAppBar(
         title = {
-            Text(
-                text = uiState.filePath.substringAfterLast('/').ifBlank { uiState.filePath },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = uiState.filePath.substringAfterLast('/').ifBlank { uiState.filePath },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (annotationCount > 0) {
+                    Spacer(Modifier.width(SpacingTokens.SM.dp))
+                    Badge { Text("$annotationCount") }
+                }
+            }
         },
         navigationIcon = {
             IconButton(
@@ -186,8 +253,8 @@ private fun FileViewerTopBar(
             }
         },
         actions = {
-            // Phase 2: md render toggle (only for markdown in SOURCE mode)
-            if (uiState.isMarkdown && uiState.mode != FileViewerMode.DIFF) {
+            // Phase 2: md render toggle (hidden when annotations exist)
+            if (annotationCount == 0 && uiState.isMarkdown && uiState.mode != FileViewerMode.DIFF) {
                 val isRender = uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW
                 IconButton(
                     onClick = onToggleRenderMode,
@@ -202,17 +269,29 @@ private fun FileViewerTopBar(
                     )
                 }
             }
-            IconButton(onClick = onCopyPath) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = stringResource(R.string.a11y_icon_copy_path)
-                )
-            }
-            IconButton(onClick = onShare) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = stringResource(R.string.a11y_icon_share)
-                )
+            // Phase 3: Submit button when annotations exist
+            if (annotationCount > 0) {
+                TextButton(
+                    onClick = onSubmitClick,
+                    modifier = Modifier.testTag("annotation_submit_button")
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(SpacingTokens.XS.dp))
+                    Text(stringResource(R.string.annotation_submit))
+                }
+            } else {
+                IconButton(onClick = onCopyPath) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = stringResource(R.string.a11y_icon_copy_path)
+                    )
+                }
+                IconButton(onClick = onShare) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = stringResource(R.string.a11y_icon_share)
+                    )
+                }
             }
         }
     )
@@ -310,4 +389,55 @@ private fun TruncationBanner() {
             )
         )
     }
+}
+
+@Composable
+private fun AnnotationSubmitDialog(
+    annotationCount: Int,
+    annotations: List<Annotation>,
+    onSubmit: (overallNote: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var overallNote by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.annotation_submit_dialog_title, annotationCount))
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.SM.dp)) {
+                OutlinedTextField(
+                    value = overallNote,
+                    onValueChange = { overallNote = it },
+                    label = { Text(stringResource(R.string.annotation_submit_overall_note)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2, maxLines = 4
+                )
+                Text(
+                    text = stringResource(R.string.annotation_submit_summary),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                annotations.sortedBy { it.index }.forEach { ann ->
+                    Text(
+                        text = "${ann.index + 1}. ${ann.startLine}:${ann.startCol} - ${ann.endLine}:${ann.endCol}\n   \"${ann.note}\"",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = SpacingTokens.SM.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSubmit(overallNote.trim()) },
+                modifier = Modifier.testTag("annotation_submit_send")
+            ) { Text(stringResource(R.string.annotation_submit_send)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }

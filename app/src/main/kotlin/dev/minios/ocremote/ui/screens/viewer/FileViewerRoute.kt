@@ -4,8 +4,10 @@ import android.content.Intent
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -17,13 +19,15 @@ import kotlinx.coroutines.launch
 @Composable
 fun FileViewerRoute(
     viewModel: FileViewerViewModel = hiltViewModel(),
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSubmitted: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var isSubmitting by remember { mutableStateOf(false) }
 
     FileViewerScreen(
         uiState = uiState,
@@ -48,6 +52,31 @@ fun FileViewerRoute(
             clipboard.setText(AnnotatedString(uiState.content))
             scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.menu_copied_to_clipboard)) }
         },
-        onToggleRenderMode = viewModel::toggleRenderMode
+        onToggleRenderMode = viewModel::toggleRenderMode,
+        // Phase 3: Annotation callbacks
+        onAnnotateSelection = { },
+        onAddAnnotation = { selectedText, note ->
+            val startChar = uiState.content.indexOf(selectedText)
+            if (startChar >= 0) {
+                viewModel.addAnnotation(selectedText, startChar, startChar + selectedText.length, note)
+            }
+        },
+        onDeleteAnnotation = viewModel::deleteAnnotation,
+        onUpdateAnnotation = viewModel::updateAnnotation,
+        onSubmitAnnotations = { overallNote ->
+            if (!isSubmitting) {
+                isSubmitting = true
+                scope.launch {
+                    val result = viewModel.submitAnnotations(overallNote)
+                    isSubmitting = false
+                    if (result.isSuccess) {
+                        snackbarHostState.showSnackbar(context.getString(R.string.annotation_submitted_toast))
+                        onSubmitted()
+                    } else {
+                        snackbarHostState.showSnackbar(context.getString(R.string.annotation_submit_failed))
+                    }
+                }
+            }
+        }
     )
 }

@@ -754,4 +754,11 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="annotation_detail_save">Save</string>
     <string name="annotation_detail_edit">Edit</string>
     <string name="annotation_detail_delete">Delete</string>
+    <string name="annotation_submit">Submit</string>
+    <string name="annotation_submit_dialog_title">Submit %1$d annotations?</string>
+    <string name="annotation_submit_overall_note">Overall note (optional)</string>
+    <string name="annotation_submit_summary">Summary:</string>
+    <string name="annotation_submit_send">Send</string>
+    <string name="annotation_submitted_toast">Annotations submitted to session</string>
+    <string name="annotation_submit_failed">Failed to submit annotations</string>
 </resources>

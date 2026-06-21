@@ -579,7 +579,8 @@ fun NavGraph(
             arguments = FileViewerNav.navArguments
         ) {
             FileViewerRoute(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onSubmitted = { navController.popBackStack() }
             )
         }
     }
