@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -86,7 +86,7 @@ fun FileViewerScreen(
     var detailAnnotation by remember { mutableStateOf<Annotation?>(null) }
     var showSubmitDialog by remember { mutableStateOf(false) }
     // Phase 2: source scroll state + fraction anchor for md render toggle
-    val sourceLazyListState = rememberLazyListState()
+    val sourceLazyListState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     var lastSourceFraction by remember { mutableStateOf(0f) }
     val sourceLineCount = remember(uiState.content) {
         if (uiState.content.isEmpty()) 1
