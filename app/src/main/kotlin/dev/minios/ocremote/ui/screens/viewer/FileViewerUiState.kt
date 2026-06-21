@@ -1,5 +1,6 @@
 package dev.minios.ocremote.ui.screens.viewer
 
+import dev.minios.ocremote.domain.model.Annotation
 import dev.minios.ocremote.domain.model.VcsFileDiff
 
 enum class FileViewerMode { SOURCE, DIFF }
@@ -35,5 +36,7 @@ data class FileViewerUiState(
     val isToolSnapshot: Boolean = false,
     val toolSnapshotBefore: String? = null,
     val toolSnapshotAfter: String? = null,
-    val toolSnapshotContent: String? = null
+    val toolSnapshotContent: String? = null,
+    // Phase 3: Annotation state
+    val annotations: List<Annotation> = emptyList()
 )

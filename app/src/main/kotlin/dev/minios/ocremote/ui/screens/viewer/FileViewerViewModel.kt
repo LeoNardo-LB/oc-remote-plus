@@ -11,6 +11,7 @@ import dev.minios.ocremote.domain.model.VcsFileDiff
 import dev.minios.ocremote.domain.repository.ToolSnapshotCache
 import dev.minios.ocremote.domain.usecase.GetFileContentUseCase
 import dev.minios.ocremote.domain.usecase.GetFileDiffUseCase
+import dev.minios.ocremote.domain.usecase.SubmitAnnotationsUseCase
 import dev.minios.ocremote.ui.navigation.routes.FileViewerNav
 import dev.minios.ocremote.ui.navigation.routes.ServerRouteParams
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,18 +27,21 @@ class FileViewerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getFileContent: GetFileContentUseCase,
     private val getFileDiff: GetFileDiffUseCase,
-    private val toolSnapshotCache: ToolSnapshotCache
+    private val toolSnapshotCache: ToolSnapshotCache,
+    private val submitAnnotationsUseCase: SubmitAnnotationsUseCase
 ) : ViewModel() {
     private val serverId = savedStateHandle.get<String>(ServerRouteParams.PARAM_SERVER_ID).orEmpty()
     private val directory = URLDecoder.decode(savedStateHandle.get<String>(FileViewerNav.PARAM_DIRECTORY).orEmpty(), "UTF-8")
     private val filePath = URLDecoder.decode(savedStateHandle.get<String>(FileViewerNav.PARAM_FILE_PATH).orEmpty(), "UTF-8")
     private val source = savedStateHandle.get<String>(FileViewerNav.PARAM_SOURCE) ?: FileViewerNav.Source.LIVE
+    private val sessionId = URLDecoder.decode(savedStateHandle.get<String>(FileViewerNav.PARAM_SESSION_ID).orEmpty(), "UTF-8")
     private val toolPartIds = URLDecoder.decode(
         savedStateHandle.get<String>(FileViewerNav.PARAM_TOOL_PART_IDS).orEmpty(), "UTF-8"
     ).split(",").filter { it.isNotBlank() }
     private val _uiState = MutableStateFlow(FileViewerUiState(filePath = filePath))
     val uiState: StateFlow<FileViewerUiState> = _uiState.asStateFlow()
     private val diffParser = DiffParser()
+    private var annotationManager: AnnotationManager? = null
 
     init {
         when (source) {
@@ -57,6 +61,7 @@ class FileViewerViewModel @Inject constructor(
                         val lines = c.content.split('\n')
                         val truncated = lines.size > 5000
                         val visible = if (truncated) lines.take(5000).joinToString("\n") else c.content
+                        annotationManager = AnnotationManager(visible)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -88,6 +93,39 @@ class FileViewerViewModel @Inject constructor(
 
     fun nextHunk() { _uiState.update { it.copy(currentHunkIndex = (it.currentHunkIndex + 1).coerceAtMost(it.hunks.size - 1)) } }
     fun prevHunk() { _uiState.update { it.copy(currentHunkIndex = (it.currentHunkIndex - 1).coerceAtLeast(0)) } }
+
+    // ============ Phase 3: Annotation Management ============
+
+    fun addAnnotation(selectedText: String, startChar: Int, endChar: Int, note: String) {
+        val manager = annotationManager ?: return
+        if (_uiState.value.mode != FileViewerMode.SOURCE) return
+        manager.add(selectedText, startChar, endChar, note)
+        _uiState.update { it.copy(annotations = manager.getAll()) }
+    }
+
+    fun deleteAnnotation(id: String) {
+        val manager = annotationManager ?: return
+        manager.delete(id)
+        _uiState.update { it.copy(annotations = manager.getAll()) }
+    }
+
+    fun updateAnnotation(id: String, note: String) {
+        val manager = annotationManager ?: return
+        manager.update(id, note)
+        _uiState.update { it.copy(annotations = manager.getAll()) }
+    }
+
+    suspend fun submitAnnotations(overallNote: String): Result<Unit> {
+        val manager = annotationManager ?: return Result.failure(IllegalStateException("No annotation manager"))
+        val anns = _uiState.value.annotations
+        if (anns.isEmpty()) return Result.failure(IllegalStateException("No annotations to submit"))
+        val result = submitAnnotationsUseCase(serverId, sessionId, anns, overallNote, filePath, directory)
+        if (result.isSuccess) {
+            manager.clear()
+            _uiState.update { it.copy(annotations = emptyList()) }
+        }
+        return result
+    }
 
     // ============ Phase 2: Markdown render toggle ============
 

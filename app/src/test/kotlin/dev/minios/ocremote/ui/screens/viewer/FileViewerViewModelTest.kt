@@ -9,6 +9,7 @@ import dev.minios.ocremote.domain.model.VcsFileDiff
 import dev.minios.ocremote.domain.repository.ToolSnapshotCache
 import dev.minios.ocremote.domain.usecase.GetFileContentUseCase
 import dev.minios.ocremote.domain.usecase.GetFileDiffUseCase
+import dev.minios.ocremote.domain.usecase.SubmitAnnotationsUseCase
 import dev.minios.ocremote.ui.navigation.routes.FileViewerNav
 import dev.minios.ocremote.ui.navigation.routes.ServerRouteParams
 import io.mockk.coEvery
@@ -21,6 +22,8 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.net.URLEncoder
@@ -32,6 +35,7 @@ class FileViewerViewModelTest {
     private val getFileContent = mockk<GetFileContentUseCase>()
     private val getFileDiff = mockk<GetFileDiffUseCase>()
     private val toolSnapshotCache = ToolSnapshotCache()
+    private val submitAnnotations = mockk<SubmitAnnotationsUseCase>()
 
     private val serverId = "srv-abc123"
     private val directory = "/home/user/project"
@@ -137,7 +141,7 @@ class FileViewerViewModelTest {
     fun `LIVE source success loads content`() = runTest {
         coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
 
-        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
 
         val state = vm.uiState.value
         assert(!state.isLoading) { "isLoading should be false after success" }
@@ -155,7 +159,8 @@ class FileViewerViewModelTest {
             savedStateHandle(source = FileViewerNav.Source.GIT_DIFF),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         val state = vm.uiState.value
@@ -174,7 +179,8 @@ class FileViewerViewModelTest {
             savedStateHandle(source = FileViewerNav.Source.TOOL_SNAPSHOT),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         val state = vm.uiState.value
@@ -195,7 +201,7 @@ class FileViewerViewModelTest {
             RuntimeException("Connection refused: port 4096")
         )
 
-        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
 
         val state = vm.uiState.value
         assert(!state.isLoading) { "isLoading should be false after failure" }
@@ -209,7 +215,7 @@ class FileViewerViewModelTest {
     fun `binary file sets isBinary and mimeType`() = runTest {
         coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(binaryContent)
 
-        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
 
         val state = vm.uiState.value
         assert(!state.isLoading) { "isLoading should be false" }
@@ -228,7 +234,7 @@ class FileViewerViewModelTest {
         )
         coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(emptyContent)
 
-        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
 
         val state = vm.uiState.value
         assert(!state.isLoading) { "isLoading should be false" }
@@ -254,7 +260,8 @@ class FileViewerViewModelTest {
             savedStateHandle(source = FileViewerNav.Source.GIT_DIFF),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         val state = vm.uiState.value
@@ -272,7 +279,8 @@ class FileViewerViewModelTest {
             savedStateHandle(source = FileViewerNav.Source.GIT_DIFF),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         val hunksCount = vm.uiState.value.hunks.size
@@ -297,7 +305,8 @@ class FileViewerViewModelTest {
             savedStateHandle(source = FileViewerNav.Source.GIT_DIFF),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         // currentHunkIndex starts at 0
@@ -321,7 +330,8 @@ class FileViewerViewModelTest {
         val vm = FileViewerViewModel(
             savedStateHandle(path = encodedMdFilePath),
             getFileContent, getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         assert(vm.uiState.value.isMarkdown) { "isMarkdown should be true for .md" }
@@ -333,7 +343,7 @@ class FileViewerViewModelTest {
     fun `init with kt file sets isMarkdown false`() = runTest {
         coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
 
-        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
 
         assert(!vm.uiState.value.isMarkdown) { "isMarkdown should be false for .kt" }
     }
@@ -346,7 +356,8 @@ class FileViewerViewModelTest {
         val vm = FileViewerViewModel(
             savedStateHandle(path = encodedMdFilePath),
             getFileContent, getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
         vm.toggleRenderMode()
 
@@ -360,7 +371,7 @@ class FileViewerViewModelTest {
     fun `toggleRenderMode is no-op for non-markdown files`() = runTest {
         coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
 
-        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
         vm.toggleRenderMode()
 
         assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) {
@@ -376,7 +387,8 @@ class FileViewerViewModelTest {
         val vm = FileViewerViewModel(
             savedStateHandle(path = encodedMdFilePath, source = FileViewerNav.Source.GIT_DIFF),
             getFileContent, getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
         vm.toggleRenderMode()
 
@@ -393,7 +405,8 @@ class FileViewerViewModelTest {
         val vm = FileViewerViewModel(
             savedStateHandle(path = encodedMdFilePath),
             getFileContent, getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
         vm.toggleRenderMode()  // → RENDER_PREVIEW
         vm.toggleRenderMode()  // → SOURCE
@@ -425,7 +438,8 @@ class FileViewerViewModelTest {
             ),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         assert(vm.uiState.value.isToolSnapshot) { "isToolSnapshot should be true" }
@@ -455,7 +469,8 @@ class FileViewerViewModelTest {
             ),
             getFileContent,
             getFileDiff,
-            toolSnapshotCache
+            toolSnapshotCache,
+            submitAnnotations
         )
 
         assert(vm.uiState.value.mode == FileViewerMode.DIFF) { "mode should be DIFF" }
@@ -466,5 +481,61 @@ class FileViewerViewModelTest {
         assert(vm.uiState.value.toolSnapshotAfter == "line1-mod\nline2-new\n") {
             "cumulativeAfter should be last part's after"
         }
+    }
+
+    // ===== Phase 3: Annotation tests =====
+
+    @Test
+    fun `addAnnotation creates annotation and updates state`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        val pos = sampleKotlinSource.indexOf("import android.os.Bundle")
+        vm.addAnnotation("import android.os.Bundle", pos, pos + 25, "use alias")
+        assertEquals(1, vm.uiState.value.annotations.size)
+        assertEquals(0, vm.uiState.value.annotations[0].index)
+    }
+
+    @Test
+    fun `addAnnotation in DIFF mode is ignored`() = runTest {
+        coEvery { getFileDiff(serverId, directory, VcsDiffMode.GIT) } returns Result.success(sampleDiffs)
+        val vm = FileViewerViewModel(savedStateHandle(source = FileViewerNav.Source.GIT_DIFF), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        vm.addAnnotation("text", 0, 4, "note")
+        assertTrue(vm.uiState.value.annotations.isEmpty())
+    }
+
+    @Test
+    fun `deleteAnnotation removes and renumbers`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        vm.addAnnotation("import", 0, 6, "n1")
+        vm.addAnnotation("class", 10, 15, "n2")
+        vm.addAnnotation("override", 20, 28, "n3")
+        val firstId = vm.uiState.value.annotations[0].id
+        vm.deleteAnnotation(firstId)
+        val anns = vm.uiState.value.annotations
+        assertEquals(2, anns.size)
+        assertEquals(0, anns[0].index)
+        assertEquals(1, anns[1].index)
+    }
+
+    @Test
+    fun `submitAnnotations calls use case and clears on success`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        coEvery { submitAnnotations(any(), any(), any(), any(), any(), any()) } returns Result.success(Unit)
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        vm.addAnnotation("import", 0, 6, "n1")
+        val result = vm.submitAnnotations("overall note")
+        assertTrue(result.isSuccess)
+        assertTrue(vm.uiState.value.annotations.isEmpty())
+    }
+
+    @Test
+    fun `submitAnnotations failure does not clear`() = runTest {
+        coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
+        coEvery { submitAnnotations(any(), any(), any(), any(), any(), any()) } returns Result.failure(RuntimeException("fail"))
+        val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
+        vm.addAnnotation("import", 0, 6, "n1")
+        vm.submitAnnotations("note")
+        assertEquals(1, vm.uiState.value.annotations.size)
     }
 }
