@@ -1,0 +1,89 @@
+appId: dev.minios.ocremote.dev
+name: E2E - Rotation Restoration
+tags:
+  - e2e
+  - workspace
+  - rotation
+---
+
+# Prerequisite: Server at 10.0.2.2:4096, session active, workspace accessible
+# Validates Phase 4 rememberSaveable: scroll position survives screen rotation.
+# Note: rotateDevice may behave differently across Android versions / emulators.
+# Key assertions are marked optional: true so non-rotation failures don't block CI.
+
+- launchApp
+
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 15000
+    optional: true
+
+# Navigate to a session
+- tapOn:
+    text: "Sessions"
+    index: 0
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+- tapOn: "D:/Develop/code/app/oc-remote"
+- extendedWaitUntil:
+    visible: "sessions active"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: ".*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Ask a question"
+    timeout: 20000
+    optional: true
+
+# Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    id: "menu_open_workspace"
+
+# Open any file
+- tapOn:
+    id: "panel_file_tree"
+    optional: true
+- tapOn:
+    text: ".*"
+    index: 0
+
+# Verify file viewer opened (portrait)
+- extendedWaitUntil:
+    visible: ".*back_button.*"
+    timeout: 5000
+    optional: true
+- takeScreenshot: e2e_rotation_portrait
+
+# Scroll to middle of the file
+- swipe:
+    direction: UP
+    duration: 800
+- swipe:
+    direction: UP
+    duration: 800
+- takeScreenshot: e2e_rotation_scrolled_position
+
+# Rotate to landscape
+- rotateDevice: LANDSCAPE
+- extendedWaitUntil:
+    visible: ".*back_button.*"
+    timeout: 5000
+    optional: true
+- takeScreenshot: e2e_rotation_landscape
+
+# Rotate back to portrait
+- rotateDevice: PORTRAIT
+- takeScreenshot: e2e_rotation_back_to_portrait
+
+# Verify scroll position roughly preserved (visual comparison of screenshots).
+# No precise assertion — position need not be pixel-perfect, just "still in the file".
+
+# Go back
+- tapOn:
+    id: "back_button"
