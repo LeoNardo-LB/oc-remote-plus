@@ -1,5 +1,5 @@
-# Flow 22: Workspace file search (file tree + git changes)
-appId: dev.minios.ocremote.dev
+﻿# Flow 22: Workspace file search (file tree + git changes)
+appId: dev.leonardo.ocremotev2.dev
 ---
 - runFlow: e2e-chat-flow.yaml
 
