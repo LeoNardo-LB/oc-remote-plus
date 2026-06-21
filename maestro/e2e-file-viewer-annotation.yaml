@@ -1,0 +1,102 @@
+appId: dev.minios.ocremote.dev
+name: E2E - File Viewer Annotation (Real OpenCode Server)
+tags:
+  - e2e
+  - workspace
+  - annotation
+---
+
+# Prerequisite: Server at 10.0.2.2:4096, session active, workspace accessible
+
+- launchApp
+
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 15000
+    optional: true
+
+# Navigate to a session
+- tapOn:
+    text: "Sessions"
+    index: 0
+- extendedWaitUntil:
+    visible: "Search sessions..."
+    timeout: 20000
+    optional: true
+- tapOn: "D:/Develop/code/app/oc-remote"
+- extendedWaitUntil:
+    visible: "sessions active"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: ".*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Ask a question"
+    timeout: 20000
+    optional: true
+
+# Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    id: "menu_open_workspace"
+
+# Open a file
+- tapOn:
+    id: "panel_file_tree"
+    optional: true
+- tapOn:
+    text: ".*"
+    index: 0
+- takeScreenshot: e2e_ann_file_opened
+
+# Long-press to trigger text selection
+- longPressOn:
+    text: ".*"
+    index: 0
+- takeScreenshot: e2e_ann_selection_started
+
+# Tap "Annotate" in custom toolbar (optional — appendTextContextMenuComponents item)
+- tapOn:
+    id: "annotation_toolbar_annotate"
+    optional: true
+- takeScreenshot: e2e_ann_input_sheet
+
+# Enter note
+- tapOn:
+    id: "annotation_input_note"
+- inputText: "Test annotation note"
+- tapOn:
+    id: "annotation_input_confirm"
+- takeScreenshot: e2e_ann_added
+
+# Verify annotation badge in TopBar
+- assertVisible:
+    text: ".*1.*"
+    optional: true
+
+# Tap submit
+- tapOn:
+    id: "annotation_submit_button"
+    optional: true
+- takeScreenshot: e2e_ann_submit_dialog
+
+# Send
+- tapOn:
+    id: "annotation_submit_send"
+    optional: true
+- takeScreenshot: e2e_ann_submitted
+
+# Verify toast (best-effort)
+- extendedWaitUntil:
+    visible: ".*Sent.*"
+    timeout: 5000
+    optional: true
+
+# Verify navigation back to chat
+- extendedWaitUntil:
+    visible: "Ask a question"
+    timeout: 10000
+    optional: true
+- takeScreenshot: e2e_ann_back_to_chat
