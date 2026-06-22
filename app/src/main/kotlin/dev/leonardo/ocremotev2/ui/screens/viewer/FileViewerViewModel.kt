@@ -308,7 +308,9 @@ class FileViewerViewModel @Inject constructor(
         }
         // Show the final edited content in SOURCE mode instead of a diff view.
         // Tool snapshot before/after may be incomplete, causing DiffView to render empty (black screen).
-        val cumulativeAfter = snapshots.last().after ?: snapshots.last().content ?: ""
+        // Fallback chain: after → content → before (edit-without-after edge case).
+        val lastSnap = snapshots.last()
+        val cumulativeAfter = lastSnap.after ?: lastSnap.content ?: lastSnap.before ?: ""
         fullContentCache = cumulativeAfter
         val totalLines = if (cumulativeAfter.isEmpty()) 0
                          else cumulativeAfter.count { it == '\n' } + if (cumulativeAfter.endsWith('\n')) 0 else 1

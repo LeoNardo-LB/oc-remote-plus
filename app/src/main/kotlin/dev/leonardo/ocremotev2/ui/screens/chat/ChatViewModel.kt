@@ -260,8 +260,11 @@ class ChatViewModel @Inject constructor(
             ?: input["path"]?.jsonPrimitive?.contentOrNull ?: return
         val metadata = (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.metadata
         val filediff = metadata?.get("filediff") as? JsonObject
+        // Fallback: server may omit filediff — use oldString/newString from tool input
         val before = filediff?.get("before")?.jsonPrimitive?.contentOrNull
+            ?: input["oldString"]?.jsonPrimitive?.contentOrNull
         val after = filediff?.get("after")?.jsonPrimitive?.contentOrNull
+            ?: input["newString"]?.jsonPrimitive?.contentOrNull
         val content = when (part.tool.lowercase()) {
             "read" -> {
                 val raw = (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.output ?: ""

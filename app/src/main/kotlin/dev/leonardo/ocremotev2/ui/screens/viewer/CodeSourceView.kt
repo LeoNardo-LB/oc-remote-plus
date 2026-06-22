@@ -1,15 +1,17 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -17,21 +19,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -39,7 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.Annotation
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.CodeTypography
@@ -49,18 +50,16 @@ import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
 import dev.snipme.highlights.model.SyntaxThemes
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
 private const val ALPHA_MASK = 0xFF000000.toInt()
+
+/**
+ * Pixel threshold from the bottom of scrollable content that triggers [onLoadMore]
+ * in annotation (Column) mode. ~50-80 lines depending on font size.
+ */
+private const val LOAD_MORE_THRESHOLD_PX = 2000
 
 @Composable
 fun CodeSourceView(
@@ -149,28 +148,122 @@ fun CodeSourceView(
     }
     val hScroll = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     val annotationEnabled = onAnnotate != null
-    val clipboardManager = LocalClipboardManager.current
 
-    // Phase 4: pagination — trigger loadMore when user scrolls near the bottom
+    // Phase 4: pagination helpers
     val visLines = visibleLineCount
     val totalLines = totalLineCount
     val hasMore = visLines != null && totalLines != null && visLines < totalLines
-    if (onLoadMore != null && hasMore) {
-        LaunchedEffect(lazyListState, visLines, totalLines) {
-            snapshotFlow {
-                val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                lastVisible >= visLines - 50
-            }
-                .filter { it }
-                .distinctUntilChanged()
-                .collect { onLoadMore() }
-        }
-    }
 
-    val lazyContent: @Composable (Modifier) -> Unit = { m ->
+    if (annotationEnabled) {
+        // ===== Annotation mode: Column + SelectionContainer =====
+        // SelectionContainer requires all selectable Text nodes in the SAME composition
+        // tree so that character-level selection works and appendTextContextMenuComponents
+        // (used by [annotationContextMenu]) can inject the "Annotate" item into the system
+        // text selection toolbar. LazyColumn breaks this because each item is composed
+        // independently, so we use Column + verticalScroll here.
+        //
+        // Layout: Row { gutter Column (fixed) | code Column (horizontalScroll) }
+        // Both columns live inside the same verticalScroll so gutter and code stay
+        // vertically aligned while only the code column scrolls horizontally.
+        val verticalScrollState = rememberScrollState()
+        val renderLineCount = visLines ?: lineCount
+
+        if (onLoadMore != null && hasMore) {
+            LaunchedEffect(verticalScrollState, visLines, totalLines) {
+                snapshotFlow {
+                    val max = verticalScrollState.maxValue
+                    max > 0 && verticalScrollState.value >= max - LOAD_MORE_THRESHOLD_PX
+                }
+                    .filter { it }
+                    .distinctUntilChanged()
+                    .collect { onLoadMore() }
+            }
+        }
+
+        SelectionContainer(modifier = modifier) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(verticalScrollState)
+                    .padding(vertical = SpacingTokens.SM.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    // Left column: gutter line numbers — fixed width, does NOT scroll horizontally
+                    Column(modifier = Modifier.width(gutterWidth)) {
+                        for (index in 0 until renderLineCount) {
+                            Text(
+                                text = "${index + 1}",
+                                style = CodeTypography,
+                                color = gutterColor,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                    // Right column: code text — scrolls horizontally independently from gutter.
+                    // vertical scroll is synced with gutter via the shared enclosing Row.
+                    Column(modifier = Modifier.weight(1f).horizontalScroll(hScroll)) {
+                        for (index in 0 until renderLineCount) {
+                            val start = lineOffsets[index]
+                            val endExclusive = if (index + 1 < lineOffsets.size)
+                                lineOffsets[index + 1] - 1
+                            else
+                                content.length
+                            val baseLine = annotated.subSequence(start, endExclusive)
+                            val lineAnnotated = if (lineAnnotations.containsKey(index)) {
+                                buildAnnotatedLineWithAnnotations(
+                                    baseLine,
+                                    lineAnnotations[index]!!,
+                                    highlightColor
+                                )
+                            } else {
+                                baseLine
+                            }
+                            Text(
+                                text = lineAnnotated,
+                                style = CodeTypography,
+                                modifier = Modifier
+                                    .padding(
+                                        start = SpacingTokens.SM.dp,
+                                        end = SpacingTokens.LG.dp
+                                    )
+                                    .annotationContextMenu(onAnnotate)
+                            )
+                        }
+                    }
+                }
+                // Phase 4: load-more indicator (inside scroll area, appears at bottom)
+                if (hasMore) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(SpacingTokens.LG.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).testTag("viewer_load_more_indicator")
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        // ===== Non-annotation mode: LazyColumn (read-only, no SelectionContainer) =====
+
+        // Phase 4: pagination — trigger loadMore when user scrolls near the bottom
+        if (onLoadMore != null && hasMore) {
+            LaunchedEffect(lazyListState, visLines, totalLines) {
+                snapshotFlow {
+                    val lastVisible = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    lastVisible >= visLines - 50
+                }
+                    .filter { it }
+                    .distinctUntilChanged()
+                    .collect { onLoadMore() }
+            }
+        }
+
         LazyColumn(
             state = lazyListState,
-            modifier = m.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = SpacingTokens.SM.dp)
         ) {
             items(
@@ -183,7 +276,6 @@ fun CodeSourceView(
                 else
                     content.length
                 val baseLine = annotated.subSequence(start, endExclusive)
-                val linePlainText = content.substring(start, endExclusive)
                 val lineAnnotated = if (lineAnnotations.containsKey(index)) {
                     buildAnnotatedLineWithAnnotations(baseLine, lineAnnotations[index]!!, highlightColor)
                 } else {
@@ -198,40 +290,11 @@ fun CodeSourceView(
                     }
                 } ?: Modifier
 
-                var showAnnotateMenu by remember { mutableStateOf(false) }
-
                 Row(
                     modifier = Modifier
                         .defaultMinSize(minWidth = maxRowWidth)
                         .then(tapModifier)
-                        .then(
-                            if (annotationEnabled && onAnnotate != null)
-                                Modifier.combinedClickable(
-                                    onClick = {},
-                                    onLongClick = { showAnnotateMenu = true }
-                                )
-                            else Modifier
-                        )
                 ) {
-                    DropdownMenu(
-                        expanded = showAnnotateMenu,
-                        onDismissRequest = { showAnnotateMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.annotation_context_annotate)) },
-                            onClick = {
-                                showAnnotateMenu = false
-                                onAnnotate?.invoke(linePlainText)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_copy)) },
-                            onClick = {
-                                showAnnotateMenu = false
-                                clipboardManager.setText(AnnotatedString(linePlainText))
-                            }
-                        )
-                    }
                     // Gutter — fixed, does NOT scroll horizontally
                     Text(
                         text = "${index + 1}",
@@ -272,8 +335,6 @@ fun CodeSourceView(
             }
         }
     }
-
-    lazyContent(modifier)
 }
 
 private fun buildHighlights(

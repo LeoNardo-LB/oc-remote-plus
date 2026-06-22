@@ -48,8 +48,11 @@ private data object AnnotationMenuKey
 /**
  * Strip line-number gutter prefixes from clipboard-captured text.
  * Gutter Text composables inside SelectionContainer may add line numbers
- * to the selected text. This regex removes "digits + whitespace" at line starts.
+ * to the selected text. This regex removes "digits + optional whitespace" at
+ * line starts. The trailing `\s?` is optional because the new Column-based
+ * layout (gutter Column | code Column) may concatenate "1code" with no space
+ * between the line number and the code text.
  */
 internal fun stripGutterNumbers(text: String): String {
-    return text.replace(Regex("(?m)^\\s*\\d+\\s"), "")
+    return text.replace(Regex("(?m)^\\s*\\d+\\s?"), "")
 }
