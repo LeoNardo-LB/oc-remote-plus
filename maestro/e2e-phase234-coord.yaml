@@ -1,0 +1,100 @@
+appId: dev.leonardo.ocremotev2.dev
+name: E2E Phase 2-4 (coordinate-based)
+---
+- killApp
+- launchApp
+
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Connect — tap center of "Start Connect" button
+- tapOn:
+    point: 50%,49%
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Open chat sessions
+- tapOn:
+    point: 50%,48%
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Tap workspace session (first oc-remote entry)
+- tapOn:
+    point: 50%,42%
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# More options (top right corner)
+- tapOn:
+    point: 93%,6%
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# View Workspace (first menu item after View)
+- tapOn:
+    point: 78%,14%
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Should be in workspace now
+- takeScreenshot: p234_01_workspace
+
+# === Open AGENTS.md ===
+# File is near bottom of list (~66% height)
+- tapOn:
+    point: 50%,70%
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- takeScreenshot: p234_02_file_opened
+
+# === Markdown toggle ===
+- tapOn:
+    point: 85%,6%
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: p234_03_md_toggle
+
+# Back
+- tapOn:
+    point: 7%,6%
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# === Pagination: open build.gradle.kts ===
+- tapOn:
+    point: 50%,74%
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- takeScreenshot: p234_04_pagination_initial
+
+# Swipe up to trigger pagination
+- swipe:
+    start: 50%, 80%
+    end: 50%, 20%
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: p234_05_pagination_scrolled
+
+# Back to workspace
+- tapOn:
+    point: 7%,6%
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# === File tree expand ===
+- tapOn:
+    point: 50%,36%
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: p234_06_tree_expanded
+
+# Final screenshot
+- takeScreenshot: p234_07_complete

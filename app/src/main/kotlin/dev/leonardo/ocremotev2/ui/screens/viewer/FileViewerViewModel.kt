@@ -270,17 +270,29 @@ class FileViewerViewModel @Inject constructor(
         }
         val first = snapshots.first()
         val content = first.content ?: first.after ?: ""
+        // Phase 4 pagination: set up line counts so CodeSourceView renders correctly
+        fullContentCache = content
+        val totalLines = if (content.isEmpty()) 0
+                         else content.count { it == '\n' } + if (content.endsWith('\n')) 0 else 1
+        val initialVisible = minOf(totalLines, INITIAL_PAGE_SIZE)
+        val visible = takeFirstLines(content, initialVisible)
+        annotationManager = AnnotationManager(content)
         _uiState.update {
             it.copy(
                 isLoading = false,
-                content = content,
+                mode = FileViewerMode.SOURCE,
+                content = visible,
                 isEmpty = content.isBlank(),
                 isMarkdown = isMarkdownFile(filePath),
                 renderMode = FileViewerRenderMode.SOURCE,
                 isToolSnapshot = true,
                 toolSnapshotContent = first.content,
                 toolSnapshotBefore = first.before,
-                toolSnapshotAfter = first.after
+                toolSnapshotAfter = first.after,
+                totalLineCount = totalLines,
+                visibleLineCount = initialVisible,
+                isFullyLoaded = initialVisible >= totalLines,
+                annotations = annotationManager?.getAll() ?: emptyList()
             )
         }
     }

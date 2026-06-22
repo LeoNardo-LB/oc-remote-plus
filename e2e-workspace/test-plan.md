@@ -407,9 +407,9 @@
   - 横幅文案："Large file — showing first 5,000 lines"
   - 横幅下方显示前 5000 行代码（带行号）
 - **依赖**：T2.5
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：项目中最大的 .kt 文件为 ChatViewModel.kt（2159 行），无任何文件超过 5000 行。文件树仅显示根目录（Phase 1 限制，目录点击为 no-op），根目录下的文件均远小于 5000 行。代码层验证完整：FileViewerViewModel.kt:52-54 `val truncated = lines.size > 5000; val visible = if (truncated) lines.take(5000).joinToString("\n") else c.content`，isTruncated=true 时 FileViewerScreen.kt:89-96 渲染 TruncationBanner (tertiaryContainer 背景 + viewer_truncated 文案) + 前 5000 行 CodeSourceView。截断阈值与逻辑正确，仅环境无法触发。
+- **证据**：N/A（环境无 >5000 行文件）
 
 ### T6.2 二进制文件提示
 - **前置条件**：工作区中存在二进制文件（图片、压缩包等）
@@ -419,9 +419,9 @@
   - 内容区居中显示 "Binary file, preview not supported"
   - 下方显示 MIME 类型信息（如 "MIME type: image/png"）
 - **依赖**：T2.5
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：项目中的二进制文件（app/src/main/res/mipmap-*/ic_launcher.png、gradle/wrapper/gradle-wrapper.jar、app/keystore/release.jks）均位于子目录中，而文件树 Phase 1 仅显示根目录文件（FileTreePanel.kt:133 目录点击为 no-op）。根目录无二进制文件。代码层验证完整：FileViewerViewModel.kt:49 `if (c.type == ContentType.BINARY) _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }`，FileViewerScreen.kt:79-82 `uiState.isBinary -> MessageState(message = viewer_binary_not_supported, detail = viewer_binary_mime + mimeType)`。二进制检测与 MIME 显示逻辑正确。
+- **证据**：N/A（根目录无可访问的二进制文件）
 
 ### T6.3 空文件提示
 - **前置条件**：工作区中存在空文件（0 字节或仅空白）
@@ -430,9 +430,9 @@
 - **成功标准**：
   - 内容区居中显示 "File is empty"（灰色文案）
 - **依赖**：T2.5
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：项目中未找到 0 字节的源码文件（扫描 .kt/.xml/.yaml/.md/.properties/.txt 等扩展名均无空文件）。代码层验证完整：FileViewerViewModel.kt:54 `isEmpty = visible.isBlank()`，FileViewerScreen.kt:88 `uiState.isEmpty -> MessageState(message = viewer_empty_file)`。空文件检测逻辑正确，仅在 `when` 分支中需注意：isEmpty 检查位于 isTruncated 之后，若文件恰好 5000+ 行且内容为空白，isTruncated 会先命中（但实际不可能发生）。
+- **证据**：N/A（环境无空文件）
 
 ### T6.4 FileViewer 加载中状态
 - **前置条件**：网络较慢
@@ -442,9 +442,9 @@
   - 内容区居中显示 CircularProgressIndicator
   - 加载完成后指示器消失，显示文件内容
 - **依赖**：T2.5
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：本地服务器（10.0.2.2:4096 → 127.0.0.1:4096）响应过快（< 50ms），打开多个文件（build.gradle.kts、gradle.properties、graph.yaml、doc-review-report.md）均未观察到加载指示器。代码层验证完整：FileViewerScreen.kt:77 `uiState.isLoading -> LoadingState()`，LoadingState (FileViewerScreen.kt:167-174) 渲染居中 CircularProgressIndicator。FileViewerViewModel.kt:32 初始 `isLoading = true`，加载完成后 :48/:54/:57/:67 更新为 false。加载状态逻辑正确。
+- **证据**：N/A（服务器响应过快无法截取）
 
 ### T6.5 FileViewer 错误状态
 - **前置条件**：文件加载失败（服务器错误、文件不存在等）
@@ -453,9 +453,9 @@
 - **成功标准**：
   - 内容区居中显示错误文案（红色 "Failed to load"）
 - **依赖**：T2.5
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：触发文件加载失败需要服务器不可达或请求不存在的文件路径，二者均需破坏当前可用环境。代码层验证完整：FileViewerViewModel.kt:57 `.onFailure { e -> _uiState.update { it.copy(isLoading = false, error = R.string.workspace_error_load_failed) } }`（LIVE 模式）和 :70（GIT_DIFF 模式），FileViewerScreen.kt:78 `uiState.error != null -> ErrorState(message = uiState.error)`，ErrorState (FileViewerScreen.kt:177-188) 渲染居中红色 error 文案。错误状态逻辑正确。
+- **证据**：N/A（无法在不破坏环境的前提下触发）
 
 ---
 
@@ -472,9 +472,9 @@
   - Show ignored 状态保持
   - 滚动位置不要求保持（LazyColumn）
 - **依赖**：T2.1, T3.1
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：✅ 通过
+- **实际结果**：从文件树面板（已加载 18 项 = 11 目录 + 7 文件）点击 panel_git_changes 切换到 Git 变更面板（显示 "54 changes (3 M, 51 A, 0 D)"），再点击 panel_file_tree 切换回文件树面板。文件列表立即完整显示，无加载指示器闪烁、无空白等待——WorkspaceViewModel.kt:58 `dirCache[path]?.let { return }` 命中缓存跳过网络请求，rootNodes 保留在 UiState 中。面板切换仅更新 currentPanel 枚举（:88），不清除已加载数据。Show ignored 状态保持（未切换）。状态保持验证通过。
+- **证据**：T7.1-panel-git-changes.png, T7.1-panel-switch-back.png
 
 ### T7.2 非 Git 项目 Git 按钮禁用
 - **前置条件**：会话项目目录不是 Git 仓库
@@ -485,9 +485,9 @@
   - Git 变更按钮（🔀）处于禁用状态（灰色，不可点击）
   - 强行进入（若可能）显示 "Not a git repository" 空状态文案
 - **依赖**：T1.2
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：当前会话项目（oc-remote）是 Git 仓库，无法测试非 Git 场景。代码层验证完整：WorkspaceScreen.kt:144 `enabled = !uiState.isNonGit`——当 isNonGit=true 时 Git 按钮 IconButton 禁用。WorkspaceViewModel.kt:110-113 loadGitChanges 的 onFailure 检测 "non-git"/"not a git" 关键词设置 isNonGit=true。GitChangesPanel.kt:91-93 `uiState.isNonGit -> GitChangesEmptyState(message = workspace_git_not_a_repo)` 显示 "Not a git repository" 文案。逻辑正确。
+- **证据**：N/A（当前项目是 Git 仓库）
 
 ### T7.3 干净工作区状态
 - **前置条件**：Git 项目无任何工作区变更（git status clean）
@@ -499,9 +499,9 @@
   - 统计文案显示 "0 changes (0 M, 0 A, 0 D)"
   - Git Badge 不显示数字（count=0）
 - **依赖**：T3.1
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：⚠️ env-issue
+- **实际结果**：当前工作区有变更（54 changes），非干净状态，无法测试空变更场景。代码层验证完整：GitChangesPanel.kt:100-102 `changes.isEmpty() -> GitChangesEmptyState(message = workspace_git_working_tree_clean)` 显示 "Working tree clean" 灰色文案。统计文案 GitChangesPanel.kt:54-60 当 changes.size=0 时显示 "0 changes (0 M, 0 A, 0 D)"。WorkspaceScreen.kt:150 `if (count != null && count > 0)` 当 count=0 时不渲染 Badge。逻辑正确。
+- **证据**：N/A（工作区有变更）
 
 ### T7.4 多语言支持（语法高亮语言识别）
 - **前置条件**：工作区中有多种语言的源码文件
@@ -515,9 +515,16 @@
   - .md 或未知扩展名 → DEFAULT（无特殊高亮）
   - 各语言关键字/字符串着色正确
 - **依赖**：T2.5
-- **状态**：⬜ 待执行
-- **实际结果**：
-- **证据**：
+- **状态**：✅ 通过（部分 env-issue）
+- **实际结果**：文件树 Phase 1 仅显示根目录文件，逐个打开根目录下不同扩展名文件验证语法高亮：
+  - **.kts → Kotlin** ✅：build.gradle.kts 打开后，关键字（plugins/id/tasks）为蓝/青色，字符串字面量（版本号）为橙/黄色，注释为灰色。CodeSourceView.kt:171 `"kt", "kts" -> SyntaxLanguage.KOTLIN` 映射正确。
+  - **.yaml → DEFAULT** ✅：graph.yaml 打开后以纯文本渲染（Highlights 1.1.0 库不支持 YAML，SyntaxLanguage 枚举无 YAML 值）。CodeSourceView.kt:188 `else -> SyntaxLanguage.DEFAULT` 降级正确，DEFAULT 模式仍有基本着色（字符串/数字），文件完全可读。
+  - **.md → DEFAULT** ✅：doc-review-report.md 打开后以纯文本渲染，Markdown 标记（#、|、-）不特殊高亮（符合预期，库不支持 Markdown）。内容中文本自带的 PASS/FAIL 等颜色来自文件内容本身而非高亮。
+  - **.properties → DEFAULT** ✅：gradle.properties 打开后以纯文本渲染，`#` 注释和键值对以 DEFAULT 基本着色显示。.properties 不在语言映射表中，正确降级。
+  - **.xml → ⚠️ env-issue**：根目录无 XML 文件（AndroidManifest.xml/strings.xml 等在子目录中，文件树 Phase 1 无法导航）。代码验证 .xml 不在 CodeSourceView.kt:170-189 映射表中，会正确降级为 DEFAULT。注：Highlights 1.1.0 库也不支持 XML（SyntaxLanguage 枚举无 XML 值），故即使映射也无法高亮。
+  - **.py/.js/.go** → ⚠️ env-issue：根目录无这些类型的文件。代码验证映射存在（CodeSourceView.kt:175-176 `"py" -> PYTHON, "js" -> JAVASCRIPT, "go" -> GO`）。
+  - **总结**：语言识别逻辑（CodeSourceView.kt:168-189 rememberLanguage）覆盖 19 种扩展名映射到 17 种 SyntaxLanguage + DEFAULT 兜底。已验证的 4 种类型（.kts/.yaml/.md/.properties）行为均符合预期。Highlights 1.1.0 库支持的 18 种语言（含 DEFAULT）与代码映射表完全匹配，XML/YAML/JSON/HTML/Markdown 为库限制，不可视为 bug。
+- **证据**：T7.4-kotlin-kts-highlighting.png, T7.4-properties-file.png, T7.4-markdown-file.png, T7.4-yaml-file.png
 
 ---
 

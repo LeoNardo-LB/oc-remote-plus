@@ -1,0 +1,145 @@
+appId: dev.leonardo.ocremotev2.dev
+name: E2E Phase 2-4 Combined
+tags:
+  - e2e
+  - phase234
+---
+- launchApp
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Local"
+    timeout: 10000
+
+# Wait for connection to settle, then try to open sessions
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# If "Start Connect" is visible, tap it; otherwise skip
+- tapOn:
+    text: "Start Connect"
+    index: 0
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Now look for the sessions button
+- extendedWaitUntil:
+    visible: "Open chat"
+    timeout: 20000
+
+- tapOn:
+    text: "Open chat"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "Search sessions"
+    timeout: 10000
+
+# Open the workspace session
+- tapOn:
+    text: ".*oc-remote.*"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "More options"
+    timeout: 15000
+
+# Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    text: ".*Workspace.*"
+    index: 0
+
+- extendedWaitUntil:
+    visible: ".*directory.*"
+    timeout: 10000
+
+- takeScreenshot: p234_01_workspace
+
+# === Phase 2: Expand directories ===
+- tapOn:
+    text: "app"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn:
+    text: "src"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: p234_02_tree_expanded
+
+# === Phase 2: Open .md file ===
+- tapOn:
+    id: "back_button"
+
+- extendedWaitUntil:
+    visible: ".*directory.*"
+    timeout: 5000
+
+- tapOn:
+    text: "AGENTS.md"
+
+- extendedWaitUntil:
+    visible: ".*import.*"
+    timeout: 8000
+    optional: true
+
+- takeScreenshot: p234_03_md_source
+
+# === Phase 2: Markdown toggle ===
+- tapOn:
+    text: ".*[Pp]review.*"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: p234_04_md_rendered
+
+# === Phase 4: Scroll / pagination ===
+- swipe:
+    start: 50%, 80%
+    end: 50%, 20%
+
+- takeScreenshot: p234_05_md_scrolled
+
+# Back to workspace
+- tapOn:
+    id: "back_button"
+
+# === Phase 4: Large file ===
+- extendedWaitUntil:
+    visible: ".*directory.*"
+    timeout: 5000
+
+- tapOn:
+    text: "build.gradle.kts"
+
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: p234_06_large_file
+
+# Swipe for pagination
+- swipe:
+    start: 50%, 80%
+    end: 50%, 20%
+
+- takeScreenshot: p234_07_large_scrolled
+
+# Done
+- tapOn:
+    id: "back_button"
+    optional: true
+
+- takeScreenshot: p234_08_complete

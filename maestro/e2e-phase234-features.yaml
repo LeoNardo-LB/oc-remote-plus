@@ -1,0 +1,85 @@
+appId: dev.leonardo.ocremotev2.dev
+name: E2E Phase 2-4 Features (from workspace)
+onFlowStart:
+  - launchApp
+---
+# App should already be at workspace (file tree panel)
+
+# === Test 1: Open AGENTS.md ===
+- extendedWaitUntil:
+    visible: "AGENTS.md"
+    timeout: 5000
+
+- tapOn:
+    text: "AGENTS.md"
+
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- takeScreenshot: maestro_01_file_opened
+
+# === Test 2: Markdown toggle ===
+- tapOn:
+    text: ".*[Pp]review.*"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: maestro_02_md_rendered
+
+# Toggle back
+- tapOn:
+    text: ".*[Ss]ource.*"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# === Test 3: Long-press for annotation ===
+- longPressOn:
+    point: 50%,50%
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: maestro_03_selection_menu
+
+# Try to tap annotate
+- tapOn:
+    text: ".*[Aa]nnotate.*"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: maestro_04_annotation_sheet
+
+# Back from file viewer
+- tapOn:
+    id: "back_button"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# === Test 4: File search ===
+# Tap search button in workspace toolbar
+- tapOn:
+    point: 90%,5%
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 2000
+
+- takeScreenshot: maestro_05_search_bar
+
+# Type search query
+- inputText: "gradle"
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: maestro_06_search_results
+
+- takeScreenshot: maestro_07_complete

@@ -1,0 +1,98 @@
+appId: dev.leonardo.ocremotev2.dev
+name: E2E Phase 2-4 Full Journey
+---
+# Step 0: Launch app (fresh)
+- killApp
+- launchApp
+
+- extendedWaitUntil:
+    visible: "Local"
+    timeout: 10000
+
+# Step 1: Connect to server
+- tapOn:
+    text: "Start Connect"
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Step 2: Open sessions
+- extendedWaitUntil:
+    visible: "Open chat"
+    timeout: 10000
+- tapOn:
+    text: "Open chat"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "Search sessions"
+    timeout: 10000
+
+# Step 3: Open workspace session (first match with oc-remote)
+- tapOn:
+    text: ".*oc-remote.*"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "More options"
+    timeout: 15000
+
+# Step 4: Open workspace
+- tapOn:
+    id: "more_vert"
+- tapOn:
+    text: ".*Workspace.*"
+    index: 0
+
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 10000
+
+# === Phase 2: File tree ===
+- takeScreenshot: p234_01_workspace
+
+- tapOn:
+    text: "AGENTS.md"
+
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 8000
+
+- takeScreenshot: p234_02_file_opened
+
+# === Phase 2: Markdown toggle (if visible) ===
+- tapOn:
+    text: ".*[Pp]review.*"
+    optional: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: p234_03_md_toggled
+
+# Back to workspace
+- tapOn:
+    id: "back_button"
+
+- extendedWaitUntil:
+    visible: "Refresh"
+    timeout: 5000
+
+# === Phase 4: Large file + scroll ===
+- tapOn:
+    text: "build.gradle.kts"
+    index: 0
+
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 5000
+
+- takeScreenshot: p234_04_large_file_initial
+
+- swipe:
+    start: 50%, 80%
+    end: 50%, 20%
+
+- takeScreenshot: p234_05_large_file_scrolled
+
+# Done — take final screenshot
+- takeScreenshot: p234_06_complete
