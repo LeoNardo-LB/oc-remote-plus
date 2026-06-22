@@ -53,6 +53,7 @@ fun FileViewerRoute(
             scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.menu_copied_to_clipboard)) }
         },
         onToggleRenderMode = viewModel::toggleRenderMode,
+        onSwitchToSource = viewModel::switchToSource,
         // Phase 3: Annotation callbacks
         onAddAnnotation = { selectedText, note ->
             // KNOWN LIMITATION: indexOf returns the first occurrence of selectedText.

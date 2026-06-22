@@ -1,5 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.workspace
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ fun WorkspaceRoute(
         onSwitchPanel = viewModel::switchPanel,
         onRefreshRoot = viewModel::refreshRoot,
         onToggleShowIgnored = viewModel::toggleShowIgnored,
+        onToggleExpand = viewModel::toggleExpand,
         onRefreshGit = viewModel::loadGitChanges,
         onOpenFile = onOpenFile,
         onOpenGitDiff = onOpenGitDiff,
@@ -67,6 +69,7 @@ fun WorkspaceScreen(
     onSwitchPanel: (WorkspacePanel) -> Unit,
     onRefreshRoot: () -> Unit,
     onToggleShowIgnored: () -> Unit,
+    onToggleExpand: (String) -> Unit,
     onRefreshGit: () -> Unit,
     onOpenFile: (String) -> Unit,
     onOpenGitDiff: (String) -> Unit,
@@ -75,6 +78,11 @@ fun WorkspaceScreen(
     onExitSearch: () -> Unit,
     onSearchQueryChange: (String) -> Unit
 ) {
+    // Intercept system back when in search mode to exit search instead of leaving the screen
+    BackHandler(enabled = uiState.isSearchMode) {
+        onExitSearch()
+    }
+
     Scaffold(
         topBar = {
             Crossfade(targetState = uiState.isSearchMode, label = "search_topbar") { isSearch ->
@@ -121,6 +129,7 @@ fun WorkspaceScreen(
                     onRefreshRoot = onRefreshRoot,
                     onToggleShowIgnored = onToggleShowIgnored,
                     onOpenFile = onOpenFile,
+                    onToggleExpand = onToggleExpand,
                     modifier = Modifier.padding(padding)
                 )
                 WorkspacePanel.GIT_CHANGES -> GitChangesPanel(
@@ -174,7 +183,7 @@ private fun WorkspaceTopBar(
             }
         },
         actions = {
-            // Phase 2: 🔍 search button (spec §6.1 order: [🔍][📁][🔀])
+            // Phase 2: 🔍 search button (spec §6.1 order: [🔍][📁/🔀])
             IconButton(
                 onClick = onSearch,
                 modifier = Modifier.testTag("workspace_search_button")
@@ -185,42 +194,52 @@ private fun WorkspaceTopBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(
-                onClick = { onSwitchPanel(WorkspacePanel.FILE_TREE) },
-                modifier = Modifier.testTag("panel_file_tree")
-            ) {
-                Icon(
-                    Icons.Filled.Folder,
-                    contentDescription = stringResource(R.string.a11y_icon_toggle_directory),
-                    tint = if (uiState.currentPanel == WorkspacePanel.FILE_TREE) {
-                        MaterialTheme.colorScheme.primary
+            // Toggle button: switches between FILE_TREE and GIT_CHANGES panels.
+            // Non-git repos only show the Folder icon (no toggle available).
+            when (uiState.currentPanel) {
+                WorkspacePanel.FILE_TREE -> {
+                    if (uiState.isNonGit) {
+                        // No git → static folder icon, no toggle
+                        Icon(
+                            Icons.Filled.Folder,
+                            contentDescription = stringResource(R.string.a11y_icon_toggle_directory),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-            }
-            IconButton(
-                onClick = { onSwitchPanel(WorkspacePanel.GIT_CHANGES) },
-                enabled = !uiState.isNonGit,
-                modifier = Modifier.testTag("panel_git_changes")
-            ) {
-                BadgedBox(
-                    badge = {
-                        val count = uiState.gitChangeCount
-                        if (count != null && count > 0) {
-                            Badge { Text("$count") }
+                        // FILE_TREE active → show Git icon to switch to GIT_CHANGES
+                        IconButton(
+                            onClick = { onSwitchPanel(WorkspacePanel.GIT_CHANGES) },
+                            modifier = Modifier.testTag("panel_toggle")
+                        ) {
+                            BadgedBox(
+                                badge = {
+                                    val count = uiState.gitChangeCount
+                                    if (count != null && count > 0) {
+                                        Badge { Text("$count") }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.CompareArrows,
+                                    contentDescription = stringResource(R.string.a11y_icon_git_changes),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.CompareArrows,
-                        contentDescription = stringResource(R.string.a11y_icon_git_changes),
-                        tint = if (uiState.currentPanel == WorkspacePanel.GIT_CHANGES) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
+                }
+                WorkspacePanel.GIT_CHANGES -> {
+                    // GIT_CHANGES active → show Folder icon to switch back to FILE_TREE
+                    IconButton(
+                        onClick = { onSwitchPanel(WorkspacePanel.FILE_TREE) },
+                        modifier = Modifier.testTag("panel_toggle")
+                    ) {
+                        Icon(
+                            Icons.Filled.Folder,
+                            contentDescription = stringResource(R.string.a11y_icon_toggle_directory),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

@@ -77,7 +77,9 @@ fun FileViewerScreen(
     onUpdateAnnotation: (id: String, note: String) -> Unit,
     onSubmitAnnotations: (overallNote: String) -> Unit,
     // Phase 4: pagination
-    onLoadMoreLines: () -> Unit
+    onLoadMoreLines: () -> Unit,
+    // DIFF → SOURCE switch so users can annotate from diff view
+    onSwitchToSource: (() -> Unit)? = null
 ) {
     var showLongPressMenu by remember { mutableStateOf(false) }
     // Phase 3: Annotation UI state
@@ -110,7 +112,8 @@ fun FileViewerScreen(
                 onShare = onShare,
                 onToggleRenderMode = toggleWithAnchor,
                 annotationCount = uiState.annotations.size,
-                onSubmitClick = { showSubmitDialog = true }
+                onSubmitClick = { showSubmitDialog = true },
+                onSwitchToSource = onSwitchToSource
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -250,7 +253,8 @@ private fun FileViewerTopBar(
     onShare: () -> Unit,
     onToggleRenderMode: () -> Unit,
     annotationCount: Int = 0,
-    onSubmitClick: () -> Unit = {}
+    onSubmitClick: () -> Unit = {},
+    onSwitchToSource: (() -> Unit)? = null
 ) {
     TopAppBar(
         title = {
@@ -278,6 +282,15 @@ private fun FileViewerTopBar(
             }
         },
         actions = {
+            // DIFF mode → show "Source" button so users can switch to annotatable source view
+            if (uiState.mode == FileViewerMode.DIFF && onSwitchToSource != null) {
+                TextButton(
+                    onClick = onSwitchToSource,
+                    modifier = Modifier.testTag("viewer_switch_to_source")
+                ) {
+                    Text(stringResource(R.string.viewer_diff_show_source))
+                }
+            }
             // Phase 2: md render toggle (hidden when annotations exist)
             if (annotationCount == 0 && uiState.isMarkdown && uiState.mode != FileViewerMode.DIFF) {
                 val isRender = uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW

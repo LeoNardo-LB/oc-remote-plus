@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,14 +38,13 @@ import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.isDirectory
 import dev.leonardo.ocremotev2.ui.screens.workspace.FileTreeNode
 import dev.leonardo.ocremotev2.ui.screens.workspace.WorkspaceUiState
+import dev.leonardo.ocremotev2.ui.screens.workspace.flattenTree
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
 /**
- * File tree panel: renders the workspace root nodes as a flattened, depth-indented list.
- * Replaces Task 12's [FileTreePanelPlaceholder]; same parameter signature, pure call-site rename.
- *
- * Phase 1 scope: root tree only. Sub-directory expansion is a Phase 4 refinement
- * (directory clicks are no-ops here).
+ * File tree panel: renders the workspace as a flattened, depth-indented list.
+ * Directories can be expanded/collapsed via [onToggleExpand]; sub-directory
+ * children are lazily loaded on first expansion.
  */
 @Composable
 fun FileTreePanel(
@@ -51,6 +52,7 @@ fun FileTreePanel(
     onRefreshRoot: () -> Unit,
     onToggleShowIgnored: () -> Unit,
     onOpenFile: (String) -> Unit,
+    onToggleExpand: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val emptyDirectoryMessage = stringResource(R.string.workspace_empty_directory)
@@ -86,12 +88,23 @@ fun FileTreePanel(
             uiState.rootNodes.isEmpty() -> FileTreeEmptyState(message = emptyDirectoryMessage)
 
             else -> {
-                val flattened = remember(uiState.rootNodes, uiState.showIgnored) {
-                    flatten(uiState.rootNodes, depth = 0, showIgnored = uiState.showIgnored)
+                val flattened = remember(
+                    uiState.rootNodes,
+                    uiState.expandedDirs,
+                    uiState.showIgnored
+                ) {
+                    flattenTree(uiState.rootNodes, uiState.expandedDirs, uiState.showIgnored)
                 }
                 LazyColumn {
-                    items(flattened, key = { it.first.node.path }) { (node, depth) ->
-                        FileTreeItem(node = node, depth = depth, onOpenFile = onOpenFile)
+                    items(flattened, key = { it.first.node.path }) { (treeNode, depth) ->
+                        FileTreeItem(
+                            treeNode = treeNode,
+                            depth = depth,
+                            isExpanded = treeNode.node.path in uiState.expandedDirs,
+                            isLoading = treeNode.node.path in uiState.loadingDirs,
+                            onOpenFile = onOpenFile,
+                            onToggleExpand = onToggleExpand
+                        )
                     }
                 }
             }
@@ -100,42 +113,52 @@ fun FileTreePanel(
 }
 
 /**
- * Recursively flattens the tree into a (node, depth) list for [LazyColumn].
- * Ignored nodes are filtered out unless [showIgnored] is true.
- */
-private fun flatten(
-    nodes: List<FileTreeNode>,
-    depth: Int,
-    showIgnored: Boolean
-): List<Pair<FileTreeNode, Int>> =
-    nodes.filter { showIgnored || !it.node.ignored }.flatMap { node ->
-        listOf(node to depth) + (node.children?.let { children ->
-            flatten(children, depth + 1, showIgnored)
-        } ?: emptyList())
-    }
-
-/**
- * Single row in the file tree. Files invoke [onOpenFile] with their path;
- * directories are no-ops in Phase 1 (expansion arrives in Phase 4).
+ * Single row in the file tree.
+ * - Directories invoke [onToggleExpand] with their path and show an expand/collapse arrow.
+ * - Files invoke [onOpenFile] with their path.
+ * - When [isLoading] is true (sub-directory being fetched), a small spinner replaces the arrow.
  */
 @Composable
 fun FileTreeItem(
-    node: FileTreeNode,
+    treeNode: FileTreeNode,
     depth: Int,
-    onOpenFile: (String) -> Unit
+    isExpanded: Boolean,
+    isLoading: Boolean,
+    onOpenFile: (String) -> Unit,
+    onToggleExpand: (String) -> Unit
 ) {
-    val isDirectory = node.node.isDirectory()
+    val isDirectory = treeNode.node.isDirectory()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                if (!isDirectory) onOpenFile(node.node.path)
-                // TODO Phase 4: directory expansion via dirLoadEvents
+                if (isDirectory) onToggleExpand(treeNode.node.path)
+                else onOpenFile(treeNode.node.path)
             }
             .padding(start = (depth * SpacingTokens.LG).dp)
             .padding(vertical = SpacingTokens.SM.dp, horizontal = SpacingTokens.MD.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (isDirectory) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = if (isExpanded) Icons.Filled.KeyboardArrowDown
+                                  else Icons.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(
+                        if (isExpanded) R.string.a11y_icon_collapse_directory
+                        else R.string.a11y_icon_expand_directory
+                    ),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(SpacingTokens.XS.dp))
+        }
+
         Icon(
             imageVector = if (isDirectory) Icons.Filled.Folder else Icons.Filled.Description,
             contentDescription = null,
@@ -143,17 +166,10 @@ fun FileTreeItem(
         )
         Spacer(Modifier.width(SpacingTokens.SM.dp))
         Text(
-            text = node.node.name,
+            text = treeNode.node.name,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        if (node.isLoading) {
-            Spacer(Modifier.width(SpacingTokens.SM.dp))
-            CircularProgressIndicator(
-                modifier = Modifier.size(14.dp),
-                strokeWidth = 2.dp
-            )
-        }
     }
 }
 

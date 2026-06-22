@@ -84,6 +84,7 @@ class FileViewerViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
+                                mode = FileViewerMode.SOURCE,
                                 content = visible,
                                 isEmpty = visible.isBlank(),
                                 isMarkdown = isMarkdownFile(filePath),
@@ -231,6 +232,22 @@ class FileViewerViewModel @Inject constructor(
                 renderMode = if (it.renderMode == FileViewerRenderMode.SOURCE) FileViewerRenderMode.RENDER_PREVIEW
                 else FileViewerRenderMode.SOURCE
             )
+        }
+    }
+
+    /**
+     * Switch from DIFF mode to SOURCE mode so users can annotate the code.
+     * If source content was never loaded (e.g., entered via GIT_DIFF), fetches it first.
+     */
+    fun switchToSource() {
+        val current = _uiState.value
+        if (current.mode == FileViewerMode.SOURCE) return
+        if (current.content.isBlank()) {
+            // Source content never loaded → fetch now (loadLive sets mode = SOURCE)
+            loadLive()
+        } else {
+            // Content already available → just switch mode
+            _uiState.update { it.copy(mode = FileViewerMode.SOURCE) }
         }
     }
 

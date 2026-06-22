@@ -19,6 +19,9 @@ data class WorkspaceUiState(
     val rootLoading: Boolean = true,
     val rootError: Int? = null,
     val showIgnored: Boolean = false,
+    // Phase 4: directory expansion state
+    val expandedDirs: Set<String> = emptySet(),
+    val loadingDirs: Set<String> = emptySet(),
     val gitChanges: List<VcsChange> = emptyList(),
     val gitLoading: Boolean = false,
     val gitError: Int? = null,

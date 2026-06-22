@@ -62,14 +62,27 @@ class WorkspaceViewModel @Inject constructor(
         if (serverId.isBlank()) return
         dirCache[path]?.let { return }
         loadJobs[path]?.cancel()
-        if (path.isEmpty()) _uiState.update { it.copy(rootLoading = true, rootError = null) }
+        if (path.isEmpty()) {
+            _uiState.update { it.copy(rootLoading = true, rootError = null) }
+        } else {
+            _uiState.update { it.copy(loadingDirs = it.loadingDirs + path) }
+        }
         loadJobs[path] = viewModelScope.launch {
             listDirectory(serverId, directory, path)
                 .onSuccess { nodes ->
                     dirCache[path] = nodes
                     if (path.isEmpty()) {
-                        _uiState.update { it.copy(rootNodes = nodes.toTreeNodes(), rootLoading = false) }
+                        _uiState.update {
+                            it.copy(rootNodes = nodes.toTreeNodes(), rootLoading = false)
+                        }
                     } else {
+                        _uiState.update { state ->
+                            state.copy(
+                                rootNodes = state.rootNodes.withChildren(path, nodes.toTreeNodes()),
+                                expandedDirs = state.expandedDirs + path,
+                                loadingDirs = state.loadingDirs - path
+                            )
+                        }
                         _dirLoadEvents.tryEmit(DirectoryLoadResult(path, nodes, null))
                     }
                 }
@@ -77,15 +90,34 @@ class WorkspaceViewModel @Inject constructor(
                     if (path.isEmpty()) {
                         _uiState.update { it.copy(rootLoading = false, rootError = R.string.workspace_error_load_failed) }
                     } else {
+                        _uiState.update { it.copy(loadingDirs = it.loadingDirs - path) }
                         _dirLoadEvents.tryEmit(DirectoryLoadResult(path, emptyList(), e.message))
                     }
                 }
         }
     }
 
+    fun toggleExpand(path: String) {
+        val state = _uiState.value
+        when {
+            // Already expanded → collapse
+            path in state.expandedDirs ->
+                _uiState.update { it.copy(expandedDirs = it.expandedDirs - path) }
+            // Cached but not expanded → expand (children already in tree from prior load)
+            path in dirCache ->
+                _uiState.update { it.copy(expandedDirs = it.expandedDirs + path) }
+            // Not loaded → trigger async load
+            else -> {
+                _uiState.update { it.copy(loadingDirs = it.loadingDirs + path) }
+                loadDirectory(path)
+            }
+        }
+    }
+
     fun refreshRoot() {
         dirCache.clear()
         loadJobs.values.forEach { it.cancel() }
+        _uiState.update { it.copy(expandedDirs = emptySet(), loadingDirs = emptySet()) }
         loadDirectory("")
     }
 

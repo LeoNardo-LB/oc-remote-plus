@@ -37,7 +37,8 @@ class FileTreePanelTest {
                 ),
                 onRefreshRoot = {},
                 onToggleShowIgnored = {},
-                onOpenFile = {}
+                onOpenFile = {},
+                onToggleExpand = {}
             )
         }
         composeTestRule.onNodeWithTag("file_tree_loading").assertIsDisplayed()
@@ -54,7 +55,8 @@ class FileTreePanelTest {
                 ),
                 onRefreshRoot = {},
                 onToggleShowIgnored = {},
-                onOpenFile = {}
+                onOpenFile = {},
+                onToggleExpand = {}
             )
         }
         composeTestRule.onNodeWithText(
@@ -74,7 +76,8 @@ class FileTreePanelTest {
                 ),
                 onRefreshRoot = {},
                 onToggleShowIgnored = {},
-                onOpenFile = {}
+                onOpenFile = {},
+                onToggleExpand = {}
             )
         }
         composeTestRule.onNodeWithText("空目录").assertIsDisplayed()
@@ -91,7 +94,8 @@ class FileTreePanelTest {
                 ),
                 onRefreshRoot = {},
                 onToggleShowIgnored = {},
-                onOpenFile = {}
+                onOpenFile = {},
+                onToggleExpand = {}
             )
         }
         composeTestRule.onNodeWithText("app").assertIsDisplayed()
@@ -113,7 +117,8 @@ class FileTreePanelTest {
                 ),
                 onRefreshRoot = {},
                 onToggleShowIgnored = { toggled = true },
-                onOpenFile = {}
+                onOpenFile = {},
+                onToggleExpand = {}
             )
         }
         composeTestRule.onNodeWithText("显示隐藏").performClick()

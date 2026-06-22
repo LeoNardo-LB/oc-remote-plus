@@ -666,6 +666,8 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="a11y_icon_more_options">More options</string>
     <string name="a11y_icon_create_folder">Create folder</string>
     <string name="a11y_icon_toggle_directory">Toggle directory</string>
+    <string name="a11y_icon_expand_directory">Expand directory</string>
+    <string name="a11y_icon_collapse_directory">Collapse directory</string>
     <string name="a11y_icon_toggle_session">Toggle session</string>
     <string name="a11y_icon_model_variant">Model variant</string>
     <string name="a11y_icon_delete_rule">Delete rule</string>
@@ -740,6 +742,7 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <!-- File Viewer markdown toggle -->
     <string name="viewer_md_show_render">Show rendered preview</string>
     <string name="viewer_md_show_source">Show source code</string>
+    <string name="viewer_diff_show_source">Source</string>
 
     <!-- File Viewer tool snapshot -->
     <string name="fileviewer_error_tool_snapshot_missing">Tool snapshot data not found</string>
