@@ -450,9 +450,9 @@ class FileViewerViewModelTest {
         assert(toolSnapshotCache.get("part-1") == null) { "cache should be cleared on cleanup" }
     }
 
-    // 17. TOOL_SNAPSHOT_DIFF loads cumulative diff from multiple parts
+    // 17. TOOL_SNAPSHOT_DIFF shows final edited content in SOURCE mode (not diff)
     @Test
-    fun `TOOL_SNAPSHOT_DIFF loads cumulative diff from multiple cached parts`() = runTest {
+    fun `TOOL_SNAPSHOT_DIFF shows final edited content in SOURCE mode`() = runTest {
         toolSnapshotCache.clear()
         toolSnapshotCache.putAll(
             mapOf(
@@ -473,14 +473,16 @@ class FileViewerViewModelTest {
             submitAnnotations
         )
 
-        assert(vm.uiState.value.mode == FileViewerMode.DIFF) { "mode should be DIFF" }
+        assert(vm.uiState.value.mode == FileViewerMode.SOURCE) { "mode should be SOURCE (not DIFF)" }
         assert(vm.uiState.value.isToolSnapshot) { "isToolSnapshot should be true" }
         assert(vm.uiState.value.toolSnapshotBefore == "line1\nline2\n") {
-            "cumulativeBefore should be first part's before"
+            "toolSnapshotBefore should be first part's before"
         }
         assert(vm.uiState.value.toolSnapshotAfter == "line1-mod\nline2-new\n") {
-            "cumulativeAfter should be last part's after"
+            "toolSnapshotAfter should be last part's after"
         }
+        assert(vm.uiState.value.content.contains("line1-mod")) { "content should show edited result" }
+        assert(vm.uiState.value.content.contains("line2-new")) { "content should show edited result" }
     }
 
     // ===== Phase 3: Annotation tests =====

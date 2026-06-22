@@ -263,7 +263,10 @@ class ChatViewModel @Inject constructor(
         val before = filediff?.get("before")?.jsonPrimitive?.contentOrNull
         val after = filediff?.get("after")?.jsonPrimitive?.contentOrNull
         val content = when (part.tool.lowercase()) {
-            "read" -> (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.output
+            "read" -> {
+                val raw = (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.output ?: ""
+                cleanReadToolOutput(raw)
+            }
             "write" -> input["content"]?.jsonPrimitive?.contentOrNull
             "edit" -> after
             else -> null
@@ -274,6 +277,30 @@ class ChatViewModel @Inject constructor(
                 filePath = filePath, content = content, before = before, after = after, toolName = part.tool
             )
         )
+    }
+
+    /**
+     * Strip Read tool output wrappers (<path>, <content> tags) and embedded
+     * line-number prefixes ("291: text" → "text") to avoid double line numbers
+     * in the file viewer (which adds its own gutter).
+     */
+    private fun cleanReadToolOutput(raw: String): String {
+        var result = raw
+        // Extract <content>...</content> if present
+        val contentMatch = Regex("<content>(?:\\r?\\n)?(.*?)(?:\\r?\\n)?</content>", RegexOption.DOT_MATCHES_ALL).find(result)
+        result = if (contentMatch != null) {
+            contentMatch.groupValues[1]
+        } else {
+            // Remove known XML-like wrapper lines
+            result.lines().filter { line ->
+                !line.startsWith("<path>") && !line.startsWith("</path>") &&
+                !line.startsWith("<type>") && !line.startsWith("</type>") &&
+                !line.startsWith("<content>") && !line.startsWith("</content>")
+            }.joinToString("\n")
+        }
+        // Strip embedded line numbers: "291: text" → "text"
+        result = result.replace(Regex("(?m)^\\s*\\d+:\\s"), "")
+        return result.trim()
     }
 
     /** Snapshot of message IDs at the time of revert. Used to distinguish

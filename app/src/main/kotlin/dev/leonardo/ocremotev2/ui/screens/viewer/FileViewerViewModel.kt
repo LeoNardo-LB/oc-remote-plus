@@ -8,7 +8,6 @@ import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.Annotation
 import dev.leonardo.ocremotev2.domain.model.ContentType
 import dev.leonardo.ocremotev2.domain.model.VcsDiffMode
-import dev.leonardo.ocremotev2.domain.model.VcsFileDiff
 import dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache
 import dev.leonardo.ocremotev2.domain.usecase.GetFileContentUseCase
 import dev.leonardo.ocremotev2.domain.usecase.GetFileDiffUseCase
@@ -307,47 +306,31 @@ class FileViewerViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = false, error = R.string.fileviewer_error_tool_snapshot_missing) }
             return
         }
-        val cumulativeBefore = snapshots.first().before ?: ""
+        // Show the final edited content in SOURCE mode instead of a diff view.
+        // Tool snapshot before/after may be incomplete, causing DiffView to render empty (black screen).
         val cumulativeAfter = snapshots.last().after ?: snapshots.last().content ?: ""
-        val patch = computeUnifiedDiff(cumulativeBefore, cumulativeAfter)
-        val hunks = diffParser.parseUnifiedDiff(patch)
-
+        fullContentCache = cumulativeAfter
+        val totalLines = if (cumulativeAfter.isEmpty()) 0
+                         else cumulativeAfter.count { it == '\n' } + if (cumulativeAfter.endsWith('\n')) 0 else 1
+        val initialVisible = minOf(totalLines, INITIAL_PAGE_SIZE)
+        val visible = takeFirstLines(cumulativeAfter, initialVisible)
+        annotationManager = AnnotationManager(cumulativeAfter)
         _uiState.update {
             it.copy(
                 isLoading = false,
-                mode = FileViewerMode.DIFF,
-                diff = VcsFileDiff(file = filePath, patch = patch, additions = 0, deletions = 0, status = null),
-                hunks = hunks,
-                currentHunkIndex = 0,
-                isEmpty = hunks.isEmpty(),
+                mode = FileViewerMode.SOURCE,
+                content = visible,
+                isEmpty = cumulativeAfter.isBlank(),
+                isMarkdown = isMarkdownFile(filePath),
+                renderMode = FileViewerRenderMode.SOURCE,
                 isToolSnapshot = true,
-                toolSnapshotBefore = cumulativeBefore,
-                toolSnapshotAfter = cumulativeAfter
+                toolSnapshotBefore = snapshots.first().before,
+                toolSnapshotAfter = cumulativeAfter,
+                totalLineCount = totalLines,
+                visibleLineCount = initialVisible,
+                isFullyLoaded = initialVisible >= totalLines,
+                annotations = annotationManager?.getAll() ?: emptyList()
             )
-        }
-    }
-
-    /**
-     * Simple line-level unified diff via common prefix/suffix.
-     * Independent from chat module's internal computeSimpleDiff to avoid cross-module coupling.
-     */
-    private fun computeUnifiedDiff(before: String, after: String): String {
-        val beforeLines = before.lines()
-        val afterLines = after.lines()
-        if (beforeLines == afterLines) return ""
-        val prefixLen = (0 until minOf(beforeLines.size, afterLines.size))
-            .takeWhile { beforeLines[it] == afterLines[it] }
-            .size
-        val maxSuffix = minOf(beforeLines.size - prefixLen, afterLines.size - prefixLen)
-        val suffixLen = (0 until maxSuffix)
-            .takeWhile { beforeLines[beforeLines.size - 1 - it] == afterLines[afterLines.size - 1 - it] }
-            .size
-        return buildString {
-            append("@@ -1,${beforeLines.size} +1,${afterLines.size} @@\n")
-            beforeLines.take(prefixLen).forEach { append(" ").append(it).append("\n") }
-            beforeLines.drop(prefixLen).dropLast(suffixLen).forEach { append("-").append(it).append("\n") }
-            afterLines.drop(prefixLen).dropLast(suffixLen).forEach { append("+").append(it).append("\n") }
-            beforeLines.takeLast(suffixLen).forEach { append(" ").append(it).append("\n") }
         }
     }
 

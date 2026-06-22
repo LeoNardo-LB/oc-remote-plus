@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -148,6 +149,7 @@ fun CodeSourceView(
     }
     val hScroll = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     val annotationEnabled = onAnnotate != null
+    val clipboardManager = LocalClipboardManager.current
 
     // Phase 4: pagination — trigger loadMore when user scrolls near the bottom
     val visLines = visibleLineCount
@@ -201,7 +203,6 @@ fun CodeSourceView(
                 Row(
                     modifier = Modifier
                         .defaultMinSize(minWidth = maxRowWidth)
-                        .horizontalScroll(hScroll)
                         .then(tapModifier)
                         .then(
                             if (annotationEnabled && onAnnotate != null)
@@ -223,7 +224,15 @@ fun CodeSourceView(
                                 onAnnotate?.invoke(linePlainText)
                             }
                         )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.chat_copy)) },
+                            onClick = {
+                                showAnnotateMenu = false
+                                clipboardManager.setText(AnnotatedString(linePlainText))
+                            }
+                        )
                     }
+                    // Gutter — fixed, does NOT scroll horizontally
                     Text(
                         text = "${index + 1}",
                         style = CodeTypography,
@@ -231,14 +240,21 @@ fun CodeSourceView(
                         textAlign = TextAlign.End,
                         modifier = Modifier.width(gutterWidth)
                     )
-                    Text(
-                        text = lineAnnotated,
-                        style = CodeTypography,
-                        modifier = Modifier.padding(
-                            start = SpacingTokens.SM.dp,
-                            end = SpacingTokens.LG.dp
+                    // Code — scrolls horizontally independently from gutter
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .horizontalScroll(hScroll)
+                    ) {
+                        Text(
+                            text = lineAnnotated,
+                            style = CodeTypography,
+                            modifier = Modifier.padding(
+                                start = SpacingTokens.SM.dp,
+                                end = SpacingTokens.LG.dp
+                            )
                         )
-                    )
+                    }
                 }
             }
             // Phase 4: load-more indicator
