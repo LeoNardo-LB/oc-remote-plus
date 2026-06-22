@@ -1,6 +1,8 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,15 +17,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -31,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.Annotation
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.CodeTypography
@@ -173,6 +181,7 @@ fun CodeSourceView(
                 else
                     content.length
                 val baseLine = annotated.subSequence(start, endExclusive)
+                val linePlainText = content.substring(start, endExclusive)
                 val lineAnnotated = if (lineAnnotations.containsKey(index)) {
                     buildAnnotatedLineWithAnnotations(baseLine, lineAnnotations[index]!!, highlightColor)
                 } else {
@@ -187,12 +196,34 @@ fun CodeSourceView(
                     }
                 } ?: Modifier
 
+                var showAnnotateMenu by remember { mutableStateOf(false) }
+
                 Row(
                     modifier = Modifier
                         .defaultMinSize(minWidth = maxRowWidth)
                         .horizontalScroll(hScroll)
                         .then(tapModifier)
+                        .then(
+                            if (annotationEnabled && onAnnotate != null)
+                                Modifier.combinedClickable(
+                                    onClick = {},
+                                    onLongClick = { showAnnotateMenu = true }
+                                )
+                            else Modifier
+                        )
                 ) {
+                    DropdownMenu(
+                        expanded = showAnnotateMenu,
+                        onDismissRequest = { showAnnotateMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.annotation_context_annotate)) },
+                            onClick = {
+                                showAnnotateMenu = false
+                                onAnnotate?.invoke(linePlainText)
+                            }
+                        )
+                    }
                     Text(
                         text = "${index + 1}",
                         style = CodeTypography,
@@ -203,16 +234,10 @@ fun CodeSourceView(
                     Text(
                         text = lineAnnotated,
                         style = CodeTypography,
-                        modifier = Modifier
-                            .padding(
-                                start = SpacingTokens.SM.dp,
-                                end = SpacingTokens.LG.dp
-                            )
-                            .then(
-                                if (annotationEnabled && onAnnotate != null)
-                                    Modifier.annotationContextMenu(onAnnotate)
-                                else Modifier
-                            )
+                        modifier = Modifier.padding(
+                            start = SpacingTokens.SM.dp,
+                            end = SpacingTokens.LG.dp
+                        )
                     )
                 }
             }
@@ -232,13 +257,7 @@ fun CodeSourceView(
         }
     }
 
-    if (annotationEnabled && onAnnotate != null) {
-        SelectionContainer {
-            lazyContent(modifier)
-        }
-    } else {
-        lazyContent(modifier)
-    }
+    lazyContent(modifier)
 }
 
 private fun buildHighlights(
