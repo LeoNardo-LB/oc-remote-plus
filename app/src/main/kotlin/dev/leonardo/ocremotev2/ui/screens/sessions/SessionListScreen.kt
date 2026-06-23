@@ -41,8 +41,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -350,11 +354,23 @@ fun SessionListScreen(
                     }
 
                     // Scroll to top only when returning from a session where the user
-                    // sent a message (flag written by ChatScreen via SavedStateHandle).
-                    // rememberLazyListState would otherwise restore the old offset.
-                    LaunchedEffect(Unit) {
-                        if (viewModel.consumeScrollToTopOnReturn()) {
-                            listState.scrollToItem(0)
+                    // sent a message. Observe the NavBackStackEntry lifecycle (ON_RESUME)
+                    // instead of a composition-keyed effect: Compose Navigation may keep
+                    // this composable in composition while the user is in Chat, so a
+                    // Unit-keyed LaunchedEffect would not reliably re-fire on return. A
+                    // lifecycle observer catches the resume transition in both cases.
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME &&
+                                viewModel.consumeScrollToTopOnReturn()
+                            ) {
+                                scope.launch { listState.scrollToItem(0) }
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
                         }
                     }
 
