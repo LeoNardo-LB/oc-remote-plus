@@ -117,17 +117,23 @@ fun ChatMessageList(
         }?.message?.id
     }
 
-    val compensateState = remember(streamingMsgId) { CompensateState() }
-    val bannerCompensateState = remember(streamingMsgId) { CompensateState() }
+    val compensateState = remember { CompensateState() }
+    val bannerCompensateState = remember { CompensateState() }
+
+    // Reset height tracking when streaming message changes (new message arrives),
+    // but DO NOT reset shouldCompensate — it must persist across message changes
+    // so that delta compensation stays active during multi-message replies.
+    LaunchedEffect(streamingMsgId) {
+        compensateState.lastHeight = 0
+        bannerCompensateState.lastHeight = 0
+    }
 
     // Track whether user has scrolled away from bottom.
-    // When shouldCompensate=true, SSE height growth is counteracted via
-    // requestScrollToItem inside the layout modifier — no height freeze.
-    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
+    // Once user scrolls (even slightly), shouldCompensate stays true
+    // until they explicitly return via the scroll-to-bottom FAB.
+    LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             compensateState.shouldCompensate = true
-        } else if (isAtBottom) {
-            compensateState.shouldCompensate = false
         }
     }
 
