@@ -306,7 +306,8 @@ class AppNotificationManager @Inject constructor(
         sessionId: String?,
         error: String
     ) {
-        val (sessionTitle, _) = if (sessionId != null) getSessionInfo(sessionId) else Pair(null, null)
+        if (sessionId == null) return
+        val (sessionTitle, _) = getSessionInfo(sessionId)
         val displayName = sessionTitle?.takeIf { it.isNotBlank() }
             ?: context.getString(R.string.notification_new_session)
         val title = "${context.getString(R.string.notification_tag_error)} · $displayName"

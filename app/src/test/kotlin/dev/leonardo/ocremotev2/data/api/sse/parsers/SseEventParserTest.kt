@@ -747,6 +747,30 @@ class SseEventParserTest {
     }
 
     @Test
+    fun `str extracts data dot message from NamedError format`() {
+        val namedError = buildJsonObject {
+            put("name", "UnknownError")
+            put("data", buildJsonObject {
+                put("message", "Agent crashed unexpectedly")
+            })
+        }
+        val obj = buildJsonObject { put("error", namedError) }
+        assertEquals("Agent crashed unexpectedly", obj.str("error"))
+    }
+
+    @Test
+    fun `str extracts name from NamedError when data message absent`() {
+        val namedError = buildJsonObject {
+            put("name", "AbortedError")
+            put("data", buildJsonObject {
+                put("reason", "user_cancelled")
+            })
+        }
+        val obj = buildJsonObject { put("error", namedError) }
+        assertEquals("AbortedError", obj.str("error"))
+    }
+
+    @Test
     fun `str extracts type field from JsonObject when message absent`() {
         val innerObj = buildJsonObject {
             put("type", "context_overflow")
