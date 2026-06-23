@@ -149,16 +149,10 @@ fun FileViewerScreen(
                 }
                 uiState.isExtremelyLarge -> Column(Modifier.fillMaxSize()) {
                     LargeFileWarningBanner(lineCount = uiState.totalLineCount)
-                    CodeSourceView(
+                    CodeWebView(
                         content = uiState.content,
                         filePath = uiState.filePath,
-                        annotations = uiState.annotations,
                         onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
-                        onTapAnnotation = { ann -> detailAnnotation = ann },
-                        lazyListState = sourceLazyListState,
-                        visibleLineCount = uiState.visibleLineCount,
-                        totalLineCount = uiState.totalLineCount,
-                        onLoadMore = onLoadMoreLines,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -167,42 +161,18 @@ fun FileViewerScreen(
                         loadedLines = uiState.visibleLineCount,
                         totalLines = uiState.totalLineCount
                     )
-                    CodeSourceView(
+                    CodeWebView(
                         content = uiState.content,
                         filePath = uiState.filePath,
-                        annotations = uiState.annotations,
                         onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
-                        onTapAnnotation = { ann -> detailAnnotation = ann },
-                        lazyListState = sourceLazyListState,
-                        visibleLineCount = uiState.visibleLineCount,
-                        totalLineCount = uiState.totalLineCount,
-                        onLoadMore = onLoadMoreLines,
                         modifier = Modifier.weight(1f)
                     )
                 }
-                else -> CodeSourceView(
+                else -> CodeWebView(
                     content = uiState.content,
                     filePath = uiState.filePath,
-                    annotations = uiState.annotations,
                     onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
-                    onTapAnnotation = { ann -> detailAnnotation = ann },
-                    lazyListState = sourceLazyListState,
                     modifier = Modifier.fillMaxSize()
-                )
-            }
-            DropdownMenu(
-                expanded = showLongPressMenu,
-                onDismissRequest = { showLongPressMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.a11y_icon_copy_all)) },
-                    onClick = {
-                        onCopyAllContent()
-                        showLongPressMenu = false
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null)
-                    }
                 )
             }
         }

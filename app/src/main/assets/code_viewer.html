@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link id="theme-css" rel="stylesheet" href="highlight/github-dark.min.css">
+    <script src="highlight/highlight.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            -webkit-user-select: text;
+            user-select: text;
+            overflow-x: auto;
+            padding: 8px;
+        }
+        .container { display: flex; }
+        .gutter {
+            text-align: right;
+            padding-right: 12px;
+            color: #6b7280;
+            user-select: none;
+            -webkit-user-select: none;
+            white-space: pre;
+            flex-shrink: 0;
+        }
+        .code-area {
+            flex: 1;
+            overflow-x: auto;
+        }
+        pre {
+            margin: 0;
+            white-space: pre;
+        }
+        pre code {
+            font-family: inherit !important;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+        .annotation-highlight {
+            background-color: rgba(255, 235, 59, 0.3);
+            border-bottom: 2px solid #ffeb3b;
+        }
+        /* Custom context menu */
+        #ctx-menu {
+            display: none;
+            position: fixed;
+            background: #1e1e1e;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 4px 0;
+            z-index: 1000;
+            min-width: 120px;
+        }
+        #ctx-menu button {
+            display: block;
+            width: 100%;
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+        }
+        #ctx-menu button:hover { background: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="gutter" id="gutter"></div>
+        <div class="code-area">
+            <pre><code id="code" class="hljs"></code></pre>
+        </div>
+    </div>
+    <div id="ctx-menu">
+        <button onclick="doAnnotate()">__ANNOTATE_LABEL__</button>
+        <button onclick="doCopy()">__COPY_LABEL__</button>
+    </div>
+    <script>
+        // Prevent default context menu, show custom
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            var sel = window.getSelection().toString().trim();
+            if (sel.length > 0) {
+                var menu = document.getElementById('ctx-menu');
+                menu.style.display = 'block';
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+            }
+        });
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#ctx-menu')) {
+                document.getElementById('ctx-menu').style.display = 'none';
+            }
+        });
+        function doAnnotate() {
+            document.getElementById('ctx-menu').style.display = 'none';
+            var sel = window.getSelection().toString().trim();
+            if (sel.length > 0 && window.AndroidBridge) {
+                AndroidBridge.onAnnotate(sel);
+            }
+        }
+        function doCopy() {
+            document.getElementById('ctx-menu').style.display = 'none';
+            var sel = window.getSelection().toString().trim();
+            if (sel.length > 0 && window.AndroidBridge) {
+                AndroidBridge.onCopy(sel);
+            }
+        }
+        function setCode(code, lang) {
+            var codeEl = document.getElementById('code');
+            codeEl.textContent = code;
+            if (lang && hljs.getLanguage(lang)) {
+                codeEl.className = 'hljs language-' + lang;
+                hljs.highlightElement(codeEl);
+            } else {
+                codeEl.className = 'hljs';
+                hljs.highlightElement(codeEl);
+            }
+            // Generate line numbers
+            var lines = code.split('\n');
+            var gutter = document.getElementById('gutter');
+            gutter.textContent = lines.map(function(_, i) { return (i + 1); }).join('\n');
+        }
+        function setTheme(isDark) {
+            var link = document.getElementById('theme-css');
+            link.href = isDark ? 'highlight/github-dark.min.css' : 'highlight/github.min.css';
+        }
+        function setAnnotationLabel(label, copyLabel) {
+            document.querySelectorAll('#ctx-menu button')[0].textContent = label;
+            document.querySelectorAll('#ctx-menu button')[1].textContent = copyLabel;
+        }
+    </script>
+</body>
+</html>
