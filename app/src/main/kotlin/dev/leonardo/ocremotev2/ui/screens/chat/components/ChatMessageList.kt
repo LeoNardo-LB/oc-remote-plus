@@ -73,7 +73,6 @@ import dev.leonardo.ocremotev2.ui.screens.chat.components.AlwaysConfirmDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.snapToBottom
 import dev.leonardo.ocremotev2.ui.screens.chat.util.computeTurnGroups
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
@@ -119,41 +118,29 @@ fun ChatMessageList(
     }
 
     val compensateState = remember { CompensateState() }
-    val bannerCompensateState = remember { CompensateState() }
-
-    // Per-message height tracking — ALL assistant messages get compensation,
-    // not just the last streaming one. This prevents drift when non-streaming
-    // messages (e.g. tool call cards, reasoning blocks) resize after content loads.
+    val toolCompensateState = remember { CompensateState() }
     val heightMap = remember { HashMap<String, Int>() }
 
+    // Reset height tracking when streaming message changes (new message),
+    // but DO NOT reset shouldCompensate — it must persist across message
+    // changes so compensation stays active during multi-message turns.
     LaunchedEffect(streamingMsgId) {
-        bannerCompensateState.lastHeight = 0
+        heightMap.clear()
+        toolCompensateState.lastHeight = 0
     }
 
     // Track whether user has scrolled away from bottom.
-    // Once user scrolls (even slightly), shouldCompensate stays true
-    // until they explicitly return via the scroll-to-bottom FAB.
-    LaunchedEffect(listState.isScrollInProgress) {
+    // When shouldCompensate=true, SSE height growth is counteracted via
+    // requestScrollToItem inside the layout modifier — no height freeze.
+    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
         if (listState.isScrollInProgress) {
             compensateState.shouldCompensate = true
-        }
-    }
-
-    // DIAG: poll all scroll params every 100ms while user is scrolled away
-    LaunchedEffect(compensateState.shouldCompensate) {
-        if (compensateState.shouldCompensate) {
-            ScrollDiagLogger.init(context)
-            var count = 0
-            while (true) {
-                val info = listState.layoutInfo
-                val vis = info.visibleItemsInfo.joinToString(",") { "${it.key}:${it.size}@${it.offset}" }
-                val hts = heightMap.entries.joinToString(",") { "${it.key.takeLast(8)}:${it.value}" }
-                ScrollDiagLogger.log("DUMP idx=${listState.firstVisibleItemIndex} off=${listState.firstVisibleItemScrollOffset} total=${info.totalItemsCount} scrollProg=${listState.isScrollInProgress} canBack=${listState.canScrollBackward} canFwd=${listState.canScrollForward} visN=${info.visibleItemsInfo.size} vis=[$vis] hts=[$hts]")
-                if (++count % 10 == 0) ScrollDiagLogger.flush()
-                delay(100)
-            }
-        } else {
-            ScrollDiagLogger.flush()
+        } else if (listState.firstVisibleItemIndex == 0 &&
+            listState.firstVisibleItemScrollOffset == 0) {
+            // Only reset when truly at bottom (offset == 0), not just "near bottom" (< 100).
+            // Using isAtBottom (< 100) causes premature reset during LazyColumn's
+            // natural offset adjustment, killing compensation mid-stream.
+            compensateState.shouldCompensate = false
         }
     }
 
@@ -205,106 +192,113 @@ fun ChatMessageList(
                     // Visual order (top→bottom): oldest msgs → newest msgs → revert → pending.
                     // Declaration order is bottom-up: pending (bottom) → messages (top).
 
-                    // === Unified streaming banners ===
-                    // All conditional banners merged into a single item to:
-                    // ① Prevent item insertion/removal from causing index jumps
-                    // ② Apply unified delta compensation for ALL height changes
-                    // ③ Compensate both growth (delta > 0) and shrinkage (delta < 0)
-                    item(key = "streaming_banners") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .layout { measurable, constraints ->
-                                    val placeable = measurable.measure(
-                                        constraints.copy(maxHeight = Constraints.Infinity)
-                                    )
-                                    val realHeight = placeable.height
-                                    val delta = realHeight - bannerCompensateState.lastHeight
-                                    // Skip compensation when streaming message is visible —
-                                    // it has its own layout modifier that handles delta.
-                                    val streamVisible = listState.layoutInfo.visibleItemsInfo.any {
-                                        it.key == streamingMsgId
-                                    }
-                                    if (compensateState.shouldCompensate && delta != 0 && !streamVisible) {
-                                        LazyListReflection.requestScrollToItemNoCancel(
-                                            listState,
-                                            listState.firstVisibleItemIndex,
-                                            listState.firstVisibleItemScrollOffset + delta
+                    // Revert banner
+                    if (sessionMeta.revert != null) {
+                        item(key = "revert_banner") {
+                            RevertBanner(onRedo = {
+                                viewModel.redoMessage { ok ->
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
                                         )
                                     }
-                                    bannerCompensateState.lastHeight = realHeight
-                                    layout(placeable.width, realHeight) {
-                                        placeable.placeRelative(0, 0)
-                                    }
                                 }
-                        ) {
-                            // Revert banner
-                            if (sessionMeta.revert != null) {
-                                RevertBanner(onRedo = {
-                                    viewModel.redoMessage { ok ->
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                if (ok) context.getString(R.string.chat_messages_restored) else context.getString(R.string.chat_message_redo_failed)
+                                onForceScrollToBottom()
+                            })
+                        }
+                    }
+
+                    // Compaction banner
+                    if (currentCompaction != null && currentCompaction.isActive) {
+                        item(key = "compaction_banner") {
+                            CompactionBanner(state = currentCompaction)
+                        }
+                    }
+
+                    // Retry banner — shown when session is in Retry status
+                    val retryStatus = sessionMeta.sessionStatus
+                    if (retryStatus is SessionStatus.Retry) {
+                        item(key = "retry_banner") {
+                            RetryBanner(retryStatus)
+                        }
+                    }
+
+                    // Tool progress cards (with drift compensation)
+                    if (activeTools.isNotEmpty()) {
+                        item(key = "tool_progress") {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .layout { measurable, constraints ->
+                                        val placeable = measurable.measure(
+                                            constraints.copy(maxHeight = Constraints.Infinity)
+                                        )
+                                        val realHeight = placeable.height
+                                        val delta = realHeight - toolCompensateState.lastHeight
+                                        if (compensateState.shouldCompensate && toolCompensateState.lastHeight > 0 && delta > 0) {
+                                            LazyListReflection.requestScrollToItemNoCancel(
+                                                listState,
+                                                listState.firstVisibleItemIndex,
+                                                listState.firstVisibleItemScrollOffset + delta
                                             )
                                         }
+                                        toolCompensateState.lastHeight = realHeight
+                                        layout(placeable.width, realHeight) {
+                                            placeable.placeRelative(0, 0)
+                                        }
                                     }
+                            ) {
+                                activeTools.forEach { toolInfo ->
+                                    ToolProgressCard(toolInfo = toolInfo)
+                                }
+                            }
+                        }
+                    } else {
+                        // Reset when no active tools
+                        toolCompensateState.lastHeight = 0
+                    }
+
+                    // Step progress indicator
+                    if (currentStep != null) {
+                        item(key = "step_progress") {
+                            StepProgressIndicator(stepInfo = currentStep)
+                        }
+                    }
+
+                    // Pending questions — show one at a time (oldest first)
+                    interaction.pendingQuestions.firstOrNull()?.let { question ->
+                        item(key = "question_${question.id}") {
+                            QuestionCard(
+                                question = question,
+                                positionLabel = if (interaction.pendingQuestions.size > 1) "1/${interaction.pendingQuestions.size}" else null,
+                                onSubmit = { answers ->
+                                    viewModel.replyToQuestion(question.id, answers)
                                     onForceScrollToBottom()
-                                })
-                            }
+                                },
+                                onReject = {
+                                    viewModel.rejectQuestion(question.id)
+                                    onForceScrollToBottom()
+                                }
+                            )
+                        }
+                    }
 
-                            // Compaction banner
-                            if (currentCompaction != null && currentCompaction.isActive) {
-                                CompactionBanner(state = currentCompaction)
-                            }
-
-                            // Retry banner
-                            val retryStatus = sessionMeta.sessionStatus
-                            if (retryStatus is SessionStatus.Retry) {
-                                RetryBanner(retryStatus)
-                            }
-
-                            // Tool progress cards
-                            activeTools.forEach { toolInfo ->
-                                ToolProgressCard(toolInfo = toolInfo)
-                            }
-
-                            // Step progress indicator
-                            if (currentStep != null) {
-                                StepProgressIndicator(stepInfo = currentStep)
-                            }
-
-                            // Pending questions — show one at a time (oldest first)
-                            interaction.pendingQuestions.firstOrNull()?.let { question ->
-                                QuestionCard(
-                                    question = question,
-                                    positionLabel = if (interaction.pendingQuestions.size > 1) "1/${interaction.pendingQuestions.size}" else null,
-                                    onSubmit = { answers ->
-                                        viewModel.replyToQuestion(question.id, answers)
-                                        onForceScrollToBottom()
-                                    },
-                                    onReject = {
-                                        viewModel.rejectQuestion(question.id)
-                                        onForceScrollToBottom()
-                                    }
-                                )
-                            }
-
-                            // Pending permissions — show one at a time (oldest first)
-                            interaction.pendingPermissions.firstOrNull()?.let { permission ->
-                                PermissionCard(
-                                    permission = permission,
-                                    positionLabel = if (interaction.pendingPermissions.size > 1) "1/${interaction.pendingPermissions.size}" else null,
-                                    onOnce = {
-                                        viewModel.replyToPermission(permission.id, "once")
-                                        onForceScrollToBottom()
-                                    },
-                                    onAlways = { showAlwaysDialog = permission },
-                                    onReject = {
-                                        viewModel.replyToPermission(permission.id, "reject")
-                                        onForceScrollToBottom()
-                                    }
-                                )
-                            }
+                    // Pending permissions — show one at a time (oldest first)
+                    interaction.pendingPermissions.firstOrNull()?.let { permission ->
+                        item(key = "perm_${permission.id}") {
+                            PermissionCard(
+                                permission = permission,
+                                positionLabel = if (interaction.pendingPermissions.size > 1) "1/${interaction.pendingPermissions.size}" else null,
+                                onOnce = {
+                                    viewModel.replyToPermission(permission.id, "once")
+                                    onForceScrollToBottom()
+                                },
+                                onAlways = { showAlwaysDialog = permission },
+                                onReject = {
+                                    viewModel.replyToPermission(permission.id, "reject")
+                                    onForceScrollToBottom()
+                                }
+                            )
                         }
                     }
 
@@ -328,7 +322,7 @@ fun ChatMessageList(
                                     val msgId = msg.message.id
                                     val prevHeight = heightMap[msgId]
                                     val delta = if (prevHeight != null) realHeight - prevHeight else 0
-                                    if (compensateState.shouldCompensate && delta > 0) {
+                                    if (compensateState.shouldCompensate && prevHeight != null && delta > 0) {
                                         LazyListReflection.requestScrollToItemNoCancel(
                                             listState,
                                             listState.firstVisibleItemIndex,
@@ -585,40 +579,5 @@ private object LazyListReflection {
         // Setting value = Unit triggers the invalidation.
         @Suppress("UNCHECKED_CAST")
         (invalidatorField.get(state) as androidx.compose.runtime.MutableState<Unit>).value = Unit
-    }
-}
-
-/**
- * Writes diagnostic logs to Download/oc_remote_crash/ (same as crash logs).
- */
-internal object ScrollDiagLogger {
-    private var file: java.io.File? = null
-    private val sb = StringBuilder()
-
-    fun init(context: android.content.Context) {
-        if (file == null) {
-            val diagDir = java.io.File(
-                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
-                "oc_remote_crash"
-            )
-            diagDir.mkdirs()
-            file = java.io.File(diagDir, "scroll_diag.log")
-        }
-        sb.clear()
-        sb.append("=== STARTED ${System.currentTimeMillis()} ===\n")
-        flush()
-    }
-
-    fun log(msg: String) {
-        android.util.Log.d("ScrollDiag", msg)
-        val ts = System.currentTimeMillis() % 100000
-        sb.append("$ts $msg\n")
-    }
-
-    fun flush() {
-        try {
-            file?.appendText(sb.toString())
-        } catch (_: Exception) {}
-        sb.clear()
     }
 }
