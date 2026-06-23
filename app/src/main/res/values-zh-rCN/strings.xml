@@ -212,6 +212,12 @@
     <string name="tool_apply_patch">应用补丁</string>
     <string name="tool_shell">Shell</string>
     <string name="tool_read">读取</string>
+    <string name="tool_glob">查找文件</string>
+    <string name="tool_grep">搜索代码</string>
+    <string name="context_exploring">探索中</string>
+    <string name="context_explored">已探索</string>
+    <string name="context_read_count">%1$d 个文件</string>
+    <string name="context_search_count">%1$d 次搜索</string>
     <string name="patch_created">已创建</string>
     <string name="patch_deleted">已删除</string>
     <string name="patch_moved">已移动</string>

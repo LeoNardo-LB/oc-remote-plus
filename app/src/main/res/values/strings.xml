@@ -305,6 +305,12 @@
     <string name="tool_apply_patch">Apply patch</string>
     <string name="tool_shell">Shell</string>
     <string name="tool_read">Read</string>
+    <string name="tool_glob">Glob</string>
+    <string name="tool_grep">Grep</string>
+    <string name="context_exploring">Exploring</string>
+    <string name="context_explored">Explored</string>
+    <string name="context_read_count">%1$d files</string>
+    <string name="context_search_count">%1$d searches</string>
     <string name="chat_input_mode_normal">Prompt</string>
     <string name="chat_shell_placeholder">Enter shell command…</string>
     <string name="chat_shell_executed">Shell command sent</string>
