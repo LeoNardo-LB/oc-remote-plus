@@ -1,93 +1,58 @@
 package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.leonardo.ocremotev2.R
 
 private const val TAG = "CodeWebView"
 
-/** Maps file extension to Highlight.js language name. */
 private fun extToLanguage(filePath: String): String {
     val ext = filePath.substringAfterLast('.', "").lowercase()
     return when (ext) {
-        "kt", "kts" -> "kotlin"
-        "java" -> "java"
-        "xml" -> "xml"
-        "json" -> "json"
-        "py" -> "python"
-        "js" -> "javascript"
-        "ts" -> "typescript"
-        "go" -> "go"
-        "rs" -> "rust"
-        "c", "h" -> "c"
-        "cpp", "cc", "cxx" -> "cpp"
-        "cs" -> "csharp"
-        "rb" -> "ruby"
-        "swift" -> "swift"
-        "php" -> "php"
-        "sh", "bash" -> "bash"
-        "sql" -> "sql"
-        "yaml", "yml" -> "yaml"
-        "html", "htm" -> "xml"
-        "css" -> "css"
-        "md" -> "markdown"
-        "gradle" -> "groovy"
-        "properties" -> "properties"
-        "dockerfile" -> "dockerfile"
-        "toml" -> "ini"
-        else -> ""
+        "kt", "kts" -> "kotlin"; "java" -> "java"; "xml" -> "xml"
+        "json" -> "json"; "py" -> "python"; "js" -> "javascript"
+        "ts" -> "typescript"; "go" -> "go"; "rs" -> "rust"
+        "c", "h" -> "c"; "cpp", "cc", "cxx" -> "cpp"; "cs" -> "csharp"
+        "rb" -> "ruby"; "swift" -> "swift"; "php" -> "php"
+        "sh", "bash" -> "bash"; "sql" -> "sql"; "yaml", "yml" -> "yaml"
+        "html", "htm" -> "xml"; "css" -> "css"; "md" -> "markdown"
+        "gradle" -> "groovy"; "properties" -> "properties"
+        "dockerfile" -> "dockerfile"; "toml" -> "ini"; else -> ""
     }
 }
 
-/**
- * Stable bridge for JavaScript → Kotlin communication.
- *
- * Uses a mutable holder so the bridge object itself never changes
- * (WebView holds a reference to it). Callbacks are posted to the
- * main thread because @JavascriptInterface methods run on a binder
- * thread — Compose state updates from non-main threads fail silently.
- */
 private class CodeViewerBridge {
     private val mainHandler = Handler(Looper.getMainLooper())
-
     var annotateCallback: ((String) -> Unit)? = null
     var copyCallback: ((String) -> Unit)? = null
 
     @JavascriptInterface
     fun onAnnotate(text: String) {
-        Log.d(TAG, "onAnnotate called: '${text.take(50)}...'")
+        Log.d(TAG, "onAnnotate: '${text.take(50)}...'")
         mainHandler.post { annotateCallback?.invoke(text) }
     }
 
     @JavascriptInterface
     fun onCopy(text: String) {
-        Log.d(TAG, "onCopy called: '${text.take(50)}...'")
+        Log.d(TAG, "onCopy: '${text.take(50)}...'")
         mainHandler.post { copyCallback?.invoke(text) }
     }
 }
 
-/**
- * WebView-based code viewer using Highlight.js.
- *
- * Replaces the hand-rolled Compose Text-based [CodeSourceView] to fix:
- * - Syntax highlighting quality (Highlight.js is industrial-grade)
- * - Text selection (WebView native selection works reliably)
- * - Custom context menu ("Annotate" injected via JavaScript)
- * - Gutter/code split scroll (CSS flexbox, gutter stays fixed)
- */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CodeWebView(
@@ -98,7 +63,9 @@ fun CodeWebView(
     onCopy: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    // Read APP theme from luminance of surface color
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val isDark = surfaceColor.red * 0.299f + surfaceColor.green * 0.587f + surfaceColor.blue * 0.114f < 0.5f
     val annotateLabel = androidx.compose.ui.res.stringResource(R.string.annotation_context_annotate)
     val copyLabel = androidx.compose.ui.res.stringResource(android.R.string.copy)
     val language = remember(filePath) { extToLanguage(filePath) }
@@ -106,8 +73,9 @@ fun CodeWebView(
         content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
     }
 
-    // Stable bridge — created once, never recreated on recomposition.
-    // Callbacks are updated in place so the WebView's reference stays valid.
+    // App surface color for WebView background (prevents transparency/blur)
+    val bgColorArgb = MaterialTheme.colorScheme.surface.toArgb()
+
     val bridge = remember { CodeViewerBridge() }
     bridge.annotateCallback = onAnnotate
     bridge.copyCallback = onCopy
@@ -121,13 +89,15 @@ fun CodeWebView(
                 settings.allowFileAccess = true
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = false
+                // Fix blurry text: set opaque background matching app theme
+                setBackgroundColor(bgColorArgb)
+                setLayerType(android.graphics.Paint.ANTI_ALIAS_FLAG, null)
                 addJavascriptInterface(bridge, "AndroidBridge")
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
-                        Log.d(TAG, "onPageFinished, setting code (${escapedContent.length} chars, lang=$language)")
                         view?.evaluateJavascript(
-                            "setCode(`$escapedContent`, '$language'); setTheme($isDark);",
+                            "setCode(`$escapedContent`, '$language'); setTheme($isDark); setLabels('$annotateLabel', '$copyLabel');",
                             null
                         )
                     }
@@ -142,7 +112,7 @@ fun CodeWebView(
         update = { webView ->
             webView.post {
                 webView.evaluateJavascript(
-                    "setCode(`$escapedContent`, '$language'); setTheme($isDark);",
+                    "setCode(`$escapedContent`, '$language'); setTheme($isDark); setLabels('$annotateLabel', '$copyLabel');",
                     null
                 )
             }
