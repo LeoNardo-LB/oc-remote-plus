@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.RateReview
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -380,21 +381,31 @@ private fun MessageCardAssistant(
                 ),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else SpacingTokens.XS.dp)
             ) {
-                // Render parts in original order
-                for (part in renderableParts) {
-                    key(part.id) {
-                        PartContent(
-                            part = part,
-                            textColor = textColor,
-                            isUser = false,
-                            onViewSubSession = onViewSubSession,
-                            onOpenFile = onOpenFile,
-                            turnAgentName = if (part is Part.Tool && part.tool == "task") {
-                                val agentParts = orderedTurnMessages?.flatMap { it.parts }
-                                    ?.filterIsInstance<Part.Agent>()
-                                    ?: currentMessage.parts.filterIsInstance<Part.Agent>()
-                                agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
-                            } else null
+                // Render parts grouped by message; a divider separates consecutive messages
+                // (e.g. main agent vs sub-agent) within the same turn bubble — not between parts.
+                val turnMsgs = orderedTurnMessages?.reversed() ?: listOf(currentMessage)
+                for ((msgIndex, msg) in turnMsgs.withIndex()) {
+                    val msgParts = filterRenderableParts(msg.parts)
+                    for (part in msgParts) {
+                        key(part.id) {
+                            PartContent(
+                                part = part,
+                                textColor = textColor,
+                                isUser = false,
+                                onViewSubSession = onViewSubSession,
+                                onOpenFile = onOpenFile,
+                                turnAgentName = if (part is Part.Tool && part.tool == "task") {
+                                    val agentParts = orderedTurnMessages?.flatMap { it.parts }
+                                        ?.filterIsInstance<Part.Agent>()
+                                        ?: currentMessage.parts.filterIsInstance<Part.Agent>()
+                                    agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
+                                } else null
+                            )
+                        }
+                    }
+                    if (msgIndex < turnMsgs.lastIndex && msgParts.isNotEmpty()) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = if (compact) 3.dp else 6.dp)
                         )
                     }
                 }

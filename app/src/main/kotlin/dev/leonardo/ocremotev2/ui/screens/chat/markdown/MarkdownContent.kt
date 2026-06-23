@@ -22,9 +22,11 @@ import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import dev.snipme.highlights.Highlights
 import com.mikepenz.markdown.model.markdownDimens
+import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.markdownAnimations
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalChatFontSize
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCompactMessages
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCodeWordWrap
 import dev.leonardo.ocremotev2.ui.theme.CodeTypography
 import androidx.compose.ui.text.TextLinkStyles
@@ -260,6 +262,22 @@ internal fun MarkdownContent(
         tableMaxWidth = screenWidthDp * 1.5f
     )
 
+    // Block-level spacing between markdown elements (heading↔paragraph, paragraph↔list, ...).
+    // mikepenz defaults `block` to 2.dp which is too tight; scale it with the compact-messages
+    // setting so the whole message (bubble padding + inter-message gap + block gap) breathes
+    // together. Rationale: docs/research/typography-spacing-research.md (GitHub ~10px, WCAG).
+    val compact = LocalCompactMessages.current
+    // Inter-block spacing follows GitHub's markdown CSS (the de-facto standard):
+    //   - ul/ol margin = 0       → `list` stays 0 so it never stacks on top of `block`
+    //   - p margin-bottom ≈ 10px → `block` ≈ 6dp at 14sp body
+    //   - li+li ≈ 4px            → `listItemBottom` = 4dp (2dp compact)
+    // Line-height is NOT scaled — it stays tied to the font-size setting (WCAG ≥1.5).
+    val padding = markdownPadding(
+        block = if (compact) 2.dp else 4.dp,
+        list = 0.dp,
+        listItemBottom = 2.dp,
+    )
+
     val markdownState = rememberMarkdownState(
         content = normalizedMarkdown,
         retainState = true,
@@ -271,6 +289,7 @@ internal fun MarkdownContent(
         typography = typography,
         components = components,
         dimens = dimens,
+        padding = padding,
         animations = markdownAnimations(animateTextSize = { this }),
         imageTransformer = Coil3ImageTransformerImpl,
         modifier = Modifier.fillMaxWidth()
