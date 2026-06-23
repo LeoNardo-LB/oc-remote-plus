@@ -589,8 +589,7 @@ private object LazyListReflection {
 }
 
 /**
- * Writes diagnostic logs to device file for user to copy without adb.
- * File location: Android/data/dev.leonardo.ocremotev2.dev/files/scroll_diag.log
+ * Writes diagnostic logs to Download/oc_remote_crash/ (same as crash logs).
  */
 internal object ScrollDiagLogger {
     private var file: java.io.File? = null
@@ -598,7 +597,12 @@ internal object ScrollDiagLogger {
 
     fun init(context: android.content.Context) {
         if (file == null) {
-            file = java.io.File(context.getExternalFilesDir(null), "scroll_diag.log")
+            val diagDir = java.io.File(
+                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+                "oc_remote_crash"
+            )
+            diagDir.mkdirs()
+            file = java.io.File(diagDir, "scroll_diag.log")
         }
         sb.clear()
         sb.append("=== STARTED ${System.currentTimeMillis()} ===\n")
