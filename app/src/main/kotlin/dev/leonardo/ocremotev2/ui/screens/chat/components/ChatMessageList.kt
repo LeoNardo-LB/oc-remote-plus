@@ -73,6 +73,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.components.AlwaysConfirmDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.snapToBottom
 import dev.leonardo.ocremotev2.ui.screens.chat.util.computeTurnGroups
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
@@ -135,6 +136,19 @@ fun ChatMessageList(
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             compensateState.shouldCompensate = true
+        }
+    }
+
+    // DIAG: poll all scroll params every 100ms while user is scrolled away
+    LaunchedEffect(compensateState.shouldCompensate) {
+        if (compensateState.shouldCompensate) {
+            while (true) {
+                val info = listState.layoutInfo
+                val vis = info.visibleItemsInfo.joinToString(",") { "${it.key}:${it.size}@${it.offset}" }
+                val hts = heightMap.entries.joinToString(",") { "${it.key.takeLast(8)}:${it.value}" }
+                android.util.Log.d("ScrollDiag", "DUMP idx=${listState.firstVisibleItemIndex} off=${listState.firstVisibleItemScrollOffset} total=${info.totalItemsCount} scrollProg=${listState.isScrollInProgress} canBack=${listState.canScrollBackward} canFwd=${listState.canScrollForward} visN=${info.visibleItemsInfo.size} vis=[$vis] rev=${info.reverseLayout} hts=[$hts]")
+                delay(100)
+            }
         }
     }
 
