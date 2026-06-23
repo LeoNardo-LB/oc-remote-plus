@@ -142,13 +142,18 @@ fun ChatMessageList(
     // DIAG: poll all scroll params every 100ms while user is scrolled away
     LaunchedEffect(compensateState.shouldCompensate) {
         if (compensateState.shouldCompensate) {
+            ScrollDiagLogger.init(context)
+            var count = 0
             while (true) {
                 val info = listState.layoutInfo
                 val vis = info.visibleItemsInfo.joinToString(",") { "${it.key}:${it.size}@${it.offset}" }
                 val hts = heightMap.entries.joinToString(",") { "${it.key.takeLast(8)}:${it.value}" }
-                android.util.Log.d("ScrollDiag", "DUMP idx=${listState.firstVisibleItemIndex} off=${listState.firstVisibleItemScrollOffset} total=${info.totalItemsCount} scrollProg=${listState.isScrollInProgress} canBack=${listState.canScrollBackward} canFwd=${listState.canScrollForward} visN=${info.visibleItemsInfo.size} vis=[$vis] rev=${info.reverseLayout} hts=[$hts]")
+                ScrollDiagLogger.log("DUMP idx=${listState.firstVisibleItemIndex} off=${listState.firstVisibleItemScrollOffset} total=${info.totalItemsCount} scrollProg=${listState.isScrollInProgress} canBack=${listState.canScrollBackward} canFwd=${listState.canScrollForward} visN=${info.visibleItemsInfo.size} vis=[$vis] hts=[$hts]")
+                if (++count % 10 == 0) ScrollDiagLogger.flush()
                 delay(100)
             }
+        } else {
+            ScrollDiagLogger.flush()
         }
     }
 
@@ -580,5 +585,36 @@ private object LazyListReflection {
         // Setting value = Unit triggers the invalidation.
         @Suppress("UNCHECKED_CAST")
         (invalidatorField.get(state) as androidx.compose.runtime.MutableState<Unit>).value = Unit
+    }
+}
+
+/**
+ * Writes diagnostic logs to device file for user to copy without adb.
+ * File location: Android/data/dev.leonardo.ocremotev2.dev/files/scroll_diag.log
+ */
+internal object ScrollDiagLogger {
+    private var file: java.io.File? = null
+    private val sb = StringBuilder()
+
+    fun init(context: android.content.Context) {
+        if (file == null) {
+            file = java.io.File(context.getExternalFilesDir(null), "scroll_diag.log")
+        }
+        sb.clear()
+        sb.append("=== STARTED ${System.currentTimeMillis()} ===\n")
+        flush()
+    }
+
+    fun log(msg: String) {
+        android.util.Log.d("ScrollDiag", msg)
+        val ts = System.currentTimeMillis() % 100000
+        sb.append("$ts $msg\n")
+    }
+
+    fun flush() {
+        try {
+            file?.appendText(sb.toString())
+        } catch (_: Exception) {}
+        sb.clear()
     }
 }

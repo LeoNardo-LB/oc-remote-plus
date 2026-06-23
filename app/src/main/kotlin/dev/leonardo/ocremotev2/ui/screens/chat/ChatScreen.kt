@@ -231,6 +231,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.components.MessageCardRole
 import dev.leonardo.ocremotev2.ui.screens.chat.components.ChatEmptyState
 import dev.leonardo.ocremotev2.ui.screens.chat.components.ChatErrorState
 import dev.leonardo.ocremotev2.ui.screens.chat.components.ChatMessageList
+import dev.leonardo.ocremotev2.ui.screens.chat.components.ScrollDiagLogger
 import dev.leonardo.ocremotev2.ui.screens.chat.components.ChatTopBar
 import dev.leonardo.ocremotev2.ui.screens.chat.components.ErrorPayloadContent
 import dev.leonardo.ocremotev2.ui.components.indicators.PulsingDotsIndicator
@@ -326,7 +327,8 @@ fun ChatScreen(
     LaunchedEffect(messageCount) {
         val trulyAtBottom = listState.firstVisibleItemIndex == 0 &&
             listState.firstVisibleItemScrollOffset == 0
-        android.util.Log.d("ScrollDiag", "MCOUNT n=$messageCount auto=$autoScrollEnabled bottom=$isAtBottom truly=$trulyAtBottom off=${listState.firstVisibleItemScrollOffset} idx=${listState.firstVisibleItemIndex} scrollProg=${listState.isScrollInProgress}")
+        ScrollDiagLogger.log("MCOUNT n=$messageCount auto=$autoScrollEnabled bottom=$isAtBottom truly=$trulyAtBottom off=${listState.firstVisibleItemScrollOffset} idx=${listState.firstVisibleItemIndex} scrollProg=${listState.isScrollInProgress}")
+        ScrollDiagLogger.flush()
         if (messageCount > 0 && trulyAtBottom && !listState.isScrollInProgress) {
             listState.scrollToItem(0)
         }
@@ -335,7 +337,8 @@ fun ChatScreen(
     // Force-scroll to bottom on explicit user actions (send, command, compact, etc.)
     LaunchedEffect(forceScrollTick) {
         if (forceScrollTick > 0) {
-            android.util.Log.d("ScrollDiag", "SNAP_FORCE tick=$forceScrollTick off=${listState.firstVisibleItemScrollOffset}")
+            ScrollDiagLogger.log("SNAP_FORCE tick=$forceScrollTick off=${listState.firstVisibleItemScrollOffset}")
+            ScrollDiagLogger.flush()
             listState.snapToBottom()
         }
     }
@@ -347,7 +350,8 @@ fun ChatScreen(
         if (pendingCount > 0) {
             // Wait until the list has items to scroll to.
             snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
-            android.util.Log.d("ScrollDiag", "SNAP_PENDING n=$pendingCount off=${listState.firstVisibleItemScrollOffset}")
+            ScrollDiagLogger.log("SNAP_PENDING n=$pendingCount off=${listState.firstVisibleItemScrollOffset}")
+            ScrollDiagLogger.flush()
             listState.snapToBottom()
         }
     }
