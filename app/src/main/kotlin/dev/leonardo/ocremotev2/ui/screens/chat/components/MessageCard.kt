@@ -57,6 +57,9 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.formatTokenCount
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import dev.leonardo.ocremotev2.ui.screens.chat.util.performHaptic
 import dev.leonardo.ocremotev2.ui.screens.chat.util.resolveUserCommandLabel
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.ContextToolGroupCard
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.PartGroup
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.groupContextParts
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -386,21 +389,30 @@ private fun MessageCardAssistant(
                 val turnMsgs = orderedTurnMessages?.reversed() ?: listOf(currentMessage)
                 for ((msgIndex, msg) in turnMsgs.withIndex()) {
                     val msgParts = filterRenderableParts(msg.parts)
-                    for (part in msgParts) {
-                        key(part.id) {
-                            PartContent(
-                                part = part,
-                                textColor = textColor,
-                                isUser = false,
-                                onViewSubSession = onViewSubSession,
-                                onOpenFile = onOpenFile,
-                                turnAgentName = if (part is Part.Tool && part.tool == "task") {
-                                    val agentParts = orderedTurnMessages?.flatMap { it.parts }
-                                        ?.filterIsInstance<Part.Agent>()
-                                        ?: currentMessage.parts.filterIsInstance<Part.Agent>()
-                                    agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
-                                } else null
-                            )
+                    val groups = groupContextParts(msgParts)
+                    for (group in groups) {
+                        when (group) {
+                            is PartGroup.Context -> key(group.parts.first().id) {
+                                ContextToolGroupCard(
+                                    parts = group.parts,
+                                    onOpenFile = onOpenFile ?: {},
+                                )
+                            }
+                            is PartGroup.Single -> key(group.part.id) {
+                                PartContent(
+                                    part = group.part,
+                                    textColor = textColor,
+                                    isUser = false,
+                                    onViewSubSession = onViewSubSession,
+                                    onOpenFile = onOpenFile,
+                                    turnAgentName = if (group.part is Part.Tool && group.part.tool == "task") {
+                                        val agentParts = orderedTurnMessages?.flatMap { it.parts }
+                                            ?.filterIsInstance<Part.Agent>()
+                                            ?: currentMessage.parts.filterIsInstance<Part.Agent>()
+                                        agentParts.firstOrNull()?.name?.takeIf { it.isNotBlank() }
+                                    } else null
+                                )
+                            }
                         }
                     }
                     if (msgIndex < turnMsgs.lastIndex && msgParts.isNotEmpty()) {
