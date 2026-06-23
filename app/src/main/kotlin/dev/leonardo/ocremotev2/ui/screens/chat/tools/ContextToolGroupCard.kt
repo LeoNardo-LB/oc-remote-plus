@@ -147,8 +147,11 @@ private fun toolLabel(toolName: String): String = when (toolName.lowercase()) {
 private fun toolSubtitle(part: Part.Tool): String {
     val input = extractToolInput(part)
     return when (part.tool.lowercase()) {
-        "read" -> input["filePath"]?.jsonPrimitive?.contentOrNull
-            ?: input["path"]?.jsonPrimitive?.contentOrNull ?: ""
+        "read" -> {
+            val path = input["filePath"]?.jsonPrimitive?.contentOrNull
+                ?: input["path"]?.jsonPrimitive?.contentOrNull ?: ""
+            extractFileName(path)
+        }
         "glob", "grep" -> input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
         else -> ""
     }
