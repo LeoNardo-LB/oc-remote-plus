@@ -9,7 +9,6 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
             background: var(--bg-color, #1e1e1e);
-            height: 100%;
         }
         body {
             font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
@@ -31,48 +30,14 @@
             white-space: pre;
             flex-shrink: 0;
         }
-        .code-area {
-            flex: 1;
-            overflow-x: auto;
-        }
-        pre {
-            margin: 0;
-            white-space: pre;
-        }
+        .code-area { flex: 1; overflow-x: auto; }
+        pre { margin: 0; white-space: pre; }
         pre code {
             font-family: inherit !important;
             padding: 0 !important;
             background: transparent !important;
         }
-        .hljs {
-            background: transparent !important;
-        }
-        /* Custom context menu — positioned above selection */
-        #ctx-menu {
-            display: none;
-            position: fixed;
-            background: #2d2d2d;
-            border: 1px solid #555;
-            border-radius: 8px;
-            padding: 0;
-            z-index: 1000;
-            min-width: 100px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-        }
-        #ctx-menu button {
-            display: block;
-            width: 100%;
-            padding: 10px 16px;
-            background: none;
-            border: none;
-            color: #e0e0e0;
-            font-size: 14px;
-            text-align: left;
-            cursor: pointer;
-        }
-        #ctx-menu button:first-child { border-radius: 8px 8px 0 0; }
-        #ctx-menu button:last-child { border-radius: 0 0 8px 8px; }
-        #ctx-menu button:hover { background: #404040; }
+        .hljs { background: transparent !important; }
     </style>
 </head>
 <body>
@@ -82,70 +47,16 @@
             <pre><code id="code" class="hljs"></code></pre>
         </div>
     </div>
-    <div id="ctx-menu">
-        <button id="btn-annotate" onclick="doAnnotate()">__ANNOTATE_LABEL__</button>
-        <button id="btn-copy" onclick="doCopy()">__COPY_LABEL__</button>
-    </div>
     <script>
-        var menuTimer = null;
-        // Show context menu above selection with delay
-        function showMenuAboveSelection() {
-            var sel = window.getSelection();
-            var text = sel.toString().trim();
-            if (text.length === 0) {
-                document.getElementById('ctx-menu').style.display = 'none';
-                return;
-            }
-            // Get selection rect — position menu ABOVE it
-            var rect = sel.getRangeAt(0).getBoundingClientRect();
-            var menu = document.getElementById('ctx-menu');
-            menu.style.display = 'block';
-            // Center horizontally over selection, position above
-            var menuWidth = 120;
-            var left = rect.left + (rect.width / 2) - (menuWidth / 2);
-            left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
-            var top = rect.top - 48; // 48px above selection
-            if (top < 8) top = rect.bottom + 8; // If no space above, show below
-            menu.style.left = left + 'px';
-            menu.style.top = top + 'px';
-        }
-        // On contextmenu: wait 600ms before showing (avoids accidental triggers)
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            if (menuTimer) clearTimeout(menuTimer);
-            menuTimer = setTimeout(showMenuAboveSelection, 600);
-        });
-        // Hide menu on tap outside
-        document.addEventListener('touchstart', function(e) {
-            if (!e.target.closest('#ctx-menu')) {
-                document.getElementById('ctx-menu').style.display = 'none';
-                if (menuTimer) { clearTimeout(menuTimer); menuTimer = null; }
-            }
-        }, true);
-        function doAnnotate() {
-            document.getElementById('ctx-menu').style.display = 'none';
-            var sel = window.getSelection().toString().trim();
-            if (sel.length > 0 && window.AndroidBridge) {
-                AndroidBridge.onAnnotate(sel);
-            }
-        }
-        function doCopy() {
-            document.getElementById('ctx-menu').style.display = 'none';
-            var sel = window.getSelection().toString().trim();
-            if (sel.length > 0 && window.AndroidBridge) {
-                AndroidBridge.onCopy(sel);
-            }
-        }
         function setCode(code, lang) {
             var codeEl = document.getElementById('code');
             codeEl.textContent = code;
             if (lang && hljs.getLanguage(lang)) {
                 codeEl.className = 'hljs language-' + lang;
-                hljs.highlightElement(codeEl);
             } else {
                 codeEl.className = 'hljs';
-                hljs.highlightElement(codeEl);
             }
+            hljs.highlightElement(codeEl);
             var lines = code.split('\n');
             var gutter = document.getElementById('gutter');
             gutter.textContent = lines.map(function(_, i) { return (i + 1); }).join('\n');
@@ -153,13 +64,8 @@
         function setTheme(isDark) {
             var link = document.getElementById('theme-css');
             link.href = isDark ? 'highlight/github-dark.min.css' : 'highlight/github.min.css';
-            // Set background/body color to match app theme
             document.documentElement.style.setProperty('--bg-color', isDark ? '#1e1e1e' : '#ffffff');
             document.documentElement.style.setProperty('--text-color', isDark ? '#e0e0e0' : '#1e1e1e');
-        }
-        function setLabels(annotateLabel, copyLabel) {
-            document.getElementById('btn-annotate').textContent = annotateLabel;
-            document.getElementById('btn-copy').textContent = copyLabel;
         }
     </script>
 </body>
