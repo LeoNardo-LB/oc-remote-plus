@@ -82,8 +82,6 @@ fun FileViewerScreen(
     // DIFF → SOURCE switch so users can annotate from diff view
     onSwitchToSource: (() -> Unit)? = null
 ) {
-    var showLongPressMenu by remember { mutableStateOf(false) }
-    // Phase 3: Annotation UI state
     var pendingAnnotationText by remember { mutableStateOf<String?>(null) }
     var detailAnnotation by remember { mutableStateOf<Annotation?>(null) }
     var showSubmitDialog by remember { mutableStateOf(false) }
@@ -123,10 +121,6 @@ fun FileViewerScreen(
             Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = { showLongPressMenu = true }
-                )
         ) {
             when {
                 uiState.isLoading -> LoadingState()
