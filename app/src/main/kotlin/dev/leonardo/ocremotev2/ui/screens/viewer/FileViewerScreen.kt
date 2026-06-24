@@ -203,12 +203,19 @@ fun FileViewerScreen(
         )
     }
 
-    // Phase 3: Annotation Detail Dialog
+    // Annotation edit sheet — reuses AnnotationInputSheet (bottom sheet, not dialog)
     detailAnnotation?.let { ann ->
-        AnnotationDetailDialog(
-            annotation = ann,
-            onEdit = { newNote -> onUpdateAnnotation(ann.id, newNote) },
-            onDelete = { onDeleteAnnotation(ann.id) },
+        AnnotationInputSheet(
+            selectedText = ann.selectedText,
+            initialNote = ann.note,
+            onConfirm = { newNote ->
+                onUpdateAnnotation(ann.id, newNote)
+                detailAnnotation = null
+            },
+            onDelete = {
+                onDeleteAnnotation(ann.id)
+                detailAnnotation = null
+            },
             onDismiss = { detailAnnotation = null }
         )
     }

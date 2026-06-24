@@ -32,22 +32,26 @@ import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import kotlinx.coroutines.launch
 
 /**
- * Bottom sheet for entering a modification note for a selected code snippet.
+ * Bottom sheet for entering or editing a modification note.
  *
  * @param selectedText The code the user selected (preview, read-only).
- * @param onConfirm Called with the entered note when user taps "确定".
- * @param onDismiss Called when sheet is dismissed (cancel or outside tap).
+ * @param initialNote Pre-filled note (editing mode). Empty for new annotation.
+ * @param onConfirm Called with the entered note when user taps confirm.
+ * @param onDismiss Called when sheet is dismissed.
+ * @param onDelete When non-null, shows a delete button (edit mode).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnnotationInputSheet(
     selectedText: String,
+    initialNote: String = "",
     onConfirm: (note: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    var note by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf(initialNote) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -98,21 +102,30 @@ fun AnnotationInputSheet(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                }) { Text(stringResource(R.string.cancel)) }
+                // Delete button (edit mode only)
+                if (onDelete != null) {
+                    TextButton(onClick = {
+                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDelete() }
+                    }) { Text(stringResource(R.string.annotation_detail_delete)) }
+                }
 
-                TextButton(
-                    onClick = {
-                        if (note.isNotBlank()) {
-                            scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(note.trim()) }
-                        }
-                    },
-                    enabled = note.isNotBlank(),
-                    modifier = Modifier.testTag("annotation_input_confirm")
-                ) { Text(stringResource(R.string.annotation_input_confirm)) }
+                Row {
+                    TextButton(onClick = {
+                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                    }) { Text(stringResource(R.string.cancel)) }
+
+                    TextButton(
+                        onClick = {
+                            if (note.isNotBlank()) {
+                                scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(note.trim()) }
+                            }
+                        },
+                        enabled = note.isNotBlank(),
+                        modifier = Modifier.testTag("annotation_input_confirm")
+                    ) { Text(stringResource(R.string.annotation_input_confirm)) }
+                }
             }
         }
     }
