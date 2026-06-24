@@ -33,6 +33,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -75,7 +76,7 @@ fun FileViewerScreen(
     onAddAnnotation: (selectedText: String, note: String) -> Unit,
     onDeleteAnnotation: (id: String) -> Unit,
     onUpdateAnnotation: (id: String, note: String) -> Unit,
-    onSubmitAnnotations: (overallNote: String) -> Unit,
+    onSubmitAnnotations: (overallNote: String, editedNotes: Map<String, String>) -> Unit,
     // Phase 4: pagination
     onLoadMoreLines: () -> Unit,
     // DIFF → SOURCE switch so users can annotate from diff view
@@ -205,8 +206,8 @@ fun FileViewerScreen(
         AnnotationSubmitDialog(
             annotationCount = uiState.annotations.size,
             annotations = uiState.annotations,
-            onSubmit = { overallNote ->
-                onSubmitAnnotations(overallNote)
+            onSubmit = { overallNote, editedNotes ->
+                onSubmitAnnotations(overallNote, editedNotes)
                 showSubmitDialog = false
             },
             onDismiss = { showSubmitDialog = false }
@@ -421,10 +422,12 @@ private fun LargeFileWarningBanner(lineCount: Int) {
 private fun AnnotationSubmitDialog(
     annotationCount: Int,
     annotations: List<Annotation>,
-    onSubmit: (overallNote: String) -> Unit,
+    onSubmit: (overallNote: String, editedNotes: Map<String, String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var overallNote by remember { mutableStateOf("") }
+    // Track edited notes by annotation ID
+    val editedNotes = remember(annotations) { mutableStateMapOf<String, String>() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -446,17 +449,21 @@ private fun AnnotationSubmitDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 annotations.sortedBy { it.index }.forEach { ann ->
-                    Text(
-                        text = "${ann.index + 1}. ${ann.startLine}:${ann.startCol} - ${ann.endLine}:${ann.endCol}\n   \"${ann.note}\"",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = SpacingTokens.SM.dp)
+                    val currentNote = editedNotes[ann.id] ?: ann.note
+                    OutlinedTextField(
+                        value = currentNote,
+                        onValueChange = { editedNotes[ann.id] = it },
+                        label = { Text("${ann.index + 1}. [${ann.startLine}:${ann.startCol},${ann.endLine}:${ann.endCol}]") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 1, maxLines = 3,
+                        textStyle = MaterialTheme.typography.bodySmall
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSubmit(overallNote.trim()) },
+                onClick = { onSubmit(overallNote.trim(), editedNotes.toMap()) },
                 modifier = Modifier.testTag("annotation_submit_send")
             ) { Text(stringResource(R.string.annotation_submit_send)) }
         },

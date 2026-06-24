@@ -67,15 +67,15 @@ fun FileViewerRoute(
         onDeleteAnnotation = viewModel::deleteAnnotation,
         onUpdateAnnotation = viewModel::updateAnnotation,
         onLoadMoreLines = viewModel::loadMoreLines,
-        onSubmitAnnotations = { overallNote ->
+        onSubmitAnnotations = { overallNote, editedNotes ->
             if (!isSubmitting) {
                 isSubmitting = true
                 scope.launch {
-                    val result = viewModel.submitAnnotations(overallNote)
+                    val result = viewModel.submitAnnotations(overallNote, editedNotes)
                     isSubmitting = false
                     if (result.isSuccess) {
                         snackbarHostState.showSnackbar(context.getString(R.string.annotation_submitted_toast))
-                        onSubmitted()
+                        onBack()
                     } else {
                         snackbarHostState.showSnackbar(context.getString(R.string.annotation_submit_failed))
                     }

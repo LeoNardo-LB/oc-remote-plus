@@ -177,15 +177,19 @@ class FileViewerViewModel @Inject constructor(
         saveAnnotationsToHandle(all)
     }
 
-    suspend fun submitAnnotations(overallNote: String): Result<Unit> {
+    suspend fun submitAnnotations(overallNote: String, editedNotes: Map<String, String> = emptyMap()): Result<Unit> {
         val manager = annotationManager ?: return Result.failure(IllegalStateException("No annotation manager"))
-        val anns = _uiState.value.annotations
+        // Apply any edited notes before submitting
+        editedNotes.forEach { (id, newNote) -> manager.update(id, newNote) }
+        val anns = manager.getAll()
         if (anns.isEmpty()) return Result.failure(IllegalStateException("No annotations to submit"))
         val result = submitAnnotationsUseCase(serverId, sessionId, anns, overallNote, filePath, directory)
         if (result.isSuccess) {
             manager.clear()
-            _uiState.update { it.copy(annotations = emptyList()) }
-            saveAnnotationsToHandle(emptyList())
+            annotationManager = null
+            fullContentCache = ""
+            _uiState.update { it.copy(annotations = emptyList(), content = "", isEmpty = true) }
+            savedStateHandle.remove<Any>("annotations_flat")
         }
         return result
     }

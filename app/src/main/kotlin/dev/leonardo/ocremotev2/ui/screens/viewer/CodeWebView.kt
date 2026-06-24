@@ -13,6 +13,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,6 +152,23 @@ fun CodeWebView(
     val annotateRef = remember { mutableStateOf<((String) -> Unit)?>(null) }
     annotateRef.value = onAnnotate
 
+    // Track WebView reference for cleanup on dispose
+    var webViewRef: WebView? = null
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewRef?.apply {
+                stopLoading()
+                removeJavascriptInterface("AndroidBridge")
+                loadUrl("about:blank")
+                clearHistory()
+                (parent as? android.view.ViewGroup)?.removeView(this)
+                destroy()
+            }
+            webViewRef = null
+        }
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -179,6 +197,7 @@ fun CodeWebView(
                     .replace("__ANNOTATE_LABEL__", annotateLabel)
                     .replace("__COPY_LABEL__", "Copy")
                 loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
+                webViewRef = this
             }
         },
         update = { webView ->
