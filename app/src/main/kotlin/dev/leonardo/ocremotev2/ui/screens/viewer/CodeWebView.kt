@@ -54,7 +54,8 @@ private class CodeWebViewWithAnnotate(
         val wrappedCallback = AnnotateActionCallback(
             original = callback,
             annotateLabel = annotateLabel,
-            onAnnotateClicked = {
+            onItemClick = { mode ->
+                // Capture selection BEFORE mode.finish() clears it
                 evaluateJavascript("getSelectionInfo()") { result ->
                     try {
                         val arr = JSONArray(result ?: "[\"\", -1]")
@@ -62,11 +63,18 @@ private class CodeWebViewWithAnnotate(
                         val start = arr.optInt(1, -1)
                         if (text.isNotBlank() && start >= 0) {
                             val end = start + text.length
-                            Log.d(TAG, "Annotate: '${text.take(50)}...' at [$start, $end]")
-                            handler.post { onAnnotate(text, start, end) }
+                            Log.d(TAG, "Annotate OK: '${text.take(50)}...' [$start-$end]")
+                            handler.post {
+                                onAnnotate(text, start, end)
+                                mode.finish()
+                            }
+                        } else {
+                            Log.w(TAG, "Annotate skip: text='${text.take(30)}' start=$start")
+                            handler.post { mode.finish() }
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to parse selection info", e)
+                        Log.e(TAG, "Annotate parse failed: ${result?.take(80)}", e)
+                        handler.post { mode.finish() }
                     }
                 }
             }
@@ -81,7 +89,7 @@ private class CodeWebViewWithAnnotate(
 private class AnnotateActionCallback(
     private val original: ActionMode.Callback,
     private val annotateLabel: String,
-    private val onAnnotateClicked: () -> Unit,
+    private val onItemClick: (ActionMode) -> Unit,
 ) : ActionMode.Callback {
 
     private val annotateItemId = 0x1001
@@ -97,8 +105,7 @@ private class AnnotateActionCallback(
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         if (item.itemId == annotateItemId) {
-            onAnnotateClicked()
-            mode.finish()
+            onItemClick(mode)  // Don't finish here — let callback do it after JS returns
             return true
         }
         return original.onActionItemClicked(mode, item)
