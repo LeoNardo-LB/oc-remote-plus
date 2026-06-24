@@ -25,23 +25,10 @@
         pre { margin: 0; white-space: pre; }
         pre code { font-family: inherit !important; padding: 0 !important; background: transparent !important; }
         .hljs { background: transparent !important; }
+        /* Annotation highlight */
         .annotated {
             background-color: rgba(255, 235, 59, 0.2);
             text-decoration: underline wavy #ffeb3b;
-        }
-        /* Floating Annotate button */
-        #annotate-btn {
-            display: none;
-            position: fixed;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 13px;
-            z-index: 1000;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
     </style>
 </head>
@@ -52,7 +39,6 @@
             <pre><code id="code" class="hljs"></code></pre>
         </div>
     </div>
-    <button id="annotate-btn">__ANNOTATE_LABEL__</button>
     <script>
         var _rawCode = '';
         var _currentSelection = '';
@@ -78,60 +64,16 @@
         }
 
         function setLabels(annotateLabel) {
-            document.getElementById('annotate-btn').textContent = annotateLabel;
+            // Reserved for future use
         }
 
-        // Track text selection — show floating Annotate button
-        document.addEventListener('selectionchange', function() {
+        function getSelectionInfo() {
             var sel = window.getSelection();
-            _currentSelection = sel.toString();
-            var btn = document.getElementById('annotate-btn');
-            if (_currentSelection.trim().length > 0) {
-                // Position button above the selection
-                try {
-                    var rect = sel.getRangeAt(0).getBoundingClientRect();
-                    btn.style.display = 'block';
-                    btn.style.left = (rect.left + rect.width/2 - 50) + 'px';
-                    var top = rect.top - 44;
-                    btn.style.top = (top < 8 ? rect.bottom + 8 : top) + 'px';
-                } catch(e) {
-                    btn.style.display = 'block';
-                    btn.style.left = '50%';
-                    btn.style.top = '20%';
-                }
-            } else {
-                btn.style.display = 'none';
-            }
-        });
-
-        // Annotate button click — capture selection synchronously in JS
-        document.getElementById('annotate-btn').addEventListener('click', function() {
-            var text = _currentSelection.trim();
-            if (text.length === 0) return;
-            // Find offset in original code
+            var text = sel.toString();
+            if (!text) return JSON.stringify(['', -1]);
             var start = _rawCode.indexOf(text);
-            if (start < 0) start = 0;
-            // Hide button
-            this.style.display = 'none';
-            // Clear selection
-            window.getSelection().removeAllRanges();
-            // Call Android bridge directly — synchronous, no async round-trip
-            if (window.AndroidBridge) {
-                AndroidBridge.onSelection(text, start);
-            }
-        });
-
-        // Hide button when tapping elsewhere
-        document.addEventListener('touchstart', function(e) {
-            if (!e.target.closest('#annotate-btn')) {
-                // Delay to allow selectionchange to fire first
-                setTimeout(function() {
-                    if (_currentSelection.trim().length === 0) {
-                        document.getElementById('annotate-btn').style.display = 'none';
-                    }
-                }, 300);
-            }
-        });
+            return JSON.stringify([text, start]);
+        }
 
         function applyAnnotations(json) {
             var anns;
