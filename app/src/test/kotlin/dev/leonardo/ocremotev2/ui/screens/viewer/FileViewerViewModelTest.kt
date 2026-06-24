@@ -450,7 +450,7 @@ class FileViewerViewModelTest {
         assert(toolSnapshotCache.get("part-1") == null) { "cache should be cleared on cleanup" }
     }
 
-    // 17. TOOL_SNAPSHOT_DIFF shows final edited content in SOURCE mode (not diff)
+    // 17. TOOL_SNAPSHOT_DIFF fetches full file content from server (not just edited fragment)
     @Test
     fun `TOOL_SNAPSHOT_DIFF shows final edited content in SOURCE mode`() = runTest {
         toolSnapshotCache.clear()
@@ -459,6 +459,12 @@ class FileViewerViewModelTest {
                 "p1" to ToolSnapshotCache.Snapshot("app/X.kt", null, "line1\nline2\n", "line1-mod\nline2\n", "edit"),
                 "p2" to ToolSnapshotCache.Snapshot("app/X.kt", null, "line1-mod\nline2\n", "line1-mod\nline2-new\n", "edit")
             )
+        )
+
+        // Edit tools now fetch the full file from server (snapshot only has the fragment)
+        val fullFile = "line1-mod\nline2-new\nline3\nline4\n"
+        coEvery { getFileContent(serverId, directory, "app/X.kt") } returns Result.success(
+            FileContent(path = "app/X.kt", type = ContentType.TEXT, content = fullFile)
         )
 
         val vm = FileViewerViewModel(
@@ -481,8 +487,9 @@ class FileViewerViewModelTest {
         assert(vm.uiState.value.toolSnapshotAfter == "line1-mod\nline2-new\n") {
             "toolSnapshotAfter should be last part's after"
         }
-        assert(vm.uiState.value.content.contains("line1-mod")) { "content should show edited result" }
-        assert(vm.uiState.value.content.contains("line2-new")) { "content should show edited result" }
+        // Content should be the full file from server (includes lines beyond the edited fragment)
+        assert(vm.uiState.value.content.contains("line3")) { "content should show full file (line3)" }
+        assert(vm.uiState.value.content.contains("line4")) { "content should show full file (line4)" }
     }
 
     // ===== Phase 3: Annotation tests =====

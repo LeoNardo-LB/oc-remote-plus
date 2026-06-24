@@ -10,8 +10,11 @@ import java.util.UUID
  * Deleting a middle annotation re-numbers remaining to consecutive 0..N-1.
  *
  * @param content The full file content for computing line:col from char offsets.
+ *                Line endings are normalized to \n to match the WebView's DOM.
  */
-class AnnotationManager(private val content: String) {
+class AnnotationManager(content: String) {
+
+    private val content = content.replace("\r\n", "\n").replace("\r", "\n")
 
     private val annotations = mutableListOf<Annotation>()
 

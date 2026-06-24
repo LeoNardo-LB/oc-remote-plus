@@ -273,7 +273,47 @@ class FileViewerViewModel @Inject constructor(
         }
         val first = snapshots.first()
         val content = first.content ?: first.after ?: ""
-        // Phase 4 pagination: set up line counts so CodeSourceView renders correctly
+        setupToolSnapshotSource(content, snapshots)
+    }
+
+    private fun loadToolSnapshotDiff() {
+        if (toolPartIds.isEmpty()) {
+            _uiState.update { it.copy(isLoading = false, error = R.string.fileviewer_error_tool_snapshot_missing) }
+            return
+        }
+        val snapshots = toolSnapshotCache.getAll(toolPartIds)
+        if (snapshots.isEmpty()) {
+            _uiState.update { it.copy(isLoading = false, error = R.string.fileviewer_error_tool_snapshot_missing) }
+            return
+        }
+        val lastSnap = snapshots.last()
+        // Edit tools only cache the newString fragment — NOT the full file.
+        // Fetch the complete file content from the server so the viewer shows
+        // the entire file (not just the edited snippet).
+        viewModelScope.launch {
+            getFileContent(serverId, directory, filePath)
+                .onSuccess { c ->
+                    if (c.type == ContentType.BINARY) {
+                        _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }
+                    } else {
+                        setupToolSnapshotSource(c.content, snapshots)
+                    }
+                }
+                .onFailure {
+                    // Fallback: use the edited fragment (incomplete but better than blank)
+                    val fallback = lastSnap.after ?: lastSnap.content ?: lastSnap.before ?: ""
+                    setupToolSnapshotSource(fallback, snapshots)
+                }
+        }
+    }
+
+    /**
+     * Shared setup for TOOL_SNAPSHOT and TOOL_SNAPSHOT_DIFF: populates UI state
+     * with paginated source content + annotation manager + tool metadata.
+     */
+    private fun setupToolSnapshotSource(content: String, snapshots: List<dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache.Snapshot>) {
+        val first = snapshots.first()
+        val last = snapshots.last()
         fullContentCache = content
         val totalLines = if (content.isEmpty()) 0
                          else content.count { it == '\n' } + if (content.endsWith('\n')) 0 else 1
@@ -291,47 +331,7 @@ class FileViewerViewModel @Inject constructor(
                 isToolSnapshot = true,
                 toolSnapshotContent = first.content,
                 toolSnapshotBefore = first.before,
-                toolSnapshotAfter = first.after,
-                totalLineCount = totalLines,
-                visibleLineCount = initialVisible,
-                isFullyLoaded = initialVisible >= totalLines,
-                annotations = annotationManager?.getAll() ?: emptyList()
-            )
-        }
-    }
-
-    private fun loadToolSnapshotDiff() {
-        if (toolPartIds.isEmpty()) {
-            _uiState.update { it.copy(isLoading = false, error = R.string.fileviewer_error_tool_snapshot_missing) }
-            return
-        }
-        val snapshots = toolSnapshotCache.getAll(toolPartIds)
-        if (snapshots.isEmpty()) {
-            _uiState.update { it.copy(isLoading = false, error = R.string.fileviewer_error_tool_snapshot_missing) }
-            return
-        }
-        // Show the final edited content in SOURCE mode instead of a diff view.
-        // Tool snapshot before/after may be incomplete, causing DiffView to render empty (black screen).
-        // Fallback chain: after → content → before (edit-without-after edge case).
-        val lastSnap = snapshots.last()
-        val cumulativeAfter = lastSnap.after ?: lastSnap.content ?: lastSnap.before ?: ""
-        fullContentCache = cumulativeAfter
-        val totalLines = if (cumulativeAfter.isEmpty()) 0
-                         else cumulativeAfter.count { it == '\n' } + if (cumulativeAfter.endsWith('\n')) 0 else 1
-        val initialVisible = minOf(totalLines, INITIAL_PAGE_SIZE)
-        val visible = takeFirstLines(cumulativeAfter, initialVisible)
-        annotationManager = AnnotationManager(cumulativeAfter)
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                mode = FileViewerMode.SOURCE,
-                content = visible,
-                isEmpty = cumulativeAfter.isBlank(),
-                isMarkdown = isMarkdownFile(filePath),
-                renderMode = FileViewerRenderMode.SOURCE,
-                isToolSnapshot = true,
-                toolSnapshotBefore = snapshots.first().before,
-                toolSnapshotAfter = cumulativeAfter,
+                toolSnapshotAfter = last.after ?: last.content,
                 totalLineCount = totalLines,
                 visibleLineCount = initialVisible,
                 isFullyLoaded = initialVisible >= totalLines,

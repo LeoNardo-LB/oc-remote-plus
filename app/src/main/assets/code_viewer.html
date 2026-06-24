@@ -44,16 +44,18 @@
         var _currentSelection = '';
 
         function setCode(code, lang) {
-            _rawCode = code;
+            // Normalize line endings so _rawCode matches DOM text exactly
+            // (browser textContent converts \r\n → \n automatically)
+            _rawCode = code.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             var codeEl = document.getElementById('code');
-            codeEl.textContent = code;
+            codeEl.textContent = _rawCode;
             if (lang && hljs.getLanguage(lang)) {
                 codeEl.className = 'hljs language-' + lang;
             } else {
                 codeEl.className = 'hljs';
             }
             hljs.highlightElement(codeEl);
-            var lines = code.split('\n');
+            var lines = _rawCode.split('\n');
             document.getElementById('gutter').textContent = lines.map(function(_, i) { return (i + 1); }).join('\n');
         }
 
@@ -70,9 +72,37 @@
         function getSelectionInfo() {
             var sel = window.getSelection();
             var text = sel.toString();
-            if (!text) return ['', -1];
-            var start = _rawCode.indexOf(text);
-            return [text, start];
+            if (!text || sel.rangeCount === 0) return ['', -1];
+
+            // Use Range API to compute the actual char offset of the selection
+            // start within the code element's text content. This is accurate even
+            // when the selected text appears multiple times in the file.
+            var range = sel.getRangeAt(0);
+            var codeEl = document.getElementById('code');
+            var startOffset = _getCharOffset(codeEl, range.startContainer, range.startOffset);
+
+            // Fallback to indexOf if Range traversal fails (edge cases)
+            if (startOffset < 0) startOffset = _rawCode.indexOf(text);
+
+            return [text, startOffset];
+        }
+
+        /**
+         * Walk text nodes under root, accumulating character counts until
+         * we reach targetNode. Returns the absolute char offset of
+         * targetOffset within targetNode, or -1 if not found.
+         */
+        function _getCharOffset(root, targetNode, targetOffset) {
+            var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+            var offset = 0;
+            while (walker.nextNode()) {
+                var node = walker.currentNode;
+                if (node === targetNode) {
+                    return offset + targetOffset;
+                }
+                offset += node.textContent.length;
+            }
+            return -1;
         }
 
         function applyAnnotations(json) {
