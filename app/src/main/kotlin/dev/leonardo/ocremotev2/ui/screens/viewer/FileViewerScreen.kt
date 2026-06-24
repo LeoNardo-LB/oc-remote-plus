@@ -239,9 +239,13 @@ private fun FileViewerTopBar(
     TopAppBar(
         title = {
             Column {
+                // Extract filename handling both / and \ path separators
+                val fileName = remember(uiState.filePath) {
+                    uiState.filePath.substringAfterLast('/').substringAfterLast('\\').ifBlank { uiState.filePath }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = uiState.filePath.substringAfterLast('/').ifBlank { uiState.filePath },
+                        text = fileName,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
