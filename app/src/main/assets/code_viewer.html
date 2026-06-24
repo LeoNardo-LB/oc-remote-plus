@@ -70,9 +70,9 @@
         function getSelectionInfo() {
             var sel = window.getSelection();
             var text = sel.toString();
-            if (!text) return JSON.stringify(['', -1]);
+            if (!text) return ['', -1];
             var start = _rawCode.indexOf(text);
-            return JSON.stringify([text, start]);
+            return [text, start];
         }
 
         function applyAnnotations(json) {

@@ -99,10 +99,20 @@ private class AnnotateWebView(
                 // Match by TITLE — system may reassign itemIds
                 if (item.title?.toString() == annotateLabel) {
                     DebugLogger.log(TAG, "  → Annotate matched! Getting selection via JS...")
-                    // Synchronously evaluate JS to get selection
                     evaluateJavascript("getSelectionInfo()") { result ->
                         try {
-                            val arr = org.json.JSONArray(result ?: "[\"\", -1]")
+                            // evaluateJavascript returns JSON representation of the JS value.
+                            // getSelectionInfo() returns an array → result is ["text", start]
+                            // Use JSONTokener to handle edge cases gracefully
+                            val raw = result?.trim() ?: "null"
+                            val tokener = org.json.JSONTokener(raw)
+                            val parsed = tokener.nextValue()
+                            // If JS returned a string (double-encoded), unwrap one layer
+                            val arr = when (parsed) {
+                                is org.json.JSONArray -> parsed
+                                is String -> org.json.JSONArray(parsed)
+                                else -> throw org.json.JSONException("unexpected: ${parsed::class}")
+                            }
                             val text = arr.optString(0, "")
                             val start = arr.optInt(1, -1)
                             DebugLogger.log(TAG, "  ← JS selection: text='${text.take(40)}' start=$start len=${text.length}")
@@ -116,7 +126,7 @@ private class AnnotateWebView(
                                 Handler(Looper.getMainLooper()).post { mode.finish() }
                             }
                         } catch (e: Exception) {
-                            DebugLogger.log(TAG, "  ✗ Parse failed: ${result?.take(60)}")
+                            DebugLogger.log(TAG, "  ✗ Parse failed: ${result?.take(60)} — ${e.message}")
                             Handler(Looper.getMainLooper()).post { mode.finish() }
                         }
                     }
