@@ -303,7 +303,9 @@ fun ChatScreen(
 
     // True while a scroll-position restoration is in progress. Suppresses the messageCount
     // auto-scroll effect so it doesn't fight the restore (both target the same listState).
-    var isRestoringScroll by remember { mutableStateOf(false) }
+    // Initialize to true when there's a pending restore — prevents messageCount effect
+    // from racing ahead of the restore effect on composition rebuild.
+    var isRestoringScroll by remember { mutableStateOf(viewModel.scrollRestoreVersion > 0) }
 
     // Force scroll trigger — incremented by user actions to force-scroll to bottom
     // regardless of autoScrollEnabled. Each tick forces a snapToBottom().
@@ -319,6 +321,7 @@ fun ChatScreen(
 
     // Disable auto-scroll when user scrolls up; re-enable at bottom
     LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
+        if (isRestoringScroll) return@LaunchedEffect
         if (listState.isScrollInProgress) {
             autoScrollEnabled = false
         } else if (isAtBottom) {
@@ -347,7 +350,7 @@ fun ChatScreen(
     // so the user immediately sees the newly rendered card.
     val pendingCount = interaction.pendingQuestions.size + interaction.pendingPermissions.size
     LaunchedEffect(pendingCount) {
-        if (pendingCount > 0) {
+        if (pendingCount > 0 && !isRestoringScroll) {
             // Wait until the list has items to scroll to.
             snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
             listState.snapToBottom()

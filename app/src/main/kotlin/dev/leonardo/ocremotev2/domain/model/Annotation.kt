@@ -18,7 +18,11 @@ data class Annotation(
     val selectedText: String, // Originally selected snippet
     val note: String,         // User's modification note
     val createdAt: Long       // Epoch millis
-)
+) {
+    /** Unified position label: "startLine:startCol-endLine:endCol" */
+    val positionLabel: String
+        get() = "$startLine:$startCol-$endLine:$endCol"
+}
 
 /** 1-based line and column position. */
 data class LineCol(val line: Int, val col: Int)

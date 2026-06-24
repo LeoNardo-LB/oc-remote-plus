@@ -490,7 +490,7 @@ private fun AnnotationSubmitDialog(
                     OutlinedTextField(
                         value = currentNote,
                         onValueChange = { editedNotes[ann.id] = it },
-                        label = { Text("${ann.index + 1}. [${ann.startLine}:${ann.startCol},${ann.endLine}:${ann.endCol}]") },
+                        label = { Text("${ann.index + 1}. ${ann.positionLabel}") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 1, maxLines = 3,
                         textStyle = MaterialTheme.typography.bodySmall

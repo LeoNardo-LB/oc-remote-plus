@@ -43,7 +43,7 @@ object AnnotationPromptBuilder {
         sb.append("用户的具体备注如下：\n")
         annotations.sortedBy { it.index }.forEach { ann ->
             sb.append("${ann.index + 1}. ")
-              .append("${ann.startLine}:${ann.startCol}-${ann.endLine}:${ann.endCol} ")
+              .append("${ann.positionLabel} ")
               .append(ann.note).append("\n")
         }
         return sb.toString().trimEnd()

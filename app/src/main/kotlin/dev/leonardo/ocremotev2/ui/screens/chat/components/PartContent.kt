@@ -1,6 +1,9 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.chat.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,20 +12,28 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import androidx.compose.foundation.text.selection.SelectionContainer
 import dev.leonardo.ocremotev2.ui.screens.chat.markdown.MarkdownContent
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCallCard
@@ -164,11 +175,7 @@ internal fun PartContent(
             )
         }
         is Part.Question -> {
-            Text(
-                text = stringResource(R.string.chat_question_inline, part.question),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.tertiary
-            )
+            CollapsibleQuestionPart(question = part.question)
         }
         is Part.Abort -> {
             Text(
@@ -218,6 +225,66 @@ internal fun PartContent(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Collapsible card for historical Part.Question — shows [?] "提问" + question summary,
+ * tap to expand full question text.
+ */
+@Composable
+private fun CollapsibleQuestionPart(question: String) {
+    var expanded by remember { mutableStateOf(false) }
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    androidx.compose.material3.Surface(
+        shape = dev.leonardo.ocremotev2.ui.theme.ShapeTokens.smallMedium,
+        color = containerColor,
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(4.dp).fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    Icons.Default.HelpOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = accentColor
+                )
+                Text(
+                    text = "提问",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = question,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = contentColor.copy(alpha = 0.35f)
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = question,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor,
+                    modifier = Modifier.padding(start = 20.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)
+                )
             }
         }
     }

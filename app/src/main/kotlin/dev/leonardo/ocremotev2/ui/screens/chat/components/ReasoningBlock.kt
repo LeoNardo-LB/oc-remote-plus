@@ -44,11 +44,9 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.leonardo.ocremotev2.R
-import dev.leonardo.ocremotev2.ui.components.AmoledSurface
 import dev.leonardo.ocremotev2.ui.screens.chat.markdown.MarkdownContent
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.leonardo.ocremotev2.ui.screens.chat.util.halfScreenHeight
-import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import dev.leonardo.ocremotev2.ui.screens.chat.util.performHaptic
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
@@ -59,7 +57,6 @@ import kotlinx.coroutines.delay
 internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleExpand: () -> Unit = {}, durationMs: Long? = null, isStreaming: Boolean = false, startTimeMs: Long? = null) {
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
-    val isAmoled = isAmoledTheme()
     val expanded = isExpanded
 
     // Live elapsed timer for streaming reasoning
@@ -79,6 +76,7 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
     }
 
     val accentColor = MaterialTheme.colorScheme.primary.copy(alpha = AlphaTokens.MEDIUM)
+    val containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = AlphaTokens.MEDIUM)
     val textColor = MaterialTheme.colorScheme.onSurface
 
     // Pulse animation for the thinking dot (runs only while durationMs == null = still thinking)
@@ -100,30 +98,33 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
         else -> stringResource(R.string.chat_status_thinking)
     }
 
-    // Unified container: same AmoledSurface + shape as ToolCardScaffold
-    AmoledSurface(
-        isAmoledDark = isAmoled,
-        shape = ShapeTokens.smallMedium,
-        normalTonalElevation = 1.dp,
+    Surface(
+        shape = ShapeTokens.none,
+        color = containerColor,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() }
-                .padding(4.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Accent left bar
+            Box(
+                modifier = Modifier
+                    .width(2.5.dp)
+                    .fillMaxHeight()
+                    .background(accentColor)
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { performHaptic(hapticView, hapticOn); onToggleExpand() }
+                    .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Animated pulse dot — wrapped in 16.dp box to match ToolCardScaffold icon height
-                    Box(
-                        modifier = Modifier.size(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Animated pulse dot (shows only while thinking)
                         Box(
                             modifier = Modifier
                                 .size(5.dp)
@@ -135,58 +136,58 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
                                     )
                                 }
                         )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = headerText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = textColor.copy(alpha = AlphaTokens.MUTED)
+                        )
                     }
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text(
-                        text = headerText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = textColor.copy(alpha = AlphaTokens.MUTED)
+
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded)
+                            stringResource(R.string.chat_collapse)
+                        else
+                            stringResource(R.string.chat_expand),
+                        modifier = Modifier.size(18.dp),
+                        tint = textColor.copy(alpha = AlphaTokens.FAINT)
                     )
                 }
 
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded)
-                        stringResource(R.string.chat_collapse)
-                    else
-                        stringResource(R.string.chat_expand),
-                    modifier = Modifier.size(16.dp),
-                    tint = textColor.copy(alpha = AlphaTokens.FAINT)
-                )
-            }
-
-            // Streaming placeholder when text is empty
-            if (isStreaming && text.isBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = accentColor.copy(alpha = AlphaTokens.MUTED)
-                )
-            }
-
-            // Expandable content
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Column {
+                // Streaming placeholder when text is empty
+                if (isStreaming && text.isBlank()) {
                     Spacer(modifier = Modifier.height(6.dp))
-                    val halfScreenHeight = halfScreenHeight()
-                    val reasoningScrollState = rememberScrollState()
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = halfScreenHeight)
-                            .verticalScroll(reasoningScrollState)
-                    ) {
-                    MarkdownContent(
-                        markdown = text,
-                        textColor = textColor.copy(alpha = AlphaTokens.MUTED),
-                        isUser = false,
-                        customFontSize = "small"
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = accentColor.copy(alpha = AlphaTokens.MUTED)
                     )
+                }
+
+                // Expandable content
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val halfScreenHeight = halfScreenHeight()
+                        val reasoningScrollState = rememberScrollState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = halfScreenHeight)
+                                .verticalScroll(reasoningScrollState)
+                        ) {
+                        MarkdownContent(
+                            markdown = text,
+                            textColor = textColor.copy(alpha = AlphaTokens.MUTED),
+                            isUser = false,
+                            customFontSize = "small"
+                        )
+                        }
                     }
                 }
             }
