@@ -1,5 +1,11 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.chat.dialog
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.toggleable
@@ -16,9 +22,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -29,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -75,6 +86,8 @@ internal fun QuestionCard(
 
     // Prevent multiple submissions — state is scoped per question via remember(key)
     var submitted by remember(question.id) { mutableStateOf(false) }
+    // Collapsed by default — tap header to expand options
+    var expanded by remember(question.id) { mutableStateOf(false) }
 
     // Track answers per question
     val answersPerQuestion = remember {
@@ -97,10 +110,17 @@ internal fun QuestionCard(
             modifier = Modifier.padding(SpacingTokens.MD.dp),
             verticalArrangement = Arrangement.spacedBy(SpacingTokens.SM.dp)
         ) {
-            // Header row — matches PermissionCard style
+            // Header row — clickable to expand/collapse, shows question summary
             Row(
                 horizontalArrangement = Arrangement.spacedBy(SpacingTokens.SM.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(ShapeTokens.small)
+                    .clickable {
+                        performHaptic(hapticView, hapticOn)
+                        expanded = !expanded
+                    }
             ) {
                 Icon(
                     @Suppress("DEPRECATION")
@@ -114,15 +134,35 @@ internal fun QuestionCard(
                     style = MaterialTheme.typography.titleSmall,
                     color = contentColor
                 )
-                if (positionLabel != null) {
-                    Spacer(Modifier.weight(1f))
+                // Show first question text as summary (truncated)
+                val summary = question.questions.firstOrNull()?.question?.takeIf { it.isNotBlank() }
+                if (summary != null) {
                     Text(
-                        text = positionLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contentColor.copy(alpha = AlphaTokens.MUTED)
+                        text = summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = contentColor.copy(alpha = AlphaTokens.MUTED),
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) stringResource(R.string.chat_collapse) else stringResource(R.string.chat_expand),
+                    modifier = Modifier.size(18.dp),
+                    tint = contentColor.copy(alpha = AlphaTokens.FAINT)
+                )
             }
+
+            // Expandable content — tap header to toggle
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(SpacingTokens.SM.dp)) {
             // Sub-agent source label (shown when question comes from a child session)
             if (question.sourceSessionTitle != null) {
                 Text(
@@ -393,23 +433,35 @@ internal fun QuestionCard(
                 }
             }
 
-            // Bottom actions
-            DialogButtons(
-                buttons = buildList {
-                    add(Triple(stringResource(R.string.chat_dismiss), DialogButtonRole.Secondary) {
-                        if (!submitted) { performHaptic(hapticView, hapticOn); submitted = true; onReject() }
-                    })
+                // Bottom actions — single row: dismiss (left) + submit (right)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { if (!submitted) { performHaptic(hapticView, hapticOn); submitted = true; onReject() } },
+                        enabled = !submitted
+                    ) {
+                        Text(stringResource(R.string.chat_dismiss))
+                    }
                     if (!isSingle) {
-                        add(Triple(stringResource(R.string.question_submit), DialogButtonRole.Primary) {
-                            if (!submitted && answersPerQuestion.any { it.isNotEmpty() }) {
-                                performHaptic(hapticView, hapticOn)
-                                submitted = true
-                                onSubmit(answersPerQuestion.map { it.toList() })
-                            }
-                        })
+                        Button(
+                            onClick = {
+                                if (!submitted && answersPerQuestion.any { it.isNotEmpty() }) {
+                                    performHaptic(hapticView, hapticOn)
+                                    submitted = true
+                                    onSubmit(answersPerQuestion.map { it.toList() })
+                                }
+                            },
+                            enabled = !submitted && answersPerQuestion.any { it.isNotEmpty() }
+                        ) {
+                            Text(stringResource(R.string.question_submit))
+                        }
                     }
                 }
-            )
+                } // close inner Column
+            } // close AnimatedVisibility
         }
     }
 }

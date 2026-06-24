@@ -164,7 +164,9 @@ internal fun ToolCardScaffold(
                     ) {
                         // 1. Left extras (diff changes indicator)
                         rightSideExtras?.invoke(this)
-                        // 2. Copy button
+                        // 2. Trailing extras (open-file button)
+                        trailingExtras?.invoke(this)
+                        // 3. Copy button
                         if (copyText.isNotBlank()) {
                             IconButton(
                                 onClick = {
@@ -181,8 +183,6 @@ internal fun ToolCardScaffold(
                                 )
                             }
                         }
-                        // 3. Trailing extras (open-file button)
-                        trailingExtras?.invoke(this)
                         // 4. Expand/collapse icon (rightmost)
                         if (showExpandIcon) {
                             Icon(

@@ -144,11 +144,24 @@
                     span.className = 'annotated';
                     span.title = note;
                     span.dataset.id = annId;
+                    console.log('[Annotate] span created, id=' + annId);
+                    // Use touchend — more reliable than click in Android WebView
+                    // (text selection can swallow click events)
+                    span.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('[Annotate] touchend fired, id=' + annId);
+                        try {
+                            AndroidBridge.onAnnotationClick(annId);
+                            console.log('[Annotate] bridge called OK');
+                        } catch(err) {
+                            console.log('[Annotate] bridge ERROR: ' + err.message);
+                        }
+                    });
                     span.addEventListener('click', function(e) {
                         e.stopPropagation();
-                        if (window.AndroidBridge && AndroidBridge.onAnnotationClick) {
-                            AndroidBridge.onAnnotationClick(annId);
-                        }
+                        console.log('[Annotate] click fired, id=' + annId);
+                        try { AndroidBridge.onAnnotationClick(annId); } catch(err) {}
                     });
                     var before = document.createTextNode(node.textContent.substring(0, localStart));
                     var annotated = document.createTextNode(node.textContent.substring(localStart, localEnd));

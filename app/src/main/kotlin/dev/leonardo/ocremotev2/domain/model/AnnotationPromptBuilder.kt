@@ -11,9 +11,9 @@
  *   <overallNote>
  *
  *   ## 具体备注
- *   注格式为[<行号1:字符索引>,<行号2:字符索引>] <具体备注内容>
+ *   注格式为<行号1:字符索引>-<行号2:字符索引> <具体备注内容>
  *   用户的具体备注如下：
- *   1. [x1:y1,x2:y2] <note>
+ *   1. x1:y1-x2:y2 <note>
  *   2. ...
  */
 object AnnotationPromptBuilder {
@@ -39,11 +39,11 @@ object AnnotationPromptBuilder {
         }
 
         sb.append("## 具体备注\n")
-        sb.append("注格式为[<行号1:字符索引>,<行号2:字符索引>] <具体备注内容>\n\n")
+        sb.append("注格式为<行号1:字符索引>-<行号2:字符索引> <具体备注内容>\n\n")
         sb.append("用户的具体备注如下：\n")
         annotations.sortedBy { it.index }.forEach { ann ->
             sb.append("${ann.index + 1}. ")
-              .append("[${ann.startLine}:${ann.startCol},${ann.endLine}:${ann.endCol}] ")
+              .append("${ann.startLine}:${ann.startCol}-${ann.endLine}:${ann.endCol} ")
               .append(ann.note).append("\n")
         }
         return sb.toString().trimEnd()

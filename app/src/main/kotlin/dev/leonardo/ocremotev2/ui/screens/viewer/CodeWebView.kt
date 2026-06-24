@@ -227,6 +227,14 @@ fun CodeWebView(
                 setBackgroundColor(bgColorArgb)
                 addJavascriptInterface(bridge, "AndroidBridge")
 
+                // Capture JS console.log → DebugLogger for annotation click diagnosis
+                webChromeClient = object : android.webkit.WebChromeClient() {
+                    override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
+                        DebugLogger.log(TAG, "JS: ${consoleMessage.message()}")
+                        return true
+                    }
+                }
+
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         view?.evaluateJavascript(
