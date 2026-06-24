@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,8 +16,10 @@ import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -231,8 +234,12 @@ internal fun PartContent(
 }
 
 /**
- * Collapsible card for historical Part.Question — shows [?] "提问" + question summary,
- * tap to expand full question text.
+ * Collapsible card for historical Part.Question.
+ * Header: [?] "提问" + question summary.
+ * Expanded: full question text + user's selected answer (if available).
+ *
+ * The question field from opencode may be plain text or contain structured
+ * JSON with question + answers. This composable handles both cases.
  */
 @Composable
 private fun CollapsibleQuestionPart(question: String) {
@@ -240,6 +247,11 @@ private fun CollapsibleQuestionPart(question: String) {
     val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val contentColor = MaterialTheme.colorScheme.onSurfaceVariant
     val accentColor = MaterialTheme.colorScheme.primary
+
+    // Parse question: plain text or embedded JSON with answer info
+    val parsed = remember(question) {
+        parseQuestionContent(question)
+    }
 
     androidx.compose.material3.Surface(
         shape = dev.leonardo.ocremotev2.ui.theme.ShapeTokens.smallMedium,
@@ -264,7 +276,7 @@ private fun CollapsibleQuestionPart(question: String) {
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
-                    text = question,
+                    text = parsed.displayText,
                     style = MaterialTheme.typography.bodySmall,
                     color = contentColor,
                     maxLines = 1,
@@ -275,17 +287,90 @@ private fun CollapsibleQuestionPart(question: String) {
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = contentColor.copy(alpha = 0.35f)
+                    tint = contentColor.copy(alpha = AlphaTokens.FAINT)
                 )
             }
             AnimatedVisibility(visible = expanded) {
-                Text(
-                    text = question,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor,
-                    modifier = Modifier.padding(start = 20.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)
-                )
+                Column(modifier = Modifier.padding(start = 20.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)) {
+                    Text(
+                        text = parsed.displayText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = contentColor
+                    )
+                    // Show user's answer if available
+                    parsed.answers.forEach { answer ->
+                        Spacer(Modifier.height(4.dp))
+                        Surface(
+                            color = accentColor.copy(alpha = AlphaTokens.SELECTED),
+                            shape = androidx.compose.material3.MaterialTheme.shapes.small,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.RadioButtonChecked,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = accentColor
+                                )
+                                Text(
+                                    text = answer,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = accentColor
+                                )
+                            }
+                        }
+                    }
+                    // Show raw content if JSON parse found extra fields
+                    if (parsed.rawExtra.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = parsed.rawExtra,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = contentColor.copy(alpha = AlphaTokens.MUTED)
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+/** Result of parsing a Part.Question question field. */
+private data class ParsedQuestion(
+    val displayText: String,
+    val answers: List<String>,
+    val rawExtra: String
+)
+
+/** Parse question field — handles plain text and embedded JSON. */
+private fun parseQuestionContent(raw: String): ParsedQuestion {
+    val trimmed = raw.trim()
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+        return ParsedQuestion(displayText = raw, answers = emptyList(), rawExtra = "")
+    }
+    return try {
+        val json = org.json.JSONObject(trimmed)
+        val q = json.optString("question", raw)
+        val answers = mutableListOf<String>()
+        // Try "answer" (single string)
+        json.optString("answer", "").takeIf { it.isNotBlank() }?.let { answers.add(it) }
+        // Try "answers" (array of strings)
+        json.optJSONArray("answers")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val item = arr.get(i)
+                if (item is String) answers.add(item)
+                else if (item is org.json.JSONArray) {
+                    for (j in 0 until item.length()) answers.add(item.getString(j))
+                }
+            }
+        }
+        ParsedQuestion(displayText = q, answers = answers, rawExtra = "")
+    } catch (e: Exception) {
+        // Not valid JSON — show as plain text
+        ParsedQuestion(displayText = raw, answers = emptyList(), rawExtra = "")
     }
 }
