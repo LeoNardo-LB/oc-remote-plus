@@ -7,37 +7,30 @@
     <script src="highlight/highlight.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body {
-            background: var(--bg-color, #1e1e1e);
-        }
+        html, body { background: var(--bg-color, #1e1e1e); }
         body {
             font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.5;
-            -webkit-user-select: text;
-            user-select: text;
-            overflow-x: auto;
-            padding: 8px;
+            font-size: 13px; line-height: 1.5;
+            -webkit-user-select: text; user-select: text;
+            overflow-x: auto; padding: 8px;
             color: var(--text-color, #e0e0e0);
         }
         .container { display: flex; }
         .gutter {
-            text-align: right;
-            padding-right: 12px;
-            color: #6b7280;
-            user-select: none;
-            -webkit-user-select: none;
-            white-space: pre;
-            flex-shrink: 0;
+            text-align: right; padding-right: 12px; color: #6b7280;
+            user-select: none; -webkit-user-select: none;
+            white-space: pre; flex-shrink: 0;
         }
         .code-area { flex: 1; overflow-x: auto; }
         pre { margin: 0; white-space: pre; }
-        pre code {
-            font-family: inherit !important;
-            padding: 0 !important;
-            background: transparent !important;
-        }
+        pre code { font-family: inherit !important; padding: 0 !important; background: transparent !important; }
         .hljs { background: transparent !important; }
+        /* Annotation highlight — yellow wavy underline */
+        .annotated {
+            background-color: rgba(255, 235, 59, 0.25);
+            text-decoration: underline wavy #ffeb3b;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -48,7 +41,10 @@
         </div>
     </div>
     <script>
+        var _rawCode = '';
+
         function setCode(code, lang) {
+            _rawCode = code;
             var codeEl = document.getElementById('code');
             codeEl.textContent = code;
             if (lang && hljs.getLanguage(lang)) {
@@ -58,14 +54,98 @@
             }
             hljs.highlightElement(codeEl);
             var lines = code.split('\n');
-            var gutter = document.getElementById('gutter');
-            gutter.textContent = lines.map(function(_, i) { return (i + 1); }).join('\n');
+            document.getElementById('gutter').textContent = lines.map(function(_, i) { return (i + 1); }).join('\n');
+            // Clear old annotations after re-highlighting
+            _clearSpans(document.getElementById('code'));
         }
+
         function setTheme(isDark) {
-            var link = document.getElementById('theme-css');
-            link.href = isDark ? 'highlight/github-dark.min.css' : 'highlight/github.min.css';
+            document.getElementById('theme-css').href = isDark ? 'highlight/github-dark.min.css' : 'highlight/github.min.css';
             document.documentElement.style.setProperty('--bg-color', isDark ? '#1e1e1e' : '#ffffff');
             document.documentElement.style.setProperty('--text-color', isDark ? '#e0e0e0' : '#1e1e1e');
+        }
+
+        /**
+         * Called by Android ActionMode handler. Finds selected text in _rawCode
+         * (the original, un-escaped content) and returns [text, startOffset].
+         * This avoids the Kotlin-side escaping mismatch issue.
+         */
+        function getSelectionInfo() {
+            var sel = window.getSelection();
+            var text = sel.toString();
+            if (!text) return JSON.stringify(['', -1]);
+            // Search in raw code (not the highlighted DOM) for accurate offset
+            var start = _rawCode.indexOf(text);
+            return JSON.stringify([text, start]);
+        }
+
+        /**
+         * Apply annotation highlights to the code element.
+         */
+        function applyAnnotations(json) {
+            var anns = JSON.parse(json);
+            if (!anns || anns.length === 0) return;
+            _clearSpans(document.getElementById('code'));
+            var codeEl = document.getElementById('code');
+
+            anns.forEach(function(ann) {
+                var text = ann.selectedText || ann.text || '';
+                var note = ann.note || '';
+                var index = ann.index || 0;
+
+                // Find all occurrences of this text in the code element
+                _highlightText(codeEl, text, note, index);
+            });
+        }
+
+        function _highlightText(root, searchText, note, annIndex) {
+            if (!searchText) return;
+            var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+            var texts = [];
+            while (walker.nextNode()) texts.push(walker.currentNode);
+
+            var fullText = texts.map(function(n) { return n.textContent; }).join('');
+            var offset = 0;
+            var searchIdx = fullText.indexOf(searchText);
+            if (searchIdx < 0) return;
+
+            for (var i = 0; i < texts.length; i++) {
+                var node = texts[i];
+                var len = node.textContent.length;
+                if (offset <= searchIdx && searchIdx < offset + len) {
+                    // Found the text node containing the match
+                    var localStart = searchIdx - offset;
+                    var localEnd = localStart + searchText.length;
+
+                    var span = document.createElement('span');
+                    span.className = 'annotated';
+                    span.title = '#' + (annIndex + 1) + ': ' + note;
+                    span.setAttribute('data-annotation', annIndex);
+
+                    node.parentNode.replaceChild(span, node);
+
+                    // Split and re-insert: before, annotated, after
+                    var beforeText = document.createTextNode(node.textContent.substring(0, localStart));
+                    var annotatedText = document.createTextNode(node.textContent.substring(localStart, localEnd));
+                    var afterText = document.createTextNode(node.textContent.substring(localEnd));
+
+                    span.appendChild(annotatedText);
+                    if (beforeText.textContent) span.parentNode.insertBefore(beforeText, span);
+                    if (afterText.textContent) span.parentNode.insertBefore(afterText, span.nextSibling);
+                    span.parentNode.removeChild(node);
+                    return;
+                }
+                offset += len;
+            }
+        }
+
+        function _clearSpans(el) {
+            var spans = el.querySelectorAll('.annotated');
+            spans.forEach(function(span) {
+                var text = span.textContent;
+                var textNode = document.createTextNode(text);
+                span.parentNode.replaceChild(textNode, span);
+            });
         }
     </script>
 </body>

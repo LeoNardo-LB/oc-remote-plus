@@ -55,13 +55,9 @@ fun FileViewerRoute(
         onToggleRenderMode = viewModel::toggleRenderMode,
         onSwitchToSource = viewModel::switchToSource,
         // Phase 3: Annotation callbacks
-        onAddAnnotation = { selectedText, note ->
-            // KNOWN LIMITATION: indexOf returns the first occurrence of selectedText.
-            // Duplicate text will anchor to the wrong location. This is inherent
-            // to clipboard-based selection capture (Phase 3 plan §known-limitations).
-            val startChar = uiState.content.indexOf(selectedText)
+        onAddAnnotation = { selectedText, startChar, endChar, note ->
             if (startChar >= 0) {
-                viewModel.addAnnotation(selectedText, startChar, startChar + selectedText.length, note)
+                viewModel.addAnnotation(selectedText, startChar, endChar, note)
             }
         },
         onDeleteAnnotation = viewModel::deleteAnnotation,

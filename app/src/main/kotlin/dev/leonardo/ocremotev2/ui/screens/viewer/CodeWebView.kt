@@ -13,8 +13,8 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -23,7 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.leonardo.ocremotev2.R
-import kotlin.math.sqrt
+import org.json.JSONArray
 
 private const val TAG = "CodeWebView"
 
@@ -42,58 +42,42 @@ private fun extToLanguage(filePath: String): String {
     }
 }
 
-/**
- * WebView subclass that intercepts the native text selection ActionMode
- * to inject an "Annotate" item alongside Copy/Select all.
- *
- * This replaces the JavaScript contextmenu approach which conflicted with
- * the native selection bar (two overlapping menus).
- */
 private class CodeWebViewWithAnnotate(
     context: Context,
     private val annotateLabel: String,
-    private val onAnnotate: (String) -> Unit,
+    private val onAnnotate: (text: String, startOffset: Int, endOffset: Int) -> Unit,
 ) : WebView(context) {
 
     private val handler = Handler(Looper.getMainLooper())
 
     override fun startActionMode(callback: ActionMode.Callback, type: Int): ActionMode {
-        // Wrap the system callback to inject our "Annotate" menu item
         val wrappedCallback = AnnotateActionCallback(
             original = callback,
             annotateLabel = annotateLabel,
             onAnnotateClicked = {
-                // Get selected text from WebView
-                evaluateJavascript("window.getSelection().toString()") { result ->
-                    val text = result
-                        ?.removeSurrounding("\"")
-                        ?.replace("\\n", "\n")
-                        ?.replace("\\r", "")
-                        ?.trim()
-                        ?: ""
-                    if (text.isNotBlank()) {
-                        Log.d(TAG, "Annotate selected: '${text.take(50)}...'")
-                        handler.post { onAnnotate(text) }
+                evaluateJavascript("getSelectionInfo()") { result ->
+                    try {
+                        val arr = JSONArray(result ?: "[\"\", -1]")
+                        val text = arr.optString(0, "")
+                        val start = arr.optInt(1, -1)
+                        if (text.isNotBlank() && start >= 0) {
+                            val end = start + text.length
+                            Log.d(TAG, "Annotate: '${text.take(50)}...' at [$start, $end]")
+                            handler.post { onAnnotate(text, start, end) }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse selection info", e)
                     }
                 }
             }
         )
-        return if (type == ActionMode.TYPE_FLOATING) {
-            super.startActionMode(wrappedCallback, type)
-        } else {
-            super.startActionMode(wrappedCallback, type)
-        }
+        return super.startActionMode(wrappedCallback, type)
     }
 
-    // Legacy overload — delegate to the typed version
-    override fun startActionMode(callback: ActionMode.Callback): ActionMode {
-        return startActionMode(callback, ActionMode.TYPE_PRIMARY)
-    }
+    override fun startActionMode(callback: ActionMode.Callback): ActionMode =
+        startActionMode(callback, ActionMode.TYPE_PRIMARY)
 }
 
-/**
- * Wraps the system ActionMode callback to add "Annotate" to the selection menu.
- */
 private class AnnotateActionCallback(
     private val original: ActionMode.Callback,
     private val annotateLabel: String,
@@ -104,17 +88,14 @@ private class AnnotateActionCallback(
 
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
         val result = original.onCreateActionMode(mode, menu)
-        // Add our custom item — click handled in onActionItemClicked below
         menu.add(0, annotateItemId, 100, annotateLabel)
         return result
     }
 
-    override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
-        return original.onPrepareActionMode(mode, menu)
-    }
+    override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean =
+        original.onPrepareActionMode(mode, menu)
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-        // Intercept our Annotate item BEFORE the system callback
         if (item.itemId == annotateItemId) {
             onAnnotateClicked()
             mode.finish()
@@ -123,9 +104,7 @@ private class AnnotateActionCallback(
         return original.onActionItemClicked(mode, item)
     }
 
-    override fun onDestroyActionMode(mode: ActionMode) {
-        original.onDestroyActionMode(mode)
-    }
+    override fun onDestroyActionMode(mode: ActionMode) = original.onDestroyActionMode(mode)
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -134,12 +113,10 @@ fun CodeWebView(
     content: String,
     filePath: String,
     modifier: Modifier = Modifier,
-    onAnnotate: ((String) -> Unit)? = null,
-    onCopy: ((String) -> Unit)? = null,
+    onAnnotate: ((text: String, startOffset: Int, endOffset: Int) -> Unit)? = null,
+    annotationsJson: String = "",
 ) {
     val annotateLabel = stringResource(R.string.annotation_context_annotate)
-
-    // App theme detection
     val surfaceColor = MaterialTheme.colorScheme.surface
     val isDark = surfaceColor.red * 0.299f + surfaceColor.green * 0.587f + surfaceColor.blue * 0.114f < 0.5f
     val bgColorArgb = surfaceColor.toArgb()
@@ -148,11 +125,9 @@ fun CodeWebView(
         content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
     }
 
-    // Stable annotate callback holder (survives recomposition)
-    val annotateRef = remember { mutableStateOf<((String) -> Unit)?>(null) }
+    val annotateRef = remember { mutableStateOf<((text: String, start: Int, end: Int) -> Unit)?>(null) }
     annotateRef.value = onAnnotate
 
-    // Track WebView reference for cleanup on dispose
     var webViewRef: WebView? = null
 
     DisposableEffect(Unit) {
@@ -175,7 +150,7 @@ fun CodeWebView(
             CodeWebViewWithAnnotate(
                 context = ctx,
                 annotateLabel = annotateLabel,
-                onAnnotate = { text -> annotateRef.value?.invoke(text) }
+                onAnnotate = { text, start, end -> annotateRef.value?.invoke(text, start, end) }
             ).apply {
                 settings.javaScriptEnabled = true
                 settings.userAgentString = "OCRemoteCodeViewer"
@@ -206,6 +181,13 @@ fun CodeWebView(
                     "setCode(`$escapedContent`, '$language'); setTheme($isDark);",
                     null
                 )
+                // Apply annotation highlights after code is set
+                if (annotationsJson.isNotBlank() && annotationsJson != "[]") {
+                    webView.evaluateJavascript(
+                        "applyAnnotations('$annotationsJson')",
+                        null
+                    )
+                }
             }
         }
     )

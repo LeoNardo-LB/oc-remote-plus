@@ -73,7 +73,7 @@ fun FileViewerScreen(
     onCopyAllContent: () -> Unit,
     onToggleRenderMode: () -> Unit,
     // Phase 3: Annotation callbacks
-    onAddAnnotation: (selectedText: String, note: String) -> Unit,
+    onAddAnnotation: (selectedText: String, startChar: Int, endChar: Int, note: String) -> Unit,
     onDeleteAnnotation: (id: String) -> Unit,
     onUpdateAnnotation: (id: String, note: String) -> Unit,
     onSubmitAnnotations: (overallNote: String, editedNotes: Map<String, String>) -> Unit,
@@ -82,9 +82,23 @@ fun FileViewerScreen(
     // DIFF → SOURCE switch so users can annotate from diff view
     onSwitchToSource: (() -> Unit)? = null
 ) {
-    var pendingAnnotationText by remember { mutableStateOf<String?>(null) }
+    // Annotation state: (selectedText, startChar, endChar)
+    var pendingAnnotation by remember { mutableStateOf<Triple<String, Int, Int>?>(null) }
     var detailAnnotation by remember { mutableStateOf<Annotation?>(null) }
     var showSubmitDialog by remember { mutableStateOf(false) }
+    // Serialize annotations for WebView highlight rendering
+    val annotationsJson = remember(uiState.annotations) {
+        if (uiState.annotations.isEmpty()) ""
+        else org.json.JSONArray().apply {
+            uiState.annotations.forEach { ann ->
+                put(org.json.JSONObject().apply {
+                    put("text", ann.selectedText)
+                    put("note", ann.note)
+                    put("index", ann.index)
+                })
+            }
+        }.toString()
+    }
     // Phase 2: source scroll state + fraction anchor for md render toggle
     val sourceLazyListState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     var lastSourceFraction by remember { mutableStateOf(0f) }
@@ -147,7 +161,8 @@ fun FileViewerScreen(
                     CodeWebView(
                         content = uiState.content,
                         filePath = uiState.filePath,
-                        onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
+                        onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
+                        annotationsJson = annotationsJson,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -159,14 +174,16 @@ fun FileViewerScreen(
                     CodeWebView(
                         content = uiState.content,
                         filePath = uiState.filePath,
-                        onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
+                        onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
+                        annotationsJson = annotationsJson,
                         modifier = Modifier.weight(1f)
                     )
                 }
                 else -> CodeWebView(
                     content = uiState.content,
                     filePath = uiState.filePath,
-                    onAnnotate = { selectedText -> pendingAnnotationText = selectedText },
+                    onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
+                    annotationsJson = annotationsJson,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -174,14 +191,14 @@ fun FileViewerScreen(
     }
 
     // Phase 3: Annotation Input Sheet
-    pendingAnnotationText?.let { selectedText ->
+    pendingAnnotation?.let { (selectedText, startChar, endChar) ->
         AnnotationInputSheet(
             selectedText = selectedText,
             onConfirm = { note ->
-                onAddAnnotation(selectedText, note)
-                pendingAnnotationText = null
+                onAddAnnotation(selectedText, startChar, endChar, note)
+                pendingAnnotation = null
             },
-            onDismiss = { pendingAnnotationText = null }
+            onDismiss = { pendingAnnotation = null }
         )
     }
 
