@@ -678,4 +678,35 @@
     <string name="fileviewer_error_tool_snapshot_unsupported">工具快照视图在 Phase 2 实现</string>
     <string name="a11y_icon_hunk_previous">上一个差异块</string>
     <string name="a11y_icon_hunk_next">下一个差异块</string>
+    <!-- Workspace + accessibility -->
+    <string name="a11y_icon_collapse_directory">折叠目录</string>
+    <string name="a11y_icon_expand_directory">展开目录</string>
+    <string name="workspace_search_hint">输入以搜索文件</string>
+    <string name="workspace_search_no_git_match">没有匹配的更改</string>
+    <string name="workspace_search_no_results">没有匹配的文件</string>
+    <string name="tool_card_group_count">本轮 %1$d 次编辑</string>
+    <!-- Annotation -->
+    <string name="annotation_context_annotate">标注</string>
+    <string name="annotation_detail_delete">删除</string>
+    <string name="annotation_detail_edit">编辑</string>
+    <string name="annotation_detail_save">保存</string>
+    <string name="annotation_detail_selected">选中的代码</string>
+    <string name="annotation_detail_title">标注 #%1$d</string>
+    <string name="annotation_input_confirm">确认</string>
+    <string name="annotation_input_hint">修改说明</string>
+    <string name="annotation_input_title">添加标注</string>
+    <string name="annotation_submit">提交</string>
+    <string name="annotation_submit_dialog_title">提交 %1$d 条标注？</string>
+    <string name="annotation_submit_failed">提交标注失败</string>
+    <string name="annotation_submit_overall_note">总体备注（可选）</string>
+    <string name="annotation_submit_send">发送</string>
+    <string name="annotation_submit_summary">摘要：</string>
+    <string name="annotation_submitted_toast">标注已提交到会话</string>
+    <string name="fileviewer_error_tool_snapshot_missing">未找到工具快照数据</string>
+    <!-- Viewer -->
+    <string name="viewer_diff_show_source">源码</string>
+    <string name="viewer_large_file_warning">大文件（%1$d 行）— 可能影响性能</string>
+    <string name="viewer_loading_progress">加载中：%1$d / %2$d 行</string>
+    <string name="viewer_md_show_render">显示渲染预览</string>
+    <string name="viewer_md_show_source">显示源代码</string>
 </resources>

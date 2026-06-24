@@ -149,7 +149,8 @@ internal fun PartContent(
             PatchCard(
                 patch = part,
                 isExpanded = toolExpandedStates[part.id] ?: autoExpand,
-                onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) }
+                onToggleExpand = { onToggleToolExpanded(part.id, autoExpand) },
+                onOpenFile = onOpenFile
             )
         }
         is Part.File -> {

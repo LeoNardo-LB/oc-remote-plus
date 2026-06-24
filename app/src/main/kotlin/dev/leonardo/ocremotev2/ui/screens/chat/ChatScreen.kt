@@ -296,7 +296,14 @@ fun ChatScreen(
     val listState = rememberLazyListState()
 
     // Whether auto-scroll should follow new content.
-    var autoScrollEnabled by remember { mutableStateOf(true) }
+    // rememberSaveable so the value survives composition disposal when navigating to
+    // FileViewer / sub-session and back — otherwise it resets to true and forces scroll
+    // to bottom on return even when the user was browsing earlier messages.
+    var autoScrollEnabled by rememberSaveable { mutableStateOf(true) }
+
+    // True while a scroll-position restoration is in progress. Suppresses the messageCount
+    // auto-scroll effect so it doesn't fight the restore (both target the same listState).
+    var isRestoringScroll by remember { mutableStateOf(false) }
 
     // Force scroll trigger — incremented by user actions to force-scroll to bottom
     // regardless of autoScrollEnabled. Each tick forces a snapToBottom().
@@ -324,7 +331,7 @@ fun ChatScreen(
     // not actively scrolling (prevents race with user gestures).
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
-        if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
+        if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress && !isRestoringScroll) {
             listState.scrollToItem(0)
         }
     }
@@ -347,21 +354,28 @@ fun ChatScreen(
         }
     }
 
-    // Restore scroll positions when returning from sub-session navigation.
+    // Restore scroll position when returning from FileViewer / sub-session navigation.
+    // Keyed on scrollRestoreVersion which is bumped by saveScrollPosition() (on navigate-away)
+    // and by bumpScrollRestoreIfPending() (on ON_RESUME return).
     LaunchedEffect(viewModel.scrollRestoreVersion) {
         val version = viewModel.scrollRestoreVersion
         if (version > 0) {
-            var retries = 0
-            while (messageState.messages.isEmpty() && retries < 20) {
-                delay(50L)
-                retries++
-            }
-            if (messageState.messages.isNotEmpty()) {
-                val savedIdx = viewModel.savedLazyIndex
-                val totalItems = listState.layoutInfo.totalItemsCount
-                val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
-                listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
-            }
+            isRestoringScroll = true
+            autoScrollEnabled = false
+            // Wait until messages are loaded...
+            snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
+            // ...and the LazyColumn has measured them (totalItemsCount > 0). Reading
+            // totalItemsCount before layout completes returns 0, which would coerce
+            // targetIdx to 0 (= bottom in reverseLayout) and defeat the restore.
+            snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
+            val savedIdx = viewModel.savedLazyIndex
+            val totalItems = listState.layoutInfo.totalItemsCount
+            val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
+            listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
+            isRestoringScroll = false
+            // Re-evaluate autoScrollEnabled based on restored position: only follow
+            // new content if we're at the bottom (reverseLayout: index 0).
+            autoScrollEnabled = (targetIdx == 0)
         } else {
             // Initial load: scroll to bottom (item 0)
             snapshotFlow { messageState.messages.isNotEmpty() }
@@ -496,11 +510,15 @@ fun ChatScreen(
         }
     }
 
-    // Refresh session when returning from background (lock screen / app switch)
+    // Refresh session when returning from background (lock screen / app switch).
+    // Also re-trigger scroll restoration when returning from FileViewer / sub-session
+    // (only if a position was saved — plain background→foreground is ignored so the
+    // user's current browsing position is not disturbed).
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && viewModel.sessionId.isNotBlank()) {
                 viewModel.refreshIfNeeded()
+                viewModel.bumpScrollRestoreIfPending()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

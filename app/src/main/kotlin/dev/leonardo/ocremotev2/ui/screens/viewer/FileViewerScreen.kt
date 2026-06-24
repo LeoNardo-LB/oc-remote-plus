@@ -163,27 +163,19 @@ fun FileViewerScreen(
                         filePath = uiState.filePath,
                         onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
                         annotationsJson = annotationsJson,
+                        onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
+                        onAnnotationClick = { id -> detailAnnotation = uiState.annotations.find { it.id == id } },
                         modifier = Modifier.weight(1f)
                     )
                 }
-                !uiState.isFullyLoaded -> Column(Modifier.fillMaxSize()) {
-                    TruncationBanner(
-                        loadedLines = uiState.visibleLineCount,
-                        totalLines = uiState.totalLineCount
-                    )
-                    CodeWebView(
-                        content = uiState.content,
-                        filePath = uiState.filePath,
-                        onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
-                        annotationsJson = annotationsJson,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                // Unified: CodeWebView auto-loads more on scroll-to-bottom (no manual banner needed)
                 else -> CodeWebView(
                     content = uiState.content,
                     filePath = uiState.filePath,
                     onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
                     annotationsJson = annotationsJson,
+                    onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
+                    onAnnotationClick = { id -> detailAnnotation = uiState.annotations.find { it.id == id } },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -240,15 +232,33 @@ private fun FileViewerTopBar(
 ) {
     TopAppBar(
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = uiState.filePath.substringAfterLast('/').ifBlank { uiState.filePath },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (annotationCount > 0) {
-                    Spacer(Modifier.width(SpacingTokens.SM.dp))
-                    Badge { Text("$annotationCount") }
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = uiState.filePath.substringAfterLast('/').ifBlank { uiState.filePath },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (annotationCount > 0) {
+                        Spacer(Modifier.width(SpacingTokens.SM.dp))
+                        Badge { Text("$annotationCount") }
+                    }
+                }
+                // Subtitle: path relative to workspace
+                val dirPath = uiState.directory
+                val relativePath = if (dirPath.isNotBlank() && uiState.filePath.startsWith(dirPath)) {
+                    uiState.filePath.removePrefix(dirPath).removePrefix("/")
+                } else {
+                    uiState.filePath.substringBeforeLast('/').ifBlank { "" }
+                }
+                if (relativePath.isNotBlank()) {
+                    Text(
+                        text = relativePath,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         },

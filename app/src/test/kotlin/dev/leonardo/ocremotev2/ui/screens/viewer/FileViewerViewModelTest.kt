@@ -590,7 +590,7 @@ class FileViewerViewModelTest {
     }
 
     @Test
-    fun `loadMoreLines increases visibleLineCount by 200 and respects totalLineCount`() = runTest {
+    fun `loadMoreLines increases visibleLineCount by 500 and respects totalLineCount`() = runTest {
         val largeContent = buildString {
             append("package dev.leonardo.ocremotev2\n\n")
             append("class LargeFile {\n")
@@ -603,7 +603,7 @@ class FileViewerViewModelTest {
         val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
         val initialVisible = vm.uiState.value.visibleLineCount
         vm.loadMoreLines()
-        assertEquals(initialVisible + 200, vm.uiState.value.visibleLineCount)
+        assertEquals(initialVisible + 500, vm.uiState.value.visibleLineCount)
         assertEquals(false, vm.uiState.value.isFullyLoaded)
     }
 
@@ -637,7 +637,7 @@ class FileViewerViewModelTest {
         val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
         assertEquals(10000, vm.uiState.value.visibleLineCount)
         vm.loadMoreLines()
-        assertEquals(10200, vm.uiState.value.visibleLineCount)
+        assertEquals(10500, vm.uiState.value.visibleLineCount)
     }
 
     // ===== Phase 4: Annotation rotation survival =====

@@ -29,6 +29,7 @@
         .annotated {
             background-color: rgba(255, 235, 59, 0.2);
             text-decoration: underline wavy #ffeb3b;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -63,6 +64,16 @@
             document.getElementById('theme-css').href = isDark ? 'highlight/github-dark.min.css' : 'highlight/github.min.css';
             document.documentElement.style.setProperty('--bg-color', isDark ? '#1e1e1e' : '#ffffff');
             document.documentElement.style.setProperty('--text-color', isDark ? '#e0e0e0' : '#1e1e1e');
+        }
+
+        /** Reload code while preserving scroll position (for pagination). */
+        function setCodePreserveScroll(code, lang) {
+            var oldScroll = window.scrollY;
+            setCode(code, lang);
+            requestAnimationFrame(function() {
+                window.scrollTo(0, oldScroll);
+                // Re-apply annotations after content reload
+            });
         }
 
         function setLabels(annotateLabel) {
@@ -112,11 +123,11 @@
             var codeEl = document.getElementById('code');
             anns.forEach(function(ann) {
                 var text = ann.text || ann.selectedText || '';
-                _highlightText(codeEl, text, ann.note || '', ann.index || 0);
+                _highlightText(codeEl, text, ann.note || '', ann.index || 0, ann.id || '');
             });
         }
 
-        function _highlightText(root, searchText, note, annIndex) {
+        function _highlightText(root, searchText, note, annIndex, annId) {
             if (!searchText) return;
             var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
             var texts = [];
@@ -134,6 +145,13 @@
                     var span = document.createElement('span');
                     span.className = 'annotated';
                     span.title = note;
+                    span.dataset.id = annId;
+                    span.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        if (window.AndroidBridge && AndroidBridge.onAnnotationClick) {
+                            AndroidBridge.onAnnotationClick(annId);
+                        }
+                    });
                     var before = document.createTextNode(node.textContent.substring(0, localStart));
                     var annotated = document.createTextNode(node.textContent.substring(localStart, localEnd));
                     var after = document.createTextNode(node.textContent.substring(localEnd));

@@ -485,19 +485,41 @@ class ChatViewModel @Inject constructor(
         private set
 
     /**
-     * Incremented each time [saveScrollPosition] is called.
+     * Incremented each time [saveScrollPosition] is called, and again by
+     * [bumpScrollRestoreIfPending] when ChatScreen resumes with a pending restore.
      * ChatScreen observes this via LaunchedEffect to reliably restore scroll position
-     * after sub-session navigation. Using rememberLazyListState(initial...) is unreliable
-     * because `remember` caches the initial state on first composition and ignores
-     * new values on recomposition, causing scroll to sometimes restore and sometimes not.
+     * after FileViewer / sub-session navigation. Using rememberLazyListState(initial...)
+     * is unreliable because `remember` caches the initial state on first composition and
+     * ignores new values on recomposition, causing scroll to sometimes restore and sometimes not.
      */
     var scrollRestoreVersion by mutableStateOf(0)
         private set
+
+    /**
+     * True when a scroll position has been saved (via [saveScrollPosition]) but not yet
+     * restored. Used by [bumpScrollRestoreIfPending] to re-trigger restoration ONLY when
+     * returning from a navigation that actually saved a position (FileViewer / sub-session),
+     * avoiding spurious restores on plain background→foreground transitions that would
+     * disturb the user's current browsing position.
+     */
+    private var hasPendingScrollRestore = false
 
     fun saveScrollPosition(lazyIndex: Int, offset: Int) {
         savedLazyIndex = lazyIndex
         savedScrollOffset = offset
         scrollRestoreVersion++
+        hasPendingScrollRestore = true
+    }
+
+    /**
+     * Re-triggers scroll position restoration on ON_RESUME, but only when a save is pending
+     * (i.e. the user is returning from FileViewer or a sub-session). Plain background→foreground
+     * transitions are ignored so the user's current browsing position is not disturbed.
+     */
+    fun bumpScrollRestoreIfPending() {
+        if (hasPendingScrollRestore) {
+            scrollRestoreVersion++
+        }
     }
     val expandReasoning = settingsRepository.getSettingsFlow().map { it.expandReasoning }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false

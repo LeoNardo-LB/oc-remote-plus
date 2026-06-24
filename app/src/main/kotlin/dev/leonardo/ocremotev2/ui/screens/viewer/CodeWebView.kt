@@ -42,12 +42,19 @@ private fun extToLanguage(filePath: String): String {
 private class SelectionBridge {
     private val mainHandler = Handler(Looper.getMainLooper())
     var callback: ((text: String, start: Int, end: Int) -> Unit)? = null
+    var annotationClickCallback: ((id: String) -> Unit)? = null
 
     @JavascriptInterface
     fun onSelection(text: String, start: Int) {
         val end = start + text.length
         DebugLogger.log(TAG, "Bridge.onSelection: '${text.take(40)}' [$start-$end]")
         mainHandler.post { callback?.invoke(text, start, end) }
+    }
+
+    @JavascriptInterface
+    fun onAnnotationClick(id: String) {
+        DebugLogger.log(TAG, "Bridge.onAnnotationClick: id=$id")
+        mainHandler.post { annotationClickCallback?.invoke(id) }
     }
 }
 
@@ -62,7 +69,25 @@ private class AnnotateWebView(
     context: Context,
     private val annotateLabel: String,
     private val bridge: SelectionBridge,
+    private val onLoadMore: (() -> Unit)? = null,
 ) : WebView(context) {
+
+    private val loadMoreRunnable = Runnable { onLoadMore?.invoke() }
+
+    override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
+        super.onScrollChanged(l, t, oldl, oldt)
+        if (onLoadMore == null) return
+        val contentH = contentHeight
+        // Trigger load-more when within 300px of the bottom
+        if (contentH > 0 && t + height >= contentH - 300) {
+            removeCallbacks(loadMoreRunnable)
+            postDelayed(loadMoreRunnable, 400)
+        }
+    }
+
+    fun cleanup() {
+        removeCallbacks(loadMoreRunnable)
+    }
 
     override fun startActionMode(callback: ActionMode.Callback?, type: Int): ActionMode {
         DebugLogger.log(TAG, "▶ startActionMode type=$type  (0=FLOATING, 1=PRIMARY, 2=MENU)")
@@ -153,6 +178,8 @@ fun CodeWebView(
     modifier: Modifier = Modifier,
     onAnnotate: ((text: String, startOffset: Int, endOffset: Int) -> Unit)? = null,
     annotationsJson: String = "",
+    onLoadMore: (() -> Unit)? = null,
+    onAnnotationClick: ((id: String) -> Unit)? = null,
 ) {
     val annotateLabel = stringResource(R.string.annotation_context_annotate)
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -165,12 +192,14 @@ fun CodeWebView(
 
     val bridge = remember { SelectionBridge() }
     bridge.callback = onAnnotate
+    bridge.annotationClickCallback = onAnnotationClick
 
-    var webViewRef: WebView? = null
+    var webViewRef: AnnotateWebView? = null
 
     DisposableEffect(Unit) {
         onDispose {
             webViewRef?.apply {
+                cleanup()
                 stopLoading()
                 removeJavascriptInterface("AndroidBridge")
                 loadUrl("about:blank")
@@ -185,7 +214,7 @@ fun CodeWebView(
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            AnnotateWebView(ctx, annotateLabel, bridge).apply {
+            AnnotateWebView(ctx, annotateLabel, bridge, onLoadMore).apply {
                 settings.javaScriptEnabled = true
                 settings.userAgentString = "OCRemoteCodeViewer"
                 settings.allowFileAccess = true
@@ -216,7 +245,7 @@ fun CodeWebView(
         update = { webView ->
             webView.post {
                 webView.evaluateJavascript(
-                    "setCode(`$escapedContent`, '$language'); setTheme($isDark);",
+                    "setCodePreserveScroll(`$escapedContent`, '$language'); setTheme($isDark);",
                     null
                 )
                 if (annotationsJson.isNotBlank() && annotationsJson != "[]") {

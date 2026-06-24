@@ -161,7 +161,6 @@ internal fun ToolCardScaffold(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        rightSideExtras?.invoke(this)
                         if (copyText.isNotBlank()) {
                             IconButton(
                                 onClick = {
@@ -186,6 +185,8 @@ internal fun ToolCardScaffold(
                                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                             )
                         }
+                        // Extras (open-file button, diff changes) go AFTER copy/expand → rightmost
+                        rightSideExtras?.invoke(this)
                     }
                 }
             }

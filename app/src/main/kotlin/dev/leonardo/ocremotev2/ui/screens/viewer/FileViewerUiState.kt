@@ -18,6 +18,7 @@ data class DiffHunk(
 
 data class FileViewerUiState(
     val filePath: String = "",
+    val directory: String = "",
     val mode: FileViewerMode = FileViewerMode.SOURCE,
     val isLoading: Boolean = true,
     val content: String = "",

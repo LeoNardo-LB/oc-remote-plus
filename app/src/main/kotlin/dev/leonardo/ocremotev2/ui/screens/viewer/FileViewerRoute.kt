@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -70,7 +71,8 @@ fun FileViewerRoute(
                     val result = viewModel.submitAnnotations(overallNote, editedNotes)
                     isSubmitting = false
                     if (result.isSuccess) {
-                        snackbarHostState.showSnackbar(context.getString(R.string.annotation_submitted_toast))
+                        // Return immediately — Toast doesn't block (unlike suspend showSnackbar)
+                        Toast.makeText(context, context.getString(R.string.annotation_submitted_toast), Toast.LENGTH_SHORT).show()
                         onBack()
                     } else {
                         snackbarHostState.showSnackbar(context.getString(R.string.annotation_submit_failed))

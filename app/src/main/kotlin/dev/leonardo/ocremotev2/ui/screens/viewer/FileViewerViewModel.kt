@@ -38,7 +38,7 @@ class FileViewerViewModel @Inject constructor(
     private val toolPartIds = URLDecoder.decode(
         savedStateHandle.get<String>(FileViewerNav.PARAM_TOOL_PART_IDS).orEmpty(), "UTF-8"
     ).split(",").filter { it.isNotBlank() }
-    private val _uiState = MutableStateFlow(FileViewerUiState(filePath = filePath))
+    private val _uiState = MutableStateFlow(FileViewerUiState(filePath = filePath, directory = directory))
     val uiState: StateFlow<FileViewerUiState> = _uiState.asStateFlow()
     private val diffParser = DiffParser()
     private var annotationManager: AnnotationManager? = null
@@ -48,7 +48,7 @@ class FileViewerViewModel @Inject constructor(
 
     private companion object {
         const val INITIAL_PAGE_SIZE = 500
-        const val PAGE_SIZE = 200
+        const val PAGE_SIZE = 500
         const val EXTREMELY_LARGE_THRESHOLD = 100_000
         const val EXTREMELY_LARGE_INITIAL = 10_000
     }
