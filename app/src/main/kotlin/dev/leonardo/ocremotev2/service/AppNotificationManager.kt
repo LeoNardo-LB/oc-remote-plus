@@ -496,7 +496,7 @@ class AppNotificationManager @Inject constructor(
 
     private fun getProjectName(directory: String?): String? {
         if (directory.isNullOrBlank()) return null
-        return directory.trimEnd('/').substringAfterLast('/')
+        return dev.leonardo.ocremotev2.util.PathUtils.fileName(directory.trimEnd('/', '\\'))
     }
 
     private fun eventNotificationId(serverId: String, sessionId: String, typeOffset: Int): Int {

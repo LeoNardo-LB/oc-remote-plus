@@ -25,6 +25,7 @@ import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.CodeTypography
+import dev.leonardo.ocremotev2.util.PathUtils
 
 /**
  * Shows a summary of files changed at the end of an agent turn.
@@ -75,7 +76,7 @@ internal fun PatchCard(
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                     )
                     Text(
-                        text = filePath.substringAfterLast('/'),
+                        text = PathUtils.fileName(filePath),
                         style = CodeTypography.copy(
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface

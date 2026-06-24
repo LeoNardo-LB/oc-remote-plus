@@ -252,5 +252,5 @@ private fun basename(path: String): String {
     if (path.isBlank()) return "/"
     val trimmed = path.trimEnd('/', '\\')
     if (trimmed.isEmpty()) return "/"
-    return trimmed.substringAfterLast('/').substringAfterLast('\\').ifBlank { trimmed }
+    return dev.leonardo.ocremotev2.util.PathUtils.fileName(trimmed).ifBlank { trimmed }
 }

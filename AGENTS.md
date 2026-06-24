@@ -111,6 +111,18 @@ See `docs/chatscreen-editing-protocol.md`. Rules:
 - Commit after each successful compilation
 - On failure: `git checkout -- <file>`, re-read, retry
 
+### Path Handling (Cross-Platform Remote Paths)
+
+Remote file paths can use `/` or `\` depending on server OS. **Always use `PathUtils`** (`util/PathUtils.kt`):
+
+| Operation | ✅ Use | ❌ Don't |
+|-----------|--------|---------|
+| Filename | `PathUtils.fileName(path)` | `substringAfterLast('/')`, `File(path).name` |
+| Parent dir | `PathUtils.parentDir(path)` | `substringBeforeLast('/')` |
+| Relative path | `PathUtils.relativePath(path, prefix)` | manual `removePrefix` |
+
+JDK APIs (`File.name`, `Path.of`) only recognize `/` on Android — `\` paths from Windows servers break.
+
 ### Signing
 - Release keystore lives at `app/keystore/release.jks` with password in `signing.properties`
 - When `signing.properties` exists → release builds use release keystore

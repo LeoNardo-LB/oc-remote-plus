@@ -59,8 +59,7 @@ internal fun EditToolCard(
     val input = extractToolInput(tool)
     val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull ?: ""
     val shortPath = extractFileName(filePath)
-    val normalizedPath = filePath.replace('\\', '/').replace('/', '/')
-    val dirPath = if ('/' in normalizedPath) normalizedPath.substringBeforeLast('/') else ""
+    val dirPath = dev.leonardo.ocremotev2.util.PathUtils.parentDir(filePath)
     val oldString = input["oldString"]?.jsonPrimitive?.contentOrNull ?: ""
     val newString = input["newString"]?.jsonPrimitive?.contentOrNull ?: ""
 

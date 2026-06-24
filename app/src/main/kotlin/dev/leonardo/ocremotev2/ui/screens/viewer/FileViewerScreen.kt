@@ -56,6 +56,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import dev.leonardo.ocremotev2.domain.model.Annotation
 import dev.leonardo.ocremotev2.util.DebugLogger
+import dev.leonardo.ocremotev2.util.PathUtils
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import kotlinx.coroutines.flow.filter
@@ -239,10 +240,8 @@ private fun FileViewerTopBar(
     TopAppBar(
         title = {
             Column {
-                // Extract filename handling both / and \ path separators
-                val fileName = remember(uiState.filePath) {
-                    uiState.filePath.substringAfterLast('/').substringAfterLast('\\').ifBlank { uiState.filePath }
-                }
+                // Extract filename handling both / and \ separators
+                val fileName = remember(uiState.filePath) { PathUtils.fileName(uiState.filePath) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = fileName,
@@ -266,7 +265,7 @@ private fun FileViewerTopBar(
                         else -> fp
                     }
                     // Show only the directory portion (no filename)
-                    full.substringBeforeLast('/').ifBlank { "" }
+                    PathUtils.parentDir(full).ifBlank { "" }
                 }
                 if (relativePath.isNotBlank()) {
                     Text(

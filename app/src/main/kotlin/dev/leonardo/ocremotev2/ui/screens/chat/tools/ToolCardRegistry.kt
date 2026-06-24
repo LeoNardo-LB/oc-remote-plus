@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.ToolState
+import dev.leonardo.ocremotev2.util.PathUtils
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -34,17 +35,9 @@ internal data class ToolDisplayInfo(
 
 /**
  * Extract the file name from a cross-platform path string.
- *
- * Server may send Windows paths (D:\foo\bar.txt) or POSIX paths (/foo/bar.txt).
- * [java.io.File.getName] only splits on the platform separator, so we normalize
- * both separators to the local [java.io.File.separatorChar] first, then call getName.
+ * Delegates to [PathUtils.fileName].
  */
-internal fun extractFileName(path: String): String {
-    if (path.isBlank()) return ""
-    val normalized = path.replace('\\', java.io.File.separatorChar)
-        .replace('/', java.io.File.separatorChar)
-    return java.io.File(normalized).name
-}
+internal fun extractFileName(path: String): String = PathUtils.fileName(path)
 
 /**
  * Extract the file name from a potentially path-like server title.
@@ -52,7 +45,7 @@ internal fun extractFileName(path: String): String {
  * e.g. "Read /path/to/File.kt" → "File.kt", "Edit file" → "Edit file" (unchanged)
  */
 private fun extractFileNameFromTitle(title: String): String {
-    val lastSegment = title.substringAfterLast('/').substringAfterLast('\\')
+    val lastSegment = PathUtils.fileName(title)
     return if (lastSegment.length < title.length && lastSegment.contains('.')) {
         lastSegment
     } else {

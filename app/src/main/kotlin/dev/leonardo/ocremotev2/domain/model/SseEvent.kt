@@ -280,8 +280,8 @@ data class Project(
     /** Display name: explicit name, or last path segment of worktree, or id */
     val displayName: String
         get() = name?.takeIf { it.isNotEmpty() }
-            ?: worktree.takeIf { it.isNotEmpty() }?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
-            ?: path.takeIf { it.isNotEmpty() }?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+            ?: worktree.takeIf { it.isNotEmpty() }?.let { dev.leonardo.ocremotev2.util.PathUtils.fileName(it.trimEnd('/', '\\')) }?.takeIf { it.isNotEmpty() }
+            ?: path.takeIf { it.isNotEmpty() }?.let { dev.leonardo.ocremotev2.util.PathUtils.fileName(it.trimEnd('/', '\\')) }?.takeIf { it.isNotEmpty() }
             ?: id.take(8)
 }
 

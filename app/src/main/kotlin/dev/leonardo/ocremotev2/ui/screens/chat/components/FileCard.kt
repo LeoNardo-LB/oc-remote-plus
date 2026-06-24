@@ -66,7 +66,7 @@ internal fun FileCardFallback(file: Part.File) {
             )
             Text(
                 text = file.filename
-                    ?: file.url?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+                    ?: file.url?.let { dev.leonardo.ocremotev2.util.PathUtils.fileName(it) }?.takeIf { it.isNotBlank() }
                     ?: file.mime,
                 style = MaterialTheme.typography.bodyMedium,
                 color = contentColor,

@@ -204,7 +204,7 @@ internal fun buildPromptParts(
         // Add file part
         val isDir = mention.path.endsWith("/")
         val absPath = if (sessionDirectory != null) "$sessionDirectory/${mention.path}" else mention.path
-        val displayName = mention.path.trimEnd('/').substringAfterLast('/')
+        val displayName = dev.leonardo.ocremotev2.util.PathUtils.fileName(mention.path.trimEnd('/', '\\'))
         parts.add(
             PromptPart(
                 type = "file",
