@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.util.DebugLogger
 
 private const val TAG = "CodeWebView"
 
@@ -45,7 +46,7 @@ private class SelectionBridge {
     @JavascriptInterface
     fun onSelection(text: String, start: Int) {
         val end = start + text.length
-        Log.d(TAG, "Bridge.onSelection: '${text.take(40)}' [$start-$end]")
+        DebugLogger.log(TAG, "Bridge.onSelection: '${text.take(40)}' [$start-$end]")
         mainHandler.post { callback?.invoke(text, start, end) }
     }
 }
@@ -64,54 +65,69 @@ private class AnnotateWebView(
 ) : WebView(context) {
 
     override fun startActionMode(callback: ActionMode.Callback?, type: Int): ActionMode {
-        Log.d(TAG, "startActionMode type=$type")
-        if (callback == null) return super.startActionMode(null, type)
+        DebugLogger.log(TAG, "▶ startActionMode type=$type  (0=FLOATING, 1=PRIMARY, 2=MENU)")
+        if (callback == null) {
+            DebugLogger.log(TAG, "  callback == null, delegating to super")
+            return super.startActionMode(null, type)
+        }
 
         val wrapped = object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                 val ok = callback.onCreateActionMode(mode, menu)
                 // Add Annotate after system items
                 menu.add(Menu.NONE, Menu.NONE, 200, annotateLabel)
-                Log.d(TAG, "onCreateActionMode: menu items=${menu.size()}")
+                // Dump all menu items for debugging
+                val items = (0 until menu.size()).map { i ->
+                    val item = menu.getItem(i)
+                    "'${item.title}'(id=${item.itemId})"
+                }.joinToString(", ")
+                DebugLogger.log(TAG, "  ✓ onCreateActionMode ok=$ok  items=[$items]")
                 return ok
             }
 
             override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
-                return callback.onPrepareActionMode(mode, menu)
+                val result = callback.onPrepareActionMode(mode, menu)
+                val items = (0 until menu.size()).map { i ->
+                    "'${menu.getItem(i).title}'"
+                }.joinToString(", ")
+                DebugLogger.log(TAG, "  ~ onPrepareActionMode result=$result  items=[$items]")
+                return result
             }
 
             override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                Log.d(TAG, "onActionItemClicked: title='${item.title}' id=${item.itemId}")
+                DebugLogger.log(TAG, "  ✋ onActionItemClicked title='${item.title}' id=${item.itemId}")
                 // Match by TITLE — system may reassign itemIds
                 if (item.title?.toString() == annotateLabel) {
-                    Log.d(TAG, "Annotate clicked! Getting selection...")
+                    DebugLogger.log(TAG, "  → Annotate matched! Getting selection via JS...")
                     // Synchronously evaluate JS to get selection
                     evaluateJavascript("getSelectionInfo()") { result ->
                         try {
                             val arr = org.json.JSONArray(result ?: "[\"\", -1]")
                             val text = arr.optString(0, "")
                             val start = arr.optInt(1, -1)
-                            Log.d(TAG, "Selection: text='${text.take(40)}' start=$start")
+                            DebugLogger.log(TAG, "  ← JS selection: text='${text.take(40)}' start=$start len=${text.length}")
                             if (text.isNotBlank() && start >= 0) {
-                                val end = start + text.length
                                 Handler(Looper.getMainLooper()).post {
-                                    bridge.onSelection(text, start)  // bridge handles thread + callback
+                                    bridge.onSelection(text, start)
                                     mode.finish()
                                 }
                             } else {
+                                DebugLogger.log(TAG, "  ✗ Selection empty or invalid, finishing mode")
                                 Handler(Looper.getMainLooper()).post { mode.finish() }
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Parse failed: ${result?.take(60)}", e)
+                            DebugLogger.log(TAG, "  ✗ Parse failed: ${result?.take(60)}")
                             Handler(Looper.getMainLooper()).post { mode.finish() }
                         }
                     }
                     return true
                 }
+                DebugLogger.log(TAG, "  → Not Annotate, delegating to original callback")
                 return callback.onActionItemClicked(mode, item)
             }
 
             override fun onDestroyActionMode(mode: ActionMode) {
+                DebugLogger.log(TAG, "  ✗ onDestroyActionMode")
                 callback.onDestroyActionMode(mode)
             }
         }

@@ -14,6 +14,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
 import dev.leonardo.ocremotev2.service.SessionFocusHolder
+import dev.leonardo.ocremotev2.util.DebugLogger
 import java.io.File
 import java.io.StringWriter
 import java.text.SimpleDateFormat
@@ -33,6 +34,8 @@ class OpenCodeApp : Application() {
     
     override fun onCreate() {
         super.onCreate()
+
+        DebugLogger.init(this)
 
         val crashDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), CRASH_DIR)
 
