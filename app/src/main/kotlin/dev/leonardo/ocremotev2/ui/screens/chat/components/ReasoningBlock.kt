@@ -119,19 +119,24 @@ internal fun ReasoningBlock(text: String, isExpanded: Boolean = false, onToggleE
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Animated pulse dot (shows only while thinking)
+                    // Animated pulse dot — wrapped in 16.dp box to match ToolCardScaffold icon height
                     Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .drawBehind {
-                                drawCircle(
-                                    color = accentColor.copy(
-                                        alpha = if (isComplete) 0.4f else pulseAlpha
+                        modifier = Modifier.size(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .drawBehind {
+                                    drawCircle(
+                                        color = accentColor.copy(
+                                            alpha = if (isComplete) 0.4f else pulseAlpha
+                                        )
                                     )
-                                )
-                            }
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
+                                }
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(3.dp))
                     Text(
                         text = headerText,
                         style = MaterialTheme.typography.labelMedium,

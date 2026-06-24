@@ -65,7 +65,7 @@ internal fun ApplyPatchToolCard(
         hasContent = diffContent.isNotBlank(),
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
-        rightSideExtras = {
+        trailingExtras = {
             if (filePath.isNotBlank() && onOpenFile != null) {
                 OpenFileIconButton(onClick = { onOpenFile.invoke(filePath) })
             }

@@ -189,6 +189,10 @@ fun CodeWebView(
     val escapedContent = remember(content) {
         content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
     }
+    // Escape single quotes and backslashes in JSON so it doesn't break the JS string literal
+    val safeAnnotationsJson = remember(annotationsJson) {
+        annotationsJson.replace("\\", "\\\\").replace("'", "\\'")
+    }
 
     val bridge = remember { SelectionBridge() }
     bridge.callback = onAnnotate
@@ -229,8 +233,8 @@ fun CodeWebView(
                             "setCode(`$escapedContent`, '$language'); setTheme($isDark);",
                             null
                         )
-                        if (annotationsJson.isNotBlank() && annotationsJson != "[]") {
-                            view?.evaluateJavascript("applyAnnotations('$annotationsJson');", null)
+                        if (safeAnnotationsJson.isNotBlank() && safeAnnotationsJson != "[]") {
+                            view?.evaluateJavascript("applyAnnotations('$safeAnnotationsJson');", null)
                         }
                     }
                 }
@@ -248,8 +252,8 @@ fun CodeWebView(
                     "setCodePreserveScroll(`$escapedContent`, '$language'); setTheme($isDark);",
                     null
                 )
-                if (annotationsJson.isNotBlank() && annotationsJson != "[]") {
-                    webView.evaluateJavascript("applyAnnotations('$annotationsJson');", null)
+                if (safeAnnotationsJson.isNotBlank() && safeAnnotationsJson != "[]") {
+                    webView.evaluateJavascript("applyAnnotations('$safeAnnotationsJson');", null)
                 }
             }
         }

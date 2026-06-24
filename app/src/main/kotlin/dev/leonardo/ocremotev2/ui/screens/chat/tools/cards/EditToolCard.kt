@@ -101,11 +101,13 @@ internal fun EditToolCard(
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
         rightSideExtras = {
-            if (filePath.isNotBlank() && onOpenFile != null) {
-                OpenFileIconButton(onClick = { onOpenFile.invoke(filePath) })
-            }
             if (additions > 0 || deletions > 0) {
                 DiffChangesInline(additions = additions, deletions = deletions)
+            }
+        },
+        trailingExtras = {
+            if (filePath.isNotBlank() && onOpenFile != null) {
+                OpenFileIconButton(onClick = { onOpenFile.invoke(filePath) })
             }
         }
     ) {

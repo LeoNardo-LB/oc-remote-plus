@@ -55,6 +55,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import dev.leonardo.ocremotev2.domain.model.Annotation
+import dev.leonardo.ocremotev2.util.DebugLogger
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 import kotlinx.coroutines.flow.filter
@@ -164,8 +165,10 @@ fun FileViewerScreen(
                         onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
                         annotationsJson = annotationsJson,
                         onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
-                        onAnnotationClick = { id -> detailAnnotation = uiState.annotations.find { it.id == id } },
-                        modifier = Modifier.weight(1f)
+                        onAnnotationClick = { id ->
+                            DebugLogger.log("FileViewer", "onAnnotationClick: id='$id', annotations=${uiState.annotations.map { it.id }}")
+                            detailAnnotation = uiState.annotations.find { it.id == id }
+                        },
                     )
                 }
                 // Unified: CodeWebView auto-loads more on scroll-to-bottom (no manual banner needed)
@@ -175,7 +178,10 @@ fun FileViewerScreen(
                     onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
                     annotationsJson = annotationsJson,
                     onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
-                    onAnnotationClick = { id -> detailAnnotation = uiState.annotations.find { it.id == id } },
+                    onAnnotationClick = { id ->
+                        DebugLogger.log("FileViewer", "onAnnotationClick: id='$id', annotations=${uiState.annotations.map { it.id }}")
+                        detailAnnotation = uiState.annotations.find { it.id == id }
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -245,11 +251,18 @@ private fun FileViewerTopBar(
                     }
                 }
                 // Subtitle: path relative to workspace
-                val dirPath = uiState.directory
-                val relativePath = if (dirPath.isNotBlank() && uiState.filePath.startsWith(dirPath)) {
-                    uiState.filePath.removePrefix(dirPath).removePrefix("/")
-                } else {
-                    uiState.filePath.substringBeforeLast('/').ifBlank { "" }
+                val relativePath = remember(uiState.filePath, uiState.directory) {
+                    val fp = uiState.filePath
+                    val dir = uiState.directory
+                    // Strip workspace prefix if present, otherwise strip leading "/"
+                    val full = when {
+                        dir.isNotBlank() && fp.startsWith(dir) -> fp.removePrefix(dir).removePrefix("/")
+                        dir.isNotBlank() && fp.contains(dir) -> fp.substringAfter(dir).removePrefix("/")
+                        fp.startsWith("/") -> fp.removePrefix("/")
+                        else -> fp
+                    }
+                    // Show only the directory portion (no filename)
+                    full.substringBeforeLast('/').ifBlank { "" }
                 }
                 if (relativePath.isNotBlank()) {
                     Text(

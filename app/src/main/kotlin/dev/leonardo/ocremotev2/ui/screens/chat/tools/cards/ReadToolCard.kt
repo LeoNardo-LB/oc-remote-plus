@@ -86,7 +86,7 @@ internal fun ReadToolCard(
         hasContent = hasContent,
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
-        rightSideExtras = {
+        trailingExtras = {
             if (filePath.isNotBlank() && onOpenFile != null) {
                 OpenFileIconButton(onClick = { onOpenFile.invoke(filePath) })
             }

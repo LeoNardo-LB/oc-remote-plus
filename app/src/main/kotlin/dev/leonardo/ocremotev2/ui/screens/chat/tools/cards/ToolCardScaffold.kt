@@ -81,6 +81,7 @@ internal fun ToolCardScaffold(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     rightSideExtras: @Composable (RowScope.() -> Unit)? = null,
+    trailingExtras: @Composable (RowScope.() -> Unit)? = null,
     titleContent: (@Composable RowScope.() -> Unit)? = null,
     showExpandIcon: Boolean = true,
     expandedContent: @Composable () -> Unit,
@@ -161,6 +162,9 @@ internal fun ToolCardScaffold(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        // 1. Left extras (diff changes indicator)
+                        rightSideExtras?.invoke(this)
+                        // 2. Copy button
                         if (copyText.isNotBlank()) {
                             IconButton(
                                 onClick = {
@@ -177,6 +181,9 @@ internal fun ToolCardScaffold(
                                 )
                             }
                         }
+                        // 3. Trailing extras (open-file button)
+                        trailingExtras?.invoke(this)
+                        // 4. Expand/collapse icon (rightmost)
                         if (showExpandIcon) {
                             Icon(
                                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -185,8 +192,6 @@ internal fun ToolCardScaffold(
                                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
                             )
                         }
-                        // Extras (open-file button, diff changes) go AFTER copy/expand → rightmost
-                        rightSideExtras?.invoke(this)
                     }
                 }
             }
