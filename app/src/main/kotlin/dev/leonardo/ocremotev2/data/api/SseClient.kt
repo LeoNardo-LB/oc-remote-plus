@@ -49,11 +49,18 @@ private suspend fun ByteReadChannel.readRawLineBytes(): List<Byte>? {
  * 将 byte 块列表拼接为完整字节数组，然后一次性 UTF-8 解码。
  */
 private fun buildStringFromBytes(chunks: List<List<Byte>>): String {
-    val totalSize = chunks.sumOf { it.size }
-    if (totalSize == 0) return ""
+    if (chunks.isEmpty()) return ""
+    // SSE spec: multiple data: lines must be joined with \n (LF).
+    // Previous impl concatenated without separator, losing newlines in
+    // multi-line JSON payloads (e.g. Markdown table rows).
+    val separatorCount = chunks.size - 1
+    val totalSize = chunks.sumOf { it.size } + separatorCount
     val array = ByteArray(totalSize)
     var pos = 0
-    for (chunk in chunks) {
+    for ((idx, chunk) in chunks.withIndex()) {
+        if (idx > 0) {
+            array[pos++] = '\n'.code.toByte()  // SSE spec: \n between data: lines
+        }
         for (b in chunk) {
             array[pos++] = b
         }
