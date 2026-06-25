@@ -32,11 +32,7 @@ internal fun performHaptic(view: View, enabled: Boolean) {
  */
 @Composable
 internal fun Modifier.codeHorizontalScroll(): Modifier {
-    return if (!LocalCodeWordWrap.current) {
-        this.fillMaxWidth().horizontalScroll(rememberScrollState())
-    } else {
-        this
-    }
+    return this.fillMaxWidth().horizontalScroll(rememberScrollState())
 }
 
 

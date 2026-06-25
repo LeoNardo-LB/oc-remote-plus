@@ -187,9 +187,8 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.formatDuration
 import dev.leonardo.ocremotev2.ui.screens.chat.util.resolveUserCommandLabel
 import dev.leonardo.ocremotev2.ui.screens.chat.util.performHaptic
 import dev.leonardo.ocremotev2.ui.screens.chat.util.codeHorizontalScroll
-import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalChatFontSize
-import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCodeWordWrap
-import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCompactMessages
+import dev.leonardo.ocremotev2.ui.theme.ChatDensity
+import dev.leonardo.ocremotev2.ui.theme.LocalChatDensity
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCollapseTools
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalExpandReasoning
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalShowTurnDividers
@@ -986,7 +985,7 @@ fun ChatScreen(
                     )
                 }
                 else -> {
-                     val messageSpacing = if (LocalCompactMessages.current) 2.dp else 8.dp
+                     val messageSpacing = if (LocalChatDensity.current == ChatDensity.Compact) 2.dp else 8.dp
 
                         // messageListState returns oldest-first; normal layout renders
                         // index 0 (oldest) at top, last index (newest) at bottom.
@@ -1163,10 +1162,14 @@ private fun ChatSettingsProvider(
     val expandReasoning by viewModel.expandReasoning.collectAsStateWithLifecycle()
     val showTurnDividers by viewModel.showTurnDividers.collectAsStateWithLifecycle()
 
+    val chatDensity = when {
+        compactMessages -> ChatDensity.Compact
+        chatFontSize == "small" -> ChatDensity.Compact
+        else -> ChatDensity.Normal
+    }
+
     CompositionLocalProvider(
-        LocalChatFontSize provides chatFontSize,
-        LocalCodeWordWrap provides codeWordWrap,
-        LocalCompactMessages provides compactMessages,
+        LocalChatDensity provides chatDensity,
         LocalCollapseTools provides collapseTools,
         LocalExpandReasoning provides expandReasoning,
         LocalShowTurnDividers provides showTurnDividers,

@@ -32,6 +32,8 @@ import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes.HEADER as GFMHeader
 import org.intellij.markdown.flavours.gfm.GFMElementTypes.ROW as GFMRow
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes.CELL as GFMCell
+import dev.leonardo.ocremotev2.ui.theme.LocalChatDensity
+import dev.leonardo.ocremotev2.ui.theme.spacing
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 
@@ -58,7 +60,7 @@ internal fun SimpleMarkdownTable(
     val headerBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = AlphaTokens.MUTED)
     val rowBgOdd = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = AlphaTokens.MUTED)
     val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.FAINT)
-    val pad = 10.dp
+    val pad = LocalChatDensity.current.spacing.tableCell
     val shape = ShapeTokens.smallMedium
     val border = BorderStroke(1.dp, dividerColor)
     val annotator = annotatorSettings()

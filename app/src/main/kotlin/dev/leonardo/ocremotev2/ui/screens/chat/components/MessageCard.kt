@@ -46,7 +46,8 @@ import dev.leonardo.ocremotev2.ui.screens.chat.ChatMessage
 import dev.leonardo.ocremotev2.ui.screens.chat.filterRenderableParts
 import dev.leonardo.ocremotev2.ui.screens.chat.isBubbleRenderablePart
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.ImageThumbnailRow
-import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCompactMessages
+import dev.leonardo.ocremotev2.ui.theme.ChatDensity
+import dev.leonardo.ocremotev2.ui.theme.LocalChatDensity
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.leonardo.ocremotev2.ui.theme.QueuedBadgeColor
 import dev.leonardo.ocremotev2.ui.theme.QueuedBadgeTextColor
@@ -169,7 +170,7 @@ private fun MessageCardUser(
             tonalElevation = 0.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
-            val compact = LocalCompactMessages.current
+            val compact = LocalChatDensity.current == ChatDensity.Compact
             Column(
                     modifier = Modifier.padding(
                         horizontal = if (compact) 10.dp else SpacingTokens.LG.dp,
@@ -362,7 +363,7 @@ private fun MessageCardAssistant(
 
     if (renderableParts.isEmpty() && errorText == null) return
 
-    val compact = LocalCompactMessages.current
+    val compact = LocalChatDensity.current == ChatDensity.Compact
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
 

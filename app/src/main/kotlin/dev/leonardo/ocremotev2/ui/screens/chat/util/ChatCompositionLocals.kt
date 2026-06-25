@@ -6,15 +6,6 @@ import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCardResolver
 
 // ============ Chat Settings via CompositionLocal ============
 
-/** Chat font size setting: "small", "medium", "large". */
-val LocalChatFontSize = compositionLocalOf { "medium" }
-
-/** Whether code blocks use word wrap instead of horizontal scroll. */
-val LocalCodeWordWrap = compositionLocalOf { true }
-
-/** Whether compact message spacing is enabled. */
-val LocalCompactMessages = compositionLocalOf { false }
-
 /** Whether tool cards are collapsed by default. */
 val LocalCollapseTools = compositionLocalOf { false }
 

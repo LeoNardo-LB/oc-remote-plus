@@ -32,7 +32,8 @@ import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.ui.components.ProviderIcon
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatMessage
 import dev.leonardo.ocremotev2.ui.screens.chat.filterRenderableParts
-import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCompactMessages
+import dev.leonardo.ocremotev2.ui.theme.ChatDensity
+import dev.leonardo.ocremotev2.ui.theme.LocalChatDensity
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.leonardo.ocremotev2.ui.screens.chat.util.formatAssistantErrorMessage
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
@@ -100,7 +101,7 @@ internal fun AssistantTurnBubble(
     // Use the first message's assistant info for the header
     val firstAssistant = messages.firstOrNull()?.message as? Message.Assistant
 
-    val compact = LocalCompactMessages.current
+    val compact = LocalChatDensity.current == ChatDensity.Compact
     val hapticView = LocalView.current
     val hapticOn = LocalHapticFeedbackEnabled.current
 
