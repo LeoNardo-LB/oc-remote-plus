@@ -239,10 +239,8 @@ internal fun MarkdownContent(
                     wordWrap = wordWrap,
                     isFence = true
                 )
-            },
-            table = { model ->
-                SimpleMarkdownTable(model.content, model.node, model.typography.table)
             }
+            // table: use official Mikepenz renderer (removed custom SimpleMarkdownTable)
         )
     }
 
