@@ -512,6 +512,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun saveScrollPosition(lazyIndex: Int, offset: Int) {
+        android.util.Log.e("ScrollDebug", "ViewModel.saveScrollPosition: idx=$lazyIndex off=$offset → version=${scrollRestoreVersion + 1}")
         savedLazyIndex = lazyIndex
         savedScrollOffset = offset
         scrollRestoreVersion++
