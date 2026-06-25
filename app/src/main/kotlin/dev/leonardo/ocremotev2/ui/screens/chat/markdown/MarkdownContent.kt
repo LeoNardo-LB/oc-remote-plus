@@ -77,83 +77,16 @@ internal fun normalizeHtmlForEmbeddedPreview(html: String): String {
 // ============ Markdown Preprocessing ============
 
 /**
- * Fix non-standard table formats before GFM parsing.
- * Handles:
- * - All rows on one line with | separators (no newlines)
- * - || as row separator instead of newlines
- */
-internal fun normalizeTableFormat(text: String): String {
-    // Find table separator line: |---|---| or |:---:|---:|
-    val separatorRegex = Regex("\\|[-:]+[-|\\s:]*\\|")
-    val sepMatch = separatorRegex.find(text) ?: return text
-
-    // Check if separator is followed by a newline (properly formatted)
-    val afterSep = text.substring(sepMatch.range.last + 1)
-    if (afterSep.startsWith("\n") || afterSep.isBlank()) return text
-
-    // No newline after separator → table rows concatenated on one line
-    val separator = sepMatch.value.trim()
-    val colCount = separator.split("|").filter { it.isNotBlank() }.size
-    if (colCount == 0) return text
-
-    val before = text.substring(0, sepMatch.range.first).trimEnd()
-    val dataText = afterSep.trim()
-
-    // Handle || as row separator (another AI formatting quirk)
-    if (dataText.contains("||")) {
-        val fixed = dataText.replace("||", "\n|")
-        return before + "\n" + separator + "\n" + fixed
-    }
-
-    // Split by | and group into rows of colCount
-    val cells = dataText.split("|").map { it.trim() }.filter { it.isNotBlank() }
-    if (cells.size < colCount) return text
-
-    val rows = cells.chunked(colCount).map { row ->
-        "| " + row.joinToString(" | ") + " |"
-    }
-
-    return before + "\n" + separator + "\n" + rows.joinToString("\n")
-}
-
-/**
- * Detect and wrap HTML content in code blocks.
- * Safe version: skips Markdown table content, uses stricter HTML detection.
- */
-internal fun preserveRawHtmlPayload(markdown: String): String {
-    if (markdown.isBlank()) return markdown
-    if ("```" in markdown) return markdown
-    // Skip if contains table syntax (code generics like List<T> can trigger
-    // false-positive HTML tag detection, wrapping tables in code blocks)
-    if (Regex("\\|[-:]+[-|\\s:]+").containsMatchIn(markdown)) return markdown
-
-    val looksLikeHtmlDocument = HtmlDocumentHintRegex.containsMatchIn(markdown)
-    val htmlTagCount = HtmlTagRegex.findAll(markdown).take(20).count()
-    // Require both: HTML document hint AND many tags, or just very many tags
-    if (!looksLikeHtmlDocument && htmlTagCount < 12) return markdown
-
-    return buildString(markdown.length + 16) {
-        append("```text\n")
-        append(markdown.trimEnd())
-        append("\n```")
-    }
-}
-
-/**
- * Unified Markdown preprocessing pipeline.
- * Order matters: table fix → HTML detection → user message normalization.
+ * Minimal Markdown preprocessing — let Mikepenz handle parsing natively.
+ * Only user message newline normalization remains.
+ * Custom HTML detection and table format fixing removed to avoid
+ * false-positives that broke rendering.
  */
 internal fun normalizeMarkdown(raw: String, isUser: Boolean): String {
-    // 1. Fix non-standard table formats (before HTML detection to avoid
-    //    table separators being mistaken for other patterns)
-    var result = normalizeTableFormat(raw)
-    // 2. Detect and wrap HTML (safe — skips tables)
-    result = preserveRawHtmlPayload(result)
-    // 3. User messages: convert single \n to \n\n for paragraph breaks
-    if (isUser) {
-        result = result.replace(Regex("(?<!\n)\n(?!\n)"), "\n\n")
-    }
-    return result
+    if (!isUser) return raw
+    // User messages: single \n doesn't break in Markdown (soft break).
+    // Convert standalone \n to \n\n for paragraph breaks.
+    return raw.replace(Regex("(?<!\n)\n(?!\n)"), "\n\n")
 }
 
 @Composable
