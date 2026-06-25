@@ -98,7 +98,7 @@ val ChatDensity.typography: ChatTypographyTokens
 
 val ChatDensity.spacing: ChatSpacingTokens
     get() = when (this) {
-        ChatDensity.Normal  -> spacing(block = 4f, indent = 16f, cell = 6f, quoteH = 16f)
+        ChatDensity.Normal  -> spacing(block = 2f, indent = 16f, cell = 6f, quoteH = 16f)
         ChatDensity.Compact -> spacing(block = 2f, indent = 12f, cell = 4f, quoteH = 12f)
     }
 

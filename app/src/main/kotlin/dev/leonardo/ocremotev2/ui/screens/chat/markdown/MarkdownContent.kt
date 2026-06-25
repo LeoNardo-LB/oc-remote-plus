@@ -287,7 +287,9 @@ internal fun MarkdownContent(
     val padding = markdownPadding(
         block = spacing.block,
         list = 0.dp,
+        listItemTop = 2.dp,
         listItemBottom = spacing.listItemBottom,
+        listIndent = 4.dp,
     )
 
     Markdown(
