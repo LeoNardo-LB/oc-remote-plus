@@ -302,11 +302,14 @@ fun ChatScreen(
     // to bottom on return even when the user was browsing earlier messages.
     var autoScrollEnabled by rememberSaveable { mutableStateOf(true) }
 
-    // True while a scroll-position restoration is in progress. Suppresses the messageCount
-    // auto-scroll effect so it doesn't fight the restore (both target the same listState).
-    // Initialize to true when there's a pending restore — prevents messageCount effect
-    // from racing ahead of the restore effect on composition rebuild.
-    var isRestoringScroll by remember { mutableStateOf(viewModel.scrollRestoreVersion > 0) }
+    // CRITICAL: Force-disable auto-scroll BEFORE any LaunchedEffect runs.
+    // This synchronously prevents messageCount effect from racing to bottom
+    // when returning from FileViewer with a pending scroll restore.
+    if (viewModel.pendingScrollRestore) {
+        autoScrollEnabled = false
+    }
+
+    var isRestoringScroll by remember { mutableStateOf(viewModel.pendingScrollRestore) }
 
     // Force scroll trigger — incremented by user actions to force-scroll to bottom
     // regardless of autoScrollEnabled. Each tick forces a snapToBottom().
@@ -377,9 +380,8 @@ fun ChatScreen(
             val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
             listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
             isRestoringScroll = false
-            // Re-evaluate autoScrollEnabled based on restored position: only follow
-            // new content if we're at the bottom (reverseLayout: index 0).
             autoScrollEnabled = (targetIdx == 0)
+            viewModel.clearPendingScrollRestore()  // allow autoScroll to resume normally
         } else {
             // Initial load: scroll to bottom (item 0)
             snapshotFlow { messageState.messages.isNotEmpty() }

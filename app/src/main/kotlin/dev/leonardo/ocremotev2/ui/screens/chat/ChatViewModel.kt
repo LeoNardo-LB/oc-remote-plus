@@ -504,6 +504,13 @@ class ChatViewModel @Inject constructor(
      */
     private var hasPendingScrollRestore = false
 
+    /** Public read-only flag: true when scroll position needs to be restored on return. */
+    val pendingScrollRestore: Boolean get() = hasPendingScrollRestore
+
+    fun clearPendingScrollRestore() {
+        hasPendingScrollRestore = false
+    }
+
     fun saveScrollPosition(lazyIndex: Int, offset: Int) {
         savedLazyIndex = lazyIndex
         savedScrollOffset = offset

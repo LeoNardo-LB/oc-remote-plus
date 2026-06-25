@@ -93,84 +93,53 @@ private class AnnotateWebView(
     }
 
     override fun startActionMode(callback: ActionMode.Callback?, type: Int): ActionMode {
-        DebugLogger.log(TAG, "▶ startActionMode type=$type  (0=FLOATING, 1=PRIMARY, 2=MENU)")
-        if (callback == null) {
-            DebugLogger.log(TAG, "  callback == null, delegating to super")
-            return super.startActionMode(null, type)
-        }
+        if (callback == null) return super.startActionMode(null, type)
 
         val wrapped = object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                 val ok = callback.onCreateActionMode(mode, menu)
-                // Add Annotate after system items
                 menu.add(Menu.NONE, Menu.NONE, 200, annotateLabel)
-                // Dump all menu items for debugging
-                val items = (0 until menu.size()).map { i ->
-                    val item = menu.getItem(i)
-                    "'${item.title}'(id=${item.itemId})"
-                }.joinToString(", ")
-                DebugLogger.log(TAG, "  ✓ onCreateActionMode ok=$ok  items=[$items]")
                 return ok
             }
 
-            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
-                val result = callback.onPrepareActionMode(mode, menu)
-                val items = (0 until menu.size()).map { i ->
-                    "'${menu.getItem(i).title}'"
-                }.joinToString(", ")
-                DebugLogger.log(TAG, "  ~ onPrepareActionMode result=$result  items=[$items]")
-                return result
-            }
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu) =
+                callback.onPrepareActionMode(mode, menu)
 
             override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                DebugLogger.log(TAG, "  ✋ onActionItemClicked title='${item.title}' id=${item.itemId}")
-                // Match by TITLE — system may reassign itemIds
                 if (item.title?.toString() == annotateLabel) {
-                    DebugLogger.log(TAG, "  → Annotate matched! Getting selection via JS...")
                     evaluateJavascript("getSelectionInfo()") { result ->
                         try {
-                            // evaluateJavascript returns JSON representation of the JS value.
-                            // getSelectionInfo() returns an array → result is ["text", start]
-                            // Use JSONTokener to handle edge cases gracefully
                             val raw = result?.trim() ?: "null"
                             val tokener = org.json.JSONTokener(raw)
                             val parsed = tokener.nextValue()
-                            // If JS returned a string (double-encoded), unwrap one layer
                             val arr = when (parsed) {
                                 is org.json.JSONArray -> parsed
                                 is String -> org.json.JSONArray(parsed)
-                                else -> throw org.json.JSONException("unexpected: ${parsed::class}")
+                                else -> throw org.json.JSONException("unexpected")
                             }
                             val text = arr.optString(0, "")
                             val start = arr.optInt(1, -1)
-                            DebugLogger.log(TAG, "  ← JS selection: text='${text.take(40)}' start=$start len=${text.length}")
                             if (text.isNotBlank() && start >= 0) {
                                 Handler(Looper.getMainLooper()).post {
                                     bridge.onSelection(text, start)
                                     mode.finish()
                                 }
                             } else {
-                                DebugLogger.log(TAG, "  ✗ Selection empty or invalid, finishing mode")
                                 Handler(Looper.getMainLooper()).post { mode.finish() }
                             }
                         } catch (e: Exception) {
-                            DebugLogger.log(TAG, "  ✗ Parse failed: ${result?.take(60)} — ${e.message}")
                             Handler(Looper.getMainLooper()).post { mode.finish() }
                         }
                     }
                     return true
                 }
-                DebugLogger.log(TAG, "  → Not Annotate, delegating to original callback")
                 return callback.onActionItemClicked(mode, item)
             }
 
-            override fun onDestroyActionMode(mode: ActionMode) {
-                DebugLogger.log(TAG, "  ✗ onDestroyActionMode")
+            override fun onDestroyActionMode(mode: ActionMode) =
                 callback.onDestroyActionMode(mode)
-            }
         }
-        // Force FLOATING type — menu appears near selection, not at top bar
-        return super.startActionMode(wrapped, ActionMode.TYPE_FLOATING)
+        return super.startActionMode(wrapped, type)
     }
 }
 
