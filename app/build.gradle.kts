@@ -17,7 +17,7 @@ plugins {
 
 android {
     namespace = "dev.leonardo.ocremotev2"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.leonardo.ocremotev2"
@@ -154,7 +154,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Markdown Rendering (mikepenz/multiplatform-markdown-renderer)
-    val markdownRendererVersion = "0.41.0"
+    val markdownRendererVersion = "0.43.0"
     implementation("com.mikepenz:multiplatform-markdown-renderer:$markdownRendererVersion")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:$markdownRendererVersion")
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:$markdownRendererVersion")
@@ -191,5 +191,13 @@ tasks.withType<Test>().configureEach {
     jvmArgs = jvmArgs.orEmpty() + listOf("-Xmx4g", "-XX:+UseCompressedOops", "-XX:MaxMetaspaceSize=512m")
     forkEvery = 50
     maxParallelForks = 1
+}
+
+// Force-upgrade kotlin-metadata-jvm so Hilt can read Kotlin 2.4.0 bytecode
+// (Mikepenz 0.43.0 is compiled with Kotlin 2.4.0)
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
+    }
 }
 
