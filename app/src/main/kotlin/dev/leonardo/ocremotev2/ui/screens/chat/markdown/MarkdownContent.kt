@@ -77,6 +77,10 @@ internal fun normalizeHtmlForEmbeddedPreview(html: String): String {
 internal fun preserveRawHtmlPayload(markdown: String): String {
     if (markdown.isBlank()) return markdown
     if ("```" in markdown) return markdown
+    // Skip if text contains Markdown table syntax — code with generics like
+    // List<String> can trigger false-positive HTML tag detection, wrapping
+    // the entire text (including tables) in a code block.
+    if (Regex("\\|[-:]+[-|\\s:]+").containsMatchIn(markdown)) return markdown
 
     val looksLikeHtmlDocument = HtmlDocumentHintRegex.containsMatchIn(markdown)
     val htmlTagCount = HtmlTagRegex.findAll(markdown).take(16).count()
@@ -98,7 +102,12 @@ internal fun MarkdownContent(
     immediate: Boolean = false  // synchronous parsing — eliminates first-frame height jump
 ) {
     val normalizedMarkdown = remember(markdown, isUser) {
-        val base = preserveRawHtmlPayload(markdown)
+        var base = preserveRawHtmlPayload(markdown)
+        // Fix non-standard table format: some AI outputs use || as row separator
+        // instead of newlines. Convert "||" to "\n|" so GFM parser can handle it.
+        if (base.contains("||") && base.contains("|---")) {
+            base = base.replace("||", "\n|")
+        }
         if (isUser) {
             // User messages: single \n doesn't break in Markdown (soft break).
             // Convert standalone \n to \n\n for paragraph breaks.
