@@ -160,8 +160,8 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:$markdownRendererVersion")
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:$markdownRendererVersion")
 
-    // Syntax Highlighting (dev.snipme/highlights — direct dep, was transitive via mikepenz-code)
-    implementation("dev.snipme:highlights:1.1.0")
+    // Syntax Highlighting (dev.hossain/compose-highlight — Compose wrapper around dev.snipme/highlights)
+    implementation("dev.hossain:compose-highlight:0.31.0")
 
     // WebView fallback (kept for legacy)
     implementation("androidx.webkit:webkit:1.16.0")
