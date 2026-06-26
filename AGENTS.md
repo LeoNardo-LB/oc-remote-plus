@@ -238,6 +238,15 @@ environment:
 - opencode password: save as environment variables ${OPENCODE_SERVER_PASSWORD}
 - emulator host access: use `10.0.2.2` to reach the host machine from Android emulator
 
+### SSE Scroll Stability
+
+The SSE → UI pipeline is: **48ms token batching** → **height compensation** → **render**. Violating any of these reintroduces flicker, chunky output, or viewport jump-to-bottom:
+
+- **`Markdown()` must use `rememberMarkdownState(content, retainState=true)`** — stateless `Markdown(content=...)` re-parses every recomposition → height oscillation → flicker.
+- **`scheduleFlush()` must NOT cancel an in-flight timer** — cancelling on every token starves flushes when rate > 20/s → chunky burst output.
+- **`layout{}` compensation applies to streaming message ONLY** (`if (isStreamingMsg)`) — applying to all assistant messages exposes completed messages to unstable measurement.
+- **`LaunchedEffect` for autoScroll keys on `isScrollInProgress` ONLY** — adding `isAtBottom` lets SSE layout transient flips lock `autoScrollEnabled=true` → viewport snaps to bottom.
+
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.**
 
