@@ -2,6 +2,7 @@
 
 import dev.leonardo.ocremotev2.domain.model.AutoApproveRule
 import dev.leonardo.ocremotev2.domain.model.CompactionStateInfo
+import dev.leonardo.ocremotev2.domain.model.FileDiff
 import dev.leonardo.ocremotev2.domain.model.Message
 import dev.leonardo.ocremotev2.domain.model.MessageWithParts
 import dev.leonardo.ocremotev2.domain.model.ModelSelection
@@ -312,4 +313,10 @@ interface ChatRepository {
      * Observe compaction state for a specific session (keyed by sessionId).
      */
     fun getCompactionStateForSession(sessionId: String): Flow<CompactionStateInfo?>
+
+    /**
+     * Observe file diffs for a specific session (keyed by sessionId).
+     * Backs [dev.leonardo.ocremotev2.domain.model.Part.Patch] line counts.
+     */
+    fun getSessionDiffsForSession(sessionId: String): Flow<List<FileDiff>>
 }

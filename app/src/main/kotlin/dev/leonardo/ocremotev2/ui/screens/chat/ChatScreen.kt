@@ -194,6 +194,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalExpandReasoning
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalShowTurnDividers
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalImageSaveRequest
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalSessionDiffs
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalToolExpandedStates
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnToggleToolExpanded
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalToolCardResolver
@@ -436,6 +437,10 @@ fun ChatScreen(
     val compressImageAttachments by viewModel.compressImageAttachments.collectAsStateWithLifecycle()
     val imageAttachmentMaxLongSide by viewModel.imageAttachmentMaxLongSide.collectAsStateWithLifecycle()
     val imageAttachmentWebpQuality by viewModel.imageAttachmentWebpQuality.collectAsStateWithLifecycle()
+    // File diffs for the current session — backs PatchCard line counts (+N -N)
+    val sessionDiffs by viewModel.chatRepositoryExposed
+        .getSessionDiffsForSession(viewModel.sessionId)
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     var showSendConfirmDialog by remember { mutableStateOf(false) }
     // Pending send action: stored so the confirm dialog can trigger it
     var pendingSendAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -527,6 +532,7 @@ fun ChatScreen(
         LocalToolExpandedStates provides messageState.toolExpandedStates,
         LocalOnToggleToolExpanded provides { toolId, defaultExpanded -> viewModel.toggleToolExpanded(toolId, defaultExpanded) },
         LocalToolCardResolver provides viewModel.toolCardResolver,
+        LocalSessionDiffs provides mapOf(viewModel.sessionId to sessionDiffs),
     ) {
     Scaffold(
         snackbarHost = {

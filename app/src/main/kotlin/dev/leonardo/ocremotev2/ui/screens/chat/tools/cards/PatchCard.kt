@@ -20,19 +20,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.Part
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.DiffChangesInline
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalSessionDiffs
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
-import dev.leonardo.ocremotev2.ui.theme.CodeTypography
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.util.PathUtils
 
 /**
  * Shows a summary of files changed at the end of an agent turn.
- * Uses [ToolCardScaffold] with [titleContent] for consistent height/style
- * with other tool cards (ToolCallCard). Each file is clickable → FileViewer.
+ * Standard single-line title via [ToolCardScaffold]; the expanded list shows
+ * per-file +N/-N change counts (sourced from [LocalSessionDiffs]).
+ * Each file is clickable → FileViewer.
  */
 @Composable
 internal fun PatchCard(
@@ -47,59 +48,29 @@ internal fun PatchCard(
         stringResource(R.string.chat_files_changed, patch.files.size)
     else
         stringResource(R.string.chat_files_changed_plural, patch.files.size)
-    // Subtitle: file names (same structure as ToolCallCard)
-    val subtitle = patch.files.take(3).joinToString(" · ") { PathUtils.fileName(it) } +
-        if (patch.files.size > 3) " · +${patch.files.size - 3}" else ""
+    val sessionDiffs = LocalSessionDiffs.current[patch.sessionId]
 
     ToolCardScaffold(
         icon = Icons.Default.Code,
         iconTint = accentColor,
-        title = "",
+        title = title,
         copyText = title,
         isExpanded = isExpanded,
         isRunning = false,
         hasContent = patch.files.isNotEmpty(),
         isAmoled = isAmoled,
         onToggleExpand = onToggleExpand,
-        titleContent = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Code,
-                    contentDescription = title,
-                    modifier = Modifier.size(16.dp),
-                    tint = accentColor
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = subtitle,
-                        style = CodeTypography.copy(fontSize = 11.sp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.MUTED),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
     ) {
         Column(
             modifier = Modifier.padding(top = 2.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             for (filePath in patch.files) {
+                val fileDiff = sessionDiffs?.find { it.file == filePath }
                 Surface(
                     onClick = { onOpenFile?.invoke(filePath) },
                     enabled = onOpenFile != null,
-                    shape = dev.leonardo.ocremotev2.ui.theme.ShapeTokens.small,
+                    shape = ShapeTokens.small,
                     color = MaterialTheme.colorScheme.surface.copy(alpha = AlphaTokens.MEDIUM),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -120,6 +91,11 @@ internal fun PatchCard(
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        DiffChangesInline(
+                            additions = fileDiff?.additions ?: 0,
+                            deletions = fileDiff?.deletions ?: 0
                         )
                     }
                 }

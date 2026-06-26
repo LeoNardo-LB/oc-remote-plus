@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.chat.util
 
 import androidx.compose.runtime.compositionLocalOf
+import dev.leonardo.ocremotev2.domain.model.FileDiff
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.DefaultToolCardResolver
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCardResolver
 
@@ -31,3 +32,6 @@ val LocalOnToggleToolExpanded = compositionLocalOf<(String, Boolean) -> Unit> { 
 val LocalToolCardResolver = compositionLocalOf<ToolCardResolver> {
     DefaultToolCardResolver()
 }
+
+/** File diffs keyed by sessionId. Backs [dev.leonardo.ocremotev2.domain.model.Part.Patch] line counts. */
+val LocalSessionDiffs = compositionLocalOf<Map<String, List<FileDiff>>> { emptyMap() }

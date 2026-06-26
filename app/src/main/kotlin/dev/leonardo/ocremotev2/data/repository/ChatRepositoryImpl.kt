@@ -8,6 +8,7 @@ import dev.leonardo.ocremotev2.data.repository.handler.CompactionStateInfo as Da
 import dev.leonardo.ocremotev2.data.repository.handler.StepProgressInfo as DataStepProgressInfo
 import dev.leonardo.ocremotev2.data.repository.handler.ToolProgressInfo as DataToolProgressInfo
 import dev.leonardo.ocremotev2.domain.model.CompactionStateInfo
+import dev.leonardo.ocremotev2.domain.model.FileDiff
 import dev.leonardo.ocremotev2.domain.model.Message
 import dev.leonardo.ocremotev2.domain.model.MessageWithParts
 import dev.leonardo.ocremotev2.domain.model.ModelSelection
@@ -450,6 +451,9 @@ class ChatRepositoryImpl @Inject constructor(
 
     override fun getCompactionStateForSession(sessionId: String): Flow<CompactionStateInfo?> =
         eventDispatcher.compactionState.map { it[sessionId]?.toDomain() }
+
+    override fun getSessionDiffsForSession(sessionId: String): Flow<List<FileDiff>> =
+        eventDispatcher.sessionDiffs.map { it[sessionId] ?: emptyList() }
 
     // ============ Permission Auto-Approve ============
 

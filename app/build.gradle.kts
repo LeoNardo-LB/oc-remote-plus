@@ -158,10 +158,10 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer:$markdownRendererVersion")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:$markdownRendererVersion")
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:$markdownRendererVersion")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-code:$markdownRendererVersion")
 
-    // Syntax Highlighting (dev.hossain/compose-highlight — Compose wrapper around dev.snipme/highlights)
-    implementation("dev.hossain:compose-highlight:0.31.0")
+    // Syntax highlighting for FileViewer source view (dev.snipme/highlights).
+    // Note: Markdown code blocks use mikepenz's built-in default renderer, NOT this library.
+    implementation("dev.snipme:highlights:1.1.0")
 
     // WebView fallback (kept for legacy)
     implementation("androidx.webkit:webkit:1.16.0")
