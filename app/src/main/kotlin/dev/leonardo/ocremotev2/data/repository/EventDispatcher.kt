@@ -31,6 +31,9 @@ private const val TAG = "EventDispatcher"
 class EventDispatcher @Inject constructor(
     private val sessionHandler: SessionEventHandler,
     private val messageHandler: MessageEventHandler,
+    private val messagePartHandler: MessagePartHandler,
+    private val messageUpdatedHandler: MessageUpdatedHandler,
+    private val messageRemovedHandler: MessageRemovedHandler,
     private val permissionHandler: PermissionEventHandler,
     private val questionHandler: QuestionEventHandler,
     private val miscHandler: MiscEventHandler,
@@ -71,10 +74,19 @@ class EventDispatcher @Inject constructor(
             SseEvent.SessionDiff::class, SseEvent.SessionCompacted::class,
             SseEvent.VcsBranchUpdated::class, SseEvent.ProjectUpdated::class
         )
-        // Messages + parts → MessageEventHandler
+        // Messages → per-sub-event handlers. They share the MessageEventHandler
+        // state store (injected) but are registered independently so each
+        // message event type routes to its focused handler.
         bind(
-            messageHandler,
-            SseEvent.MessageUpdated::class, SseEvent.MessageRemoved::class,
+            messageUpdatedHandler,
+            SseEvent.MessageUpdated::class
+        )
+        bind(
+            messageRemovedHandler,
+            SseEvent.MessageRemoved::class
+        )
+        bind(
+            messagePartHandler,
             SseEvent.MessagePartUpdated::class, SseEvent.MessagePartDelta::class,
             SseEvent.MessagePartRemoved::class
         )

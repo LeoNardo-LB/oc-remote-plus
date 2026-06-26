@@ -31,6 +31,9 @@ class EventDispatcherTest {
         dispatcher = EventDispatcher(
             sessionHandler = sessionHandler,
             messageHandler = messageHandler,
+            messagePartHandler = MessagePartHandler(messageHandler),
+            messageUpdatedHandler = MessageUpdatedHandler(messageHandler),
+            messageRemovedHandler = MessageRemovedHandler(messageHandler),
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
             miscHandler = miscHandler,
