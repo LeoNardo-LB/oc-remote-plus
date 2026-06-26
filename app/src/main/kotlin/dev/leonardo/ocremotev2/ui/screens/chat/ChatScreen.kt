@@ -320,10 +320,12 @@ fun ChatScreen(
 
     // ORIGINAL logic (unchanged): disable auto-scroll when scrolling up,
     // re-enable at bottom. This works correctly for normal chat.
-    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
+    // Key is ONLY isScrollInProgress — NOT isAtBottom — so SSE layout changes
+    // that briefly flip isAtBottom won't lock autoScrollEnabled=true.
+    LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             autoScrollEnabled = false
-        } else if (isAtBottom) {
+        } else if (isAtBottom && !viewModel.pendingScrollRestore) {
             autoScrollEnabled = true
         }
     }

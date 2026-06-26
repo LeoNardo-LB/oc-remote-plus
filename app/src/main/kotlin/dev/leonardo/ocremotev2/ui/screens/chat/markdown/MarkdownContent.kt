@@ -26,6 +26,7 @@ import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import dev.hossain.highlight.ui.CodeBlockStyle
@@ -298,6 +299,7 @@ internal fun MarkdownContent(
         typography = typography,
         components = components,
         padding = padding,
+        animations = markdownAnimations(animateTextSize = { this }),
         imageTransformer = Coil3ImageTransformerImpl,
         modifier = Modifier.fillMaxWidth(),
     )

@@ -49,7 +49,10 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     private var batchJob: Job? = null
 
     private fun scheduleFlush() {
-        batchJob?.cancel()
+        // Do NOT cancel an in-flight timer — that starves flushes when token
+        // arrival rate > 1/48ms. Let deltas accumulate; the running timer will
+        // flush them all when it fires.
+        if (batchJob?.isActive == true) return
         batchJob = batchScope.launch {
             delay(48)
             flushPendingDeltas()
@@ -73,7 +76,6 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
                     val part = messageParts[idx]
                     val newPart = when (part) {
                         is Part.Text -> {
-                            android.util.Log.e("DeltaDebug", "delta='${entry.delta.take(80)}' hasNL=${entry.delta.contains("\n")} fullLen=${entry.delta.length}")
                             if (part.text.endsWith(entry.delta)) part  // dedup
                             else part.copy(text = part.text + entry.delta)
                         }
@@ -195,7 +197,8 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     private fun handleMessagePartUpdated(event: SseEvent.MessagePartUpdated) {
         val messageId = event.part.messageId
         val partId = event.part.id
-        val thread = Thread.currentThread().threadId()
+        @Suppress("DEPRECATION")
+        val thread = Thread.currentThread().id
         _parts.update { current ->
             val messageParts = current[messageId]?.toMutableList() ?: mutableListOf()
             val idx = messageParts.indexOfFirst { it.id == partId }
@@ -346,7 +349,8 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     // ============ Batch Operations ============
 
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        val thread = Thread.currentThread().threadId()
+        @Suppress("DEPRECATION")
+        val thread = Thread.currentThread().id
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
@@ -422,7 +426,8 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
      * the window between REST snapshot and new SSE connection establishment.
      */
     fun replaceMessages(sessionId: String, newMessages: List<MessageWithParts>) {
-        val thread = Thread.currentThread().threadId()
+        @Suppress("DEPRECATION")
+        val thread = Thread.currentThread().id
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
