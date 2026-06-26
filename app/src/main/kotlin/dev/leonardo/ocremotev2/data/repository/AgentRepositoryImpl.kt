@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
+import dev.leonardo.ocremotev2.data.api.system.SystemApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.domain.model.AgentInfo
 import dev.leonardo.ocremotev2.domain.model.CommandInfo
@@ -10,13 +11,14 @@ import javax.inject.Singleton
 
 @Singleton
 class AgentRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi,
+    private val systemApi: SystemApi,
+    private val fileApi: FileApi,
     private val serverRepo: ServerDataStore
 ) : AgentRepository {
 
     override suspend fun listAgents(serverId: String): Result<List<AgentInfo>> = runCatching {
         val conn = resolveConnection(serverId)
-        api.listAgents(conn).map { it.toDomain() }
+        systemApi.listAgents(conn).map { it.toDomain() }
     }
 
     override suspend fun switchAgent(serverId: String, sessionId: String, agentId: String): Result<Unit> {
@@ -25,7 +27,7 @@ class AgentRepositoryImpl @Inject constructor(
 
     override suspend fun loadCommands(serverId: String): Result<List<CommandInfo>> = runCatching {
         val conn = resolveConnection(serverId)
-        api.listCommands(conn).map { it.toDomain() }
+        systemApi.listCommands(conn).map { it.toDomain() }
     }
 
     override suspend fun searchFiles(
@@ -36,7 +38,7 @@ class AgentRepositoryImpl @Inject constructor(
         limit: Int
     ): Result<List<String>> = runCatching {
         val conn = resolveConnection(serverId)
-        api.findFiles(conn, query, dirs = dirs, directory = directory, limit = limit)
+        fileApi.findFiles(conn, query, dirs = dirs, directory = directory, limit = limit)
     }
 
     private suspend fun resolveConnection(serverId: String): ServerConnection {

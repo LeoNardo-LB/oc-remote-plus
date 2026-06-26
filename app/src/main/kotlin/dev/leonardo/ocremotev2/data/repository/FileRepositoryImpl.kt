@@ -1,6 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
 import dev.leonardo.ocremotev2.data.mapper.FileMapper
 import dev.leonardo.ocremotev2.domain.model.FileContent
 import dev.leonardo.ocremotev2.domain.model.FileNode
@@ -11,7 +11,7 @@ import javax.inject.Singleton
 
 @Singleton
 class FileRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi,
+    private val api: FileApi,
     private val serverRepository: ServerRepository
 ) : FileRepository {
 

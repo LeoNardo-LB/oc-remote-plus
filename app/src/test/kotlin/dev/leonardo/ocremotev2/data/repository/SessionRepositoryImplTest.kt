@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.message.MessageApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.repository.handler.*
 import dev.leonardo.ocremotev2.domain.model.*
@@ -15,14 +16,16 @@ import org.junit.Test
 class SessionRepositoryImplTest {
 
     private lateinit var repo: SessionRepositoryImpl
-    private lateinit var api: OpenCodeApi
+    private lateinit var sessionApi: SessionApi
+    private lateinit var messageApi: MessageApi
     private lateinit var eventDispatcher: EventDispatcher
     private lateinit var serverRepo: ServerDataStore
     private lateinit var sessionHandler: SessionEventHandler
 
     @Before
     fun setup() {
-        api = mockk(relaxed = true)
+        sessionApi = mockk(relaxed = true)
+        messageApi = mockk(relaxed = true)
         serverRepo = mockk(relaxed = true)
         sessionHandler = SessionEventHandler()
         val messageHandler = MessageEventHandler()
@@ -39,7 +42,7 @@ class SessionRepositoryImplTest {
             sessionNextHandler = SessionNextEventHandler(),
             sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
         )
-        repo = SessionRepositoryImpl(api, eventDispatcher, serverRepo)
+        repo = SessionRepositoryImpl(sessionApi, messageApi, eventDispatcher, serverRepo)
     }
 
     private fun testSession(id: String) = Session(
@@ -75,7 +78,7 @@ class SessionRepositoryImplTest {
         coEvery { serverRepo.getServer("server1") } returns ServerConfig(
             id = "server1", url = "http://localhost:4096"
         )
-        coEvery { api.createSession(any(), "Title", any(), any()) } returns newSession
+        coEvery { sessionApi.createSession(any(), "Title", any(), any()) } returns newSession
 
         val result = repo.createSession("server1", CreateSessionOpts(title = "Title"))
         assertTrue(result.isSuccess)
@@ -97,7 +100,7 @@ class SessionRepositoryImplTest {
         coEvery { serverRepo.getServer("server1") } returns ServerConfig(
             id = "server1", url = "http://localhost:4096"
         )
-        coEvery { api.deleteSession(any(), "s1") } returns true
+        coEvery { sessionApi.deleteSession(any(), "s1") } returns true
 
         val result = repo.deleteSession("server1", "s1")
         assertTrue(result.isSuccess)
@@ -116,7 +119,7 @@ class SessionRepositoryImplTest {
         coEvery { serverRepo.getServer("server1") } returns ServerConfig(
             id = "server1", url = "http://localhost:4096"
         )
-        coEvery { api.deleteSession(any(), "s1") } throws java.io.IOException("Connection reset")
+        coEvery { sessionApi.deleteSession(any(), "s1") } throws java.io.IOException("Connection reset")
 
         val result = repo.deleteSession("server1", "s1")
         assertTrue(result.isFailure)

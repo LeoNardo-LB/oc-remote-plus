@@ -1,7 +1,8 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
 import android.util.Log
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.message.MessageApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.domain.model.CreateSessionOpts
 import dev.leonardo.ocremotev2.domain.model.MessageWithParts
@@ -18,14 +19,15 @@ import javax.inject.Singleton
 
 /**
  * Implementation of [SessionRepository].
- * Bridges domain interface with EventDispatcher (state) and OpenCodeApi (network).
+ * Bridges domain interface with EventDispatcher (state) and domain APIs (network).
  *
  * Phase 3: compiled but not yet wired to UseCases. Phase 4 will migrate
- * ViewModel/OpenCodeApi direct calls to go through this repository.
+ * ViewModel direct calls to go through this repository.
  */
 @Singleton
 class SessionRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi,
+    private val sessionApi: SessionApi,
+    private val messageApi: MessageApi,
     private val eventDispatcher: EventDispatcher,
     private val serverRepo: ServerDataStore
 ) : SessionRepository {
@@ -67,7 +69,7 @@ class SessionRepositoryImpl @Inject constructor(
 
     override suspend fun createSession(serverId: String, opts: CreateSessionOpts): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.createSession(
+        sessionApi.createSession(
             conn = conn,
             title = opts.title,
             parentId = opts.parentId,
@@ -77,7 +79,7 @@ class SessionRepositoryImpl @Inject constructor(
 
     override suspend fun deleteSession(serverId: String, sessionId: String): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.deleteSession(conn, sessionId)
+        sessionApi.deleteSession(conn, sessionId)
     }
 
     override suspend fun switchSession(sessionId: String): Result<Unit> = runCatching {
@@ -88,48 +90,48 @@ class SessionRepositoryImpl @Inject constructor(
 
     override suspend fun getSession(serverId: String, sessionId: String): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.getSession(conn, sessionId)
+        sessionApi.getSession(conn, sessionId)
     }
 
     // ============ Session Lifecycle ============
 
     override suspend fun abort(serverId: String, sessionId: String, directory: String?): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.abortSession(conn, sessionId, directory)
+        sessionApi.abortSession(conn, sessionId, directory)
     }
 
     override suspend fun rename(serverId: String, sessionId: String, title: String): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.updateSession(conn, sessionId, title)
+        sessionApi.updateSession(conn, sessionId, title)
     }
 
     override suspend fun fork(serverId: String, sessionId: String): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.forkSession(conn, sessionId)
+        sessionApi.forkSession(conn, sessionId)
     }
 
     // ============ Archive ============
 
     override suspend fun archive(serverId: String, sessionId: String): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.updateSessionFields(conn, sessionId, mapOf("archived" to true))
+        sessionApi.updateSessionFields(conn, sessionId, mapOf("archived" to true))
     }
 
     override suspend fun unarchive(serverId: String, sessionId: String): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.updateSessionFields(conn, sessionId, mapOf("archived" to false))
+        sessionApi.updateSessionFields(conn, sessionId, mapOf("archived" to false))
     }
 
     // ============ Share / Export ============
 
     override suspend fun shareSession(serverId: String, sessionId: String): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.shareSession(conn, sessionId)
+        sessionApi.shareSession(conn, sessionId)
     }
 
     override suspend fun unshareSession(serverId: String, sessionId: String): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.unshareSession(conn, sessionId)
+        sessionApi.unshareSession(conn, sessionId)
     }
 
     override suspend fun compactSession(
@@ -139,7 +141,7 @@ class SessionRepositoryImpl @Inject constructor(
         modelId: String
     ): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.summarizeSession(conn, sessionId, providerId, modelId)
+        sessionApi.summarizeSession(conn, sessionId, providerId, modelId)
     }
 
     override suspend fun exportSessionToStream(
@@ -149,14 +151,14 @@ class SessionRepositoryImpl @Inject constructor(
         onProgress: (Long) -> Unit
     ): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.exportSessionToStream(conn, sessionId, outputStream, onProgress)
+        messageApi.exportSessionToStream(conn, sessionId, outputStream, onProgress)
     }
 
     // ============ Import ============
 
     override suspend fun importSession(serverId: String, shareUrl: String): Result<Session> = runCatching {
         val conn = resolveConnection(serverId)
-        api.importSession(conn, shareUrl)
+        sessionApi.importSession(conn, shareUrl)
     }
 
     // ============ Message Operations ============
@@ -167,7 +169,7 @@ class SessionRepositoryImpl @Inject constructor(
         messageId: String
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
-        api.deleteMessage(conn, sessionId, messageId)
+        messageApi.deleteMessage(conn, sessionId, messageId)
     }
 
     override suspend fun deleteMessagePart(
@@ -177,7 +179,7 @@ class SessionRepositoryImpl @Inject constructor(
         partIndex: Int
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
-        api.deleteMessagePart(conn, sessionId, messageId, partIndex)
+        messageApi.deleteMessagePart(conn, sessionId, messageId, partIndex)
     }
 
     override suspend fun listMessages(
@@ -186,7 +188,7 @@ class SessionRepositoryImpl @Inject constructor(
         limit: Int
     ): Result<List<MessageWithParts>> = runCatching {
         val conn = resolveConnection(serverId)
-        api.listMessages(conn, sessionId, limit)
+        messageApi.listMessages(conn, sessionId, limit)
     }
 
     // ============ Private Helpers ============
@@ -243,7 +245,7 @@ class SessionRepositoryImpl @Inject constructor(
 
     override suspend fun fetchSessionStatuses(serverId: String, directory: String?): Result<Map<String, SessionStatus>> = runCatching {
         val conn = resolveConnection(serverId)
-        val rawStatuses = api.fetchSessionStatus(conn, directory = directory).getOrThrow()
+        val rawStatuses = sessionApi.fetchSessionStatus(conn, directory = directory).getOrThrow()
         rawStatuses.mapValues { (_, info) ->
             when (info.type) {
                 "busy" -> SessionStatus.Busy

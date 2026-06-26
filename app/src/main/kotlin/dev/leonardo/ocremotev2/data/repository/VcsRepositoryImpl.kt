@@ -1,6 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
 import dev.leonardo.ocremotev2.data.mapper.VcsMapper
 import dev.leonardo.ocremotev2.domain.model.VcsDiffMode
 import dev.leonardo.ocremotev2.domain.repository.ServerRepository
@@ -10,7 +10,7 @@ import javax.inject.Singleton
 
 @Singleton
 class VcsRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi,
+    private val api: FileApi,
     private val serverRepository: ServerRepository
 ) : VcsRepository {
 

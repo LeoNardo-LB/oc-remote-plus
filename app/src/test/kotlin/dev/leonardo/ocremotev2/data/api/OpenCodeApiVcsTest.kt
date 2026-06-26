@@ -1,5 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.data.api
 
+import dev.leonardo.ocremotev2.data.api.file.FileApi
+import dev.leonardo.ocremotev2.data.api.file.FileApiImpl
 import dev.leonardo.ocremotev2.data.dto.response.FileDiffDto
 import dev.leonardo.ocremotev2.data.dto.response.VcsBranchDto
 import dev.leonardo.ocremotev2.data.dto.response.VcsChangeDto
@@ -22,11 +24,11 @@ class OpenCodeApiVcsTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun buildApi(engine: MockEngine): OpenCodeApi {
+    private fun buildApi(engine: MockEngine): FileApi {
         val httpClient = HttpClient(engine) {
             install(ContentNegotiation) { json(json) }
         }
-        return OpenCodeApi(httpClient, json)
+        return FileApiImpl(ApiClient(httpClient, json))
     }
 
     private val conn = ServerConnection.from(

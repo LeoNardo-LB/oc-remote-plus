@@ -25,7 +25,7 @@ class ApiClient @Inject constructor(
  * Attach the `x-opencode-directory` header to a request when [directory] is non-null.
  *
  * Shared by all domain Api implementations — extracted verbatim from the original
- * `OpenCodeApi.directoryHeader` private extension so method bodies can be moved
+ * monolithic API class's `directoryHeader` private extension so method bodies can be moved
  * without modification.
  */
 internal fun HttpRequestBuilder.directoryHeader(directory: String?) {

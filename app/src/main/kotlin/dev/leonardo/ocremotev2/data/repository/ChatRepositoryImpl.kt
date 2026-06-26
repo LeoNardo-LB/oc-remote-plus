@@ -1,6 +1,9 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.message.MessageApi
+import dev.leonardo.ocremotev2.data.api.provider.ProviderApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
+import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.dto.common.ModelSelection as DataModelSelection
 import dev.leonardo.ocremotev2.data.dto.request.PromptPart as DataPromptPart
@@ -31,14 +34,17 @@ import javax.inject.Singleton
 
 /**
  * Implementation of [ChatRepository].
- * Bridges domain interface with EventDispatcher (state) and OpenCodeApi (network).
+ * Bridges domain interface with EventDispatcher (state) and domain APIs (network).
  *
  * Phase 3: compiled but not yet wired to UseCases. Phase 4 will migrate
- * ViewModel/OpenCodeApi direct calls to go through this repository.
+ * ViewModel direct calls to go through this repository.
  */
 @Singleton
 class ChatRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi,
+    private val messageApi: MessageApi,
+    private val sessionApi: SessionApi,
+    private val terminalApi: TerminalApi,
+    private val providerApi: ProviderApi,
     private val eventDispatcher: EventDispatcher,
     private val serverRepo: ServerDataStore,
     private val permissionAutoApprover: PermissionAutoApprover
@@ -119,7 +125,7 @@ class ChatRepositoryImpl @Inject constructor(
     override suspend fun sendMessage(sessionId: String, parts: List<Part>): Result<Message> = runCatching {
         val conn = resolveConnectionForSession(sessionId)
         val promptParts = parts.map { it.toDataPromptPart() }
-        api.promptAsync(conn, sessionId, promptParts)
+        messageApi.promptAsync(conn, sessionId, promptParts)
         // The actual message arrives via SSE — return a lightweight placeholder.
         // Callers should observe [getMessagesFlow] for the real Message.
         Message.User(
@@ -133,14 +139,14 @@ class ChatRepositoryImpl @Inject constructor(
         val sessionId = findSessionForPermission(permissionId)
             ?: throw IllegalStateException("Session not found for permission $permissionId")
         val conn = resolveConnectionForSession(sessionId)
-        api.replyToPermission(conn, permissionId, reply)
+        messageApi.replyToPermission(conn, permissionId, reply)
     }
 
     override suspend fun replyQuestion(questionId: String, answer: String): Result<Boolean> = runCatching {
         val sessionId = findSessionForQuestion(questionId)
             ?: throw IllegalStateException("Session not found for question $questionId")
         val conn = resolveConnectionForSession(sessionId)
-        api.replyToQuestion(conn, questionId, listOf(listOf(answer)))
+        messageApi.replyToQuestion(conn, questionId, listOf(listOf(answer)))
     }
 
     override suspend fun promptAsync(
@@ -153,17 +159,17 @@ class ChatRepositoryImpl @Inject constructor(
         directory: String?
     ): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.promptAsync(conn, sessionId, parts.map { it.toData() }, model?.toData(), agent, variant, directory)
+        messageApi.promptAsync(conn, sessionId, parts.map { it.toData() }, model?.toData(), agent, variant, directory)
     }
 
     override suspend fun revertSession(serverId: String, sessionId: String, messageId: String): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.revertSession(conn, sessionId, messageId)
+        sessionApi.revertSession(conn, sessionId, messageId)
     }
 
     override suspend fun unrevertSession(serverId: String, sessionId: String): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        api.unrevertSession(conn, sessionId)
+        sessionApi.unrevertSession(conn, sessionId)
     }
 
     override suspend fun respondPermission(
@@ -173,26 +179,26 @@ class ChatRepositoryImpl @Inject constructor(
         directory: String?
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
-        api.replyToPermission(conn, permissionId, reply, directory = directory)
+        messageApi.replyToPermission(conn, permissionId, reply, directory = directory)
     }
 
     override suspend fun selectModel(serverId: String, providerId: String, modelId: String): Result<Unit> = runCatching {
         val conn = resolveConnection(serverId)
-        // TODO: Phase 4 — verify if OpenCodeApi has a dedicated updateModel endpoint
+        // TODO: Phase 4 — verify if there is a dedicated updateModel endpoint
         // For now, use config patch as fallback
-        api.updateConfig(conn, dev.leonardo.ocremotev2.data.dto.request.ServerConfigPatch())
+        providerApi.updateConfig(conn, dev.leonardo.ocremotev2.data.dto.request.ServerConfigPatch())
     }
 
     // ============ Pending Queries ============
 
     override suspend fun listPendingPermissions(serverId: String, directory: String?): Result<List<PermissionState>> = runCatching {
         val conn = resolveConnection(serverId)
-        api.listPendingPermissions(conn, directory).map { it.toDomainPermissionState() }
+        messageApi.listPendingPermissions(conn, directory).map { it.toDomainPermissionState() }
     }
 
     override suspend fun listPendingQuestions(serverId: String, directory: String?): Result<List<QuestionState>> = runCatching {
         val conn = resolveConnection(serverId)
-        api.listPendingQuestions(conn, directory).map { it.toDomainQuestionState() }
+        messageApi.listPendingQuestions(conn, directory).map { it.toDomainQuestionState() }
     }
 
     override suspend fun replyToQuestion(
@@ -202,7 +208,7 @@ class ChatRepositoryImpl @Inject constructor(
         directory: String?
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
-        api.replyToQuestion(conn, requestId, answers, directory)
+        messageApi.replyToQuestion(conn, requestId, answers, directory)
     }
 
     override suspend fun rejectQuestion(
@@ -211,7 +217,7 @@ class ChatRepositoryImpl @Inject constructor(
         directory: String?
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
-        api.rejectQuestion(conn, requestId, directory)
+        messageApi.rejectQuestion(conn, requestId, directory)
     }
 
     // ============ Undo/Redo ============
@@ -228,7 +234,7 @@ class ChatRepositoryImpl @Inject constructor(
                 throw UnsupportedOperationException("Use revertSession(serverId, sessionId, messageId) for undo")
             }
             "redo" -> {
-                api.unrevertSession(conn, sessionId)
+                sessionApi.unrevertSession(conn, sessionId)
             }
             else -> throw IllegalArgumentException("Invalid action: $action. Must be 'undo' or 'redo'")
         }
@@ -244,7 +250,7 @@ class ChatRepositoryImpl @Inject constructor(
         directory: String?
     ): Result<Boolean> = runCatching {
         val conn = resolveConnection(serverId)
-        api.executeCommand(conn, sessionId, command, arguments, directory)
+        sessionApi.executeCommand(conn, sessionId, command, arguments, directory)
     }
 
     override suspend fun runShellCommand(
@@ -260,7 +266,7 @@ class ChatRepositoryImpl @Inject constructor(
         val model = if (providerId != null && modelId != null) {
             DataModelSelection(providerId = providerId, modelId = modelId)
         } else null
-        api.runShellCommand(conn, sessionId, command, agent, model, directory)
+        terminalApi.runShellCommand(conn, sessionId, command, agent, model, directory)
     }
 
     override fun getToolExpandedStates(): Map<String, Boolean> = toolExpandedStates

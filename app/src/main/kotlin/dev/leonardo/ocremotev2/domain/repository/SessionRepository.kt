@@ -43,7 +43,7 @@ interface SessionRepository {
 
     /**
      * Switch the active session.
-     * Phase 3 impl: delegates to OpenCodeApi or connection service.
+     * Phase 3 impl: delegates to SessionApi or connection service.
      */
     suspend fun switchSession(sessionId: String): Result<Unit>
 

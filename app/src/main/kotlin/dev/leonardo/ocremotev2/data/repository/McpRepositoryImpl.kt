@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.provider.ProviderApi
+import dev.leonardo.ocremotev2.data.api.system.SystemApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.domain.model.McpServerStatus
 import dev.leonardo.ocremotev2.domain.repository.McpRepository
@@ -9,7 +10,8 @@ import javax.inject.Singleton
 
 @Singleton
 class McpRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi
+    private val systemApi: SystemApi,
+    private val providerApi: ProviderApi
 ) : McpRepository {
 
     @Volatile
@@ -24,8 +26,8 @@ class McpRepositoryImpl @Inject constructor(
 
     override suspend fun getMcpServers(): Result<List<McpServerStatus>> = runCatching {
         val conn = requireConnection()
-        val statusMap = api.getMcpStatus(conn)
-        val configMap = api.getConfig(conn).mcp ?: emptyMap()
+        val statusMap = systemApi.getMcpStatus(conn)
+        val configMap = providerApi.getConfig(conn).mcp ?: emptyMap()
 
         statusMap.map { (name, entry) ->
             val config = configMap[name]
@@ -42,9 +44,9 @@ class McpRepositoryImpl @Inject constructor(
     override suspend fun toggleMcpServer(name: String, connect: Boolean): Result<Boolean> = runCatching {
         val conn = requireConnection()
         if (connect) {
-            api.connectMcpServer(conn, name)
+            systemApi.connectMcpServer(conn, name)
         } else {
-            api.disconnectMcpServer(conn, name)
+            systemApi.disconnectMcpServer(conn, name)
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.domain.model.TerminalEvent
 import dev.leonardo.ocremotev2.domain.repository.TerminalRepository
@@ -11,13 +10,12 @@ import javax.inject.Singleton
 
 @Singleton
 class TerminalRepositoryImpl @Inject constructor(
-    private val api: OpenCodeApi,
     private val serverRepo: ServerDataStore
 ) : TerminalRepository {
 
     override fun connectTerminal(serverId: String, sessionId: String): Flow<TerminalEvent> {
         // TODO: Wire to actual WebSocket PTY stream.
-        // The interface uses sessionId but OpenCodeApi PTY methods use ptyId.
+        // The interface uses sessionId but PTY methods use ptyId.
         // The flow requires: createPty → openPtySocket(ptyId) → emit frames.
         return flow { /* stub */ }
     }
@@ -35,8 +33,8 @@ class TerminalRepositoryImpl @Inject constructor(
         val config = serverRepo.getServer(serverId)
             ?: throw IllegalStateException("Server config not found: $serverId")
         val conn = ServerConnection.from(config.url, config.username, config.password)
-        // TODO: Interface uses sessionId but api.updatePtySize requires ptyId.
+        // TODO: Interface uses sessionId but updatePtySize requires ptyId.
         // Need a sessionId→ptyId mapping or change interface to accept ptyId.
-        // api.updatePtySize(conn, sessionId, cols, rows)
+        // terminalApi.updatePtySize(conn, sessionId, cols, rows)
     }
 }

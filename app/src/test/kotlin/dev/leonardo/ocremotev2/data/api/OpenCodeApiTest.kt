@@ -15,10 +15,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Characterization tests for OpenCodeApi DTO serialization/deserialization.
+ * Characterization tests for domain API DTO serialization/deserialization.
  *
- * These tests lock in the EXISTING serialization contract for DTOs defined in
- * OpenCodeApi.kt that are NOT already covered by SerializationTest.
+ * These tests lock in the EXISTING serialization contract for DTOs that are NOT
+ * already covered by SerializationTest.
  *
  * Phase 0 safety net: if any of these break, the refactoring broke the API contract.
  */

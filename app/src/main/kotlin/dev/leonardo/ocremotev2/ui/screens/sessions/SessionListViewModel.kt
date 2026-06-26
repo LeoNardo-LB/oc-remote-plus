@@ -11,7 +11,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.leonardo.ocremotev2.data.dto.response.FileNodeDto
 import dev.leonardo.ocremotev2.data.dto.response.ServerPaths
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
+import dev.leonardo.ocremotev2.data.api.system.SystemApi
+import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
 import dev.leonardo.ocremotev2.domain.model.Project
@@ -72,7 +75,10 @@ data class SessionItem(
 class SessionListViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val eventDispatcher: EventDispatcher,
-    private val api: OpenCodeApi,
+    private val sessionApi: SessionApi,
+    private val fileApi: FileApi,
+    private val systemApi: SystemApi,
+    private val terminalApi: TerminalApi,
     private val manageSessionUseCase: ManageSessionUseCase,
     private val deleteSessionUseCase: DeleteSessionUseCase,
     private val draftRepository: DraftRepository,
@@ -251,19 +257,19 @@ class SessionListViewModel @Inject constructor(
             _error.value = null
             resetPagination()
             try {
-                val projects = api.listProjects(conn)
+                val projects = fileApi.listProjects(conn)
                 _projects.value = projects
                 if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${projects.size} projects for multi-project session fetch")
 
                 if (projects.isEmpty()) {
-                    val sessions = api.listSessions(conn, search = _searchQuery.value)
+                    val sessions = sessionApi.listSessions(conn, search = _searchQuery.value)
                     eventDispatcher.setSessions(serverId, sessions)
                     if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions (no projects)")
                 } else {
                     var totalSessions = 0
                     for (project in projects) {
                         try {
-                            val sessions = api.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
+                            val sessions = sessionApi.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
                             eventDispatcher.setSessions(serverId, sessions)
                             totalSessions += sessions.size
                             if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${sessions.size} sessions for project ${project.displayName}")
@@ -306,15 +312,15 @@ class SessionListViewModel @Inject constructor(
             _isRefreshing.value = true
             _error.value = null
             try {
-                val projects = api.listProjects(conn)
+                val projects = fileApi.listProjects(conn)
                 _projects.value = projects
                 if (projects.isEmpty()) {
-                    val sessions = api.listSessions(conn, search = _searchQuery.value)
+                    val sessions = sessionApi.listSessions(conn, search = _searchQuery.value)
                     eventDispatcher.setSessions(serverId, sessions)
                 } else {
                     for (project in projects) {
                         try {
-                            val sessions = api.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
+                            val sessions = sessionApi.listSessions(conn, directory = project.worktree, search = _searchQuery.value)
                             eventDispatcher.setSessions(serverId, sessions)
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed to refresh sessions for project ${project.displayName}: ${e.message}")
@@ -334,7 +340,7 @@ class SessionListViewModel @Inject constructor(
 
     private suspend fun syncSessionStatuses(directory: String? = null) {
         try {
-            val result = api.fetchSessionStatus(conn, directory = directory)
+            val result = sessionApi.fetchSessionStatus(conn, directory = directory)
             result.onSuccess { statuses ->
                 if (BuildConfig.DEBUG) Log.d(TAG, "Polled ${statuses.size} session statuses for directory: ${directory ?: "all"}")
                 val statusMap = statuses.mapValues { (_, info) ->
@@ -478,7 +484,7 @@ class SessionListViewModel @Inject constructor(
             _isLoadingMore.value = true
             try {
                 val cursor = _currentCursor.value
-                val sessions = api.listSessions(
+                val sessions = sessionApi.listSessions(
                     conn,
                     directory = _baseDirectory.value,
                     search = _searchQuery.value,
@@ -537,7 +543,7 @@ class SessionListViewModel @Inject constructor(
     suspend fun getServerPaths(): ServerPaths {
         if (cachedServerPaths == null) {
             cachedServerPaths = try {
-                api.getServerPaths(conn)
+                systemApi.getServerPaths(conn)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get server paths", e)
                 ServerPaths()
@@ -560,7 +566,7 @@ class SessionListViewModel @Inject constructor(
             async {
                 val drivePath = "$letter:\\"
                 try {
-                    val response = api.probeDirectory(conn, drivePath)
+                    val response = fileApi.probeDirectory(conn, drivePath)
                     if (response) {
                         FileNodeDto(
                             name = "$letter:",
@@ -581,7 +587,7 @@ class SessionListViewModel @Inject constructor(
     /** List directories in a given path on the server. */
     suspend fun listDirectories(directory: String): List<FileNodeDto> {
         return try {
-            val nodes = api.listDirectory(conn, path = "", directory = directory)
+            val nodes = fileApi.listDirectory(conn, path = "", directory = directory)
             nodes.filter { it.type == "directory" }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to list directory: $directory", e)
@@ -592,7 +598,7 @@ class SessionListViewModel @Inject constructor(
     /** Search for directories matching a query, scoped to a base directory. */
     suspend fun searchDirectories(query: String, directory: String): List<String> {
         return try {
-            api.findFiles(conn, query = query, type = "directory", directory = directory, limit = 50)
+            fileApi.findFiles(conn, query = query, type = "directory", directory = directory, limit = 50)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to search directories", e)
             emptyList()
@@ -613,7 +619,7 @@ class SessionListViewModel @Inject constructor(
                 "${parentDirectory.trimEnd('/')}/$sanitized"
             }
 
-            val tempSession = api.createSession(
+            val tempSession = sessionApi.createSession(
                 conn = conn,
                 title = "mkdir",
                 directory = parentDirectory,
@@ -624,7 +630,7 @@ class SessionListViewModel @Inject constructor(
                 val command = "mkdir -p -- '$escaped'"
 
                 val runShellOk = runCatching {
-                    api.runShellCommand(
+                    terminalApi.runShellCommand(
                         conn = conn,
                         sessionId = tempSession.id,
                         command = command,
@@ -634,7 +640,7 @@ class SessionListViewModel @Inject constructor(
                 }.getOrElse { false }
 
                 if (!runShellOk) {
-                    val executeOk = api.executeCommand(
+                    val executeOk = sessionApi.executeCommand(
                         conn = conn,
                         sessionId = tempSession.id,
                         command = "bash",
@@ -662,7 +668,7 @@ class SessionListViewModel @Inject constructor(
 
     private suspend fun directoryExists(directory: String): Boolean {
         return try {
-            api.listDirectory(conn, path = "", directory = directory)
+            fileApi.listDirectory(conn, path = "", directory = directory)
             true
         } catch (_: Exception) {
             false

@@ -1,6 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.dto.response.FileContentDto
 import dev.leonardo.ocremotev2.data.dto.response.FileNodeDto
@@ -20,7 +20,7 @@ import org.junit.Test
 
 class FileRepositoryImplTest {
 
-    private val api: OpenCodeApi = mockk()
+    private val api: FileApi = mockk()
     private val serverRepository: ServerRepository = mockk()
     private lateinit var sut: FileRepository
 
