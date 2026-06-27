@@ -71,6 +71,7 @@ import dev.leonardo.ocremotev2.ui.screens.settings.sections.AppearanceSection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatBehaviorSection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatDisplaySection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.GeneralSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.NotificationsSection
 import dev.leonardo.ocremotev2.ui.screens.settings.components.TerminalFontSizeDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ThemePickerDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.getImageMaxSideDisplayName
@@ -198,43 +199,7 @@ fun SettingsScreen(
             )
 
             // ======== Notifications ========
-            SectionHeader(stringResource(R.string.settings_section_notifications))
-
-            // Notifications
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_notifications)) },
-                supportingContent = { Text(stringResource(R.string.settings_notifications_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.a11y_settings_notifications))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = notificationsEnabled,
-                        onCheckedChange = { viewModel.setNotificationsEnabled(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setNotificationsEnabled(!notificationsEnabled) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Silent notifications
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_silent_notifications)) },
-                supportingContent = { Text(stringResource(R.string.settings_silent_notifications_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.NotificationsOff, contentDescription = stringResource(R.string.a11y_settings_silent_notifications))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = silentNotifications,
-                        onCheckedChange = { viewModel.setSilentNotifications(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setSilentNotifications(!silentNotifications) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            NotificationsSection(viewModel = viewModel)
 
             // ======== Permissions ========
             SectionHeader(stringResource(R.string.settings_auto_approve_rules))
