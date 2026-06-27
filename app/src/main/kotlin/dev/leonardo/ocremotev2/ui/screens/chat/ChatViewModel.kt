@@ -1,13 +1,8 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.chat
 
 import android.util.Log
-import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import dev.leonardo.ocremotev2.BuildConfig
-import dev.leonardo.ocremotev2.R
 import androidx.lifecycle.SavedStateHandle
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -22,7 +17,6 @@ import dev.leonardo.ocremotev2.domain.model.PromptPart
 import dev.leonardo.ocremotev2.domain.model.ProviderCatalog
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
 import dev.leonardo.ocremotev2.data.repository.SessionStatusManager
-import dev.leonardo.ocremotev2.ui.navigation.routes.ChatNav
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCardResolver
 import dev.leonardo.ocremotev2.ui.screens.chat.util.ContextBreakdown
 import dev.leonardo.ocremotev2.ui.screens.chat.util.ContextDetailState
@@ -32,8 +26,6 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.SessionTimestamps
 import dev.leonardo.ocremotev2.ui.screens.chat.util.cacheHitRate
 import dev.leonardo.ocremotev2.ui.screens.chat.util.countMessages
 import dev.leonardo.ocremotev2.ui.screens.chat.util.estimateContextBreakdown
-import dev.leonardo.ocremotev2.domain.model.Draft
-import dev.leonardo.ocremotev2.domain.repository.DraftRepository
 import dev.leonardo.ocremotev2.domain.model.*
 import dev.leonardo.ocremotev2.domain.repository.ChatRepository
 import dev.leonardo.ocremotev2.domain.repository.SessionRepository
@@ -42,23 +34,14 @@ import dev.leonardo.ocremotev2.domain.tracker.TokenStatsTracker
 import dev.leonardo.ocremotev2.domain.usecase.*
 import dev.leonardo.ocremotev2.data.api.SseClient
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.net.URLDecoder
 import javax.inject.Inject
 
@@ -310,21 +293,9 @@ class ChatViewModel @Inject constructor(
      *  old messages (should be hidden) from new messages (should be shown). */
     // Removed: using m.id <= revertState.messageId instead (OpenCode pattern)
 
-    // ============ Loading & Error State ============
-    private val _isLoading = MutableStateFlow(true)
-    private val _isRefreshing = MutableStateFlow(false)  // Background refresh — no UI wipe
-    /** Timestamp of last successful refresh. Used to skip unnecessary ON_RESUME refreshes. */
-    private var lastRefreshTimeMs: Long = 0L
-    private val _error = MutableStateFlow<String?>(null)
-    private val _isSending = MutableStateFlow(false)
-
-    // ============ V1 Message State ============
-    private val _messagesList = MutableStateFlow<List<Message>>(emptyList())
-    /** Raw (unfiltered) messages — used for hasIncompleteMessage check to avoid
-     *  the window where a new assistant message has no parts yet. */
-    private val _rawMessagesList = MutableStateFlow<List<Message>>(emptyList())
-    private val _partsList = MutableStateFlow<List<Part>>(emptyList())
-    private var sseJob: Job? = null
+    // (lastRefreshTimeMs migrated to SessionActionsDelegate — Phase 3 Task 6 — G cluster.)
+    // (_isLoading / _isRefreshing / _error / _isSending / _messagesList / _rawMessagesList /
+    //  _partsList / sseJob) migrated to MessageDataDelegate (Phase 3 Task 5 — B cluster).
 
     /** Expose chatRepository for ChatMessageList composable (tool progress, step progress, compaction state). */
     val chatRepositoryExposed: ChatRepository get() = chatRepository
@@ -344,13 +315,25 @@ class ChatViewModel @Inject constructor(
     val serverId: String = URLDecoder.decode(
         savedStateHandle.get<String>("serverId") ?: "", "UTF-8"
     )
-    private val directoryParam: String = URLDecoder.decode(
-        savedStateHandle.get<String>(ChatNav.PARAM_DIRECTORY) ?: "", "UTF-8"
+    // ============ Session Lifecycle Delegate (Phase 3 Task 3 — C cluster) ============
+    // Owns session identity/directory/lazy-creation — the spine of the delegate layer.
+    // sessionIdFlow feeds 6 combine pipelines; sessionDirectory/sessionLoaded feed
+    // TerminalDelegate & DraftInputDelegate via their constructor providers.
+    private val sessionLifecycle = SessionLifecycleDelegate(
+        manageSessionUseCase = manageSessionUseCase,
+        sessionRepository = sessionRepository,
+        serverId = serverId,
+        savedStateHandle = savedStateHandle,
+        scope = viewModelScope,
+        // Forwarding via VM methods (not direct messageData refs) avoids a
+        // property-init circular dependency: messageData needs sessionLifecycle
+        // .sessionIdFlow while sessionLifecycle's lambdas would reference messageData.
+        // Method calls resolve lazily at invocation time (well after both are init).
+        onMessagesNeedLoading = { loadMessagesForSession() },
+        onStartObservingMessages = { startObservingMessages() },
     )
-    private val _sessionId = MutableStateFlow(URLDecoder.decode(
-        savedStateHandle.get<String>("sessionId") ?: "", "UTF-8"
-    ))
-    val sessionId: String get() = _sessionId.value
+    /** Current session id — facade over [sessionLifecycle]. */
+    val sessionId: String get() = sessionLifecycle.sessionId
 
     /**
      * Called when ChatScreen enters composition.
@@ -374,58 +357,115 @@ class ChatViewModel @Inject constructor(
         sessionStatusManager.setServerId(serverId)
     }
 
-    private val _allProviders = MutableStateFlow<List<ProviderCatalog>>(emptyList())
-    private val _providers = MutableStateFlow<List<ProviderCatalog>>(emptyList())
-    private val _hiddenModels = MutableStateFlow<Set<String>>(emptySet())
-    private val _defaultModels = MutableStateFlow<Map<String, String>>(emptyMap())
-    private val _selectedProviderId = MutableStateFlow<String?>(null)
-    private val _selectedModelId = MutableStateFlow<String?>(null)
-    // Track if the model was explicitly selected by the user to avoid overwriting it with defaults/history
-    private var isModelExplicitlySelected = false
-    /** The directory of this session's project — sent as x-opencode-directory so the server resolves the correct project context. */
-    private var sessionDirectory: String? = null
-    /** Mutex to prevent concurrent session creation */
-    private val sessionCreateMutex = Mutex()
-    /** Signals when [loadSession] has finished (successfully or with error), so that terminal
-     *  creation can wait for [sessionDirectory] to be populated. */
-    private val sessionLoaded = CompletableDeferred<Unit>()
-    private val _agents = MutableStateFlow<List<AgentInfo>>(emptyList())
-    /** Pair(agentName, explicitlySelected) — using a single flow avoids race between flag and value */
-    private val _selectedAgent = MutableStateFlow("build" to false)
-    private val _selectedVariant = MutableStateFlow<String?>(null)
-    private val _commands = MutableStateFlow<List<CommandInfo>>(emptyList())
-    private val terminalWorkspace = terminalRegistry.workspaceFor(
-        serverId, serverUrl, username, password.ifEmpty { null }
-    ).also {
-        if (BuildConfig.DEBUG) {
-            Log.d("TerminalZoom", "ChatViewModel init: workspaceId=${System.identityHashCode(it)} flowId=${System.identityHashCode(it.activeFontSizeSp)} serverId=$serverId vmId=${System.identityHashCode(this)}")
-        }
-    }
-    val terminalTabs: StateFlow<List<TerminalTabUi>> = terminalWorkspace.tabList
-    val activeTerminalTabId: StateFlow<String?> = terminalWorkspace.activeTabId
+    // ============ Model Config Delegate (Phase 3 Task 4 — A cluster) ============
+    // Owns provider/agent/model/variant/command selection and the modelConfigState
+    // resolution pipeline (with self-feedback side effects). Consumes sessionIdFlow
+    // from sessionLifecycle; exposes selectedAgentValue/selectedVariantValue for
+    // DraftInputDelegate draft persistence and sendParts().
+    private val modelConfig = ModelConfigDelegate(
+        selectModelUseCase = selectModelUseCase,
+        manageAgentUseCase = manageAgentUseCase,
+        settingsRepository = settingsRepository,
+        sessionRepository = sessionRepository,
+        messagePaging = messagePaging,
+        tokenStatsTracker = tokenStatsTracker,
+        serverId = serverId,
+        sessionIdFlow = sessionLifecycle.sessionIdFlow,
+        scope = viewModelScope,
+    )
+    val modelConfigState: StateFlow<ModelConfigState> get() = modelConfig.modelConfigState
+    fun selectAgent(name: String) = modelConfig.selectAgent(name)
+    fun cycleVariant() = modelConfig.cycleVariant()
+    fun selectModel(providerId: String, modelId: String) = modelConfig.selectModel(providerId, modelId)
+
+    // ============ Message Data Delegate (Phase 3 Task 5 — B cluster) ============
+    // Owns message SSE observation, loading, pagination, send-state, tool-expand,
+    // and the messageListState/interactionState combine pipelines. Consumes
+    // sessionIdFlow from sessionLifecycle; exposes intent methods (onSendStarted/
+    // onSendSuccess/onSendError) and sseJob management (cancelSseJob/
+    // startObservingMessages) so sendParts/abort/revert coordinators stay in the
+    // ViewModel but never touch this delegate's private state directly.
+    private val messageData: MessageDataDelegate = MessageDataDelegate(
+        manageSessionUseCase = manageSessionUseCase,
+        managePermissionUseCase = managePermissionUseCase,
+        chatRepository = chatRepository,
+        messagePaging = messagePaging,
+        sessionStatusManager = sessionStatusManager,
+        sessionRepository = sessionRepository,
+        settingsRepository = settingsRepository,
+        serverId = serverId,
+        sessionIdFlow = sessionLifecycle.sessionIdFlow,
+        sessionDirectoryProvider = { sessionLifecycle.sessionDirectory },
+        scope = viewModelScope,
+    )
+    /** Message list state — facade over [messageData]. */
+    val messageListState: StateFlow<MessageListState> get() = messageData.messageListState
+    /** Interaction state — facade over [messageData]. */
+    val interactionState: StateFlow<InteractionState> get() = messageData.interactionState
+
+    private val terminalDelegate = TerminalDelegate(
+        terminalRegistry = terminalRegistry,
+        settingsRepository = settingsRepository,
+        serverId = serverId,
+        serverUrl = serverUrl,
+        username = username,
+        password = password.ifEmpty { null },
+        scope = viewModelScope,
+        sessionDirectoryProvider = { sessionLifecycle.sessionDirectory },
+        sessionLoaded = sessionLifecycle.sessionLoaded,
+    )
+    val terminalTabs: StateFlow<List<TerminalTabUi>> get() = terminalDelegate.terminalTabs
+    val activeTerminalTabId: StateFlow<String?> get() = terminalDelegate.activeTerminalTabId
     /** Incremented on active terminal tab updates — observe to trigger recomposition. */
-    val terminalVersion: StateFlow<Long> = terminalWorkspace.activeVersion
-    val terminalConnected: StateFlow<Boolean> = terminalWorkspace.activeConnected
-    val terminalFontSizeSp: StateFlow<Float> = terminalWorkspace.activeFontSizeSp
-    val terminalEmulator: org.connectbot.terminal.TerminalEmulator get() = terminalWorkspace.activeEmulator()
-    val terminalCursorKeysAppMode: Boolean get() = terminalWorkspace.activeAdapter().cursorKeysApplicationMode.value
+    val terminalVersion: StateFlow<Long> get() = terminalDelegate.terminalVersion
+    val terminalConnected: StateFlow<Boolean> get() = terminalDelegate.terminalConnected
+    val terminalFontSizeSp: StateFlow<Float> get() = terminalDelegate.terminalFontSizeSp
+    val terminalEmulator: org.connectbot.terminal.TerminalEmulator get() = terminalDelegate.terminalEmulator
+    val terminalCursorKeysAppMode: Boolean get() = terminalDelegate.terminalCursorKeysAppMode
 
-    // ============ Draft Persistence ============
-    /** Draft text for the input field — survives navigation / app restart. */
-    private val _draftText = MutableStateFlow("")
-    val draftText: StateFlow<String> = _draftText
+    // ============ Draft Input Delegate (Phase 3 Task 2 — D cluster) ============
+    private val draftDelegate = DraftInputDelegate(
+        draftUseCase = draftUseCase,
+        manageAgentUseCase = manageAgentUseCase,
+        scope = viewModelScope,
+        serverId = serverId,
+        sessionIdProvider = { sessionLifecycle.sessionId },
+        sessionDirectoryProvider = { sessionLifecycle.sessionDirectory },
+        selectedAgentProvider = { modelConfig.selectedAgentValue },
+        selectedVariantProvider = { modelConfig.selectedVariantValue },
+    )
+    val draftText: StateFlow<String> get() = draftDelegate.draftText
+    val revertedDraftEvent: SharedFlow<RevertedDraftPayload> get() = draftDelegate.revertedDraftEvent
+    val draftAttachmentUris: StateFlow<List<String>> get() = draftDelegate.draftAttachmentUris
+    val confirmedFilePaths: StateFlow<Set<String>> get() = draftDelegate.confirmedFilePaths
 
-    /** One-shot event: emits reverted draft payload (text + image attachments) for ChatScreen. */
-    private val _revertedDraftEvent = MutableSharedFlow<RevertedDraftPayload>(extraBufferCapacity = 1)
-    val revertedDraftEvent: SharedFlow<RevertedDraftPayload> = _revertedDraftEvent
-
-    /** Draft attachment URIs (content:// URIs as strings) — survives navigation / app restart. */
-    private val _draftAttachmentUris = MutableStateFlow<List<String>>(emptyList())
-    val draftAttachmentUris: StateFlow<List<String>> = _draftAttachmentUris
-
-    /** Set of file paths that have been confirmed by user selection from the popup */
-    private val _confirmedFilePaths = MutableStateFlow<Set<String>>(emptySet())
-    val confirmedFilePaths: StateFlow<Set<String>> = _confirmedFilePaths
+    // ============ Session Actions Delegate (Phase 3 Task 6 — G cluster) ============
+    // Owns 24 stateless REST operations — no private StateFlow. Reads other delegates'
+    // state via providers and delegates to UseCases/Repositories. Cross-delegate
+    // coordinators (sendParts, revertMessage, abortSession) stay in this ViewModel.
+    private val sessionActions = SessionActionsDelegate(
+        shareExportUseCase = shareExportUseCase,
+        undoRedoUseCase = undoRedoUseCase,
+        manageSessionUseCase = manageSessionUseCase,
+        managePermissionUseCase = managePermissionUseCase,
+        manageTerminalUseCase = manageTerminalUseCase,
+        sessionRepository = sessionRepository,
+        chatRepository = chatRepository,
+        serverId = serverId,
+        scope = viewModelScope,
+        sessionIdProvider = { sessionLifecycle.sessionId },
+        sessionDirectoryProvider = { sessionLifecycle.sessionDirectory },
+        modelConfigProvider = { modelConfigState.value },
+        messageListProvider = { messageListState.value.messages },
+        ensureSession = { sessionLifecycle.ensureSession() },
+        loadSessionInfo = { sessionLifecycle.loadSession() },
+        awaitSessionLoaded = { sessionLifecycle.sessionLoaded.await() },
+        refreshMessages = { messageData.refreshMessages() },
+        fixIncompleteMessagesIfIdle = { messageData.fixIncompleteMessagesIfIdle(it) },
+        loadPendingQuestions = { messageData.loadPendingQuestions() },
+        loadPendingPermissions = { messageData.loadPendingPermissions() },
+        restoreRevertedDraft = { draftDelegate.restoreRevertedDraft(it) },
+    )
 
     // ============ Settings (exposed for ChatScreen) ============
     val chatFontSize = settingsRepository.getSettingsFlow().map { it.chatFontSize }.stateIn(
@@ -446,91 +486,39 @@ class ChatViewModel @Inject constructor(
     val collapseTools = settingsRepository.getSettingsFlow().map { it.collapseTools }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    // ============ Optimistic Send ============
+    // ============ Tool Expand / Pagination (delegated — Phase 3 Task 5) ============
+    val toolExpandedStates: StateFlow<Map<String, Boolean>> get() = messageData.toolExpandedStates
 
-    /** Locally-generated IDs for optimistic messages. Used to distinguish from server-confirmed. */
-    private val _pendingMessageIds = MutableStateFlow<Set<String>>(emptySet())
+    fun toggleToolExpanded(toolId: String, defaultExpanded: Boolean = false) =
+        messageData.toggleToolExpanded(toolId, defaultExpanded)
 
-    /** Draft restored after a failed send. UI consumes once and sets back to null. */
-    private val _restoredDraft = MutableStateFlow<RevertedDraftPayload?>(null)
-
-    // ============ Tool Expand State ============
-    private val _toolExpandedStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
-    val toolExpandedStates: StateFlow<Map<String, Boolean>> = _toolExpandedStates
-
-    fun toggleToolExpanded(toolId: String, defaultExpanded: Boolean = false) {
-        _toolExpandedStates.update { it + (toolId to !(it[toolId] ?: defaultExpanded)) }
-    }
-
-    fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean {
-        return _toolExpandedStates.value[toolId] ?: autoExpand
-    }
-
-    // ============ Pagination ============
-    /**
-     * Number of messages to load per page. Doubles each "load older" click.
-     * Refreshed from the user's initialMessageCount setting at the start of [loadSession].
-     */
-    private var currentMessageLimit = 30
-    /** Whether there are more messages on the server beyond the current limit. */
-    private val _hasOlderMessages = MutableStateFlow(false)
-    /** Whether a "load older" request is in flight. */
-    private val _isLoadingOlder = MutableStateFlow(false)
+    fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean =
+        messageData.isToolExpanded(toolId, autoExpand)
 
     // ============ Scroll Position Save/Restore ============
+    private val scrollPositionDelegate = ScrollPositionDelegate()
+
     /** Saved scroll position for restoring after sub-session navigation. */
-    var savedMessageId by mutableStateOf<String?>(null)
-        private set
+    val savedMessageId: String? get() = scrollPositionDelegate.savedMessageId
     /** Raw LazyColumn index at save time — used for direct restoration without index arithmetic. */
-    var savedLazyIndex by mutableStateOf(0)
-        private set
-    var savedScrollOffset by mutableStateOf(0)
-        private set
-
-    /**
-     * Incremented each time [saveScrollPosition] is called, and again by
-     * [bumpScrollRestoreIfPending] when ChatScreen resumes with a pending restore.
-     * ChatScreen observes this via LaunchedEffect to reliably restore scroll position
-     * after FileViewer / sub-session navigation. Using rememberLazyListState(initial...)
-     * is unreliable because `remember` caches the initial state on first composition and
-     * ignores new values on recomposition, causing scroll to sometimes restore and sometimes not.
-     */
-    var scrollRestoreVersion by mutableStateOf(0)
-        private set
-
-    /**
-     * True when a scroll position has been saved (via [saveScrollPosition]) but not yet
-     * restored. Used by [bumpScrollRestoreIfPending] to re-trigger restoration ONLY when
-     * returning from a navigation that actually saved a position (FileViewer / sub-session),
-     * avoiding spurious restores on plain background→foreground transitions that would
-     * disturb the user's current browsing position.
-     */
-    private var hasPendingScrollRestore = false
+    val savedLazyIndex: Int get() = scrollPositionDelegate.savedLazyIndex
+    val savedScrollOffset: Int get() = scrollPositionDelegate.savedScrollOffset
+    val scrollRestoreVersion: Int get() = scrollPositionDelegate.scrollRestoreVersion
 
     /** Public read-only flag: true when scroll position needs to be restored on return. */
-    val pendingScrollRestore: Boolean get() = hasPendingScrollRestore
+    val pendingScrollRestore: Boolean get() = scrollPositionDelegate.pendingScrollRestore
 
-    fun clearPendingScrollRestore() {
-        hasPendingScrollRestore = false
-    }
+    fun clearPendingScrollRestore() = scrollPositionDelegate.clearPendingScrollRestore()
 
-    fun saveScrollPosition(lazyIndex: Int, offset: Int) {
-        savedLazyIndex = lazyIndex
-        savedScrollOffset = offset
-        scrollRestoreVersion++
-        hasPendingScrollRestore = true
-    }
+    fun saveScrollPosition(lazyIndex: Int, offset: Int) =
+        scrollPositionDelegate.saveScrollPosition(lazyIndex, offset)
 
     /**
      * Re-triggers scroll position restoration on ON_RESUME, but only when a save is pending
      * (i.e. the user is returning from FileViewer or a sub-session). Plain background→foreground
      * transitions are ignored so the user's current browsing position is not disturbed.
      */
-    fun bumpScrollRestoreIfPending() {
-        if (hasPendingScrollRestore) {
-            scrollRestoreVersion++
-        }
-    }
+    fun bumpScrollRestoreIfPending() = scrollPositionDelegate.bumpScrollRestoreIfPending()
     val expandReasoning = settingsRepository.getSettingsFlow().map { it.expandReasoning }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
@@ -552,254 +540,23 @@ class ChatViewModel @Inject constructor(
     val imageAttachmentWebpQuality = settingsRepository.getSettingsFlow().map { it.imageAttachmentWebpQuality }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 60
     )
-    // ============ Model/Agent Config State (with resolution side effects) ============
-
-    /**
-     * Model and agent configuration — providers, agents, model/agent selection, variants.
-     * Performs side effects: model/agent resolution from message history, model caching,
-     * and sync-back to raw StateFlows so sendParts()/runShellCommand() use consistent values.
-     */
-    val modelConfigState: StateFlow<ModelConfigState> = _sessionId.flatMapLatest { sid ->
-        combine(
-            _allProviders,
-            _providers,
-            _defaultModels,
-            _selectedProviderId,
-            _selectedModelId,
-            _agents,
-            _selectedAgent,
-            _selectedVariant,
-            _commands,
-            messagePaging.observeMessages(sid),
-            sessionRepository.getSessionsFlow(serverId),
-            tokenStatsTracker.stats,
-        ) { args ->
-            @Suppress("UNCHECKED_CAST")
-            val allProviders = args[0] as List<ProviderCatalog>
-            @Suppress("UNCHECKED_CAST")
-            val providers = args[1] as List<ProviderCatalog>
-            @Suppress("UNCHECKED_CAST")
-            val defaultModels = args[2] as Map<String, String>
-            val selProviderId = args[3] as String?
-            val selModelId = args[4] as String?
-            @Suppress("UNCHECKED_CAST")
-            val agents = args[5] as List<AgentInfo>
-            @Suppress("UNCHECKED_CAST")
-            val agentSelection = args[6] as Pair<String, Boolean>
-            val selectedAgent = agentSelection.first
-            val isAgentExplicitlySelected = agentSelection.second
-            val selectedVariant = args[7] as String?
-            @Suppress("UNCHECKED_CAST")
-            val commands = args[8] as List<CommandInfo>
-            @Suppress("UNCHECKED_CAST")
-            val sessionMessages = args[9] as List<Message>
-            @Suppress("UNCHECKED_CAST")
-            val allSessions = args[10] as List<Session>
-            val tokenStats = args[11] as TokenStatsTracker.TokenStats
-
-            // Resolve model: explicit selection > last user message's model > provider default
-            var effectiveProviderId = selProviderId
-            var effectiveModelId = selModelId
-
-            if (!isModelExplicitlySelected) {
-                val lastUserWithModel = sessionMessages
-                    .filterIsInstance<Message.User>()
-                    .lastOrNull { it.model != null }
-                if (lastUserWithModel?.model != null) {
-                    effectiveProviderId = lastUserWithModel.model.providerId
-                    effectiveModelId = lastUserWithModel.model.modelId
-                } else if (effectiveModelId == null && defaultModels.isNotEmpty()) {
-                    val entry = defaultModels.entries.first()
-                    effectiveProviderId = entry.key
-                    effectiveModelId = entry.value
-                }
-            }
-
-            // Resolve agent from last user message if not explicitly changed
-            val effectiveAgent = if (!isAgentExplicitlySelected) {
-                val lastUserAgent = sessionMessages
-                    .filterIsInstance<Message.User>()
-                    .lastOrNull { it.agent != null }
-                    ?.agent
-                lastUserAgent ?: selectedAgent
-            } else {
-                selectedAgent
-            }
-
-            // Keep raw state in sync so sendParts()/runShellCommand() always use the displayed value
-            if (effectiveAgent != selectedAgent && !isAgentExplicitlySelected) {
-                _selectedAgent.value = effectiveAgent to false
-            }
-
-            // Keep model StateFlows in sync with the effective model
-            if ((effectiveProviderId != selProviderId || effectiveModelId != selModelId) && !isModelExplicitlySelected) {
-                _selectedProviderId.value = effectiveProviderId
-                _selectedModelId.value = effectiveModelId
-            }
-
-            // Resolve available variants for the currently selected model.
-            var currentModel = if (effectiveProviderId != null && effectiveModelId != null) {
-                providers.find { it.id == effectiveProviderId }
-                    ?.models?.get(effectiveModelId)
-            } else null
-            if (currentModel == null) {
-                val firstProvider = providers.firstOrNull()
-                val firstModel = firstProvider?.models?.values?.firstOrNull()
-                if (firstProvider != null && firstModel != null) {
-                    effectiveProviderId = firstProvider.id
-                    effectiveModelId = firstModel.id
-                    currentModel = firstModel
-                }
-            }
-            val availableVariants = currentModel?.variantNames?.sorted() ?: emptyList()
-
-            // Persist the resolved model to the in-memory cache
-            if (effectiveProviderId != null && effectiveModelId != null) {
-                sessionModelCache[sid] = effectiveProviderId to effectiveModelId
-            }
-
-            // Resolve context window with fallback to provider model info
-            val session = allSessions.find { it.id == sid }
-            val contextWindow = tokenStats.contextWindow.let { cw ->
-                if (cw > 0) cw else session?.model?.let { sm ->
-                    providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.contextWindow
-                } ?: currentModel?.contextWindow ?: 0
-            }
-
-            ModelConfigState(
-                providers = providers,
-                hasServerModelCatalog = allProviders.any { it.models.isNotEmpty() },
-                defaultModels = defaultModels,
-                selectedProviderId = effectiveProviderId,
-                selectedModelId = effectiveModelId,
-                agents = agents.filter { it.mode != "subagent" && !it.hidden },
-                selectedAgent = effectiveAgent,
-                variantNames = availableVariants,
-                selectedVariant = if (selectedVariant != null && selectedVariant in availableVariants) selectedVariant else null,
-                commands = commands,
-                contextWindow = contextWindow,
-            )
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        ModelConfigState()
-    )
-
     /** Expose restored draft as StateFlow for ChatScreen consumption. */
-    val restoredDraftState: StateFlow<RevertedDraftPayload?> = _restoredDraft
+    val restoredDraftState: StateFlow<RevertedDraftPayload?> get() = draftDelegate.restoredDraftState
 
     // NOTE: Legacy uiState is declared after the 5 split StateFlows below (needs forward references).
 
     // ============ Split State Flows (independent combines for fine-grained recomposition) ============
 
-    /**
-     * Message list state — derived from V1 chatRepository flows.
-     * Combines messages, parts, and tool expand states.
-     */
-    val messageListState: StateFlow<MessageListState> = _sessionId.flatMapLatest { sid ->
-        combine(
-            sessionRepository.getSessionsFlow(serverId),
-            messagePaging.observeMessages(sid),
-            chatRepository.getAllPartsMap(),
-            _isLoading,
-            _hasOlderMessages,
-            _isLoadingOlder,
-            _toolExpandedStates,
-            _pendingMessageIds,
-            sessionStatusManager.statusFlow,
-        ) { args ->
-            @Suppress("UNCHECKED_CAST")
-            val allSessions = args[0] as List<Session>
-            @Suppress("UNCHECKED_CAST")
-            val sessionMessages = args[1] as List<Message>
-            @Suppress("UNCHECKED_CAST")
-            val allParts = args[2] as Map<String, List<Part>>
-            val loading = args[3] as Boolean
-            val hasOlderMessages = args[4] as Boolean
-            val isLoadingOlder = args[5] as Boolean
-            @Suppress("UNCHECKED_CAST")
-            val toolExpandedStates = args[6] as Map<String, Boolean>
-            @Suppress("UNCHECKED_CAST")
-            val pendingMessageIds = args[7] as Set<String>
-            @Suppress("UNCHECKED_CAST")
-            val statuses = args[8] as Map<String, SessionStatus>
-
-            val session = allSessions.find { it.id == sid }
-            val revertState = session?.revert
-
-            val visible: List<Message> = if (loading && sessionMessages.isEmpty()) {
-                emptyList()
-            } else {
-                val sorted = sessionMessages.sortedBy { it.time.created }
-                if (revertState != null) {
-                    // OpenCode pattern: filter by message ID string comparison.
-                    // Message IDs are ULID (monotonically increasing), so
-                    // id <= revertId correctly includes the revert point and
-                    // everything before it.
-                    sorted.filter { it.id < revertState.messageId }
-                } else {
-                    sorted
-                }
-            }
-
-            // P5-1: queuedMessageIds derived from FSM status — Idle forces clear.
-            // Computed on the full visible list (before P5-3 filtering) so pending
-            // assistant detection is not affected by empty-parts filtering.
-            val fsmStatus = statuses[sid] ?: SessionStatus.Idle
-            val queuedMessageIds: Set<String> = if (fsmStatus is SessionStatus.Idle) {
-                emptySet()
-            } else {
-                val pendingAssistantIndex = visible.indexOfLast {
-                    it is Message.Assistant && it.time.completed == null
-                }
-                if (pendingAssistantIndex >= 0) {
-                    visible.drop(pendingAssistantIndex + 1)
-                        .filterIsInstance<Message.User>()
-                        .map { it.id }
-                        .toSet()
-                } else {
-                    emptySet()
-                }
-            }
-
-            // P5-3: filter out assistant messages with no parts to prevent
-            // empty bubble flash (MessageUpdated arrives before MessagePartUpdated).
-            val chatMessages = visible
-                .filter { msg ->
-                    msg is Message.User || (msg is Message.Assistant && allParts[msg.id]?.isNotEmpty() == true)
-                }
-                .map { msg ->
-                    ChatMessage(
-                        message = msg,
-                        parts = allParts[msg.id] ?: emptyList()
-                    )
-                }
-
-            MessageListState(
-                messages = chatMessages,
-                messageCount = chatMessages.size,
-                hasOlderMessages = hasOlderMessages,
-                isLoadingOlder = isLoadingOlder,
-                toolExpandedStates = toolExpandedStates,
-                queuedMessageIds = queuedMessageIds,
-                pendingMessageIds = pendingMessageIds,
-            )
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        MessageListState()
-    )
+    // messageListState — migrated to MessageDataDelegate (Phase 3 Task 5 — B cluster).
 
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
-     * Includes [_sessionId] as a source so lazy-session creation triggers immediate recomputation.
+     * Includes [SessionLifecycleDelegate.sessionIdFlow] as a source so lazy-session creation triggers immediate recomputation.
      * Session status is sourced from [SessionStatusManager.statusFlow] (FSM-driven),
      * the single source of truth for busy/idle/activity state.
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
-        _sessionId,
+        sessionLifecycle.sessionIdFlow,
         sessionRepository.getSessionsFlow(serverId),
         sessionStatusManager.statusFlow,
         sessionRepository.getCurrentAgentFlow(serverId),
@@ -835,38 +592,7 @@ class ChatViewModel @Inject constructor(
         SessionMetaState()
     )
 
-    /**
-     * Interaction state — loading, sending, error derived from V1 sources,
-     * pending permission/question cards from V1 chatRepository.
-     */
-    val interactionState: StateFlow<InteractionState> = combine(
-        _sessionId,
-        _isLoading,
-        _error,
-        _isSending,
-        sessionRepository.getSessionsFlow(serverId),
-        chatRepository.getAllQuestionsFlow(),
-        chatRepository.getAllPermissionsFlow(),
-    ) { args ->
-        val sid = args[0] as String
-        val loading = args[1] as Boolean
-        val error = args[2] as String?
-        val sending = args[3] as Boolean
-        @Suppress("UNCHECKED_CAST")
-        val allSessions = args[4] as List<Session>
-
-        InteractionState(
-            isLoading = loading,
-            isSending = sending,
-            error = error,
-            pendingPermissions = chatRepository.getPermissionsWithChildren(sid, allSessions),
-            pendingQuestions = chatRepository.getQuestionsWithChildren(sid, allSessions),
-        )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        InteractionState()
-    )
+    // interactionState — migrated to MessageDataDelegate (Phase 3 Task 5 — B cluster).
 
     /**
      * Token usage statistics — changes on every streaming token update.
@@ -893,7 +619,7 @@ class ChatViewModel @Inject constructor(
      * Session directory — current chat's working directory, used for the top bar subtitle.
      * Empty when session is not yet resolved or has no directory.
      */
-    val directoryState: StateFlow<String> = _sessionId.flatMapLatest { sid ->
+    val directoryState: StateFlow<String> = sessionLifecycle.sessionIdFlow.flatMapLatest { sid ->
         sessionRepository.getSessionsFlow(serverId).map { sessions ->
             sessions.find { it.id == sid }?.directory.orEmpty()
         }
@@ -908,7 +634,7 @@ class ChatViewModel @Inject constructor(
      * cache hit rate, and per-call token metrics. Built from the last assistant message
      * (with token-bearing StepFinish) plus session-level stats. Drives [ContextDetailDialog].
      */
-    val contextDetailState: StateFlow<ContextDetailState> = _sessionId.flatMapLatest { sid ->
+    val contextDetailState: StateFlow<ContextDetailState> = sessionLifecycle.sessionIdFlow.flatMapLatest { sid ->
         combine(
             messageListState,
             tokenStatsState,
@@ -975,7 +701,7 @@ class ChatViewModel @Inject constructor(
         interactionState,
         tokenStatsState,
         modelConfigState,
-        _restoredDraft,
+        draftDelegate.restoredDraftState,
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val msgList = args[0] as MessageListState
@@ -1045,7 +771,7 @@ class ChatViewModel @Inject constructor(
         // Token values use the LAST assistant message's tokens (represents current context size).
         // Cost is cumulative across all API calls.
         viewModelScope.launch {
-            _messagesList.collect { messages ->
+            messageData.messagesList.collect { messages ->
                 val assistantMessages = messages.filterIsInstance<Message.Assistant>()
 
                 // Cost is cumulative across all API calls
@@ -1079,651 +805,122 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Restore draft from disk
+        // Restore draft from disk — apply restored agent/variant to model config
         if (!isNewSession) {
-            val draft = draftUseCase.getDraft(sessionId)
+            val draft = draftDelegate.restorePersistedDraft()
             if (draft != null) {
-                _draftText.value = draft.text
-                _draftAttachmentUris.value = draft.imageUris
-                if (draft.confirmedFilePaths.isNotEmpty()) {
-                    _confirmedFilePaths.value = draft.confirmedFilePaths.toSet()
-                }
-                if (!draft.selectedAgent.isNullOrBlank()) {
-                    _selectedAgent.value = draft.selectedAgent to true
-                }
-                if (!draft.selectedVariant.isNullOrBlank()) {
-                    _selectedVariant.value = draft.selectedVariant
-                }
+                modelConfig.applyDraftRestore(draft.selectedAgent, draft.selectedVariant)
             }
         }
 
         // Restore model selection from in-memory cache (survives session switching, cleared on app restart)
         if (!isNewSession) {
-            sessionModelCache[sessionId]?.let { (providerId, modelId) ->
-                _selectedProviderId.value = providerId
-                _selectedModelId.value = modelId
-                isModelExplicitlySelected = true
-            }
+            modelConfig.restoreModelFromCache()
         }
 
-        viewModelScope.launch {
-            settingsRepository.hiddenModels(serverId).collect { hidden ->
-                _hiddenModels.value = hidden
-                applyProviderFilter()
-            }
-        }
-
-        viewModelScope.launch {
-            settingsRepository.getSettingsFlow().map { it.terminalFontSize }.collect { size ->
-                terminalWorkspace.setDefaultFontSize(size)
-            }
-        }
+        modelConfig.observeHiddenModels()
 
         // Load initial message count from settings, then load data
         if (!isNewSession) {
             viewModelScope.launch {
                 try {
-                    loadSession()
+                    sessionLifecycle.loadSession()
                 } catch (e: Exception) {
                 }
                 try {
-                    loadMessages()
+                    messageData.loadMessages()
                 } catch (e: Exception) {
                 }
                 try {
-                    loadPendingQuestions()
+                    messageData.loadPendingQuestions()
                 } catch (e: Exception) {
                 }
                 try {
-                    loadPendingPermissions()
+                    messageData.loadPendingPermissions()
                 } catch (e: Exception) {
                 }
             }
         } else {
             // New session: set directory from route param, skip loading
-            if (directoryParam.isNotEmpty()) {
-                sessionDirectory = directoryParam
-            }
-            if (!sessionLoaded.isCompleted) {
-                sessionLoaded.complete(Unit)
-            }
+            sessionLifecycle.initForNewSession()
             // New session has nothing to load — mark loading complete immediately
-            _isLoading.value = false
+            messageData.markLoaded()
         }
-        loadProviders()
-        loadAgents()
-        loadCommands()
+        modelConfig.loadProviders()
+        modelConfig.loadAgents()
+        modelConfig.loadCommands()
     }
 
-    /**
-     * Load session info and messages via V1 API, then observe SSE-driven flows.
-     */
-    private suspend fun loadSession() {
-        // Apply user-configured initial message count as the pagination starting point
-        currentMessageLimit = settingsRepository.getSettingsFlow().first().initialMessageCount
-        try {
-            // 1. Load session info for directory / session metadata
-            val session = manageSessionUseCase.getSession(serverId, sessionId)
-            if (session.directory.isNotBlank()) {
-                sessionDirectory = session.directory
-                if (BuildConfig.DEBUG) Log.d(TAG, "Session directory: ${session.directory}")
-            }
-            sessionRepository.setSessions(serverId, listOf(session))
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load session info", e)
-        } finally {
-            if (!sessionLoaded.isCompleted) {
-                sessionLoaded.complete(Unit)
-            }
-        }
-
-        // 2. Load messages via V1 API
-        try {
-            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-            chatRepository.setMessages(sessionId, messages)
-            if (BuildConfig.DEBUG) Log.d(TAG, "V1 loaded ${messages.size} messages for session $sessionId")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load messages", e)
-        }
-
-        // 3. Start observing chatRepository flows (driven by SSE EventDispatcher)
-        runCatching { startObservingMessages() }
-            .onFailure { Log.e(TAG, "Failed to start observing messages", it) }
-    }
-
-    /**
-     * Observe V1 chatRepository flows (driven by SSE EventDispatcher).
-     * Messages and parts are updated automatically as SSE events arrive.
-     */
-    private fun startObservingMessages() {
-        sseJob?.cancel()
-        sseJob = viewModelScope.launch {
-            combine(
-                chatRepository.getMessagesFlow(sessionId),
-                chatRepository.getParts(sessionId),
-            ) { messages, parts ->
-                val grouped = parts.groupBy { it.messageId }
-                // 过滤掉还没有 parts 的 assistant 消息：
-                // MessageUpdated 可能先于 MessagePartUpdated 到达，此时 assistant 消息存在但没有内容，
-                // 导致 UI 上看起来回复没出现。等第一个 part 到达后自然会显示。
-                val visibleMessages = messages.filter { msg ->
-                    msg is Message.User || (msg is Message.Assistant && grouped[msg.id]?.isNotEmpty() == true)
-                }
-                val missingParts = messages.size - visibleMessages.size
-                Log.d(TAG, "[sseJob] msgs=${messages.size} visible=${visibleMessages.size} parts=${parts.size} active=${sseJob?.isActive} filtered=$missingParts")
-                _rawMessagesList.value = messages
-                _messagesList.value = visibleMessages
-                _partsList.value = parts
-            }.collect { }
-        }
-    }
+    // loadMessagesForSession / startObservingMessages — migrated to MessageDataDelegate
+    // (Phase 3 Task 5 — B cluster). These thin forwarders are invoked via the
+    // sessionLifecycle callbacks; they exist as VM methods (rather than inlining
+    // messageData refs into the lambdas) to avoid a property-init circular dep.
+    private suspend fun loadMessagesForSession() = messageData.loadMessagesForSession()
+    private fun startObservingMessages() = messageData.startObservingMessages()
 
     /**
      * Load messages via V1 API for modelConfigState resolution (model/agent from history).
+     * Facade over [messageData].
      */
-    fun loadMessages() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            try {
-                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-                chatRepository.setMessages(sessionId, messages)
-                _hasOlderMessages.value = messages.size >= currentMessageLimit
-
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Loaded ${messages.size} messages for session $sessionId (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
-                }
-            } catch (e: Throwable) {
-                Log.e(TAG, "Failed to load messages", e)
-                if (e is OutOfMemoryError || (e.cause is OutOfMemoryError)) {
-                    Log.w(TAG, "OOM loading messages, retrying with smaller limit")
-                    currentMessageLimit = (currentMessageLimit / 2).coerceAtLeast(10)
-                    try {
-                        val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-                        chatRepository.mergeMessages(sessionId, messages)
-                        _hasOlderMessages.value = messages.size >= currentMessageLimit
-                        if (BuildConfig.DEBUG) Log.d(TAG, "Retry succeeded: loaded ${messages.size} messages (limit=$currentMessageLimit)")
-                    } catch (retryEx: Throwable) {
-                        Log.e(TAG, "Retry also failed", retryEx)
-                        _error.value = retryEx.message ?: "Failed to load messages"
-                    }
-                } else {
-                    _error.value = e.message ?: "Failed to load messages"
-                }
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
+    fun loadMessages() = messageData.loadMessages()
 
     /**
-     * Refresh session data — reloads messages and session status from REST.
+     * Refresh session data — facade over [sessionActions].
      */
-    fun refreshSession() {
-        viewModelScope.launch {
-            refreshAndSync()
-        }
-    }
+    fun refreshSession() = sessionActions.refreshSession()
 
     /**
      * Refresh session only if enough time has passed since last refresh.
-     * Called from ON_RESUME — avoids unnecessary REST calls during brief app-switches.
-     *
-     * Only syncs session status and refreshes messages via REST.
-     * Does NOT restart sseJob to avoid scroll position reset and data flickering.
+     * Facade over [sessionActions].
      */
-    fun refreshIfNeeded() {
-        val elapsed = System.currentTimeMillis() - lastRefreshTimeMs
-        if (elapsed >= REFRESH_COOLDOWN_MS) {
-            refreshSession()
-        }
-    }
+    fun refreshIfNeeded() = sessionActions.refreshIfNeeded()
 
-    /**
-     * Refresh messages via V1 API.
-     */
-    private suspend fun refreshMessages() {
-        _isRefreshing.value = true
-        try {
-            val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-            chatRepository.setMessages(sessionId, messages)
-            _hasOlderMessages.value = messages.size >= currentMessageLimit
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed to refresh messages", e)
-        } finally {
-            _isRefreshing.value = false
-        }
-    }
+    // refreshMessages — migrated to MessageDataDelegate (Phase 3 Task 5 — B cluster).
 
     /**
      * Query the OpenCode server for actual session statuses and correct
-     * any UI state drift caused by missed SSE events.
-     *
-     * Writes ALL session statuses from REST response (not just current session).
-     * Only marks the current session's messages as completed if it's truly idle.
-     *
-     * Triggered on:
-     * - Entering a session (LaunchedEffect(sessionId))
-     * - Resuming from background (DisposableEffect ON_RESUME)
+     * any UI state drift caused by missed SSE events. Facade over [sessionActions].
      */
-    fun syncSessionStatus() {
-        viewModelScope.launch {
-            // Wait for loadSession() to complete so sessionDirectory is populated.
-            // Without this, REST call may use null directory and return incorrect status.
-            if (sessionId.isNotBlank()) {
-                sessionLoaded.await()
-            }
-            val result = sessionRepository.fetchSessionStatuses(serverId, directory = sessionDirectory)
-            result.onSuccess { statusMap ->
-                // Batch-update ALL session statuses (one REST call, all sessions)
-                sessionRepository.syncAllSessionStatuses(statusMap)
+    fun syncSessionStatus() = sessionActions.syncSessionStatus()
 
-                // Only mark current session as idle if REST explicitly confirmed it's idle.
-                // null means the server didn't report this session (possibly wrong directory),
-                // which must NOT be treated as "confirmed idle" — doing so would incorrectly
-                // overwrite a legitimate Busy status from SSE and break ongoing tasks.
-                val currentStatus = statusMap[sessionId]
-                if (currentStatus is SessionStatus.Idle) {
-                    sessionRepository.markSessionIdleProtected(sessionId)
-                    // If server says idle but local messages are incomplete (server restart),
-                    // fix the messages so the UI shows the correct state.
-                    fixIncompleteMessagesIfIdle(sessionId)
-                }
-            }
-        }
-    }
+    // refreshAndSync — migrated to SessionActionsDelegate (Phase 3 Task 6 — G cluster).
 
-    /**
-     * Combined refresh + sync — runs in a single coroutine to avoid
-     * state conflicts between parallel REST responses.
-     */
-    private suspend fun refreshAndSync() {
-        // 1. Load session info first (needed for sessionDirectory)
-        loadSession()
+    /** Load older messages — facade over [messageData]. */
+    fun loadOlderMessages() = messageData.loadOlderMessages()
 
-        // 2. Refresh messages (uses _isRefreshing, not _isLoading)
-        refreshMessages()
+    // loadPendingQuestions — migrated to MessageDataDelegate (Phase 3 Task 5 — B cluster).
 
-        // 3. Sync session statuses AFTER messages are loaded
-        //    so we have the latest data when checking idle state
-        if (sessionId.isNotBlank()) {
-            sessionLoaded.await()
-        }
-        val result = sessionRepository.fetchSessionStatuses(serverId, directory = sessionDirectory)
-        result.onSuccess { statusMap ->
-            sessionRepository.syncAllSessionStatuses(statusMap)
-            val currentStatus = statusMap[sessionId]
-            if (currentStatus is SessionStatus.Idle) {
-                sessionRepository.markSessionIdleProtected(sessionId)
-                fixIncompleteMessagesIfIdle(sessionId)
-            }
-        }
+    // loadPendingPermissions — migrated to MessageDataDelegate (Phase 3 Task 5 — B cluster).
 
-        // 4. Load pending items
-        loadPendingQuestions()
-        loadPendingPermissions()
+    // Model/agent/provider/variant/command selection + modelConfigState resolution
+    // are delegated to ModelConfigDelegate (Phase 3 Task 4 — A cluster).
 
-        lastRefreshTimeMs = System.currentTimeMillis()
-    }
+    // ============ @ File Mention Search (delegated — Phase 3 Task 2) ============
+    val fileSearchResults: StateFlow<List<String>> get() = draftDelegate.fileSearchResults
 
-    /**
-     * Fix messages with time.completed == null when the server confirms the session is idle.
-     * This handles the server-restart scenario: after restart, all sessions are idle in-memory,
-     * but the database preserves interrupted messages with finished_at = NULL.
-     * We must NOT call this during periodic polling — only on explicit user actions
-     * (entering session, aborting) to avoid breaking premature-idle protection.
-     */
-    private fun fixIncompleteMessagesIfIdle(sid: String) {
-        val messages = _rawMessagesList.value
-        val hasIncomplete = messages.any { it is Message.Assistant && it.time.completed == null }
-        if (hasIncomplete) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "Fixing incomplete messages for session $sid (server confirmed idle)")
-            sessionRepository.markSessionIdle(sid)
-        }
-    }
+    fun searchFilesForMention(query: String) = draftDelegate.searchFilesForMention(query)
+    fun confirmFilePath(path: String) = draftDelegate.confirmFilePath(path)
+    fun removeFilePath(path: String) = draftDelegate.removeFilePath(path)
+    fun clearFileSearch() = draftDelegate.clearFileSearch()
+    fun clearConfirmedPaths() = draftDelegate.clearConfirmedPaths()
 
-    fun loadOlderMessages() {
-        viewModelScope.launch {
-            _isLoadingOlder.value = true
-            currentMessageLimit = currentMessageLimit * 2
-            try {
-                val messages = manageSessionUseCase.listMessages(serverId, sessionId, limit = currentMessageLimit)
-                chatRepository.mergeMessages(sessionId, messages)
-                _hasOlderMessages.value = messages.size >= currentMessageLimit
+    // ============ Draft Management (delegated) ============
 
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Loaded older: ${messages.size} messages (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load older messages", e)
-                currentMessageLimit = currentMessageLimit / 2
-            } finally {
-                _isLoadingOlder.value = false
-            }
-        }
-    }
-
-    /**
-     * Load pending questions from the server REST API.
-     * Converts QuestionRequest DTOs to SseEvent.QuestionAsked domain objects.
-     * Must be called after loadSession() so sessionDirectory is set.
-     */
-    private suspend fun loadPendingQuestions() {
-        try {
-            val allQuestions = managePermissionUseCase.listPendingQuestions(serverId, directory = sessionDirectory)
-            if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingQuestions: ${allQuestions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
-
-            // Include questions from child sessions
-            val childSessionIds = chatRepository.getSessionsSnapshot()
-                .filter { it.parentId == sessionId }
-                .map { it.id }
-                .toSet()
-
-            val sessionQuestions = allQuestions
-                .filter { it.sessionId == sessionId || it.sessionId in childSessionIds }
-                .map { req ->
-                    val isChild = req.sessionId != sessionId
-                    SseEvent.QuestionAsked(
-                        id = req.id,
-                        sessionId = req.sessionId,
-                        questions = req.questions.map { q ->
-                            SseEvent.QuestionAsked.Question(
-                                header = q.header,
-                                question = q.question,
-                                multiple = q.multiple,
-                                custom = q.custom,
-                                options = q.options.map { o ->
-                                    SseEvent.QuestionAsked.Option(
-                                        label = o.label,
-                                        description = o.description
-                                    )
-                                }
-                            )
-                        },
-                        tool = req.tool,
-                        sourceSessionTitle = if (isChild) {
-                            chatRepository.getSessionsSnapshot().find { it.id == req.sessionId }?.title
-                        } else null
-                    )
-                }
-            if (sessionQuestions.isNotEmpty()) {
-                // 合并 SSE 已有的问题 + REST 恢复的问题（去重），防止覆盖 SSE 新推送的问题
-                val existingSseQs = chatRepository.getQuestionsSnapshot()[sessionId] ?: emptyList()
-                val existingIds = existingSseQs.map { it.id }.toSet()
-                val newQs = sessionQuestions.filter { it.id !in existingIds }
-                if (newQs.isNotEmpty()) {
-                    chatRepository.setQuestions(sessionId, existingSseQs + newQs)
-                    if (BuildConfig.DEBUG) Log.d(TAG, "Merged ${newQs.size} new + ${existingSseQs.size} existing questions for session $sessionId")
-                } else {
-                    if (BuildConfig.DEBUG) Log.d(TAG, "All ${sessionQuestions.size} REST questions already present via SSE for session $sessionId")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load pending questions: ${e.javaClass.simpleName}: ${e.message}", e)
-        }
-    }
-
-    /** Load pending permissions from the server REST API on session open (REST recovery). */
-    private suspend fun loadPendingPermissions() {
-        try {
-            val allPermissions = managePermissionUseCase.listPendingPermissions(serverId, directory = sessionDirectory)
-            if (BuildConfig.DEBUG) Log.d(TAG, "loadPendingPermissions: ${allPermissions.size} total pending (directory=$sessionDirectory), filtering for session $sessionId")
-
-            // Include permissions from child sessions
-            val childSessionIds = chatRepository.getSessionsSnapshot()
-                .filter { it.parentId == sessionId }
-                .map { it.id }
-                .toSet()
-
-            val sessionPermissions = allPermissions
-                .filter { it.sessionId == sessionId || it.sessionId in childSessionIds }
-                .map { req ->
-                    val isChild = req.sessionId != sessionId
-                    SseEvent.PermissionAsked(
-                        id = req.id,
-                        sessionId = req.sessionId,
-                        permission = req.permission,
-                        patterns = req.patterns,
-                        metadata = req.metadata,
-                        always = req.always,
-                        tool = req.tool,
-                        sourceSessionTitle = if (isChild) {
-                            chatRepository.getSessionsSnapshot().find { it.id == req.sessionId }?.title
-                        } else null
-                    )
-                }
-            if (sessionPermissions.isNotEmpty()) {
-                // Group permissions by their target sessionId to match SSE storage pattern
-                // SSE stores child session permissions under childSessionId, REST should do the same
-                val permissionsByTarget = sessionPermissions.groupBy { it.sessionId }
-                for ((targetSessionId, perms) in permissionsByTarget) {
-                    val existingSsePerms = chatRepository.getPermissionsSnapshot()[targetSessionId] ?: emptyList()
-                    val existingIds = existingSsePerms.map { it.id }.toSet()
-                    val newPerms = perms.filter { it.id !in existingIds }
-                    if (newPerms.isNotEmpty()) {
-                        chatRepository.setPermissions(targetSessionId, existingSsePerms + newPerms)
-                        if (BuildConfig.DEBUG) Log.d(TAG, "Merged ${newPerms.size} new + ${existingSsePerms.size} existing permissions for session $targetSessionId")
-                    } else {
-                        if (BuildConfig.DEBUG) Log.d(TAG, "All ${perms.size} REST permissions already present via SSE for session $targetSessionId")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load pending permissions: ${e.javaClass.simpleName}: ${e.message}", e)
-        }
-    }
-
-    // Removed initModelFromMessages as it's handled reactively
-
-    private fun loadProviders() {
-        viewModelScope.launch {
-            try {
-                val response = selectModelUseCase.loadProviders(serverId)
-                _allProviders.value = response.providers
-                applyProviderFilter()
-                _defaultModels.value = response.default
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${response.providers.size} providers, defaults: ${response.default}")
-                // No need to set default here, combine block handles fallback
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load providers", e)
-            }
-        }
-    }
-
-    private fun applyProviderFilter() {
-        val hidden = _hiddenModels.value
-        val filtered = _allProviders.value
-            .map { provider ->
-                provider.copy(
-                    models = provider.models.filterKeys { modelId ->
-                        "${provider.id}:$modelId" !in hidden
-                    }
-                )
-            }
-            .filter { it.models.isNotEmpty() }
-        _providers.value = filtered
-    }
-
-    private fun loadAgents() {
-        viewModelScope.launch {
-            try {
-                val agents = manageAgentUseCase.loadAgents(serverId)
-                _agents.value = agents
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${agents.size} agents: ${agents.map { it.name }}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load agents", e)
-            }
-        }
-    }
-
-    fun selectAgent(name: String) {
-        _selectedAgent.value = name to true
-    }
-
-    private fun loadCommands() {
-        viewModelScope.launch {
-            try {
-                val commands = manageAgentUseCase.loadCommands(serverId)
-                _commands.value = commands
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${commands.size} commands: ${commands.map { it.name }}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load commands", e)
-            }
-        }
-    }
-
-    /**
-     * Cycle through available thinking effort variants for the current model.
-     * Cycles: none -> first -> second -> ... -> last -> none (default).
-     */
-    fun cycleVariant() {
-        val variants = modelConfigState.value.variantNames
-        if (variants.isEmpty()) return
-        val current = _selectedVariant.value
-        if (current == null || current !in variants) {
-            _selectedVariant.value = variants.first()
-        } else {
-            val idx = variants.indexOf(current)
-            _selectedVariant.value = if (idx == variants.lastIndex) null else variants[idx + 1]
-        }
-    }
-
-    fun selectModel(providerId: String, modelId: String) {
-        // MUST set flag BEFORE modifying StateFlows — on Main.immediate dispatcher,
-        // setting a StateFlow value synchronously triggers combine recomputation,
-        // which would overwrite our values if the flag isn't set yet.
-        isModelExplicitlySelected = true
-        _selectedProviderId.value = providerId
-        _selectedModelId.value = modelId
-        // Remember selection for this session (in-memory, cleared on app restart)
-        sessionModelCache[sessionId] = providerId to modelId
-    }
-
-    // ============ @ File Mention Search ============
-
-    /** File search results for @-autocomplete */
-    private val _fileSearchResults = MutableStateFlow<List<String>>(emptyList())
-    val fileSearchResults: StateFlow<List<String>> = _fileSearchResults
-
-    /** Debounce job for file search */
-    private var fileSearchJob: Job? = null
-
-    /** Search files and directories for @-mention autocomplete. Debounced by 200ms. */
-    fun searchFilesForMention(query: String) {
-        fileSearchJob?.cancel()
-        if (query.isEmpty()) {
-            // Show recent/top files immediately with no debounce
-            fileSearchJob = viewModelScope.launch {
-                try {
-                    val results = manageAgentUseCase.searchFiles(
-                        serverId = serverId,
-                        query = "",
-                        dirs = "true",
-                        directory = sessionDirectory,
-                        limit = 15
-                    )
-                    _fileSearchResults.value = results
-                } catch (e: Exception) {
-                    Log.e(TAG, "File search failed", e)
-                    _fileSearchResults.value = emptyList()
-                }
-            }
-            return
-        }
-        fileSearchJob = viewModelScope.launch {
-            delay(150) // debounce
-            try {
-                val results = manageAgentUseCase.searchFiles(
-                    serverId = serverId,
-                    query = query,
-                    dirs = "true",
-                    directory = sessionDirectory,
-                    limit = 15
-                )
-                _fileSearchResults.value = results
-            } catch (e: Exception) {
-                Log.e(TAG, "File search failed for query '$query'", e)
-                _fileSearchResults.value = emptyList()
-            }
-        }
-    }
-
-    /** Add a confirmed file path (user selected it from the popup) */
-    fun confirmFilePath(path: String) {
-        _confirmedFilePaths.value = _confirmedFilePaths.value + path
-    }
-
-    /** Remove a confirmed file path */
-    fun removeFilePath(path: String) {
-        _confirmedFilePaths.value = _confirmedFilePaths.value - path
-    }
-
-    /** Clear file search results (e.g. when popup is closed) */
-    fun clearFileSearch() {
-        fileSearchJob?.cancel()
-        _fileSearchResults.value = emptyList()
-    }
-
-    /** Clear confirmed file paths (e.g. after sending a message) */
-    fun clearConfirmedPaths() {
-        _confirmedFilePaths.value = emptySet()
-    }
-
-    // ============ Draft Management ============
-
-    /** Update the draft text (called on every keystroke). */
-    fun updateDraftText(text: String) {
-        _draftText.value = text
-    }
-
-    /** Add an attachment URI to the draft. */
-    fun addDraftAttachment(uri: String) {
-        _draftAttachmentUris.value = _draftAttachmentUris.value + uri
-    }
-
-    /** Remove an attachment URI from the draft by index. */
-    fun removeDraftAttachment(index: Int) {
-        val current = _draftAttachmentUris.value.toMutableList()
-        if (index in current.indices) {
-            current.removeAt(index)
-            _draftAttachmentUris.value = current
-        }
-    }
-
-    /** Clear all draft state (called after sending a message). */
-    fun clearDraft() {
-        _draftText.value = ""
-        _draftAttachmentUris.value = emptyList()
-        draftUseCase.clearDraft(sessionId)
-    }
-
-    /** Consume the restored draft after UI has read it. */
-    fun consumeRestoredDraft() {
-        _restoredDraft.value = null
-    }
-
-    /** Persist current draft to disk. */
-    private fun saveDraft() {
-        val agentPair = _selectedAgent.value
-        val draft = Draft(
-            text = _draftText.value,
-            imageUris = _draftAttachmentUris.value,
-            confirmedFilePaths = _confirmedFilePaths.value.toList(),
-            selectedAgent = agentPair.first.takeIf { agentPair.second },
-            selectedVariant = _selectedVariant.value
-        )
-        draftUseCase.saveDraft(sessionId, draft)
-    }
+    fun updateDraftText(text: String) = draftDelegate.updateDraftText(text)
+    fun addDraftAttachment(uri: String) = draftDelegate.addDraftAttachment(uri)
+    fun removeDraftAttachment(index: Int) = draftDelegate.removeDraftAttachment(index)
+    fun clearDraft() = draftDelegate.clearDraft()
+    fun consumeRestoredDraft() = draftDelegate.consumeRestoredDraft()
 
     override fun onCleared() {
-        sseJob?.cancel()
+        messageData.cancelSseJob()
         closeTerminalSession()
         super.onCleared()
-        saveDraft()
+        draftDelegate.saveDraft()
     }
 
     /** Get the session directory for building file:// URLs */
-    fun getSessionDirectory(): String? = sessionDirectory
+    fun getSessionDirectory(): String? = sessionLifecycle.sessionDirectory
 
     fun sendMessage(text: String, attachments: List<PromptPart> = emptyList()) {
         if (text.isBlank() && attachments.isEmpty()) return
@@ -1740,34 +937,6 @@ class ChatViewModel @Inject constructor(
         val parts = promptParts + attachments
         if (parts.isEmpty()) return
         sendParts(parts)
-    }
-
-    /**
-     * Ensures a session exists before sending messages.
-     * If sessionId is empty (new session), creates one via API.
-     * Thread-safe via Mutex to prevent duplicate creation.
-     * After creation, starts observing SSE-driven flows so messages appear.
-     */
-    private suspend fun ensureSession(): String {
-        if (sessionId.isNotEmpty()) return sessionId
-        return sessionCreateMutex.withLock {
-            // Double-check after acquiring lock
-            if (sessionId.isNotEmpty()) return sessionId
-            val dir = if (directoryParam.isNotEmpty()) directoryParam else sessionDirectory
-            val session = manageSessionUseCase.createSession(serverId, directory = dir)
-            sessionRepository.setSessions(serverId, listOf(session))
-            _sessionId.value = session.id
-            sessionDirectory = session.directory.ifBlank { dir }
-            if (!sessionLoaded.isCompleted) {
-                sessionLoaded.complete(Unit)
-            }
-            // Start observing SSE-driven message/part flows for the new session.
-            // Without this, SSE events arrive at EventDispatcher but ChatViewModel
-            // never collects them — messages stay invisible.
-            runCatching { startObservingMessages() }
-                .onFailure { Log.e(TAG, "Failed to start observing after session creation", it) }
-            sessionId
-        }
     }
 
     /**
@@ -1798,11 +967,10 @@ class ChatViewModel @Inject constructor(
     private fun sendParts(parts: List<PromptPart>) {
         scrollSignal.requestScrollToTop()
         val pendingId = "pending-${java.util.UUID.randomUUID()}"
-        _pendingMessageIds.update { it + pendingId }
+        messageData.onSendStarted(pendingId)
         viewModelScope.launch {
-            _isSending.value = true
             try {
-                val currentSessionId = ensureSession()
+                val currentSessionId = sessionLifecycle.ensureSession()
                 sessionStatusManager.onSendParts(currentSessionId)
                 // P5-5: read from modelConfigState (resolved effective value) instead of
                 // raw _selectedProviderId which may be null on new session's first send.
@@ -1824,98 +992,50 @@ class ChatViewModel @Inject constructor(
                     parts = parts,
                     model = model,
                     agent = modelConfigState.value.selectedAgent,
-                    variant = _selectedVariant.value,
-                    directory = sessionDirectory
+                    variant = modelConfig.selectedVariantValue,
+                    directory = sessionLifecycle.sessionDirectory
                 )
-                // P5-4: clear pendingId on success path (was only cleared in catch block).
-                _pendingMessageIds.update { it - pendingId }
+                messageData.onSendSuccess(pendingId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
-                _pendingMessageIds.update { it - pendingId }
                 // Restore draft from the failed send
                 val failedText = parts.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("\n")
                 if (failedText.isNotBlank()) {
-                    _restoredDraft.value = RevertedDraftPayload(text = failedText)
+                    draftDelegate.setRestoredDraft(RevertedDraftPayload(text = failedText))
                 }
-                _error.value = e.message ?: "Failed to send message"
-            } finally {
-                _isSending.value = false
+                messageData.onSendError(e.message ?: "Failed to send message", pendingId)
             }
         }
     }
 
     /**
-     * Reply to a permission request.
+     * Reply to a permission request. Facade over [sessionActions].
      * @param requestId The permission request ID
      * @param reply One of: "once", "always", "reject"
      */
-    fun replyToPermission(requestId: String, reply: String) {
-        viewModelScope.launch {
-            val logMsg = "[Permission] replyToPermission: id=$requestId reply=$reply dir=$sessionDirectory"
-            Log.i(TAG, logMsg)
-            appendDiagnosticLog(logMsg)
-            try {
-                val success = managePermissionUseCase.replyToPermission(
-                    serverId = serverId,
-                    requestId = requestId,
-                    reply = reply,
-                    directory = sessionDirectory
-                )
-                val resultMsg = "[Permission] replyToPermission result: id=$requestId success=$success"
-                Log.i(TAG, resultMsg)
-                appendDiagnosticLog(resultMsg)
-                if (success) {
-                    // Optimistically remove the permission card — SSE event may arrive late or not at all
-                    chatRepository.removePermission(requestId)
-                } else {
-                    // API returned non-2xx (e.g. already replied by another client) — remove card anyway
-                    // to prevent permanently stuck permission cards
-                    val warnMsg = "[Permission] API returned failure for $requestId, removing card as fallback (likely already replied)"
-                    Log.w(TAG, warnMsg)
-                    appendDiagnosticLog(warnMsg)
-                    chatRepository.removePermission(requestId)
-                }
-            } catch (e: Exception) {
-                val errMsg = "[Permission] Exception replying to $requestId: ${e.javaClass.simpleName}: ${e.message}"
-                Log.e(TAG, errMsg, e)
-                appendDiagnosticLog(errMsg)
-                // Network/timeout error — remove card to prevent stuck state;
-                // if the reply didn't reach the server, the server will re-emit the permission event
-                chatRepository.removePermission(requestId)
-            }
-        }
-    }
+    fun replyToPermission(requestId: String, reply: String) =
+        sessionActions.replyToPermission(requestId, reply)
 
-    fun savePermissionRule(event: dev.leonardo.ocremotev2.domain.model.SseEvent.PermissionAsked, directory: String) {
-        viewModelScope.launch {
-            val rule = dev.leonardo.ocremotev2.domain.model.AutoApproveRule(
-                toolName = event.permission,
-                sessionId = null,
-                directoryPattern = directory
-            )
-            chatRepository.addPermissionAutoApproveRule(rule)
-        }
-    }
+    /** Save a permission auto-approve rule. Facade over [sessionActions]. */
+    fun savePermissionRule(event: dev.leonardo.ocremotev2.domain.model.SseEvent.PermissionAsked, directory: String) =
+        sessionActions.savePermissionRule(event, directory)
 
+    /**
+     * Abort the current session — coordinator.
+     * Delegates REST abort + markIdle to [sessionActions], then handles
+     * SSE job cancel/restart (B↔C↔G orchestration).
+     */
     fun abortSession() {
         sessionStatusManager.onAbort(sessionId)
         viewModelScope.launch {
             try {
-                sseJob?.cancel()
-                sseJob = null
-                sessionRepository.abort(serverId, sessionId, sessionDirectory)
+                messageData.cancelSseJob()
+                sessionActions.abortSession()
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
-                // Force-complete messages AND set Idle — abort is a terminal action.
-                // Must use markSessionIdle (not Protected) because:
-                // 1. SSE stream is cancelled above, server's idle event won't reach us
-                // 2. markSessionIdleProtected is blocked by SSE freshness window (5s)
-                // 3. markSessionIdleProtected doesn't complete messages, so premature-idle
-                //    protection would block any future idle events
-                sessionRepository.markSessionIdle(sessionId)
                 // P5-2: restart sseJob to avoid _rawMessagesList freeze.
-                runCatching { startObservingMessages() }
+                runCatching { messageData.startObservingMessages() }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to abort session", e)
             }
@@ -1923,203 +1043,46 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Reply to a question request.
+     * Reply to a question request. Facade over [sessionActions].
      * @param requestId The question request ID
      * @param answers Answers for each question (list of selected labels per question)
      */
-    fun replyToQuestion(requestId: String, answers: List<List<String>>) {
-        viewModelScope.launch {
-            val logMsg = "[Question] replyToQuestion: id=$requestId answers=$answers dir=$sessionDirectory"
-            Log.i(TAG, logMsg)
-            appendDiagnosticLog(logMsg)
-            try {
-                val success = managePermissionUseCase.replyToQuestion(
-                    serverId = serverId,
-                    requestId = requestId,
-                    answers = answers,
-                    directory = sessionDirectory
-                )
-                val resultMsg = "[Question] replyToQuestion result: id=$requestId success=$success"
-                Log.i(TAG, resultMsg)
-                appendDiagnosticLog(resultMsg)
-                // Always remove the question card regardless of API result.
-                chatRepository.removeQuestion(requestId)
-            } catch (e: Exception) {
-                val errMsg = "[Question] Exception replying to $requestId: ${e.javaClass.simpleName}: ${e.message}"
-                Log.e(TAG, errMsg, e)
-                appendDiagnosticLog(errMsg)
-                // Network/timeout — remove card; server will re-emit if still pending
-                chatRepository.removeQuestion(requestId)
-            }
-        }
-    }
+    fun replyToQuestion(requestId: String, answers: List<List<String>>) =
+        sessionActions.replyToQuestion(requestId, answers)
 
     /**
-     * Reject a question request.
+     * Reject a question request. Facade over [sessionActions].
      */
-    fun rejectQuestion(requestId: String) {
-        viewModelScope.launch {
-            val logMsg = "[Question] rejectQuestion: id=$requestId dir=$sessionDirectory"
-            Log.i(TAG, logMsg)
-            appendDiagnosticLog(logMsg)
-            try {
-                val success = managePermissionUseCase.rejectQuestion(serverId = serverId, requestId = requestId, directory = sessionDirectory)
-                val resultMsg = "[Question] rejectQuestion result: id=$requestId success=$success"
-                Log.i(TAG, resultMsg)
-                appendDiagnosticLog(resultMsg)
-                // Always remove the question card regardless of API result.
-                // If already answered by another client, server returns non-2xx — card should still close.
-                chatRepository.removeQuestion(requestId)
-            } catch (e: Exception) {
-                val errMsg = "[Question] Exception rejecting $requestId: ${e.javaClass.simpleName}: ${e.message}"
-                Log.e(TAG, errMsg, e)
-                appendDiagnosticLog(errMsg)
-                // Network/timeout — remove card; server will re-emit if still pending
-                chatRepository.removeQuestion(requestId)
-            }
-        }
-    }
+    fun rejectQuestion(requestId: String) =
+        sessionActions.rejectQuestion(requestId)
 
-    // ============ Slash Command Actions ============
+    // ============ Slash Command Actions (delegated — Phase 3 Task 6) ============
 
-    /** Share the current session. Returns the share URL or null on failure. */
-    fun shareSession(onResult: (String?) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val session = shareExportUseCase.shareSession(serverId, sessionId)
-                val url = session.share?.url
-                if (BuildConfig.DEBUG) Log.d(TAG, "Shared session $sessionId: $url")
-                onResult(url)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to share session", e)
-                onResult(null)
-            }
-        }
-    }
+    /** Share the current session. Facade over [sessionActions]. */
+    fun shareSession(onResult: (String?) -> Unit) =
+        sessionActions.shareSession(onResult)
 
-    fun unshareSession(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                shareExportUseCase.unshareSession(serverId, sessionId)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Unshared session $sessionId")
-                onResult(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to unshare session", e)
-                onResult(false)
-            }
-        }
-    }
+    /** Unshare the current session. Facade over [sessionActions]. */
+    fun unshareSession(onResult: (Boolean) -> Unit) =
+        sessionActions.unshareSession(onResult)
 
-    /** Compact (summarize) the current session. */
-    fun compactSession(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val config = modelConfigState.value
-                val providerId = config.selectedProviderId
-                val modelId = config.selectedModelId
-                if (providerId == null || modelId == null) {
-                    Log.e(TAG, "Cannot compact: no model selected")
-                    onResult(false)
-                    return@launch
-                }
-                shareExportUseCase.compactSession(serverId, sessionId, providerId, modelId)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Compacted session $sessionId")
-                onResult(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to compact session", e)
-                onResult(false)
-            }
-        }
-    }
+    /** Compact (summarize) the current session. Facade over [sessionActions]. */
+    fun compactSession(onResult: (Boolean) -> Unit) =
+        sessionActions.compactSession(onResult)
 
     /**
-     * Export the session as JSON directly to a file URI.
-     * Streams API responses directly to the output stream to avoid OOM
-     * on large sessions (messages can be 80+ MB).
-     * Shows a notification with download progress.
+     * Export the session as JSON to a file URI. Facade over [sessionActions].
      */
-    fun exportSession(context: android.content.Context, uri: android.net.Uri, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            val channelId = "opencode_export"
-            val notificationId = 9999
+    fun exportSession(context: android.content.Context, uri: android.net.Uri, onResult: (Boolean) -> Unit) =
+        sessionActions.exportSession(context, uri, onResult)
 
-            // Create notification channel
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                val channel = android.app.NotificationChannel(
-                    channelId,
-                    context.getString(R.string.menu_export_session),
-                    android.app.NotificationManager.IMPORTANCE_LOW
-                ).apply {
-                    description = context.getString(R.string.notification_export_progress)
-                    setShowBadge(false)
-                }
-                notificationManager.createNotificationChannel(channel)
-            }
+    /** Undo the last user message in the session, restoring its text to the input field. Facade over [sessionActions]. */
+    fun undoMessage(onResult: (Boolean) -> Unit) =
+        sessionActions.undoMessage(onResult)
 
-            val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(context.getString(R.string.menu_export_session))
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setProgress(0, 0, true)
-
-            try {
-                Log.d(TAG, "exportSession: streaming to $uri")
-                notificationManager.notify(notificationId, builder.build())
-
-                var lastNotifyTime = 0L
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    shareExportUseCase.exportSessionToStream(serverId, sessionId, outputStream) { bytesWritten ->
-                        val now = System.currentTimeMillis()
-                        if (now - lastNotifyTime > 500) { // throttle to 2 updates/sec
-                            lastNotifyTime = now
-                            val mb = String.format("%.1f MB", bytesWritten / 1_000_000.0)
-                            builder.setContentText(mb)
-                            notificationManager.notify(notificationId, builder.build())
-                        }
-                    }
-                }
-
-                Log.d(TAG, "exportSession: done")
-                notificationManager.cancel(notificationId)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onResult(true)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to export session", e)
-                notificationManager.cancel(notificationId)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onResult(false)
-                }
-            }
-        }
-    }
-
-    /** Undo the last user message in the session, restoring its text to the input field. */
-    fun undoMessage(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                // Find the last user message (before any existing revert point)
-                val messages = messageListState.value.messages
-                val lastUser = messages.firstOrNull { it.isUser }
-                if (lastUser == null) {
-                    onResult(false)
-                    return@launch
-                }
-                undoRedoUseCase.revertSession(serverId, sessionId, lastUser.message.id)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message ${lastUser.message.id}")
-                // Restore the user message text to the input field
-                restoreRevertedDraft(extractRevertedDraft(lastUser))
-                onResult(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to revert session", e)
-                onResult(false)
-            }
-        }
-    }
-
-    /** Revert to a specific user message by ID, optionally restoring its text to the input field. */
+    /** Revert to a specific user message by ID, optionally restoring its text to the input field.
+     *  Coordinator (B↔D↔G orchestration): halts busy session, reverts via undoRedoUseCase,
+     *  reconnects SSE, restores draft. */
     fun revertMessage(messageId: String, revertedText: String? = null, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
@@ -2129,9 +1092,8 @@ class ChatViewModel @Inject constructor(
                 if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "Revert: halting busy session $sessionId")
                     sessionStatusManager.onAbort(sessionId)
-                    sseJob?.cancel()
-                    sseJob = null
-                    runCatching { sessionRepository.abort(serverId, sessionId, sessionDirectory) }
+                    messageData.cancelSseJob()
+                    runCatching { sessionRepository.abort(serverId, sessionId, sessionLifecycle.sessionDirectory) }
                     sessionRepository.markSessionIdle(sessionId)
                     // NOTE: startObservingMessages deferred to after setRevert below
                 }
@@ -2146,13 +1108,15 @@ class ChatViewModel @Inject constructor(
 
                 // Reconnect SSE now — old messages will be filtered by revert state.
                 if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
-                    runCatching { startObservingMessages() }
+                    runCatching { messageData.startObservingMessages() }
                 }
 
                 val targetMessage = messageListState.value.messages
                     .firstOrNull { it.message.id == messageId && it.isUser }
                 val fallbackPayload = RevertedDraftPayload(text = revertedText.orEmpty())
-                restoreRevertedDraft(targetMessage?.let { extractRevertedDraft(it) } ?: fallbackPayload)
+                draftDelegate.restoreRevertedDraft(
+                    targetMessage?.let { sessionActions.extractRevertedDraft(it) } ?: fallbackPayload
+                )
                 onResult(true)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to revert to message $messageId", e)
@@ -2161,248 +1125,66 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun extractRevertedDraft(message: ChatMessage): RevertedDraftPayload {
-        val revertedText = message.parts
-            .filterIsInstance<Part.Text>()
-            .joinToString("\n") { it.text }
+    // extractRevertedDraft — migrated to SessionActionsDelegate (Phase 3 Task 6 — G cluster).
+    // restoreRevertedDraft — inlined to draftDelegate.restoreRevertedDraft() (Phase 3 Task 6).
 
-        val imageUris = message.parts
-            .filterIsInstance<Part.File>()
-            .mapNotNull { part ->
-                val mime = part.mime.lowercase()
-                if (mime.startsWith("image/") && !part.url.isNullOrBlank()) part.url else null
-            }
+    /** Redo the last undone message. Facade over [sessionActions]. */
+    fun redoMessage(onResult: (Boolean) -> Unit) =
+        sessionActions.redoMessage(onResult)
 
-        return RevertedDraftPayload(
-            text = revertedText,
-            attachmentUris = imageUris,
-        )
-    }
+    /** Delete a message from the current session. Facade over [sessionActions]. */
+    fun deleteMessage(messageId: String, onResult: (Boolean) -> Unit) =
+        sessionActions.deleteMessage(messageId, onResult)
 
-    private fun restoreRevertedDraft(payload: RevertedDraftPayload) {
-        _draftText.value = payload.text
-        _draftAttachmentUris.value = payload.attachmentUris
-        _confirmedFilePaths.value = emptySet()
-        _revertedDraftEvent.tryEmit(payload)
-    }
-
-    /** Redo the last undone message. */
-    fun redoMessage(onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                undoRedoUseCase.unrevertSession(serverId, sessionId)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Unreverted session $sessionId")
-                onResult(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to unrevert session", e)
-                onResult(false)
-            }
-        }
-    }
-
-    /** Delete a message from the current session. */
-    fun deleteMessage(messageId: String, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val success = manageSessionUseCase.deleteMessage(serverId, sessionId, messageId)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Deleted message $messageId: success=$success")
-                onResult(success)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete message $messageId", e)
-                onResult(false)
-            }
-        }
-    }
-
-    /** Delete a specific part from a message by index. */
-    fun deleteMessagePart(messageId: String, partIndex: Int, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val success = manageSessionUseCase.deleteMessagePart(serverId, sessionId, messageId, partIndex)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Deleted part $partIndex from message $messageId: success=$success")
-                onResult(success)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete part $partIndex from message $messageId", e)
-                onResult(false)
-            }
-        }
-    }
+    /** Delete a specific part from a message by index. Facade over [sessionActions]. */
+    fun deleteMessagePart(messageId: String, partIndex: Int, onResult: (Boolean) -> Unit) =
+        sessionActions.deleteMessagePart(messageId, partIndex, onResult)
 
     /**
-     * Called when a SessionUpdated SSE event is received.
-     * Refreshes the message list to pick up revert/unrevert changes.
+     * Called when a SessionUpdated SSE event is received. Facade over [sessionActions].
      */
-    fun onSessionUpdated(session: Session) {
-        if (session.id != sessionId) return
-        viewModelScope.launch {
-            try {
-                val messages = manageSessionUseCase.listMessages(serverId, sessionId, 100)
-                chatRepository.replaceMessages(sessionId, messages)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Refreshed messages after session update")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to refresh messages after session update", e)
-            }
-        }
-    }
+    fun onSessionUpdated(session: Session) =
+        sessionActions.onSessionUpdated(session)
 
-    /** Fork the current session. Returns the new session or null. */
-    fun forkSession(onResult: (Session?) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val session = manageSessionUseCase.forkSession(serverId, sessionId)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Forked session $sessionId -> ${session.id}")
-                onResult(session)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to fork session", e)
-                onResult(null)
-            }
-        }
-    }
+    /** Fork the current session. Facade over [sessionActions]. */
+    fun forkSession(onResult: (Session?) -> Unit) =
+        sessionActions.forkSession(onResult)
 
-    /** Rename the current session. */
-    fun renameSession(title: String, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                manageSessionUseCase.renameSession(serverId, sessionId, title)
-                if (BuildConfig.DEBUG) Log.d(TAG, "Renamed session $sessionId to $title")
-                onResult(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to rename session", e)
-                onResult(false)
-            }
-        }
-    }
+    /** Rename the current session. Facade over [sessionActions]. */
+    fun renameSession(title: String, onResult: (Boolean) -> Unit) =
+        sessionActions.renameSession(title, onResult)
 
-    /** Execute a server-side command (e.g. /init, /review, MCP commands). */
-    fun executeCommand(command: String, arguments: String = "", onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val currentSessionId = ensureSession()
-                if (sessionDirectory.isNullOrBlank()) {
-                    loadSession()
-                }
+    /** Execute a server-side command. Facade over [sessionActions]. */
+    fun executeCommand(command: String, arguments: String = "", onResult: (Boolean) -> Unit) =
+        sessionActions.executeCommand(command, arguments, onResult)
 
-                val normalizedCommand = command.removePrefix("/").trim()
-                val effectiveDirectory = sessionDirectory
-                    ?: chatRepository.getSessionsSnapshot()
-                        .firstOrNull { it.id == currentSessionId }
-                        ?.directory
-                        ?.takeIf { it.isNotBlank() }
-                // /init: when arguments are omitted, rely on x-opencode-directory only.
-                // Passing an explicit path (absolute or ".") can lead to duplicated or
-                // malformed path text in the generated init prompt.
-                val effectiveArguments = if (
-                    normalizedCommand.equals("init", ignoreCase = true) && arguments.isBlank()
-                ) {
-                    ""
-                } else {
-                    arguments
-                }
+    /** Execute shell command in current session. Facade over [sessionActions]. */
+    fun runShellCommand(command: String, onResult: (Boolean) -> Unit) =
+        sessionActions.runShellCommand(command, onResult)
 
-                val ok = manageTerminalUseCase.executeCommand(
-                    serverId = serverId,
-                    sessionId = currentSessionId,
-                    command = normalizedCommand,
-                    arguments = effectiveArguments,
-                    directory = effectiveDirectory,
-                )
-                if (BuildConfig.DEBUG) {
-                    Log.d(
-                        TAG,
-                        "Executed command /$normalizedCommand in session $currentSessionId: $ok (directory=$effectiveDirectory, arguments=$effectiveArguments)"
-                    )
-                }
-                onResult(ok)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to execute command /$command", e)
-                onResult(false)
-            }
-        }
-    }
+    fun openTerminalSession(onResult: (Boolean) -> Unit = {}) =
+        terminalDelegate.openTerminalSession(onResult)
 
-    /** Execute shell command in current session. */
-    fun runShellCommand(command: String, onResult: (Boolean) -> Unit) {
-        val trimmed = command.trim()
-        if (trimmed.isBlank()) {
-            onResult(false)
-            return
-        }
-        viewModelScope.launch {
-            try {
-                // P5-5: read from modelConfigState for consistency with sendParts.
-                val modelCfg = modelConfigState.value
-                val model = if (modelCfg.selectedProviderId != null && modelCfg.selectedModelId != null) {
-                    ModelSelection(
-                        providerId = modelCfg.selectedProviderId,
-                        modelId = modelCfg.selectedModelId
-                    )
-                } else null
-                val ok = manageTerminalUseCase.runShellCommand(
-                    serverId = serverId,
-                    sessionId = sessionId,
-                    command = trimmed,
-                    agent = modelConfigState.value.selectedAgent,
-                    model = model,
-                    directory = sessionDirectory
-                )
-                if (BuildConfig.DEBUG) Log.d(TAG, "Executed shell command in session $sessionId: $ok")
-                onResult(ok)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to execute shell command", e)
-                onResult(false)
-            }
-        }
-    }
+    fun createTerminalTab(onResult: (Boolean) -> Unit = {}) =
+        terminalDelegate.createTerminalTab(onResult)
 
-    fun openTerminalSession(onResult: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            // Wait for loadSession() to finish so sessionDirectory is populated.
-            // This prevents the race condition where the PTY is created with directory=null
-            // and then resize is attempted with the real directory.
-            sessionLoaded.await()
-            if (BuildConfig.DEBUG) Log.d(TAG, "openTerminalSession: sessionDirectory=$sessionDirectory")
-            terminalWorkspace.ensureActiveTab(cwd = sessionDirectory, directory = sessionDirectory, onResult = onResult)
-        }
-    }
+    fun switchTerminalTab(tabId: String) = terminalDelegate.switchTerminalTab(tabId)
 
-    fun createTerminalTab(onResult: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            sessionLoaded.await()
-            terminalWorkspace.createTab(cwd = sessionDirectory, directory = sessionDirectory, onResult = onResult)
-        }
-    }
+    fun closeTerminalTab(tabId: String) = terminalDelegate.closeTerminalTab(tabId)
 
-    fun switchTerminalTab(tabId: String) {
-        terminalWorkspace.switchTab(tabId)
-    }
+    fun reconnectTerminalTab(tabId: String, onResult: (Boolean) -> Unit = {}) =
+        terminalDelegate.reconnectTerminalTab(tabId, onResult)
 
-    fun closeTerminalTab(tabId: String) {
-        terminalWorkspace.closeTab(tabId)
-    }
+    fun setTerminalFontSize(fontSizeSp: Float) =
+        terminalDelegate.setTerminalFontSize(fontSizeSp)
 
-    fun reconnectTerminalTab(tabId: String, onResult: (Boolean) -> Unit = {}) {
-        terminalWorkspace.reconnectTab(tabId, onResult)
-    }
+    fun sendTerminalInput(input: String) = terminalDelegate.sendTerminalInput(input)
 
-    fun setTerminalFontSize(fontSizeSp: Float) {
-        terminalWorkspace.setActiveFontSize(fontSizeSp)
-    }
+    fun clearTerminalBuffer() = terminalDelegate.clearTerminalBuffer()
 
-    fun sendTerminalInput(input: String) {
-        terminalWorkspace.sendActiveInput(input)
-    }
+    fun resizeTerminal(cols: Int, rows: Int) = terminalDelegate.resizeTerminal(cols, rows)
 
-    fun clearTerminalBuffer() {
-        terminalWorkspace.clearActiveBuffer()
-    }
-
-    fun resizeTerminal(cols: Int, rows: Int) {
-        terminalWorkspace.resizeActive(cols, rows)
-    }
-
-    fun closeTerminalSession() {
-        // Global terminal workspaces are server-scoped and survive chat screen changes.
-    }
+    fun closeTerminalSession() = terminalDelegate.closeTerminalSession()
 
     /** Connection parameters for navigation to other sessions. */
     fun getConnectionParams(): ConnectionParams = ConnectionParams(
@@ -2413,15 +1195,8 @@ class ChatViewModel @Inject constructor(
         serverId = serverId
     )
 
-    /** Get the last assistant message text for copying. */
-    fun getLastAssistantText(): String? {
-        val msgs = messageListState.value.messages
-        val last = msgs.firstOrNull { it.isAssistant } ?: return null
-        return last.parts
-            .filterIsInstance<Part.Text>()
-            .joinToString("") { it.text }
-            .ifBlank { null }
-    }
+    /** Get the last assistant message text for copying. Facade over [sessionActions]. */
+    fun getLastAssistantText(): String? = sessionActions.getLastAssistantText()
 
     /** Append a diagnostic log line for permission/question debugging. */
     private fun appendDiagnosticLog(message: String) {
@@ -2429,15 +1204,7 @@ class ChatViewModel @Inject constructor(
         Log.i(TAG, message)
     }
 
-    companion object {
-        /**
-         * In-memory cache mapping sessionId → (providerId, modelId).
-         * Survives session switching (ViewModel recreation) but clears on app restart (process death).
-         */
-        private val sessionModelCache = mutableMapOf<String, Pair<String, String>>()
-
-        const val REFRESH_COOLDOWN_MS = 5_000L  // Skip refresh if last one was < 5s ago
-    }
+    companion object
 }
 
 /** Holds server connection info for navigation purposes. */

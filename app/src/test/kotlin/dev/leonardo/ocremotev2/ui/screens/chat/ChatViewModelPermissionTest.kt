@@ -89,9 +89,13 @@ class ChatViewModelPermissionTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        val messageStore = MessageEventHandler()
         eventDispatcher = EventDispatcher(
             sessionHandler = SessionEventHandler(),
-            messageHandler = MessageEventHandler(),
+            messageHandler = messageStore,
+            messagePartHandler = MessagePartHandler(messageStore),
+            messageUpdatedHandler = MessageUpdatedHandler(messageStore),
+            messageRemovedHandler = MessageRemovedHandler(messageStore),
             permissionHandler = PermissionEventHandler(),
             questionHandler = QuestionEventHandler(),
             miscHandler = MiscEventHandler(),

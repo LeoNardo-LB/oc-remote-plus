@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
+import dev.leonardo.ocremotev2.ui.screens.chat.util.SlashCommand
 
 /**
  * Slash command suggestion popup shown when user types "/".

@@ -1,5 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.data.api
 
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.domain.model.Session
 import io.mockk.coEvery
@@ -12,11 +13,11 @@ import org.junit.Test
  * Tests that listSessions correctly passes search/cursor/limit
  * query parameters to the HTTP request.
  */
-class OpenCodeApiSearchPaginationTest {
+class SessionApiSearchPaginationTest {
 
     @Test
     fun `listSessions passes search query parameter`() = runTest {
-        val api: OpenCodeApi = mockk()
+        val api: SessionApi = mockk()
         val conn = ServerConnection.from("http://localhost:8080")
         val sessions = listOf(
             Session(id = "s1", title = "Test", time = Session.Time(created = 1000L, updated = 1000L))
@@ -32,7 +33,7 @@ class OpenCodeApiSearchPaginationTest {
 
     @Test
     fun `listSessions passes cursor and limit parameters`() = runTest {
-        val api: OpenCodeApi = mockk()
+        val api: SessionApi = mockk()
         val conn = ServerConnection.from("http://localhost:8080")
 
         coEvery { api.listSessions(any(), search = null, cursor = "abc123", limit = 20) } returns emptyList()
@@ -44,7 +45,7 @@ class OpenCodeApiSearchPaginationTest {
 
     @Test
     fun `listSessions default parameters remain backward compatible`() = runTest {
-        val api: OpenCodeApi = mockk()
+        val api: SessionApi = mockk()
         val conn = ServerConnection.from("http://localhost:8080")
 
         coEvery { api.listSessions(any()) } returns emptyList()

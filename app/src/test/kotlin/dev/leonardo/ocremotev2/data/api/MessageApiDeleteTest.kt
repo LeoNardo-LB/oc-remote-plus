@@ -1,5 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.data.api
 
+import dev.leonardo.ocremotev2.data.api.message.MessageApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -8,9 +9,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class OpenCodeApiMessageDeleteTest {
+class MessageApiDeleteTest {
 
-    private val api: OpenCodeApi = mockk()
+    private val api: MessageApi = mockk()
     private val conn = ServerConnection.from("http://localhost:8080")
 
     @Test

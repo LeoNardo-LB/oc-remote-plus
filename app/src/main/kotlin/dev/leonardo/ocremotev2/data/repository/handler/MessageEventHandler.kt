@@ -12,11 +12,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Handles message and part events: updated, removed, part updated/delta/removed.
- * Manages: messages, parts
+ * Shared state store for message and part data.
+ *
+ * Owns the `_messages`, `_parts`, and `assistantMessageIds` state that is tightly
+ * coupled across the message/part lifecycle (e.g. [handleMessagePartUpdated]
+ * consults `assistantMessageIds` populated by [handleMessageUpdated];
+ * [handleMessageUpdated] seeds `_parts` for user messages). Because of this
+ * coupling the per-sub-event dispatch lives in dedicated handlers
+ * ([MessagePartHandler], [MessageUpdatedHandler], [MessageRemovedHandler])
+ * which inject this store and delegate to its `internal` handlers.
  */
 @Singleton
-class MessageEventHandler @Inject constructor() : SseEventHandler {
+class MessageEventHandler @Inject constructor() {
 
     private companion object {
         const val TAG = "MsgEventHandler"
@@ -105,18 +112,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
     }
     // ── End SSE delta batching ────────────────────────────────────────
 
-    override fun handle(event: SseEvent, serverId: String): Boolean {
-        return when (event) {
-            is SseEvent.MessageUpdated -> { handleMessageUpdated(event); true }
-            is SseEvent.MessageRemoved -> { handleMessageRemoved(event); true }
-            is SseEvent.MessagePartUpdated -> { handleMessagePartUpdated(event); true }
-            is SseEvent.MessagePartDelta -> { handleMessagePartDelta(event); true }
-            is SseEvent.MessagePartRemoved -> { handleMessagePartRemoved(event); true }
-            else -> false
-        }
-    }
-
-    private fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
+    internal fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }
         _messages.update { current ->
@@ -185,7 +181,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         if (BuildConfig.DEBUG) Log.d(TAG, "Pruned ${removedIds.size} reverted messages for session ${sessionId.take(12)}")
     }
 
-    private fun handleMessageRemoved(event: SseEvent.MessageRemoved) {
+    internal fun handleMessageRemoved(event: SseEvent.MessageRemoved) {
         _messages.update { current ->
             val sessionMessages = current[event.sessionId]?.filter { it.id != event.messageId }
             if (sessionMessages != null) current + (event.sessionId to sessionMessages) else current
@@ -194,7 +190,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         assistantMessageIds.remove(event.messageId)
     }
 
-    private fun handleMessagePartUpdated(event: SseEvent.MessagePartUpdated) {
+    internal fun handleMessagePartUpdated(event: SseEvent.MessagePartUpdated) {
         val messageId = event.part.messageId
         val partId = event.part.id
         @Suppress("DEPRECATION")
@@ -319,7 +315,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         }
     }
 
-    private fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
+    internal fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
         // Buffer delta for batch flush (48ms window) — reduces recomposition
         // frequency from per-token to ~20/sec, eliminating layout jitter.
         val partType = when (_parts.value[event.messageId]
@@ -339,7 +335,7 @@ class MessageEventHandler @Inject constructor() : SseEventHandler {
         scheduleFlush()
     }
 
-    private fun handleMessagePartRemoved(event: SseEvent.MessagePartRemoved) {
+    internal fun handleMessagePartRemoved(event: SseEvent.MessagePartRemoved) {
         _parts.update { current ->
             val messageParts = current[event.messageId]?.filter { it.id != event.partId }
             if (messageParts != null) current + (event.messageId to messageParts) else current

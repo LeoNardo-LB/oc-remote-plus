@@ -69,7 +69,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.SessionMetaState
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.PermissionCard
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.QuestionCard
 import dev.leonardo.ocremotev2.ui.screens.chat.components.AlwaysConfirmDialog
-import dev.leonardo.ocremotev2.ui.screens.chat.snapToBottom
+import dev.leonardo.ocremotev2.ui.screens.chat.util.snapToBottom
 import dev.leonardo.ocremotev2.ui.screens.chat.util.computeTurnGroups
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch

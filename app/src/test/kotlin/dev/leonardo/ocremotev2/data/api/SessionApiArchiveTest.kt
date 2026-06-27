@@ -1,5 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.data.api
 
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.domain.model.Session
 import io.mockk.coEvery
@@ -8,9 +9,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class OpenCodeApiArchiveTest {
+class SessionApiArchiveTest {
 
-    private val api: OpenCodeApi = mockk()
+    private val api: SessionApi = mockk()
     private val conn = ServerConnection.from("http://localhost:8080")
     private val baseSession = Session(
         id = "s1",

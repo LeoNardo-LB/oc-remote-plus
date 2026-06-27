@@ -2,7 +2,7 @@
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.provider.ProviderApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.dto.response.ProvidersResponse as DataProvidersResponse
 import dev.leonardo.ocremotev2.domain.model.LocalServerState
@@ -20,13 +20,13 @@ import javax.inject.Singleton
 /**
  * Implementation of [ServerRepository].
  * Wraps the existing [ServerDataStore] (DataStore CRUD),
- * [LocalServerManager] (Termux lifecycle), and [OpenCodeApi] (providers/config).
+ * [LocalServerManager] (Termux lifecycle), and [ProviderApi] (providers/config).
  */
 @Singleton
 class ServerRepositoryImpl @Inject constructor(
     private val dataRepo: dev.leonardo.ocremotev2.data.repository.ServerDataStore,
     private val localServerManager: LocalServerManager,
-    private val api: OpenCodeApi,
+    private val api: ProviderApi,
     @ApplicationContext private val appContext: Context
 ) : ServerRepository {
 

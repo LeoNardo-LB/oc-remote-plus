@@ -15,6 +15,7 @@ import dev.leonardo.ocremotev2.domain.model.SseEvent
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.reflect.KClass
 
 private const val TAG = "EventDispatcher"
 
@@ -30,6 +31,9 @@ private const val TAG = "EventDispatcher"
 class EventDispatcher @Inject constructor(
     private val sessionHandler: SessionEventHandler,
     private val messageHandler: MessageEventHandler,
+    private val messagePartHandler: MessagePartHandler,
+    private val messageUpdatedHandler: MessageUpdatedHandler,
+    private val messageRemovedHandler: MessageRemovedHandler,
     private val permissionHandler: PermissionEventHandler,
     private val questionHandler: QuestionEventHandler,
     private val miscHandler: MiscEventHandler,
@@ -44,6 +48,74 @@ class EventDispatcher @Inject constructor(
         sessionStatusManager.incompleteAssistantChecker = { sessionId ->
             hasIncompleteAssistant(sessionId)
         }
+    }
+
+    // ============ Event Handler Registry (Open/Closed Principle) ============
+    // Maps each SseEvent subclass to its single responsible handler.
+    // To support a new event domain: add a bind() call below. processEvent itself
+    // never changes — it just looks up this map. This replaces the previous
+    // broadcast model where every event was sent to all 6 handlers and each
+    // handler filtered internally via its own `when` block.
+    private val registry: Map<KClass<out SseEvent>, SseEventHandler> = buildRegistry()
+
+    private fun buildRegistry(): Map<KClass<out SseEvent>, SseEventHandler> {
+        val map = mutableMapOf<KClass<out SseEvent>, SseEventHandler>()
+        fun bind(handler: SseEventHandler, vararg events: KClass<out SseEvent>) {
+            for (e in events) map[e] = handler
+        }
+        // Session lifecycle + server connection events → SessionEventHandler
+        bind(
+            sessionHandler,
+            SseEvent.ServerConnected::class, SseEvent.ServerHeartbeat::class,
+            SseEvent.ServerInstanceDisposed::class,
+            SseEvent.SessionCreated::class, SseEvent.SessionUpdated::class,
+            SseEvent.SessionDeleted::class, SseEvent.SessionStatus::class,
+            SseEvent.SessionIdle::class, SseEvent.SessionError::class,
+            SseEvent.SessionDiff::class, SseEvent.SessionCompacted::class,
+            SseEvent.VcsBranchUpdated::class, SseEvent.ProjectUpdated::class
+        )
+        // Messages → per-sub-event handlers. They share the MessageEventHandler
+        // state store (injected) but are registered independently so each
+        // message event type routes to its focused handler.
+        bind(
+            messageUpdatedHandler,
+            SseEvent.MessageUpdated::class
+        )
+        bind(
+            messageRemovedHandler,
+            SseEvent.MessageRemoved::class
+        )
+        bind(
+            messagePartHandler,
+            SseEvent.MessagePartUpdated::class, SseEvent.MessagePartDelta::class,
+            SseEvent.MessagePartRemoved::class
+        )
+        // Permission → PermissionEventHandler
+        bind(
+            permissionHandler,
+            SseEvent.PermissionAsked::class, SseEvent.PermissionReplied::class
+        )
+        // Question → QuestionEventHandler
+        bind(
+            questionHandler,
+            SseEvent.QuestionAsked::class, SseEvent.QuestionReplied::class,
+            SseEvent.QuestionRejected::class
+        )
+        // Misc (todo, command, pty, workspace, file, vcs, install, lsp) → MiscEventHandler
+        bind(
+            miscHandler,
+            SseEvent.TodoUpdated::class, SseEvent.CommandExecuted::class,
+            SseEvent.PtyCreated::class, SseEvent.PtyUpdated::class, SseEvent.PtyDeleted::class,
+            SseEvent.WorkspaceReady::class, SseEvent.WorkspaceFailed::class,
+            SseEvent.FileEdited::class, SseEvent.McpToolsChanged::class,
+            SseEvent.FileWatcherUpdated::class,
+            SseEvent.InstallationUpdated::class, SseEvent.InstallationUpdateAvailable::class,
+            SseEvent.WorktreeReady::class, SseEvent.WorktreeFailed::class,
+            SseEvent.LspUpdated::class
+        )
+        // SessionNext → SessionNextEventHandler
+        bind(sessionNextHandler, SseEvent.SessionNext::class)
+        return map
     }
 
     // ============ Public State (read-only) ============
@@ -80,12 +152,15 @@ class EventDispatcher @Inject constructor(
      * - CommandExecuted: resets session status to Idle
      */
     fun processEvent(event: SseEvent, serverId: String) {
-        sessionHandler.handle(event, serverId)
-        messageHandler.handle(event, serverId)
-        permissionHandler.handle(event, serverId)
-        questionHandler.handle(event, serverId)
-        miscHandler.handle(event, serverId)
-        sessionNextHandler.handle(event, serverId)
+        // Registry dispatch: route event to its single registered handler (O(1) lookup).
+        // Replaces the previous broadcast model where every event was sent to all 6
+        // handlers and each filtered internally via its own `when` block.
+        val handler = registry[event::class]
+        if (handler != null) {
+            handler.handle(event, serverId)
+        } else if (BuildConfig.DEBUG) {
+            Log.w(TAG, "No handler registered for ${event::class.simpleName}")
+        }
         forwardToStatusManager(event)
 
         // Cross-handler: SessionDeleted cascades cleanup to other handlers

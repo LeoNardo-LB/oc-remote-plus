@@ -85,7 +85,6 @@ import coil3.compose.AsyncImage
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.AgentInfo
 import dev.leonardo.ocremotev2.domain.model.CommandInfo
-import dev.leonardo.ocremotev2.domain.model.PromptPart
 import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.ui.components.ProviderIcon
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatMessage
@@ -98,6 +97,8 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.agentColor
 import dev.leonardo.ocremotev2.ui.screens.chat.util.decodeDataUrlBytes
 import dev.leonardo.ocremotev2.ui.screens.chat.util.imageThumbnailModel
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
+import dev.leonardo.ocremotev2.ui.screens.chat.util.SlashCommand
+import dev.leonardo.ocremotev2.ui.screens.chat.util.SlashCommandRegistry
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
@@ -105,128 +106,13 @@ import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
 
-/**
- * Slash command definition for the suggestion popup.
- * @param name Command name without the "/" prefix
- * @param description Human-readable description
- * @param type "server" commands are sent via API, "client" commands trigger local actions
- */
-internal data class SlashCommand(
-    val name: String,
-    val description: String?,
-    val type: String // "server" or "client"
-)
-
 internal enum class ChatInputMode {
     NORMAL,
     SHELL
 }
 
-/** Client-side slash commands that mirror the original opencode TUI. */
-@Composable
-internal fun clientCommands(): List<SlashCommand> {
-    return listOf(
-        SlashCommand("new", stringResource(R.string.cmd_new), "client"),
-        SlashCommand("compact", stringResource(R.string.cmd_compact), "client"),
-        SlashCommand("fork", stringResource(R.string.cmd_fork), "client"),
-        SlashCommand("share", stringResource(R.string.cmd_share), "client"),
-        SlashCommand("unshare", stringResource(R.string.cmd_unshare), "client"),
-        SlashCommand("undo", stringResource(R.string.cmd_undo), "client"),
-        SlashCommand("redo", stringResource(R.string.cmd_redo), "client"),
-        SlashCommand("rename", stringResource(R.string.cmd_rename), "client"),
-        SlashCommand("shell", stringResource(R.string.cmd_shell_mode), "client"),
-    )
-}
-
 // BreathingCircleIndicator moved to components/BreathingCircleIndicator.kt
 // FileMentionVisualTransformation moved to input/FileMentionVisualTransformation.kt
-
-/**
- * Splits raw input text into a list of [PromptPart] objects.
- * Text around confirmed @file mentions becomes type="text" parts,
- * and each @file mention becomes a type="file" part with a file:// URL.
- */
-internal fun buildPromptParts(
-    text: String,
-    confirmedPaths: Set<String>,
-    sessionDirectory: String?
-): List<PromptPart> {
-    if (confirmedPaths.isEmpty()) {
-        val trimmed = text.trim()
-        return if (trimmed.isEmpty()) emptyList()
-        else listOf(PromptPart(type = "text", text = trimmed))
-    }
-
-    // Find all confirmed @path mentions with their positions
-    data class Mention(val start: Int, val end: Int, val path: String)
-    val mentions = mutableListOf<Mention>()
-
-    for (path in confirmedPaths) {
-        val needle = "@$path"
-        var searchFrom = 0
-        while (true) {
-            val idx = text.indexOf(needle, searchFrom)
-            if (idx == -1) break
-            val endIdx = idx + needle.length
-            // Boundary check: next char must be whitespace, end-of-string, or @
-            if (endIdx < text.length) {
-                val next = text[endIdx]
-                if (!next.isWhitespace() && next != '@') {
-                    searchFrom = endIdx
-                    continue
-                }
-            }
-            mentions.add(Mention(idx, endIdx, path))
-            searchFrom = endIdx
-        }
-    }
-
-    if (mentions.isEmpty()) {
-        val trimmed = text.trim()
-        return if (trimmed.isEmpty()) emptyList()
-        else listOf(PromptPart(type = "text", text = trimmed))
-    }
-
-    // Sort by position
-    mentions.sortBy { it.start }
-
-    val parts = mutableListOf<PromptPart>()
-    var cursor = 0
-
-    for (mention in mentions) {
-        // Add text before this mention
-        if (mention.start > cursor) {
-            val segment = text.substring(cursor, mention.start).trim()
-            if (segment.isNotEmpty()) {
-                parts.add(PromptPart(type = "text", text = segment))
-            }
-        }
-        // Add file part
-        val isDir = mention.path.endsWith("/")
-        val absPath = if (sessionDirectory != null) "$sessionDirectory/${mention.path}" else mention.path
-        val displayName = dev.leonardo.ocremotev2.util.PathUtils.fileName(mention.path.trimEnd('/', '\\'))
-        parts.add(
-            PromptPart(
-                type = "file",
-                path = mention.path,
-                mime = if (isDir) "application/x-directory" else "text/plain",
-                url = "file:///$absPath",
-                filename = displayName
-            )
-        )
-        cursor = mention.end
-    }
-
-    // Trailing text
-    if (cursor < text.length) {
-        val segment = text.substring(cursor).trim()
-        if (segment.isNotEmpty()) {
-            parts.add(PromptPart(type = "text", text = segment))
-        }
-    }
-
-    return parts
-}
 
 /** Rotating placeholder hints for the input bar, similar to the WebUI prompt input. */
 private val placeholderHintResIds = listOf(
@@ -297,7 +183,7 @@ internal fun ChatInputBar(
     val canSend = (text.isNotBlank() || attachments.isNotEmpty()) && !isSending && (!isShellMode || !isBusy)
 
     // Build merged slash commands: client commands + server commands + skills (deduplicated)
-    val clientCmds = clientCommands()
+    val clientCmds = SlashCommandRegistry.clientCommands()
     val allCommands = remember(commands, clientCmds) {
         val clientNames = clientCmds.map { it.name }.toSet()
         val serverSlash = commands

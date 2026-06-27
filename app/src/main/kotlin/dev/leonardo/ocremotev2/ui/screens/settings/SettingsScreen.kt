@@ -1,6 +1,5 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.settings
 
-import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,37 +12,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PhotoSizeSelectLarge
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.ScreenLockPortrait
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material.icons.filled.WrapText
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,18 +39,17 @@ import dev.leonardo.ocremotev2.ui.screens.settings.components.ImageCompressionQu
 import dev.leonardo.ocremotev2.ui.screens.settings.components.LanguagePickerDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.LocalServerLaunchOptionsDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.MessageCountPickerDialog
-import dev.leonardo.ocremotev2.ui.screens.settings.components.PermissionRulesSection
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ReconnectModePickerDialog
-import dev.leonardo.ocremotev2.ui.screens.settings.components.SectionHeader
 import dev.leonardo.ocremotev2.ui.screens.settings.components.TerminalFontSizeDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ThemePickerDialog
-import dev.leonardo.ocremotev2.ui.screens.settings.components.getImageMaxSideDisplayName
-import dev.leonardo.ocremotev2.ui.screens.settings.components.getLanguageDisplayName
-import dev.leonardo.ocremotev2.ui.screens.settings.components.getReconnectModeDisplayName
-import dev.leonardo.ocremotev2.ui.screens.settings.components.getThemeDisplayName
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.AdvancedSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.AppearanceSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.AutoApproveRulesSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatBehaviorSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatDisplaySection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.GeneralSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.NotificationsSection
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
-import dev.leonardo.ocremotev2.ui.theme.ListItemTokens
-import kotlin.math.roundToInt
 
 /**
  * Settings Screen - global app preferences.
@@ -87,26 +62,13 @@ fun SettingsScreen(
 ) {
     val currentLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val currentTheme by viewModel.appTheme.collectAsStateWithLifecycle()
-    val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val chatDensity by viewModel.chatDensity.collectAsStateWithLifecycle()
-    val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
 
     val initialMessageCount by viewModel.initialMessageCount.collectAsStateWithLifecycle()
-    val codeWordWrap by viewModel.codeWordWrap.collectAsStateWithLifecycle()
-    val confirmBeforeSend by viewModel.confirmBeforeSend.collectAsStateWithLifecycle()
-    val amoledDark by viewModel.amoledDark.collectAsStateWithLifecycle()
-    val collapseTools by viewModel.collapseTools.collectAsStateWithLifecycle()
-    val expandReasoning by viewModel.expandReasoning.collectAsStateWithLifecycle()
-    val showTurnDividers by viewModel.showTurnDividers.collectAsStateWithLifecycle()
-    val hapticFeedback by viewModel.hapticFeedback.collectAsStateWithLifecycle()
     val reconnectMode by viewModel.reconnectMode.collectAsStateWithLifecycle()
-    val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
-    val silentNotifications by viewModel.silentNotifications.collectAsStateWithLifecycle()
-    val compressImageAttachments by viewModel.compressImageAttachments.collectAsStateWithLifecycle()
+    val terminalFontSize by viewModel.terminalFontSize.collectAsStateWithLifecycle()
     val imageAttachmentMaxLongSide by viewModel.imageAttachmentMaxLongSide.collectAsStateWithLifecycle()
     val imageAttachmentWebpQuality by viewModel.imageAttachmentWebpQuality.collectAsStateWithLifecycle()
-    val showLocalRuntime by viewModel.showLocalRuntime.collectAsStateWithLifecycle()
-    val terminalFontSize by viewModel.terminalFontSize.collectAsStateWithLifecycle()
     val localProxyEnabled by viewModel.localProxyEnabled.collectAsStateWithLifecycle()
     val localProxyUrl by viewModel.localProxyUrl.collectAsStateWithLifecycle()
     val localProxyNoProxy by viewModel.localProxyNoProxy.collectAsStateWithLifecycle()
@@ -116,7 +78,6 @@ fun SettingsScreen(
     val localServerRunInBackground by viewModel.localServerRunInBackground.collectAsStateWithLifecycle()
     val localServerAutoStart by viewModel.localServerAutoStart.collectAsStateWithLifecycle()
     val localServerStartupTimeoutSec by viewModel.localServerStartupTimeoutSec.collectAsStateWithLifecycle()
-    val autoApproveRules by viewModel.autoApproveRules.collectAsStateWithLifecycle()
 
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -127,8 +88,6 @@ fun SettingsScreen(
     var showImageMaxSideDialog by remember { mutableStateOf(false) }
     var showImageQualityDialog by remember { mutableStateOf(false) }
     var showLocalLaunchOptionsDialog by remember { mutableStateOf(false) }
-
-    val switchColors = SwitchDefaults.colors()
 
     Scaffold(
         topBar = {
@@ -159,360 +118,44 @@ fun SettingsScreen(
                     .padding(16.dp)
             ) {
             // ======== General ========
-            SectionHeader(stringResource(R.string.settings_section_general))
-
-            // Language
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_language)) },
-                supportingContent = { Text(getLanguageDisplayName(currentLanguage)) },
-                leadingContent = {
-                    Icon(Icons.Default.Language, contentDescription = stringResource(R.string.a11y_settings_language))
-                },
-                modifier = Modifier.clickable { showLanguageDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
+            GeneralSection(
+                viewModel = viewModel,
+                onShowLanguageDialog = { showLanguageDialog = true },
+                onShowReconnectModeDialog = { showReconnectModeDialog = true },
             )
-
-            // Reconnect mode
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_reconnect_mode)) },
-                supportingContent = { Text(getReconnectModeDisplayName(reconnectMode)) },
-                leadingContent = {
-                    Icon(Icons.Default.Sync, contentDescription = stringResource(R.string.a11y_settings_reconnect_mode))
-                },
-                modifier = Modifier.clickable { showReconnectModeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Appearance ========
-            SectionHeader(stringResource(R.string.settings_section_appearance))
-
-            // Theme
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_theme)) },
-                supportingContent = { Text(getThemeDisplayName(currentTheme)) },
-                leadingContent = {
-                    Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.a11y_settings_theme))
-                },
-                modifier = Modifier.clickable { showThemeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
+            AppearanceSection(
+                viewModel = viewModel,
+                onShowThemeDialog = { showThemeDialog = true },
             )
-
-            // Dynamic colors (only on Android 12+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_dynamic_color)) },
-                    supportingContent = { Text(stringResource(R.string.settings_dynamic_color_desc)) },
-                    leadingContent = {
-                        Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.a11y_settings_dynamic_color))
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = dynamicColor,
-                            onCheckedChange = { viewModel.setDynamicColor(it) },
-                            colors = switchColors
-                        )
-                    },
-                    modifier = Modifier.clickable { viewModel.setDynamicColor(!dynamicColor) }.padding(ListItemTokens.ContentPaddingMedium)
-                )
-            }
-
-            // AMOLED dark mode
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_amoled_dark)) },
-                supportingContent = { Text(stringResource(R.string.settings_amoled_dark_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.DarkMode, contentDescription = stringResource(R.string.a11y_settings_amoled_dark))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = amoledDark,
-                        onCheckedChange = { viewModel.setAmoledDark(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setAmoledDark(!amoledDark) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Chat Display ========
-            SectionHeader(stringResource(R.string.settings_section_chat_display))
-
-            // Chat font (density: normal / compact)
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_chat_font)) },
-                supportingContent = {
-                    Text(
-                        if (chatDensity == "compact") stringResource(R.string.settings_chat_font_compact)
-                        else stringResource(R.string.settings_chat_font_normal)
-                    )
-                },
-                leadingContent = {
-                    Icon(Icons.Default.FormatSize, contentDescription = stringResource(R.string.settings_chat_font))
-                },
-                modifier = Modifier.clickable { showChatDensityPicker = true }.padding(ListItemTokens.ContentPaddingMedium)
+            ChatDisplaySection(
+                viewModel = viewModel,
+                onShowChatDensityPicker = { showChatDensityPicker = true },
             )
-
-            // Code word wrap
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_code_word_wrap)) },
-                supportingContent = { Text(stringResource(R.string.settings_code_word_wrap_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.WrapText, contentDescription = stringResource(R.string.a11y_settings_code_word_wrap))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = codeWordWrap,
-                        onCheckedChange = { viewModel.setCodeWordWrap(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setCodeWordWrap(!codeWordWrap) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Auto-expand tool results
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_auto_expand_tools)) },
-                supportingContent = { Text(stringResource(R.string.settings_auto_expand_tools_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.UnfoldMore, contentDescription = stringResource(R.string.a11y_settings_auto_expand_tools))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = collapseTools,
-                        onCheckedChange = { viewModel.setCollapseTools(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setCollapseTools(!collapseTools) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Expand reasoning by default
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_expand_reasoning)) },
-                supportingContent = { Text(stringResource(R.string.settings_expand_reasoning_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Psychology, contentDescription = stringResource(R.string.a11y_settings_expand_reasoning))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = expandReasoning,
-                        onCheckedChange = { viewModel.setExpandReasoning(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setExpandReasoning(!expandReasoning) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Show turn dividers
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_turn_dividers)) },
-                supportingContent = { Text(stringResource(R.string.settings_turn_dividers_desc)) },
-                leadingContent = {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
-                },
-                trailingContent = {
-                    Switch(
-                        checked = showTurnDividers,
-                        onCheckedChange = { viewModel.setShowTurnDividers(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setShowTurnDividers(!showTurnDividers) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Chat Behavior ========
-            SectionHeader(stringResource(R.string.settings_section_chat_behavior))
-
-            // Initial message count
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_initial_messages)) },
-                supportingContent = { Text("$initialMessageCount") },
-                leadingContent = {
-                    Icon(Icons.Default.Storage, contentDescription = stringResource(R.string.a11y_settings_initial_messages))
-                },
-                modifier = Modifier.clickable { showMessageCountDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
+            ChatBehaviorSection(
+                viewModel = viewModel,
+                onShowMessageCountDialog = { showMessageCountDialog = true },
+                onShowImageMaxSideDialog = { showImageMaxSideDialog = true },
+                onShowImageQualityDialog = { showImageQualityDialog = true },
+                onShowTerminalFontSizeDialog = { showTerminalFontSizeDialog = true },
             )
-
-            // Confirm before send
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_confirm_send)) },
-                supportingContent = { Text(stringResource(R.string.settings_confirm_send_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Send, contentDescription = stringResource(R.string.a11y_settings_confirm_send))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = confirmBeforeSend,
-                        onCheckedChange = { viewModel.setConfirmBeforeSend(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setConfirmBeforeSend(!confirmBeforeSend) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Haptic feedback
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_haptic_feedback)) },
-                supportingContent = { Text(stringResource(R.string.settings_haptic_feedback_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Vibration, contentDescription = stringResource(R.string.a11y_settings_haptic_feedback))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = hapticFeedback,
-                        onCheckedChange = { viewModel.setHapticFeedback(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setHapticFeedback(!hapticFeedback) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Keep screen on
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_keep_screen_on)) },
-                supportingContent = { Text(stringResource(R.string.settings_keep_screen_on_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.ScreenLockPortrait, contentDescription = stringResource(R.string.a11y_settings_keep_screen_on))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = keepScreenOn,
-                        onCheckedChange = { viewModel.setKeepScreenOn(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setKeepScreenOn(!keepScreenOn) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Optimize image attachments
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_compress_images)) },
-                supportingContent = { Text(stringResource(R.string.settings_compress_images_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_compress_images))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = compressImageAttachments,
-                        onCheckedChange = { viewModel.setCompressImageAttachments(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable {
-                    viewModel.setCompressImageAttachments(!compressImageAttachments)
-                }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_compress_images_max_side)) },
-                supportingContent = { Text(getImageMaxSideDisplayName(imageAttachmentMaxLongSide)) },
-                leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_image_max_side))
-                },
-                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageMaxSideDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_compress_images_quality)) },
-                supportingContent = {
-                    Text(stringResource(R.string.settings_compress_images_quality_value, imageAttachmentWebpQuality))
-                },
-                leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_image_quality))
-                },
-                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageQualityDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_terminal_font_size)) },
-                supportingContent = {
-                    Text(stringResource(R.string.settings_terminal_font_size_value, terminalFontSize.roundToInt()))
-                },
-                leadingContent = {
-                    Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.a11y_settings_terminal_font_size))
-                },
-                modifier = Modifier.clickable { showTerminalFontSizeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Advanced ========
-            SectionHeader(stringResource(R.string.settings_section_advanced))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_local_runtime)) },
-                supportingContent = { Text(stringResource(R.string.settings_local_runtime_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Code, contentDescription = stringResource(R.string.a11y_settings_local_runtime))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = showLocalRuntime,
-                        onCheckedChange = { viewModel.setShowLocalRuntime(it) },
-                        colors = switchColors,
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setShowLocalRuntime(!showLocalRuntime) }.padding(ListItemTokens.ContentPaddingMedium),
+            AdvancedSection(
+                viewModel = viewModel,
+                onShowLocalLaunchOptionsDialog = { showLocalLaunchOptionsDialog = true },
             )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.home_local_launch_options)) },
-                supportingContent = { Text(stringResource(R.string.home_local_launch_options_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.a11y_settings_launch_options))
-                },
-                modifier = Modifier.clickable { showLocalLaunchOptionsDialog = true }.padding(ListItemTokens.ContentPaddingMedium),
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Notifications ========
-            SectionHeader(stringResource(R.string.settings_section_notifications))
-
-            // Notifications
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_notifications)) },
-                supportingContent = { Text(stringResource(R.string.settings_notifications_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.a11y_settings_notifications))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = notificationsEnabled,
-                        onCheckedChange = { viewModel.setNotificationsEnabled(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setNotificationsEnabled(!notificationsEnabled) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Silent notifications
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_silent_notifications)) },
-                supportingContent = { Text(stringResource(R.string.settings_silent_notifications_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.NotificationsOff, contentDescription = stringResource(R.string.a11y_settings_silent_notifications))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = silentNotifications,
-                        onCheckedChange = { viewModel.setSilentNotifications(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setSilentNotifications(!silentNotifications) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            NotificationsSection(viewModel = viewModel)
 
             // ======== Permissions ========
-            SectionHeader(stringResource(R.string.settings_auto_approve_rules))
-            PermissionRulesSection(
-                rules = autoApproveRules,
-                onDeleteRule = { rule -> viewModel.deletePermissionRule(rule) }
-            )
+            AutoApproveRulesSection(viewModel = viewModel)
         }
 
         if (showThemeDialog) {

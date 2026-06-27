@@ -4,7 +4,9 @@ import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import dev.leonardo.ocremotev2.BuildConfig
 import dev.leonardo.ocremotev2.data.api.NetworkMonitor
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
+import dev.leonardo.ocremotev2.data.api.message.MessageApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.api.SseClient
 import dev.leonardo.ocremotev2.data.api.SseReadTimeoutTracker
@@ -50,7 +52,9 @@ data class ServerConnectionState(
  */
 @Singleton
 class SseConnectionManager @Inject constructor(
-    private val api: OpenCodeApi,
+    private val sessionApi: SessionApi,
+    private val messageApi: MessageApi,
+    private val fileApi: FileApi,
     private val sseClient: SseClient,
     private val eventDispatcher: EventDispatcher,
     private val settingsRepository: SettingsDataStore,
@@ -256,17 +260,17 @@ class SseConnectionManager @Inject constructor(
 
     private suspend fun preLoadSessions(server: ServerConfig, conn: ServerConnection) {
         try {
-            val projects = api.listProjects(conn)
+            val projects = fileApi.listProjects(conn)
             if (projects.isEmpty()) {
                 // Fallback: load sessions without directory header (server CWD only)
-                val sessions = api.listSessions(conn)
+                val sessions = sessionApi.listSessions(conn)
                 eventDispatcher.setSessions(server.id, sessions)
                 Log.i(TAG, "[${server.displayName}] Pre-loaded ${sessions.size} sessions (no projects)")
             } else {
                 var totalSessions = 0
                 for (project in projects) {
                     try {
-                        val sessions = api.listSessions(conn, directory = project.worktree)
+                        val sessions = sessionApi.listSessions(conn, directory = project.worktree)
                         eventDispatcher.setSessions(server.id, sessions)
                         totalSessions += sessions.size
                     } catch (e: Exception) {
@@ -296,7 +300,7 @@ class SseConnectionManager @Inject constructor(
         var recoveredCount = 0
         for (sessionId in sessionIds) {
             try {
-                val messages = api.listMessages(conn, sessionId)
+                val messages = messageApi.listMessages(conn, sessionId)
                 eventDispatcher.replaceMessages(sessionId, messages)
                 recoveredCount++
             } catch (e: Exception) {
@@ -315,7 +319,7 @@ class SseConnectionManager @Inject constructor(
      */
     private suspend fun syncSessionStatuses(conn: ServerConnection) {
         try {
-            val result = api.fetchSessionStatus(conn)
+            val result = sessionApi.fetchSessionStatus(conn)
             result.onSuccess { statuses ->
                 val statusMap = statuses.mapValues { (_, info) ->
                     when (info.type) {

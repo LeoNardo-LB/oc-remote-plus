@@ -1,7 +1,10 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.sessions
 
 import android.util.Log
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.file.FileApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
+import dev.leonardo.ocremotev2.data.api.system.SystemApi
+import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
 import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.domain.model.SessionStatus
@@ -24,7 +27,10 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionListViewModelPaginationTest {
 
-    private val api: OpenCodeApi = mockk()
+    private val sessionApi: SessionApi = mockk()
+    private val fileApi: FileApi = mockk()
+    private val systemApi: SystemApi = mockk()
+    private val terminalApi: TerminalApi = mockk()
     private val eventDispatcher: EventDispatcher = mockk(relaxed = true)
     private val manageSessionUseCase: ManageSessionUseCase = mockk()
     private val deleteSessionUseCase: DeleteSessionUseCase = mockk()
@@ -81,7 +87,10 @@ class SessionListViewModelPaginationTest {
         return SessionListViewModel(
             savedStateHandle = savedStateHandle,
             eventDispatcher = eventDispatcher,
-            api = api,
+            sessionApi = sessionApi,
+            fileApi = fileApi,
+            systemApi = systemApi,
+            terminalApi = terminalApi,
             manageSessionUseCase = manageSessionUseCase,
             deleteSessionUseCase = deleteSessionUseCase,
             draftRepository = mockk(relaxed = true),

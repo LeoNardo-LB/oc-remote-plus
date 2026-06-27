@@ -6,7 +6,7 @@ import javax.inject.Inject
 
 /**
  * Use case: load provider catalog for model selection.
- * Routes through ProviderRepository instead of direct OpenCodeApi access.
+ * Routes through ProviderRepository instead of direct API access.
  */
 class SelectModelUseCase @Inject constructor(
     private val providerRepository: ProviderRepository

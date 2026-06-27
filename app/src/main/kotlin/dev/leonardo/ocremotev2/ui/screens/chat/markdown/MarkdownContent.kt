@@ -1,8 +1,6 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.chat.markdown
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
@@ -13,8 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -30,12 +26,6 @@ import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
-import dev.hossain.highlight.ui.CodeBlockStyle
-import dev.hossain.highlight.ui.SyntaxHighlightedCode
-import org.intellij.markdown.MarkdownTokenTypes
-import org.intellij.markdown.ast.ASTNode
-import org.intellij.markdown.ast.findChildOfType
-import org.intellij.markdown.ast.getTextInNode
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.ChatDensity
@@ -236,33 +226,8 @@ internal fun MarkdownContent(
         ),
     )
 
-    val context = LocalContext.current
     val components = remember(density, isUser) {
         markdownComponents(
-            codeBlock = { model ->
-                val (code, lang) = extractCodeAndLanguage(model.content, model.node, isFence = false)
-                CodeBlockRenderer(
-                    code = code,
-                    language = lang,
-                    isUser = isUser,
-                    density = density,
-                    backgroundColor = codeBlockBg,
-                    codeBlockFg = codeBlockFg,
-                    context = context,
-                )
-            },
-            codeFence = { model ->
-                val (code, lang) = extractCodeAndLanguage(model.content, model.node, isFence = true)
-                CodeBlockRenderer(
-                    code = code,
-                    language = lang,
-                    isUser = isUser,
-                    density = density,
-                    backgroundColor = codeBlockBg,
-                    codeBlockFg = codeBlockFg,
-                    context = context,
-                )
-            },
             heading1 = { model ->
                 // getUnescapedTextInNode returns the raw "# Title" range; strip the
                 // leading marker(s) so only the heading copy is rendered.
@@ -311,94 +276,3 @@ internal fun MarkdownContent(
     )
 }
 
-/**
- * Extracts pure code text and language from a Mikepenz code AST node.
- *
- * The [content] parameter is the entire markdown source; the [node] offsets
- * delimit the code block. Language detection only applies to fenced blocks
- * (```), indented code blocks have no language.
- */
-private fun extractCodeAndLanguage(
-    content: String,
-    node: ASTNode,
-    isFence: Boolean,
-): Pair<String, String> {
-    val codeText = if (isFence && node.children.size >= 3) {
-        val language = node.findChildOfType(MarkdownTokenTypes.FENCE_LANG)
-        val start = node.children[2].startOffset
-        val minCount = if (language != null && node.children.size > 3) 3 else 2
-        val end = node.children[(node.children.size - 2).coerceAtLeast(minCount)].endOffset
-        content.subSequence(start, end).toString().replaceIndent()
-    } else if (!isFence && node.children.isNotEmpty()) {
-        val start = node.children[0].startOffset
-        val end = node.children[node.children.size - 1].endOffset
-        content.subSequence(start, end).toString().replaceIndent()
-    } else {
-        content
-    }
-    val lang = if (isFence) {
-        node.findChildOfType(MarkdownTokenTypes.FENCE_LANG)
-            ?.getTextInNode(content)?.toString()?.trim()?.lowercase() ?: ""
-    } else {
-        ""
-    }
-    return codeText to lang
-}
-
-/**
- * Renders a code block.
- *
- * User messages show plain monospaced text (their bubble already conveys context);
- * assistant messages get full Highlight.js syntax coloring via [SyntaxHighlightedCode]
- * with a built-in copy button that surfaces a toast on copy.
- */
-@Composable
-private fun CodeBlockRenderer(
-    code: String,
-    language: String,
-    isUser: Boolean,
-    density: ChatDensity,
-    backgroundColor: Color,
-    codeBlockFg: Color,
-    context: android.content.Context,
-) {
-    val spacing = density.spacing
-    val tokens = density.typography
-
-    Surface(
-        shape = ShapeTokens.extraSmall,
-        color = backgroundColor,
-        tonalElevation = 0.dp,
-    ) {
-        if (isUser) {
-            Text(
-                text = code,
-                style = TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = tokens.codeFontSize,
-                    lineHeight = tokens.codeLineHeight,
-                    color = codeBlockFg,
-                ),
-                modifier = Modifier.padding(all = spacing.codeBlock),
-            )
-        } else {
-            SyntaxHighlightedCode(
-                code = code,
-                language = language.ifBlank { "plaintext" },
-                style = CodeBlockStyle(
-                    shape = RectangleShape,
-                    padding = PaddingValues(spacing.codeBlock),
-                    textStyle = TextStyle(
-                        fontSize = tokens.codeFontSize,
-                        lineHeight = tokens.codeLineHeight,
-                        fontFamily = FontFamily.Monospace,
-                    ),
-                    copyButtonSize = 24.dp,
-                ),
-                onCopyClick = {
-                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-                },
-            )
-        }
-    }
-}

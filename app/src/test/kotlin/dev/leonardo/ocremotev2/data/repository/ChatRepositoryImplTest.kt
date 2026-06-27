@@ -1,6 +1,9 @@
 ﻿package dev.leonardo.ocremotev2.data.repository
 
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.message.MessageApi
+import dev.leonardo.ocremotev2.data.api.provider.ProviderApi
+import dev.leonardo.ocremotev2.data.api.session.SessionApi
+import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.repository.PermissionAutoApprover
 import dev.leonardo.ocremotev2.data.repository.handler.*
@@ -16,7 +19,10 @@ import org.junit.Test
 class ChatRepositoryImplTest {
 
     private lateinit var repo: ChatRepositoryImpl
-    private lateinit var api: OpenCodeApi
+    private lateinit var messageApi: MessageApi
+    private lateinit var sessionApi: SessionApi
+    private lateinit var terminalApi: TerminalApi
+    private lateinit var providerApi: ProviderApi
     private lateinit var eventDispatcher: EventDispatcher
     private lateinit var serverRepo: ServerDataStore
     private lateinit var permissionAutoApprover: PermissionAutoApprover
@@ -27,7 +33,10 @@ class ChatRepositoryImplTest {
 
     @Before
     fun setup() {
-        api = mockk(relaxed = true)
+        messageApi = mockk(relaxed = true)
+        sessionApi = mockk(relaxed = true)
+        terminalApi = mockk(relaxed = true)
+        providerApi = mockk(relaxed = true)
         serverRepo = mockk(relaxed = true)
         permissionAutoApprover = mockk(relaxed = true)
         sessionHandler = SessionEventHandler()
@@ -39,13 +48,16 @@ class ChatRepositoryImplTest {
         eventDispatcher = EventDispatcher(
             sessionHandler = sessionHandler,
             messageHandler = messageHandler,
+            messagePartHandler = MessagePartHandler(messageHandler),
+            messageUpdatedHandler = MessageUpdatedHandler(messageHandler),
+            messageRemovedHandler = MessageRemovedHandler(messageHandler),
             permissionHandler = permissionHandler,
             questionHandler = questionHandler,
             miscHandler = miscHandler,
             sessionNextHandler = SessionNextEventHandler(),
             sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
         )
-        repo = ChatRepositoryImpl(api, eventDispatcher, serverRepo, permissionAutoApprover)
+        repo = ChatRepositoryImpl(messageApi, sessionApi, terminalApi, providerApi, eventDispatcher, serverRepo, permissionAutoApprover)
     }
 
     // ============ getMessagesFlow ============
@@ -149,7 +161,7 @@ class ChatRepositoryImplTest {
         coEvery { serverRepo.getServer("server1") } returns ServerConfig(
             id = "server1", url = "http://localhost:4096"
         )
-        coEvery { api.promptAsync(any(), "s1", any()) } returns Unit
+        coEvery { messageApi.promptAsync(any(), "s1", any()) } returns Unit
 
         val textPart = Part.Text(id = "", sessionId = "s1", messageId = "", text = "hello")
         val result = repo.sendMessage("s1", listOf(textPart))

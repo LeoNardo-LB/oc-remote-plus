@@ -2,7 +2,7 @@
 
 import android.util.Log
 import dev.leonardo.ocremotev2.BuildConfig
-import dev.leonardo.ocremotev2.data.api.OpenCodeApi
+import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.data.dto.common.PtySocket
 import dev.leonardo.ocremotev2.data.terminal.PtyToTermlibAdapter
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
@@ -29,7 +29,7 @@ data class TerminalTabUi(
 )
 
 internal class ServerTerminalWorkspace(
-    private val api: OpenCodeApi,
+    private val api: TerminalApi,
     private val conn: ServerConnection,
 ) {
     private class RuntimeTab(
