@@ -372,19 +372,26 @@ class ChatViewModel @Inject constructor(
         sessionStatusManager.setServerId(serverId)
     }
 
-    private val _allProviders = MutableStateFlow<List<ProviderCatalog>>(emptyList())
-    private val _providers = MutableStateFlow<List<ProviderCatalog>>(emptyList())
-    private val _hiddenModels = MutableStateFlow<Set<String>>(emptySet())
-    private val _defaultModels = MutableStateFlow<Map<String, String>>(emptyMap())
-    private val _selectedProviderId = MutableStateFlow<String?>(null)
-    private val _selectedModelId = MutableStateFlow<String?>(null)
-    // Track if the model was explicitly selected by the user to avoid overwriting it with defaults/history
-    private var isModelExplicitlySelected = false
-    private val _agents = MutableStateFlow<List<AgentInfo>>(emptyList())
-    /** Pair(agentName, explicitlySelected) — using a single flow avoids race between flag and value */
-    private val _selectedAgent = MutableStateFlow("build" to false)
-    private val _selectedVariant = MutableStateFlow<String?>(null)
-    private val _commands = MutableStateFlow<List<CommandInfo>>(emptyList())
+    // ============ Model Config Delegate (Phase 3 Task 4 — A cluster) ============
+    // Owns provider/agent/model/variant/command selection and the modelConfigState
+    // resolution pipeline (with self-feedback side effects). Consumes sessionIdFlow
+    // from sessionLifecycle; exposes selectedAgentValue/selectedVariantValue for
+    // DraftInputDelegate draft persistence and sendParts().
+    private val modelConfig = ModelConfigDelegate(
+        selectModelUseCase = selectModelUseCase,
+        manageAgentUseCase = manageAgentUseCase,
+        settingsRepository = settingsRepository,
+        sessionRepository = sessionRepository,
+        messagePaging = messagePaging,
+        tokenStatsTracker = tokenStatsTracker,
+        serverId = serverId,
+        sessionIdFlow = sessionLifecycle.sessionIdFlow,
+        scope = viewModelScope,
+    )
+    val modelConfigState: StateFlow<ModelConfigState> get() = modelConfig.modelConfigState
+    fun selectAgent(name: String) = modelConfig.selectAgent(name)
+    fun cycleVariant() = modelConfig.cycleVariant()
+    fun selectModel(providerId: String, modelId: String) = modelConfig.selectModel(providerId, modelId)
     private val terminalDelegate = TerminalDelegate(
         terminalRegistry = terminalRegistry,
         settingsRepository = settingsRepository,
@@ -413,8 +420,8 @@ class ChatViewModel @Inject constructor(
         serverId = serverId,
         sessionIdProvider = { sessionLifecycle.sessionId },
         sessionDirectoryProvider = { sessionLifecycle.sessionDirectory },
-        selectedAgentProvider = { _selectedAgent.value },
-        selectedVariantProvider = { _selectedVariant.value },
+        selectedAgentProvider = { modelConfig.selectedAgentValue },
+        selectedVariantProvider = { modelConfig.selectedVariantValue },
     )
     val draftText: StateFlow<String> get() = draftDelegate.draftText
     val revertedDraftEvent: SharedFlow<RevertedDraftPayload> get() = draftDelegate.revertedDraftEvent
@@ -513,140 +520,6 @@ class ChatViewModel @Inject constructor(
     val imageAttachmentWebpQuality = settingsRepository.getSettingsFlow().map { it.imageAttachmentWebpQuality }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 60
     )
-    // ============ Model/Agent Config State (with resolution side effects) ============
-
-    /**
-     * Model and agent configuration — providers, agents, model/agent selection, variants.
-     * Performs side effects: model/agent resolution from message history, model caching,
-     * and sync-back to raw StateFlows so sendParts()/runShellCommand() use consistent values.
-     */
-    val modelConfigState: StateFlow<ModelConfigState> = sessionLifecycle.sessionIdFlow.flatMapLatest { sid ->
-        combine(
-            _allProviders,
-            _providers,
-            _defaultModels,
-            _selectedProviderId,
-            _selectedModelId,
-            _agents,
-            _selectedAgent,
-            _selectedVariant,
-            _commands,
-            messagePaging.observeMessages(sid),
-            sessionRepository.getSessionsFlow(serverId),
-            tokenStatsTracker.stats,
-        ) { args ->
-            @Suppress("UNCHECKED_CAST")
-            val allProviders = args[0] as List<ProviderCatalog>
-            @Suppress("UNCHECKED_CAST")
-            val providers = args[1] as List<ProviderCatalog>
-            @Suppress("UNCHECKED_CAST")
-            val defaultModels = args[2] as Map<String, String>
-            val selProviderId = args[3] as String?
-            val selModelId = args[4] as String?
-            @Suppress("UNCHECKED_CAST")
-            val agents = args[5] as List<AgentInfo>
-            @Suppress("UNCHECKED_CAST")
-            val agentSelection = args[6] as Pair<String, Boolean>
-            val selectedAgent = agentSelection.first
-            val isAgentExplicitlySelected = agentSelection.second
-            val selectedVariant = args[7] as String?
-            @Suppress("UNCHECKED_CAST")
-            val commands = args[8] as List<CommandInfo>
-            @Suppress("UNCHECKED_CAST")
-            val sessionMessages = args[9] as List<Message>
-            @Suppress("UNCHECKED_CAST")
-            val allSessions = args[10] as List<Session>
-            val tokenStats = args[11] as TokenStatsTracker.TokenStats
-
-            // Resolve model: explicit selection > last user message's model > provider default
-            var effectiveProviderId = selProviderId
-            var effectiveModelId = selModelId
-
-            if (!isModelExplicitlySelected) {
-                val lastUserWithModel = sessionMessages
-                    .filterIsInstance<Message.User>()
-                    .lastOrNull { it.model != null }
-                if (lastUserWithModel?.model != null) {
-                    effectiveProviderId = lastUserWithModel.model.providerId
-                    effectiveModelId = lastUserWithModel.model.modelId
-                } else if (effectiveModelId == null && defaultModels.isNotEmpty()) {
-                    val entry = defaultModels.entries.first()
-                    effectiveProviderId = entry.key
-                    effectiveModelId = entry.value
-                }
-            }
-
-            // Resolve agent from last user message if not explicitly changed
-            val effectiveAgent = if (!isAgentExplicitlySelected) {
-                val lastUserAgent = sessionMessages
-                    .filterIsInstance<Message.User>()
-                    .lastOrNull { it.agent != null }
-                    ?.agent
-                lastUserAgent ?: selectedAgent
-            } else {
-                selectedAgent
-            }
-
-            // Keep raw state in sync so sendParts()/runShellCommand() always use the displayed value
-            if (effectiveAgent != selectedAgent && !isAgentExplicitlySelected) {
-                _selectedAgent.value = effectiveAgent to false
-            }
-
-            // Keep model StateFlows in sync with the effective model
-            if ((effectiveProviderId != selProviderId || effectiveModelId != selModelId) && !isModelExplicitlySelected) {
-                _selectedProviderId.value = effectiveProviderId
-                _selectedModelId.value = effectiveModelId
-            }
-
-            // Resolve available variants for the currently selected model.
-            var currentModel = if (effectiveProviderId != null && effectiveModelId != null) {
-                providers.find { it.id == effectiveProviderId }
-                    ?.models?.get(effectiveModelId)
-            } else null
-            if (currentModel == null) {
-                val firstProvider = providers.firstOrNull()
-                val firstModel = firstProvider?.models?.values?.firstOrNull()
-                if (firstProvider != null && firstModel != null) {
-                    effectiveProviderId = firstProvider.id
-                    effectiveModelId = firstModel.id
-                    currentModel = firstModel
-                }
-            }
-            val availableVariants = currentModel?.variantNames?.sorted() ?: emptyList()
-
-            // Persist the resolved model to the in-memory cache
-            if (effectiveProviderId != null && effectiveModelId != null) {
-                sessionModelCache[sid] = effectiveProviderId to effectiveModelId
-            }
-
-            // Resolve context window with fallback to provider model info
-            val session = allSessions.find { it.id == sid }
-            val contextWindow = tokenStats.contextWindow.let { cw ->
-                if (cw > 0) cw else session?.model?.let { sm ->
-                    providers.find { it.id == sm.providerId }?.models?.get(sm.id)?.contextWindow
-                } ?: currentModel?.contextWindow ?: 0
-            }
-
-            ModelConfigState(
-                providers = providers,
-                hasServerModelCatalog = allProviders.any { it.models.isNotEmpty() },
-                defaultModels = defaultModels,
-                selectedProviderId = effectiveProviderId,
-                selectedModelId = effectiveModelId,
-                agents = agents.filter { it.mode != "subagent" && !it.hidden },
-                selectedAgent = effectiveAgent,
-                variantNames = availableVariants,
-                selectedVariant = if (selectedVariant != null && selectedVariant in availableVariants) selectedVariant else null,
-                commands = commands,
-                contextWindow = contextWindow,
-            )
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        ModelConfigState()
-    )
-
     /** Expose restored draft as StateFlow for ChatScreen consumption. */
     val restoredDraftState: StateFlow<RevertedDraftPayload?> get() = draftDelegate.restoredDraftState
 
@@ -1040,34 +913,20 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Restore draft from disk
+        // Restore draft from disk — apply restored agent/variant to model config
         if (!isNewSession) {
             val draft = draftDelegate.restorePersistedDraft()
             if (draft != null) {
-                if (!draft.selectedAgent.isNullOrBlank()) {
-                    _selectedAgent.value = draft.selectedAgent to true
-                }
-                if (!draft.selectedVariant.isNullOrBlank()) {
-                    _selectedVariant.value = draft.selectedVariant
-                }
+                modelConfig.applyDraftRestore(draft.selectedAgent, draft.selectedVariant)
             }
         }
 
         // Restore model selection from in-memory cache (survives session switching, cleared on app restart)
         if (!isNewSession) {
-            sessionModelCache[sessionId]?.let { (providerId, modelId) ->
-                _selectedProviderId.value = providerId
-                _selectedModelId.value = modelId
-                isModelExplicitlySelected = true
-            }
+            modelConfig.restoreModelFromCache()
         }
 
-        viewModelScope.launch {
-            settingsRepository.hiddenModels(serverId).collect { hidden ->
-                _hiddenModels.value = hidden
-                applyProviderFilter()
-            }
-        }
+        modelConfig.observeHiddenModels()
 
         // Load initial message count from settings, then load data
         if (!isNewSession) {
@@ -1095,9 +954,9 @@ class ChatViewModel @Inject constructor(
             // New session has nothing to load — mark loading complete immediately
             _isLoading.value = false
         }
-        loadProviders()
-        loadAgents()
-        loadCommands()
+        modelConfig.loadProviders()
+        modelConfig.loadAgents()
+        modelConfig.loadCommands()
     }
 
     /**
@@ -1441,91 +1300,8 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // Removed initModelFromMessages as it's handled reactively
-
-    private fun loadProviders() {
-        viewModelScope.launch {
-            try {
-                val response = selectModelUseCase.loadProviders(serverId)
-                _allProviders.value = response.providers
-                applyProviderFilter()
-                _defaultModels.value = response.default
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${response.providers.size} providers, defaults: ${response.default}")
-                // No need to set default here, combine block handles fallback
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load providers", e)
-            }
-        }
-    }
-
-    private fun applyProviderFilter() {
-        val hidden = _hiddenModels.value
-        val filtered = _allProviders.value
-            .map { provider ->
-                provider.copy(
-                    models = provider.models.filterKeys { modelId ->
-                        "${provider.id}:$modelId" !in hidden
-                    }
-                )
-            }
-            .filter { it.models.isNotEmpty() }
-        _providers.value = filtered
-    }
-
-    private fun loadAgents() {
-        viewModelScope.launch {
-            try {
-                val agents = manageAgentUseCase.loadAgents(serverId)
-                _agents.value = agents
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${agents.size} agents: ${agents.map { it.name }}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load agents", e)
-            }
-        }
-    }
-
-    fun selectAgent(name: String) {
-        _selectedAgent.value = name to true
-    }
-
-    private fun loadCommands() {
-        viewModelScope.launch {
-            try {
-                val commands = manageAgentUseCase.loadCommands(serverId)
-                _commands.value = commands
-                if (BuildConfig.DEBUG) Log.d(TAG, "Loaded ${commands.size} commands: ${commands.map { it.name }}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load commands", e)
-            }
-        }
-    }
-
-    /**
-     * Cycle through available thinking effort variants for the current model.
-     * Cycles: none -> first -> second -> ... -> last -> none (default).
-     */
-    fun cycleVariant() {
-        val variants = modelConfigState.value.variantNames
-        if (variants.isEmpty()) return
-        val current = _selectedVariant.value
-        if (current == null || current !in variants) {
-            _selectedVariant.value = variants.first()
-        } else {
-            val idx = variants.indexOf(current)
-            _selectedVariant.value = if (idx == variants.lastIndex) null else variants[idx + 1]
-        }
-    }
-
-    fun selectModel(providerId: String, modelId: String) {
-        // MUST set flag BEFORE modifying StateFlows — on Main.immediate dispatcher,
-        // setting a StateFlow value synchronously triggers combine recomputation,
-        // which would overwrite our values if the flag isn't set yet.
-        isModelExplicitlySelected = true
-        _selectedProviderId.value = providerId
-        _selectedModelId.value = modelId
-        // Remember selection for this session (in-memory, cleared on app restart)
-        sessionModelCache[sessionId] = providerId to modelId
-    }
+    // Model/agent/provider/variant/command selection + modelConfigState resolution
+    // are delegated to ModelConfigDelegate (Phase 3 Task 4 — A cluster).
 
     // ============ @ File Mention Search (delegated — Phase 3 Task 2) ============
     val fileSearchResults: StateFlow<List<String>> get() = draftDelegate.fileSearchResults
@@ -1625,7 +1401,7 @@ class ChatViewModel @Inject constructor(
                     parts = parts,
                     model = model,
                     agent = modelConfigState.value.selectedAgent,
-                    variant = _selectedVariant.value,
+                    variant = modelConfig.selectedVariantValue,
                     directory = sessionLifecycle.sessionDirectory
                 )
                 // P5-4: clear pendingId on success path (was only cleared in catch block).
@@ -2202,12 +1978,6 @@ class ChatViewModel @Inject constructor(
     }
 
     companion object {
-        /**
-         * In-memory cache mapping sessionId → (providerId, modelId).
-         * Survives session switching (ViewModel recreation) but clears on app restart (process death).
-         */
-        private val sessionModelCache = mutableMapOf<String, Pair<String, String>>()
-
         const val REFRESH_COOLDOWN_MS = 5_000L  // Skip refresh if last one was < 5s ago
     }
 }
