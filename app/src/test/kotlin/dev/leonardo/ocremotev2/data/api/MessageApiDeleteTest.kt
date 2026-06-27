@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class OpenCodeApiMessageDeleteTest {
+class MessageApiDeleteTest {
 
     private val api: MessageApi = mockk()
     private val conn = ServerConnection.from("http://localhost:8080")

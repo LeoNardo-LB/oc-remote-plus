@@ -20,7 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class OpenCodeApiVcsTest {
+class FileApiVcsTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 

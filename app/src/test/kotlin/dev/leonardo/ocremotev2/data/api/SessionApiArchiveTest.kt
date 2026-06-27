@@ -9,7 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class OpenCodeApiArchiveTest {
+class SessionApiArchiveTest {
 
     private val api: SessionApi = mockk()
     private val conn = ServerConnection.from("http://localhost:8080")

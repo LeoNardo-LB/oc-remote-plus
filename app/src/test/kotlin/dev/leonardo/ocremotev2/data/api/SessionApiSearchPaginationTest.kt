@@ -13,7 +13,7 @@ import org.junit.Test
  * Tests that listSessions correctly passes search/cursor/limit
  * query parameters to the HTTP request.
  */
-class OpenCodeApiSearchPaginationTest {
+class SessionApiSearchPaginationTest {
 
     @Test
     fun `listSessions passes search query parameter`() = runTest {

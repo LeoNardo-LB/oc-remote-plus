@@ -22,7 +22,7 @@ import org.junit.Test
  *
  * Phase 0 safety net: if any of these break, the refactoring broke the API contract.
  */
-class OpenCodeApiTest {
+class DtoSerializationTest {
 
     private val json = Json {
         ignoreUnknownKeys = true
