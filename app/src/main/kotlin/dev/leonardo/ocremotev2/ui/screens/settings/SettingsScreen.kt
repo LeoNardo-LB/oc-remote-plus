@@ -66,6 +66,7 @@ import dev.leonardo.ocremotev2.ui.screens.settings.components.MessageCountPicker
 import dev.leonardo.ocremotev2.ui.screens.settings.components.PermissionRulesSection
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ReconnectModePickerDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.SectionHeader
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.AppearanceSection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.GeneralSection
 import dev.leonardo.ocremotev2.ui.screens.settings.components.TerminalFontSizeDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ThemePickerDialog
@@ -167,55 +168,10 @@ fun SettingsScreen(
             )
 
             // ======== Appearance ========
-            SectionHeader(stringResource(R.string.settings_section_appearance))
-
-            // Theme
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_theme)) },
-                supportingContent = { Text(getThemeDisplayName(currentTheme)) },
-                leadingContent = {
-                    Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.a11y_settings_theme))
-                },
-                modifier = Modifier.clickable { showThemeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
+            AppearanceSection(
+                viewModel = viewModel,
+                onShowThemeDialog = { showThemeDialog = true },
             )
-
-            // Dynamic colors (only on Android 12+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_dynamic_color)) },
-                    supportingContent = { Text(stringResource(R.string.settings_dynamic_color_desc)) },
-                    leadingContent = {
-                        Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.a11y_settings_dynamic_color))
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = dynamicColor,
-                            onCheckedChange = { viewModel.setDynamicColor(it) },
-                            colors = switchColors
-                        )
-                    },
-                    modifier = Modifier.clickable { viewModel.setDynamicColor(!dynamicColor) }.padding(ListItemTokens.ContentPaddingMedium)
-                )
-            }
-
-            // AMOLED dark mode
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_amoled_dark)) },
-                supportingContent = { Text(stringResource(R.string.settings_amoled_dark_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.DarkMode, contentDescription = stringResource(R.string.a11y_settings_amoled_dark))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = amoledDark,
-                        onCheckedChange = { viewModel.setAmoledDark(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setAmoledDark(!amoledDark) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Chat Display ========
             SectionHeader(stringResource(R.string.settings_section_chat_display))
