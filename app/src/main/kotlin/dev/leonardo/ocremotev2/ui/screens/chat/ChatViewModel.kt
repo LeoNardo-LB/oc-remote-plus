@@ -3,9 +3,6 @@
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import dev.leonardo.ocremotev2.BuildConfig
 import dev.leonardo.ocremotev2.R
 import androidx.lifecycle.SavedStateHandle
@@ -394,21 +391,25 @@ class ChatViewModel @Inject constructor(
     private val _selectedAgent = MutableStateFlow("build" to false)
     private val _selectedVariant = MutableStateFlow<String?>(null)
     private val _commands = MutableStateFlow<List<CommandInfo>>(emptyList())
-    private val terminalWorkspace = terminalRegistry.workspaceFor(
-        serverId, serverUrl, username, password.ifEmpty { null }
-    ).also {
-        if (BuildConfig.DEBUG) {
-            Log.d("TerminalZoom", "ChatViewModel init: workspaceId=${System.identityHashCode(it)} flowId=${System.identityHashCode(it.activeFontSizeSp)} serverId=$serverId vmId=${System.identityHashCode(this)}")
-        }
-    }
-    val terminalTabs: StateFlow<List<TerminalTabUi>> = terminalWorkspace.tabList
-    val activeTerminalTabId: StateFlow<String?> = terminalWorkspace.activeTabId
+    private val terminalDelegate = TerminalDelegate(
+        terminalRegistry = terminalRegistry,
+        settingsRepository = settingsRepository,
+        serverId = serverId,
+        serverUrl = serverUrl,
+        username = username,
+        password = password.ifEmpty { null },
+        scope = viewModelScope,
+        sessionDirectoryProvider = { sessionDirectory },
+        sessionLoaded = sessionLoaded,
+    )
+    val terminalTabs: StateFlow<List<TerminalTabUi>> get() = terminalDelegate.terminalTabs
+    val activeTerminalTabId: StateFlow<String?> get() = terminalDelegate.activeTerminalTabId
     /** Incremented on active terminal tab updates — observe to trigger recomposition. */
-    val terminalVersion: StateFlow<Long> = terminalWorkspace.activeVersion
-    val terminalConnected: StateFlow<Boolean> = terminalWorkspace.activeConnected
-    val terminalFontSizeSp: StateFlow<Float> = terminalWorkspace.activeFontSizeSp
-    val terminalEmulator: org.connectbot.terminal.TerminalEmulator get() = terminalWorkspace.activeEmulator()
-    val terminalCursorKeysAppMode: Boolean get() = terminalWorkspace.activeAdapter().cursorKeysApplicationMode.value
+    val terminalVersion: StateFlow<Long> get() = terminalDelegate.terminalVersion
+    val terminalConnected: StateFlow<Boolean> get() = terminalDelegate.terminalConnected
+    val terminalFontSizeSp: StateFlow<Float> get() = terminalDelegate.terminalFontSizeSp
+    val terminalEmulator: org.connectbot.terminal.TerminalEmulator get() = terminalDelegate.terminalEmulator
+    val terminalCursorKeysAppMode: Boolean get() = terminalDelegate.terminalCursorKeysAppMode
 
     // ============ Draft Persistence ============
     /** Draft text for the input field — survives navigation / app restart. */
@@ -478,59 +479,29 @@ class ChatViewModel @Inject constructor(
     private val _isLoadingOlder = MutableStateFlow(false)
 
     // ============ Scroll Position Save/Restore ============
+    private val scrollPositionDelegate = ScrollPositionDelegate()
+
     /** Saved scroll position for restoring after sub-session navigation. */
-    var savedMessageId by mutableStateOf<String?>(null)
-        private set
+    val savedMessageId: String? get() = scrollPositionDelegate.savedMessageId
     /** Raw LazyColumn index at save time — used for direct restoration without index arithmetic. */
-    var savedLazyIndex by mutableStateOf(0)
-        private set
-    var savedScrollOffset by mutableStateOf(0)
-        private set
-
-    /**
-     * Incremented each time [saveScrollPosition] is called, and again by
-     * [bumpScrollRestoreIfPending] when ChatScreen resumes with a pending restore.
-     * ChatScreen observes this via LaunchedEffect to reliably restore scroll position
-     * after FileViewer / sub-session navigation. Using rememberLazyListState(initial...)
-     * is unreliable because `remember` caches the initial state on first composition and
-     * ignores new values on recomposition, causing scroll to sometimes restore and sometimes not.
-     */
-    var scrollRestoreVersion by mutableStateOf(0)
-        private set
-
-    /**
-     * True when a scroll position has been saved (via [saveScrollPosition]) but not yet
-     * restored. Used by [bumpScrollRestoreIfPending] to re-trigger restoration ONLY when
-     * returning from a navigation that actually saved a position (FileViewer / sub-session),
-     * avoiding spurious restores on plain background→foreground transitions that would
-     * disturb the user's current browsing position.
-     */
-    private var hasPendingScrollRestore = false
+    val savedLazyIndex: Int get() = scrollPositionDelegate.savedLazyIndex
+    val savedScrollOffset: Int get() = scrollPositionDelegate.savedScrollOffset
+    val scrollRestoreVersion: Int get() = scrollPositionDelegate.scrollRestoreVersion
 
     /** Public read-only flag: true when scroll position needs to be restored on return. */
-    val pendingScrollRestore: Boolean get() = hasPendingScrollRestore
+    val pendingScrollRestore: Boolean get() = scrollPositionDelegate.pendingScrollRestore
 
-    fun clearPendingScrollRestore() {
-        hasPendingScrollRestore = false
-    }
+    fun clearPendingScrollRestore() = scrollPositionDelegate.clearPendingScrollRestore()
 
-    fun saveScrollPosition(lazyIndex: Int, offset: Int) {
-        savedLazyIndex = lazyIndex
-        savedScrollOffset = offset
-        scrollRestoreVersion++
-        hasPendingScrollRestore = true
-    }
+    fun saveScrollPosition(lazyIndex: Int, offset: Int) =
+        scrollPositionDelegate.saveScrollPosition(lazyIndex, offset)
 
     /**
      * Re-triggers scroll position restoration on ON_RESUME, but only when a save is pending
      * (i.e. the user is returning from FileViewer or a sub-session). Plain background→foreground
      * transitions are ignored so the user's current browsing position is not disturbed.
      */
-    fun bumpScrollRestoreIfPending() {
-        if (hasPendingScrollRestore) {
-            scrollRestoreVersion++
-        }
-    }
+    fun bumpScrollRestoreIfPending() = scrollPositionDelegate.bumpScrollRestoreIfPending()
     val expandReasoning = settingsRepository.getSettingsFlow().map { it.expandReasoning }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
@@ -1110,12 +1081,6 @@ class ChatViewModel @Inject constructor(
             settingsRepository.hiddenModels(serverId).collect { hidden ->
                 _hiddenModels.value = hidden
                 applyProviderFilter()
-            }
-        }
-
-        viewModelScope.launch {
-            settingsRepository.getSettingsFlow().map { it.terminalFontSize }.collect { size ->
-                terminalWorkspace.setDefaultFontSize(size)
             }
         }
 
@@ -2354,55 +2319,29 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun openTerminalSession(onResult: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            // Wait for loadSession() to finish so sessionDirectory is populated.
-            // This prevents the race condition where the PTY is created with directory=null
-            // and then resize is attempted with the real directory.
-            sessionLoaded.await()
-            if (BuildConfig.DEBUG) Log.d(TAG, "openTerminalSession: sessionDirectory=$sessionDirectory")
-            terminalWorkspace.ensureActiveTab(cwd = sessionDirectory, directory = sessionDirectory, onResult = onResult)
-        }
-    }
+    fun openTerminalSession(onResult: (Boolean) -> Unit = {}) =
+        terminalDelegate.openTerminalSession(onResult)
 
-    fun createTerminalTab(onResult: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            sessionLoaded.await()
-            terminalWorkspace.createTab(cwd = sessionDirectory, directory = sessionDirectory, onResult = onResult)
-        }
-    }
+    fun createTerminalTab(onResult: (Boolean) -> Unit = {}) =
+        terminalDelegate.createTerminalTab(onResult)
 
-    fun switchTerminalTab(tabId: String) {
-        terminalWorkspace.switchTab(tabId)
-    }
+    fun switchTerminalTab(tabId: String) = terminalDelegate.switchTerminalTab(tabId)
 
-    fun closeTerminalTab(tabId: String) {
-        terminalWorkspace.closeTab(tabId)
-    }
+    fun closeTerminalTab(tabId: String) = terminalDelegate.closeTerminalTab(tabId)
 
-    fun reconnectTerminalTab(tabId: String, onResult: (Boolean) -> Unit = {}) {
-        terminalWorkspace.reconnectTab(tabId, onResult)
-    }
+    fun reconnectTerminalTab(tabId: String, onResult: (Boolean) -> Unit = {}) =
+        terminalDelegate.reconnectTerminalTab(tabId, onResult)
 
-    fun setTerminalFontSize(fontSizeSp: Float) {
-        terminalWorkspace.setActiveFontSize(fontSizeSp)
-    }
+    fun setTerminalFontSize(fontSizeSp: Float) =
+        terminalDelegate.setTerminalFontSize(fontSizeSp)
 
-    fun sendTerminalInput(input: String) {
-        terminalWorkspace.sendActiveInput(input)
-    }
+    fun sendTerminalInput(input: String) = terminalDelegate.sendTerminalInput(input)
 
-    fun clearTerminalBuffer() {
-        terminalWorkspace.clearActiveBuffer()
-    }
+    fun clearTerminalBuffer() = terminalDelegate.clearTerminalBuffer()
 
-    fun resizeTerminal(cols: Int, rows: Int) {
-        terminalWorkspace.resizeActive(cols, rows)
-    }
+    fun resizeTerminal(cols: Int, rows: Int) = terminalDelegate.resizeTerminal(cols, rows)
 
-    fun closeTerminalSession() {
-        // Global terminal workspaces are server-scoped and survive chat screen changes.
-    }
+    fun closeTerminalSession() = terminalDelegate.closeTerminalSession()
 
     /** Connection parameters for navigation to other sessions. */
     fun getConnectionParams(): ConnectionParams = ConnectionParams(
