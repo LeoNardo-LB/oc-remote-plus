@@ -112,26 +112,6 @@ class MessageEventHandler @Inject constructor() {
     }
     // ── End SSE delta batching ────────────────────────────────────────
 
-    /**
-     * Aggregate entry point dispatching a message event to the matching handler.
-     *
-     * Retained as a convenience for direct unit testing of this store. Production
-     * dispatch routes through the per-sub-event handlers ([MessagePartHandler],
-     * [MessageUpdatedHandler], [MessageRemovedHandler]) registered in
-     * EventDispatcher's registry, which delegate back here via the `internal`
-     * handlers below.
-     */
-    fun handle(event: SseEvent, serverId: String): Boolean {
-        return when (event) {
-            is SseEvent.MessageUpdated -> { handleMessageUpdated(event); true }
-            is SseEvent.MessageRemoved -> { handleMessageRemoved(event); true }
-            is SseEvent.MessagePartUpdated -> { handleMessagePartUpdated(event); true }
-            is SseEvent.MessagePartDelta -> { handleMessagePartDelta(event); true }
-            is SseEvent.MessagePartRemoved -> { handleMessagePartRemoved(event); true }
-            else -> false
-        }
-    }
-
     internal fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }

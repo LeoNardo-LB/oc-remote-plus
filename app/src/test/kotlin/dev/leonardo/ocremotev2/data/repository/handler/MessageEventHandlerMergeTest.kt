@@ -31,20 +31,20 @@ class MessageEventHandlerMergeTest {
             parentId = "parent-1",
             time = TimeInfo(created = 1000L)
         )
-        handler.handle(SseEvent.MessageUpdated(msg), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(msg))
 
         val part = Part.Text(id = "p1", sessionId = "s1", messageId = "msg-1", text = "")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "msg-1", partId = "p1",
             field = "text", delta = "Hello"
-        ), "server1")
+        ))
 
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "msg-1", partId = "p1",
             field = "text", delta = " World"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         // Verify SSE accumulation worked
@@ -71,7 +71,7 @@ class MessageEventHandlerMergeTest {
             parentId = "parent-1",
             time = TimeInfo(created = 1000L, completed = null)
         )
-        handler.handle(SseEvent.MessageUpdated(sseMsg), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(sseMsg))
 
         // REST: same message with completed=2000L (server knows it's done)
         val restMsg = Message.Assistant(
@@ -100,21 +100,21 @@ class MessageEventHandlerMergeTest {
             id = "msg-2", sessionId = "s1", parentId = "p2",
             time = TimeInfo(created = 2000L)
         )
-        handler.handle(SseEvent.MessageUpdated(msg1), "server1")
-        handler.handle(SseEvent.MessageUpdated(msg2), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(msg1))
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(msg2))
 
         val part1 = Part.Text(id = "pa1", sessionId = "s1", messageId = "msg-1", text = "")
         val part2 = Part.Text(id = "pa2", sessionId = "s1", messageId = "msg-2", text = "")
-        handler.handle(SseEvent.MessagePartUpdated(part1), "server1")
-        handler.handle(SseEvent.MessagePartUpdated(part2), "server1")
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part1))
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part2))
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "msg-1", partId = "pa1",
             field = "text", delta = "Text 1"
-        ), "server1")
-        handler.handle(SseEvent.MessagePartDelta(
+        ))
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "msg-2", partId = "pa2",
             field = "text", delta = "Text 2"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         // REST: only msg-1 (msg-2 is streaming and not in REST snapshot yet)
@@ -139,19 +139,19 @@ class MessageEventHandlerMergeTest {
     fun `handleMessagePartUpdated keeps longer existing text over shorter incoming text`() {
         // SSE: build up text via PartUpdated + PartDelta = "Accumulated SSE text"
         val part = Part.Text(id = "p1", sessionId = "s1", messageId = "msg-1", text = "Accumulated")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "msg-1", partId = "p1",
             field = "text", delta = " SSE text"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         assertEquals("Accumulated SSE text", (handler.parts.value["msg-1"]!![0] as Part.Text).text)
 
         // SSE: incoming PartUpdated with shorter text "Short"
         val shortPart = Part.Text(id = "p1", sessionId = "s1", messageId = "msg-1", text = "Short")
-        handler.handle(SseEvent.MessagePartUpdated(shortPart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(shortPart))
 
         // mergePart should keep longer existing text
         val result = handler.parts.value["msg-1"]!![0] as Part.Text

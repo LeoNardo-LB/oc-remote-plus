@@ -31,7 +31,7 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessageUpdated - add new`() {
         val msg = testUserMessage("m1", "s1")
-        handler.handle(SseEvent.MessageUpdated(msg), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(msg))
 
         assertEquals(listOf(msg), handler.messages.value["s1"])
     }
@@ -39,10 +39,10 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessageUpdated - update existing`() {
         val msg = testUserMessage("m1", "s1")
-        handler.handle(SseEvent.MessageUpdated(msg), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(msg))
 
         val updated = msg.copy(time = TimeInfo(created = msg.time.created + 1000))
-        handler.handle(SseEvent.MessageUpdated(updated), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(updated))
 
         assertEquals(1, handler.messages.value["s1"]!!.size)
         assertEquals(updated, handler.messages.value["s1"]!![0])
@@ -54,9 +54,9 @@ class MessageEventHandlerTest {
         val recent = testUserMessage("m2", "s1").copy(time = TimeInfo(created = 3000L))
         val mid = testUserMessage("m3", "s1").copy(time = TimeInfo(created = 2000L))
 
-        handler.handle(SseEvent.MessageUpdated(old), "server1")
-        handler.handle(SseEvent.MessageUpdated(recent), "server1")
-        handler.handle(SseEvent.MessageUpdated(mid), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(old))
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(recent))
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(mid))
 
         val msgs = handler.messages.value["s1"]!!
         assertEquals("m1", msgs[0].id)
@@ -66,10 +66,10 @@ class MessageEventHandlerTest {
 
     @Test
     fun `handles MessageRemoved`() {
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m1", "s1")), "server1")
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m2", "s1")), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m1", "s1")))
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m2", "s1")))
 
-        handler.handle(SseEvent.MessageRemoved(sessionId = "s1", messageId = "m1"), "server1")
+        handler.handleMessageRemoved(SseEvent.MessageRemoved(sessionId = "s1", messageId = "m1"))
 
         assertEquals(1, handler.messages.value["s1"]!!.size)
         assertEquals("m2", handler.messages.value["s1"]!![0].id)
@@ -78,9 +78,9 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessageRemoved also removes parts`() {
         val part = Part.Text(id = "p1", sessionId = "s1", messageId = "m1")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
-        handler.handle(SseEvent.MessageRemoved(sessionId = "s1", messageId = "m1"), "server1")
+        handler.handleMessageRemoved(SseEvent.MessageRemoved(sessionId = "s1", messageId = "m1"))
 
         assertFalse(handler.parts.value.containsKey("m1"))
     }
@@ -88,7 +88,7 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartUpdated - add new part`() {
         val part = Part.Text(id = "part1", sessionId = "s1", messageId = "m1", text = "Hello")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
         assertEquals(listOf(part), handler.parts.value["m1"])
     }
@@ -97,8 +97,8 @@ class MessageEventHandlerTest {
     fun `handles MessagePartUpdated - replace existing part`() {
         val original = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello")
         val updated = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello World")
-        handler.handle(SseEvent.MessagePartUpdated(original), "server1")
-        handler.handle(SseEvent.MessagePartUpdated(updated), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(original))
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(updated))
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
         assertEquals("Hello World", (handler.parts.value["m1"]!![0] as Part.Text).text)
@@ -107,12 +107,12 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartDelta - appends text`() {
         val part = Part.Text(id = "part1", sessionId = "s1", messageId = "m1", text = "Hello")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "part1",
             field = "text", delta = " World"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         assertEquals("Hello World", (handler.parts.value["m1"]!![0] as Part.Text).text)
@@ -121,12 +121,12 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartDelta - appends to reasoning`() {
         val part = Part.Reasoning(id = "part1", sessionId = "s1", messageId = "m1", text = "Thinking")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "part1",
             field = "text", delta = " more"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         assertEquals("Thinking more", (handler.parts.value["m1"]!![0] as Part.Reasoning).text)
@@ -134,10 +134,10 @@ class MessageEventHandlerTest {
 
     @Test
     fun `handles MessagePartDelta creates synthetic part when partId missing`() {
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "nonexistent",
             field = "text", delta = "created"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
@@ -148,12 +148,12 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartDelta does nothing for non-text part types`() {
         val toolPart = Part.Tool(id = "p1", sessionId = "s1", messageId = "m1", callId = "c1", tool = "bash", state = ToolState.Pending())
-        handler.handle(SseEvent.MessagePartUpdated(toolPart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(toolPart))
 
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = "ignored"
-        ), "server1")
+        ))
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
         assertTrue(handler.parts.value["m1"]!![0] is Part.Tool)
@@ -163,27 +163,19 @@ class MessageEventHandlerTest {
     fun `handles MessagePartRemoved`() {
         val part1 = Part.Text(id = "p1", sessionId = "s1", messageId = "m1")
         val part2 = Part.Text(id = "p2", sessionId = "s1", messageId = "m1")
-        handler.handle(SseEvent.MessagePartUpdated(part1), "server1")
-        handler.handle(SseEvent.MessagePartUpdated(part2), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part1))
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part2))
 
-        handler.handle(SseEvent.MessagePartRemoved(sessionId = "s1", messageId = "m1", partId = "p1"), "server1")
+        handler.handleMessagePartRemoved(SseEvent.MessagePartRemoved(sessionId = "s1", messageId = "m1", partId = "p1"))
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
         assertEquals("p2", handler.parts.value["m1"]!![0].id)
     }
 
     @Test
-    fun `returns false for non-message events`() {
-        val handled = handler.handle(SseEvent.SessionCreated(
-            Session(id = "s1", title = "Test", time = Session.Time(created = 1000L, updated = 2000L))
-        ), "server1")
-        assertFalse(handled)
-    }
-
-    @Test
     fun `clearForServer removes messages for sessions`() {
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m1", "s1")), "server1")
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m2", "s2")), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m1", "s1")))
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m2", "s2")))
 
         handler.clearForServer(setOf("s1"))
 
@@ -193,8 +185,8 @@ class MessageEventHandlerTest {
 
     @Test
     fun `clearForSession removes messages for single session`() {
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m1", "s1")), "server1")
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m2", "s2")), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m1", "s1")))
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m2", "s2")))
 
         handler.clearForSession("s1")
 
@@ -220,7 +212,7 @@ class MessageEventHandlerTest {
     @Test
     fun `mergeMessages preserves SSE-fresh parts`() {
         val existingPart = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "from SSE")
-        handler.handle(SseEvent.MessagePartUpdated(existingPart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(existingPart))
 
         val msg = testUserMessage("m1", "s1")
         val stalePart = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "from REST")
@@ -231,7 +223,7 @@ class MessageEventHandlerTest {
 
     @Test
     fun `clearAll resets everything`() {
-        handler.handle(SseEvent.MessageUpdated(testUserMessage("m1", "s1")), "server1")
+        handler.handleMessageUpdated(SseEvent.MessageUpdated(testUserMessage("m1", "s1")))
         handler.clearAll()
         assertTrue(handler.messages.value.isEmpty())
         assertTrue(handler.parts.value.isEmpty())
@@ -242,18 +234,18 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartUpdated - preserves longer text from delta`() {
         val part = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
         // Delta appends " World" → text becomes "Hello World"
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = " World"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         // Server sends stale snapshot with original text
         val stalePart = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello")
-        handler.handle(SseEvent.MessagePartUpdated(stalePart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(stalePart))
 
         assertEquals("Hello World", (handler.parts.value["m1"]!![0] as Part.Text).text)
     }
@@ -261,10 +253,10 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartUpdated - replaces with longer incoming text`() {
         val part = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hi")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
         val longer = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello World")
-        handler.handle(SseEvent.MessagePartUpdated(longer), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(longer))
 
         assertEquals("Hello World", (handler.parts.value["m1"]!![0] as Part.Text).text)
     }
@@ -273,7 +265,7 @@ class MessageEventHandlerTest {
     fun `setMessages preserves SSE-fresh longer parts`() {
         // SSE accumulates longer text
         val ssePart = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello World from SSE")
-        handler.handle(SseEvent.MessagePartUpdated(ssePart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(ssePart))
 
         // REST returns shorter text
         val msg = testUserMessage("m1", "s1")
@@ -287,7 +279,7 @@ class MessageEventHandlerTest {
     fun `replaceMessages preserves SSE-fresh longer parts`() {
         // SSE accumulates longer text
         val ssePart = Part.Text(id = "p1", sessionId = "s1", messageId = "m1", text = "Hello World from SSE")
-        handler.handle(SseEvent.MessagePartUpdated(ssePart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(ssePart))
 
         // REST returns shorter text
         val msg = testUserMessage("m1", "s1")
@@ -300,10 +292,10 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartDelta - creates synthetic part when missing`() {
         // No prior updated event — delta arrives first
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = "synthetic"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         assertEquals(1, handler.parts.value["m1"]!!.size)
@@ -315,18 +307,18 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartUpdated - replaces Reasoning with longer text`() {
         val part = Part.Reasoning(id = "p1", sessionId = "s1", messageId = "m1", text = "Thinking")
-        handler.handle(SseEvent.MessagePartUpdated(part), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(part))
 
         // Delta extends
-        handler.handle(SseEvent.MessagePartDelta(
+        handler.handleMessagePartDelta(SseEvent.MessagePartDelta(
             sessionId = "s1", messageId = "m1", partId = "p1",
             field = "text", delta = " more deeply"
-        ), "server1")
+        ))
         handler.forceFlushDeltas()
 
         // Stale snapshot arrives
         val stale = Part.Reasoning(id = "p1", sessionId = "s1", messageId = "m1", text = "Thinking")
-        handler.handle(SseEvent.MessagePartUpdated(stale), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(stale))
 
         assertEquals("Thinking more deeply", (handler.parts.value["m1"]!![0] as Part.Reasoning).text)
     }
@@ -334,10 +326,10 @@ class MessageEventHandlerTest {
     @Test
     fun `handles MessagePartUpdated - non-text parts still replaced directly`() {
         val toolPart = Part.Tool(id = "p1", sessionId = "s1", messageId = "m1", callId = "c1", tool = "bash", state = ToolState.Pending())
-        handler.handle(SseEvent.MessagePartUpdated(toolPart), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(toolPart))
 
         val updatedTool = Part.Tool(id = "p1", sessionId = "s1", messageId = "m1", callId = "c1", tool = "bash", state = ToolState.Running())
-        handler.handle(SseEvent.MessagePartUpdated(updatedTool), "server1")
+        handler.handleMessagePartUpdated(SseEvent.MessagePartUpdated(updatedTool))
 
         assertTrue(handler.parts.value["m1"]!![0] is Part.Tool)
         assertTrue((handler.parts.value["m1"]!![0] as Part.Tool).state is ToolState.Running)
