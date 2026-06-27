@@ -179,6 +179,7 @@ dependencies {
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("app.cash.turbine:turbine:1.2.1")
     testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
+    testImplementation("org.json:json:20240303")
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
