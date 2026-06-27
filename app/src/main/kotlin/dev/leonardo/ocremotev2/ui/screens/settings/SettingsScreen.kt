@@ -67,6 +67,7 @@ import dev.leonardo.ocremotev2.ui.screens.settings.components.PermissionRulesSec
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ReconnectModePickerDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.SectionHeader
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.AppearanceSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatBehaviorSection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatDisplaySection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.GeneralSection
 import dev.leonardo.ocremotev2.ui.screens.settings.components.TerminalFontSizeDialog
@@ -181,120 +182,13 @@ fun SettingsScreen(
             )
 
             // ======== Chat Behavior ========
-            SectionHeader(stringResource(R.string.settings_section_chat_behavior))
-
-            // Initial message count
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_initial_messages)) },
-                supportingContent = { Text("$initialMessageCount") },
-                leadingContent = {
-                    Icon(Icons.Default.Storage, contentDescription = stringResource(R.string.a11y_settings_initial_messages))
-                },
-                modifier = Modifier.clickable { showMessageCountDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
+            ChatBehaviorSection(
+                viewModel = viewModel,
+                onShowMessageCountDialog = { showMessageCountDialog = true },
+                onShowImageMaxSideDialog = { showImageMaxSideDialog = true },
+                onShowImageQualityDialog = { showImageQualityDialog = true },
+                onShowTerminalFontSizeDialog = { showTerminalFontSizeDialog = true },
             )
-
-            // Confirm before send
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_confirm_send)) },
-                supportingContent = { Text(stringResource(R.string.settings_confirm_send_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Send, contentDescription = stringResource(R.string.a11y_settings_confirm_send))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = confirmBeforeSend,
-                        onCheckedChange = { viewModel.setConfirmBeforeSend(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setConfirmBeforeSend(!confirmBeforeSend) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Haptic feedback
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_haptic_feedback)) },
-                supportingContent = { Text(stringResource(R.string.settings_haptic_feedback_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Vibration, contentDescription = stringResource(R.string.a11y_settings_haptic_feedback))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = hapticFeedback,
-                        onCheckedChange = { viewModel.setHapticFeedback(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setHapticFeedback(!hapticFeedback) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Keep screen on
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_keep_screen_on)) },
-                supportingContent = { Text(stringResource(R.string.settings_keep_screen_on_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.ScreenLockPortrait, contentDescription = stringResource(R.string.a11y_settings_keep_screen_on))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = keepScreenOn,
-                        onCheckedChange = { viewModel.setKeepScreenOn(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setKeepScreenOn(!keepScreenOn) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Optimize image attachments
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_compress_images)) },
-                supportingContent = { Text(stringResource(R.string.settings_compress_images_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_compress_images))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = compressImageAttachments,
-                        onCheckedChange = { viewModel.setCompressImageAttachments(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable {
-                    viewModel.setCompressImageAttachments(!compressImageAttachments)
-                }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_compress_images_max_side)) },
-                supportingContent = { Text(getImageMaxSideDisplayName(imageAttachmentMaxLongSide)) },
-                leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_image_max_side))
-                },
-                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageMaxSideDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_compress_images_quality)) },
-                supportingContent = {
-                    Text(stringResource(R.string.settings_compress_images_quality_value, imageAttachmentWebpQuality))
-                },
-                leadingContent = {
-                    Icon(Icons.Default.PhotoSizeSelectLarge, contentDescription = stringResource(R.string.a11y_settings_image_quality))
-                },
-                modifier = Modifier.clickable(enabled = compressImageAttachments) { showImageQualityDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_terminal_font_size)) },
-                supportingContent = {
-                    Text(stringResource(R.string.settings_terminal_font_size_value, terminalFontSize.roundToInt()))
-                },
-                leadingContent = {
-                    Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.a11y_settings_terminal_font_size))
-                },
-                modifier = Modifier.clickable { showTerminalFontSizeDialog = true }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Advanced ========
             SectionHeader(stringResource(R.string.settings_section_advanced))
