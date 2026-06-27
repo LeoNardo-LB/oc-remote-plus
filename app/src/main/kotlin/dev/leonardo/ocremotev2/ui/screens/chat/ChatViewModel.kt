@@ -29,7 +29,6 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.SessionTimestamps
 import dev.leonardo.ocremotev2.ui.screens.chat.util.cacheHitRate
 import dev.leonardo.ocremotev2.ui.screens.chat.util.countMessages
 import dev.leonardo.ocremotev2.ui.screens.chat.util.estimateContextBreakdown
-import dev.leonardo.ocremotev2.domain.model.Draft
 import dev.leonardo.ocremotev2.domain.repository.DraftRepository
 import dev.leonardo.ocremotev2.domain.model.*
 import dev.leonardo.ocremotev2.domain.repository.ChatRepository
@@ -39,7 +38,6 @@ import dev.leonardo.ocremotev2.domain.tracker.TokenStatsTracker
 import dev.leonardo.ocremotev2.domain.usecase.*
 import dev.leonardo.ocremotev2.data.api.SseClient
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -52,7 +50,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -411,22 +408,21 @@ class ChatViewModel @Inject constructor(
     val terminalEmulator: org.connectbot.terminal.TerminalEmulator get() = terminalDelegate.terminalEmulator
     val terminalCursorKeysAppMode: Boolean get() = terminalDelegate.terminalCursorKeysAppMode
 
-    // ============ Draft Persistence ============
-    /** Draft text for the input field — survives navigation / app restart. */
-    private val _draftText = MutableStateFlow("")
-    val draftText: StateFlow<String> = _draftText
-
-    /** One-shot event: emits reverted draft payload (text + image attachments) for ChatScreen. */
-    private val _revertedDraftEvent = MutableSharedFlow<RevertedDraftPayload>(extraBufferCapacity = 1)
-    val revertedDraftEvent: SharedFlow<RevertedDraftPayload> = _revertedDraftEvent
-
-    /** Draft attachment URIs (content:// URIs as strings) — survives navigation / app restart. */
-    private val _draftAttachmentUris = MutableStateFlow<List<String>>(emptyList())
-    val draftAttachmentUris: StateFlow<List<String>> = _draftAttachmentUris
-
-    /** Set of file paths that have been confirmed by user selection from the popup */
-    private val _confirmedFilePaths = MutableStateFlow<Set<String>>(emptySet())
-    val confirmedFilePaths: StateFlow<Set<String>> = _confirmedFilePaths
+    // ============ Draft Input Delegate (Phase 3 Task 2 — D cluster) ============
+    private val draftDelegate = DraftInputDelegate(
+        draftUseCase = draftUseCase,
+        manageAgentUseCase = manageAgentUseCase,
+        scope = viewModelScope,
+        serverId = serverId,
+        sessionIdProvider = { _sessionId.value },
+        sessionDirectoryProvider = { sessionDirectory },
+        selectedAgentProvider = { _selectedAgent.value },
+        selectedVariantProvider = { _selectedVariant.value },
+    )
+    val draftText: StateFlow<String> get() = draftDelegate.draftText
+    val revertedDraftEvent: SharedFlow<RevertedDraftPayload> get() = draftDelegate.revertedDraftEvent
+    val draftAttachmentUris: StateFlow<List<String>> get() = draftDelegate.draftAttachmentUris
+    val confirmedFilePaths: StateFlow<Set<String>> get() = draftDelegate.confirmedFilePaths
 
     // ============ Settings (exposed for ChatScreen) ============
     val chatFontSize = settingsRepository.getSettingsFlow().map { it.chatFontSize }.stateIn(
@@ -451,9 +447,6 @@ class ChatViewModel @Inject constructor(
 
     /** Locally-generated IDs for optimistic messages. Used to distinguish from server-confirmed. */
     private val _pendingMessageIds = MutableStateFlow<Set<String>>(emptySet())
-
-    /** Draft restored after a failed send. UI consumes once and sets back to null. */
-    private val _restoredDraft = MutableStateFlow<RevertedDraftPayload?>(null)
 
     // ============ Tool Expand State ============
     private val _toolExpandedStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -658,7 +651,7 @@ class ChatViewModel @Inject constructor(
     )
 
     /** Expose restored draft as StateFlow for ChatScreen consumption. */
-    val restoredDraftState: StateFlow<RevertedDraftPayload?> = _restoredDraft
+    val restoredDraftState: StateFlow<RevertedDraftPayload?> get() = draftDelegate.restoredDraftState
 
     // NOTE: Legacy uiState is declared after the 5 split StateFlows below (needs forward references).
 
@@ -946,7 +939,7 @@ class ChatViewModel @Inject constructor(
         interactionState,
         tokenStatsState,
         modelConfigState,
-        _restoredDraft,
+        draftDelegate.restoredDraftState,
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val msgList = args[0] as MessageListState
@@ -1052,13 +1045,8 @@ class ChatViewModel @Inject constructor(
 
         // Restore draft from disk
         if (!isNewSession) {
-            val draft = draftUseCase.getDraft(sessionId)
+            val draft = draftDelegate.restorePersistedDraft()
             if (draft != null) {
-                _draftText.value = draft.text
-                _draftAttachmentUris.value = draft.imageUris
-                if (draft.confirmedFilePaths.isNotEmpty()) {
-                    _confirmedFilePaths.value = draft.confirmedFilePaths.toSet()
-                }
                 if (!draft.selectedAgent.isNullOrBlank()) {
                     _selectedAgent.value = draft.selectedAgent to true
                 }
@@ -1564,127 +1552,28 @@ class ChatViewModel @Inject constructor(
         sessionModelCache[sessionId] = providerId to modelId
     }
 
-    // ============ @ File Mention Search ============
+    // ============ @ File Mention Search (delegated — Phase 3 Task 2) ============
+    val fileSearchResults: StateFlow<List<String>> get() = draftDelegate.fileSearchResults
 
-    /** File search results for @-autocomplete */
-    private val _fileSearchResults = MutableStateFlow<List<String>>(emptyList())
-    val fileSearchResults: StateFlow<List<String>> = _fileSearchResults
+    fun searchFilesForMention(query: String) = draftDelegate.searchFilesForMention(query)
+    fun confirmFilePath(path: String) = draftDelegate.confirmFilePath(path)
+    fun removeFilePath(path: String) = draftDelegate.removeFilePath(path)
+    fun clearFileSearch() = draftDelegate.clearFileSearch()
+    fun clearConfirmedPaths() = draftDelegate.clearConfirmedPaths()
 
-    /** Debounce job for file search */
-    private var fileSearchJob: Job? = null
+    // ============ Draft Management (delegated) ============
 
-    /** Search files and directories for @-mention autocomplete. Debounced by 200ms. */
-    fun searchFilesForMention(query: String) {
-        fileSearchJob?.cancel()
-        if (query.isEmpty()) {
-            // Show recent/top files immediately with no debounce
-            fileSearchJob = viewModelScope.launch {
-                try {
-                    val results = manageAgentUseCase.searchFiles(
-                        serverId = serverId,
-                        query = "",
-                        dirs = "true",
-                        directory = sessionDirectory,
-                        limit = 15
-                    )
-                    _fileSearchResults.value = results
-                } catch (e: Exception) {
-                    Log.e(TAG, "File search failed", e)
-                    _fileSearchResults.value = emptyList()
-                }
-            }
-            return
-        }
-        fileSearchJob = viewModelScope.launch {
-            delay(150) // debounce
-            try {
-                val results = manageAgentUseCase.searchFiles(
-                    serverId = serverId,
-                    query = query,
-                    dirs = "true",
-                    directory = sessionDirectory,
-                    limit = 15
-                )
-                _fileSearchResults.value = results
-            } catch (e: Exception) {
-                Log.e(TAG, "File search failed for query '$query'", e)
-                _fileSearchResults.value = emptyList()
-            }
-        }
-    }
-
-    /** Add a confirmed file path (user selected it from the popup) */
-    fun confirmFilePath(path: String) {
-        _confirmedFilePaths.value = _confirmedFilePaths.value + path
-    }
-
-    /** Remove a confirmed file path */
-    fun removeFilePath(path: String) {
-        _confirmedFilePaths.value = _confirmedFilePaths.value - path
-    }
-
-    /** Clear file search results (e.g. when popup is closed) */
-    fun clearFileSearch() {
-        fileSearchJob?.cancel()
-        _fileSearchResults.value = emptyList()
-    }
-
-    /** Clear confirmed file paths (e.g. after sending a message) */
-    fun clearConfirmedPaths() {
-        _confirmedFilePaths.value = emptySet()
-    }
-
-    // ============ Draft Management ============
-
-    /** Update the draft text (called on every keystroke). */
-    fun updateDraftText(text: String) {
-        _draftText.value = text
-    }
-
-    /** Add an attachment URI to the draft. */
-    fun addDraftAttachment(uri: String) {
-        _draftAttachmentUris.value = _draftAttachmentUris.value + uri
-    }
-
-    /** Remove an attachment URI from the draft by index. */
-    fun removeDraftAttachment(index: Int) {
-        val current = _draftAttachmentUris.value.toMutableList()
-        if (index in current.indices) {
-            current.removeAt(index)
-            _draftAttachmentUris.value = current
-        }
-    }
-
-    /** Clear all draft state (called after sending a message). */
-    fun clearDraft() {
-        _draftText.value = ""
-        _draftAttachmentUris.value = emptyList()
-        draftUseCase.clearDraft(sessionId)
-    }
-
-    /** Consume the restored draft after UI has read it. */
-    fun consumeRestoredDraft() {
-        _restoredDraft.value = null
-    }
-
-    /** Persist current draft to disk. */
-    private fun saveDraft() {
-        val agentPair = _selectedAgent.value
-        val draft = Draft(
-            text = _draftText.value,
-            imageUris = _draftAttachmentUris.value,
-            confirmedFilePaths = _confirmedFilePaths.value.toList(),
-            selectedAgent = agentPair.first.takeIf { agentPair.second },
-            selectedVariant = _selectedVariant.value
-        )
-        draftUseCase.saveDraft(sessionId, draft)
-    }
+    fun updateDraftText(text: String) = draftDelegate.updateDraftText(text)
+    fun addDraftAttachment(uri: String) = draftDelegate.addDraftAttachment(uri)
+    fun removeDraftAttachment(index: Int) = draftDelegate.removeDraftAttachment(index)
+    fun clearDraft() = draftDelegate.clearDraft()
+    fun consumeRestoredDraft() = draftDelegate.consumeRestoredDraft()
 
     override fun onCleared() {
         sseJob?.cancel()
         closeTerminalSession()
         super.onCleared()
-        saveDraft()
+        draftDelegate.saveDraft()
     }
 
     /** Get the session directory for building file:// URLs */
@@ -1802,7 +1691,7 @@ class ChatViewModel @Inject constructor(
                 // Restore draft from the failed send
                 val failedText = parts.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("\n")
                 if (failedText.isNotBlank()) {
-                    _restoredDraft.value = RevertedDraftPayload(text = failedText)
+                    draftDelegate.setRestoredDraft(RevertedDraftPayload(text = failedText))
                 }
                 _error.value = e.message ?: "Failed to send message"
             } finally {
@@ -2145,10 +2034,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun restoreRevertedDraft(payload: RevertedDraftPayload) {
-        _draftText.value = payload.text
-        _draftAttachmentUris.value = payload.attachmentUris
-        _confirmedFilePaths.value = emptySet()
-        _revertedDraftEvent.tryEmit(payload)
+        draftDelegate.restoreRevertedDraft(payload)
     }
 
     /** Redo the last undone message. */
