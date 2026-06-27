@@ -67,6 +67,7 @@ import dev.leonardo.ocremotev2.ui.screens.settings.components.PermissionRulesSec
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ReconnectModePickerDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.SectionHeader
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.AppearanceSection
+import dev.leonardo.ocremotev2.ui.screens.settings.sections.ChatDisplaySection
 import dev.leonardo.ocremotev2.ui.screens.settings.sections.GeneralSection
 import dev.leonardo.ocremotev2.ui.screens.settings.components.TerminalFontSizeDialog
 import dev.leonardo.ocremotev2.ui.screens.settings.components.ThemePickerDialog
@@ -174,92 +175,10 @@ fun SettingsScreen(
             )
 
             // ======== Chat Display ========
-            SectionHeader(stringResource(R.string.settings_section_chat_display))
-
-            // Chat font (density: normal / compact)
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_chat_font)) },
-                supportingContent = {
-                    Text(
-                        if (chatDensity == "compact") stringResource(R.string.settings_chat_font_compact)
-                        else stringResource(R.string.settings_chat_font_normal)
-                    )
-                },
-                leadingContent = {
-                    Icon(Icons.Default.FormatSize, contentDescription = stringResource(R.string.settings_chat_font))
-                },
-                modifier = Modifier.clickable { showChatDensityPicker = true }.padding(ListItemTokens.ContentPaddingMedium)
+            ChatDisplaySection(
+                viewModel = viewModel,
+                onShowChatDensityPicker = { showChatDensityPicker = true },
             )
-
-            // Code word wrap
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_code_word_wrap)) },
-                supportingContent = { Text(stringResource(R.string.settings_code_word_wrap_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.WrapText, contentDescription = stringResource(R.string.a11y_settings_code_word_wrap))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = codeWordWrap,
-                        onCheckedChange = { viewModel.setCodeWordWrap(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setCodeWordWrap(!codeWordWrap) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Auto-expand tool results
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_auto_expand_tools)) },
-                supportingContent = { Text(stringResource(R.string.settings_auto_expand_tools_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.UnfoldMore, contentDescription = stringResource(R.string.a11y_settings_auto_expand_tools))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = collapseTools,
-                        onCheckedChange = { viewModel.setCollapseTools(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setCollapseTools(!collapseTools) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Expand reasoning by default
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_expand_reasoning)) },
-                supportingContent = { Text(stringResource(R.string.settings_expand_reasoning_desc)) },
-                leadingContent = {
-                    Icon(Icons.Default.Psychology, contentDescription = stringResource(R.string.a11y_settings_expand_reasoning))
-                },
-                trailingContent = {
-                    Switch(
-                        checked = expandReasoning,
-                        onCheckedChange = { viewModel.setExpandReasoning(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setExpandReasoning(!expandReasoning) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            // Show turn dividers
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_turn_dividers)) },
-                supportingContent = { Text(stringResource(R.string.settings_turn_dividers_desc)) },
-                leadingContent = {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
-                },
-                trailingContent = {
-                    Switch(
-                        checked = showTurnDividers,
-                        onCheckedChange = { viewModel.setShowTurnDividers(it) },
-                        colors = switchColors
-                    )
-                },
-                modifier = Modifier.clickable { viewModel.setShowTurnDividers(!showTurnDividers) }.padding(ListItemTokens.ContentPaddingMedium)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             // ======== Chat Behavior ========
             SectionHeader(stringResource(R.string.settings_section_chat_behavior))
