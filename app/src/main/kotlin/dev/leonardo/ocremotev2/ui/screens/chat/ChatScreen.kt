@@ -223,7 +223,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.dialog.QuestionCard
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.PermissionCard
 import dev.leonardo.ocremotev2.ui.screens.chat.input.ChatInputBar
 import dev.leonardo.ocremotev2.ui.screens.chat.input.ChatInputMode
-import dev.leonardo.ocremotev2.ui.screens.chat.input.SlashCommand
+import dev.leonardo.ocremotev2.ui.screens.chat.util.SlashCommand
 import dev.leonardo.ocremotev2.ui.screens.chat.input.rememberAttachmentHandler
 import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.ui.screens.chat.util.PromptBuilder

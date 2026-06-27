@@ -97,6 +97,8 @@ import dev.leonardo.ocremotev2.ui.screens.chat.util.agentColor
 import dev.leonardo.ocremotev2.ui.screens.chat.util.decodeDataUrlBytes
 import dev.leonardo.ocremotev2.ui.screens.chat.util.imageThumbnailModel
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
+import dev.leonardo.ocremotev2.ui.screens.chat.util.SlashCommand
+import dev.leonardo.ocremotev2.ui.screens.chat.util.SlashCommandRegistry
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
@@ -104,37 +106,9 @@ import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
 
-/**
- * Slash command definition for the suggestion popup.
- * @param name Command name without the "/" prefix
- * @param description Human-readable description
- * @param type "server" commands are sent via API, "client" commands trigger local actions
- */
-internal data class SlashCommand(
-    val name: String,
-    val description: String?,
-    val type: String // "server" or "client"
-)
-
 internal enum class ChatInputMode {
     NORMAL,
     SHELL
-}
-
-/** Client-side slash commands that mirror the original opencode TUI. */
-@Composable
-internal fun clientCommands(): List<SlashCommand> {
-    return listOf(
-        SlashCommand("new", stringResource(R.string.cmd_new), "client"),
-        SlashCommand("compact", stringResource(R.string.cmd_compact), "client"),
-        SlashCommand("fork", stringResource(R.string.cmd_fork), "client"),
-        SlashCommand("share", stringResource(R.string.cmd_share), "client"),
-        SlashCommand("unshare", stringResource(R.string.cmd_unshare), "client"),
-        SlashCommand("undo", stringResource(R.string.cmd_undo), "client"),
-        SlashCommand("redo", stringResource(R.string.cmd_redo), "client"),
-        SlashCommand("rename", stringResource(R.string.cmd_rename), "client"),
-        SlashCommand("shell", stringResource(R.string.cmd_shell_mode), "client"),
-    )
 }
 
 // BreathingCircleIndicator moved to components/BreathingCircleIndicator.kt
@@ -209,7 +183,7 @@ internal fun ChatInputBar(
     val canSend = (text.isNotBlank() || attachments.isNotEmpty()) && !isSending && (!isShellMode || !isBusy)
 
     // Build merged slash commands: client commands + server commands + skills (deduplicated)
-    val clientCmds = clientCommands()
+    val clientCmds = SlashCommandRegistry.clientCommands()
     val allCommands = remember(commands, clientCmds) {
         val clientNames = clientCmds.map { it.name }.toSet()
         val serverSlash = commands
