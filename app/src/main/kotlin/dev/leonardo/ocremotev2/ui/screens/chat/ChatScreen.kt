@@ -239,6 +239,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.components.RevertBanner
 import dev.leonardo.ocremotev2.ui.screens.chat.terminal.ChatTerminalView
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.RenameSessionDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.SendConfirmDialog
+import dev.leonardo.ocremotev2.ui.screens.chat.util.snapToBottom
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
@@ -1119,38 +1120,6 @@ fun ChatScreen(
     }
     } // CompositionLocalProvider
     } // ChatSettingsProvider
-}
-
-/**
- * Animated auto-scroll to bottom. Used for after-send follow.
- *
- * With reverseLayout=true, "bottom" = item 0.
- * Retries up to 48ms (3×16ms) to handle complex Markdown layout delays.
- */
-internal suspend fun LazyListState.smoothScrollToBottom() {
-    scrollToItem(0)
-    var attempts = 0
-    while (canScrollBackward && attempts < 3) {
-        delay(16)
-        if (!canScrollBackward) return
-        scroll { scrollBy(-10_000f) }
-        attempts++
-    }
-}
-
-/**
- * Instant snap to bottom for explicit user actions (FAB click).
- */
-internal suspend fun LazyListState.snapToBottom() {
-    if (layoutInfo.totalItemsCount == 0) return
-    scrollToItem(0)
-    var attempts = 0
-    while (canScrollBackward && attempts < 3) {
-        delay(16)
-        if (!canScrollBackward) return
-        scroll { scrollBy(-10_000f) }
-        attempts++
-    }
 }
 
 /**
