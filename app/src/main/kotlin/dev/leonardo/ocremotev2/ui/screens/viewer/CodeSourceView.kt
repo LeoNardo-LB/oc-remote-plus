@@ -31,29 +31,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.leonardo.ocremotev2.domain.model.Annotation
-import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.CodeTypography
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
-import dev.snipme.highlights.Highlights
-import dev.snipme.highlights.model.BoldHighlight
-import dev.snipme.highlights.model.ColorHighlight
-import dev.snipme.highlights.model.SyntaxLanguage
-import dev.snipme.highlights.model.SyntaxThemes
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-
-private const val ALPHA_MASK = 0xFF000000.toInt()
 
 /**
  * Pixel threshold from the bottom of scrollable content that triggers [onLoadMore]
@@ -78,12 +65,12 @@ fun CodeSourceView(
     if (content.isEmpty()) return
 
     val isDark = isSystemInDarkTheme()
-    val language = rememberLanguage(filePath)
+    val language = HighlightBuilder.rememberLanguage(filePath)
     val highlights = remember(content, language, isDark) {
-        buildHighlights(content, language, isDark)
+        HighlightBuilder.buildHighlights(content, language, isDark)
     }
     val annotated = remember(content, highlights) {
-        buildAnnotatedStringFromHighlights(content, highlights)
+        HighlightBuilder.buildAnnotatedStringFromHighlights(content, highlights)
     }
     val lineCount = remember(content) {
         if (content.isEmpty()) 0
@@ -211,7 +198,7 @@ fun CodeSourceView(
                                 content.length
                             val baseLine = annotated.subSequence(start, endExclusive)
                             val lineAnnotated = if (lineAnnotations.containsKey(index)) {
-                                buildAnnotatedLineWithAnnotations(
+                                HighlightBuilder.buildAnnotatedLineWithAnnotations(
                                     baseLine,
                                     lineAnnotations[index]!!,
                                     highlightColor
@@ -277,7 +264,7 @@ fun CodeSourceView(
                     content.length
                 val baseLine = annotated.subSequence(start, endExclusive)
                 val lineAnnotated = if (lineAnnotations.containsKey(index)) {
-                    buildAnnotatedLineWithAnnotations(baseLine, lineAnnotations[index]!!, highlightColor)
+                    HighlightBuilder.buildAnnotatedLineWithAnnotations(baseLine, lineAnnotations[index]!!, highlightColor)
                 } else {
                     baseLine
                 }
@@ -334,81 +321,5 @@ fun CodeSourceView(
                 }
             }
         }
-    }
-}
-
-private fun buildHighlights(
-    content: String,
-    language: SyntaxLanguage,
-    isDark: Boolean
-): Highlights =
-    Highlights.Builder()
-        .code(content)
-        .language(language)
-        .theme(SyntaxThemes.default(isDark))
-        .build()
-
-private fun buildAnnotatedStringFromHighlights(
-    content: String,
-    highlightsResult: Highlights
-): AnnotatedString = buildAnnotatedString {
-    append(content)
-    val maxIndex = content.length
-    highlightsResult.getHighlights().forEach { h ->
-        val start = h.location.start
-        val end = (h.location.end + 1).coerceAtMost(maxIndex)
-        if (start >= maxIndex || end <= start) return@forEach
-        when (h) {
-            is ColorHighlight -> addStyle(
-                SpanStyle(color = Color(h.rgb or ALPHA_MASK)),
-                start, end
-            )
-            is BoldHighlight -> addStyle(
-                SpanStyle(fontWeight = FontWeight.Bold),
-                start, end
-            )
-        }
-    }
-}
-
-private fun rememberLanguage(filePath: String): SyntaxLanguage {
-    val ext = filePath.substringAfterLast('.', "").lowercase()
-    return when (ext) {
-        "kt", "kts" -> SyntaxLanguage.KOTLIN
-        "java" -> SyntaxLanguage.JAVA
-        "js", "mjs", "jsx" -> SyntaxLanguage.JAVASCRIPT
-        "ts", "tsx" -> SyntaxLanguage.TYPESCRIPT
-        "py" -> SyntaxLanguage.PYTHON
-        "go" -> SyntaxLanguage.GO
-        "rs" -> SyntaxLanguage.RUST
-        "c", "h" -> SyntaxLanguage.C
-        "cpp", "cc", "cxx", "hpp", "hxx" -> SyntaxLanguage.CPP
-        "cs" -> SyntaxLanguage.CSHARP
-        "rb" -> SyntaxLanguage.RUBY
-        "dart" -> SyntaxLanguage.DART
-        "php" -> SyntaxLanguage.PHP
-        "pl", "pm" -> SyntaxLanguage.PERL
-        "swift" -> SyntaxLanguage.SWIFT
-        "coffee" -> SyntaxLanguage.COFFEESCRIPT
-        "sh", "bash", "zsh", "fish" -> SyntaxLanguage.SHELL
-        else -> SyntaxLanguage.DEFAULT
-    }
-}
-
-/**
- * Build a per-line AnnotatedString with annotation highlights overlaid on the base syntax-highlighted line.
- */
-private fun buildAnnotatedLineWithAnnotations(
-    baseLine: AnnotatedString,
-    annotations: List<Triple<Int, Int, Int>>,
-    baseColor: Color
-): AnnotatedString = buildAnnotatedString {
-    append(baseLine)
-    annotations.forEach { (relStart, relEnd, _) ->
-        addStyle(
-            SpanStyle(background = baseColor.copy(alpha = AlphaTokens.SELECTED)),
-            relStart.coerceIn(0, length),
-            relEnd.coerceIn(0, length)
-        )
     }
 }
