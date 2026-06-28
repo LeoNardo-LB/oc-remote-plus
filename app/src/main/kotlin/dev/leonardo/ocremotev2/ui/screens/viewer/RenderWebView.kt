@@ -36,12 +36,14 @@ fun RenderWebView(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val isDark = surfaceColor.red * 0.299f + surfaceColor.green * 0.587f + surfaceColor.blue * 0.114f < 0.5f
     val bgColorArgb = surfaceColor.toArgb()
+    val bgHex = argbToHex(bgColorArgb)
+    val fgHex = argbToHex(MaterialTheme.colorScheme.onSurface.toArgb())
 
     // Build HTML from current fileType + content
     val html = remember(content, fileType, mimeType, bgColorArgb) {
         when (fileType) {
-            FileType.IMAGE -> buildImageHtml(content, mimeType, bgColorArgb)
-            FileType.SVG, FileType.CSV -> RenderHtmlBuilder.build(fileType, content, isDark)
+            FileType.IMAGE -> buildImageHtml(content, mimeType, bgHex)
+            FileType.SVG, FileType.CSV -> RenderHtmlBuilder.build(fileType, content, isDark, bgHex, fgHex)
             else -> "" // fallback — should never reach here
         }
     }
@@ -78,15 +80,14 @@ fun RenderWebView(
     )
 }
 
-private fun buildImageHtml(base64Data: String, mimeType: String, bgColorArgb: Int): String {
-    val hex = argbToHex(bgColorArgb)
+private fun buildImageHtml(base64Data: String, mimeType: String, bgHex: String): String {
     return """
     <!DOCTYPE html>
     <html>
     <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
     <style>
-        body { margin:0; padding:12px 16px; background:$hex; display:flex; justify-content:center; align-items:center; min-height:100vh; }
+        body { margin:0; padding:12px 16px; background:$bgHex; display:flex; justify-content:center; align-items:center; min-height:100vh; }
         img { max-width:100%; height:auto; object-fit:contain; }
     </style>
     </head>

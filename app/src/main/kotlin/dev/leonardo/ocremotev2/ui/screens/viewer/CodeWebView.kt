@@ -162,6 +162,8 @@ fun CodeWebView(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val isDark = surfaceColor.red * 0.299f + surfaceColor.green * 0.587f + surfaceColor.blue * 0.114f < 0.5f
     val bgColorArgb = surfaceColor.toArgb()
+    val bgHex = argbToHex(bgColorArgb)
+    val textHex = argbToHex(MaterialTheme.colorScheme.onSurface.toArgb())
     val language = remember(filePath) { extToLanguage(filePath) }
     val escapedContent = remember(content) {
         content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
@@ -219,7 +221,7 @@ fun CodeWebView(
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         view?.evaluateJavascript(
-                            "setCode(`$escapedContent`, '$language'); setTheme($isDark);",
+                            "setCode(`$escapedContent`, '$language'); setTheme($isDark, '$bgHex', '$textHex');",
                             null
                         )
                         if (initialScrollLine > 0) {
@@ -252,7 +254,7 @@ fun CodeWebView(
                 }
                 if (isDark != lastIsDark) {
                     lastIsDark = isDark
-                    webView.evaluateJavascript("setTheme($isDark);", null)
+                    webView.evaluateJavascript("setTheme($isDark, '$bgHex', '$textHex');", null)
                 }
                 if (safeAnnotationsJson != lastJson) {
                     lastJson = safeAnnotationsJson
@@ -263,4 +265,11 @@ fun CodeWebView(
             }
         }
     )
+}
+
+private fun argbToHex(argb: Int): String {
+    val r = (argb shr 16) and 0xFF
+    val g = (argb shr 8) and 0xFF
+    val b = argb and 0xFF
+    return String.format("#%02X%02X%02X", r, g, b)
 }

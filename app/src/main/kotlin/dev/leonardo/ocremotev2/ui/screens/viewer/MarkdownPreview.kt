@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -86,6 +87,7 @@ fun MarkdownPreview(
         dimens = dimens,
         modifier = modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
             .verticalScroll(scrollState)
             .padding(horizontal = SpacingTokens.LG.dp, vertical = SpacingTokens.MD.dp)
     )

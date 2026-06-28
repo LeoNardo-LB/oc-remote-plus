@@ -61,10 +61,10 @@
             document.getElementById('gutter').textContent = lines.map(function(_, i) { return (i + 1); }).join('\n');
         }
 
-        function setTheme(isDark) {
+        function setTheme(isDark, bgColor, textColor) {
             document.getElementById('theme-css').href = isDark ? 'highlight/github-dark.min.css' : 'highlight/github.min.css';
-            document.documentElement.style.setProperty('--bg-color', isDark ? '#1e1e1e' : '#ffffff');
-            document.documentElement.style.setProperty('--text-color', isDark ? '#e0e0e0' : '#1e1e1e');
+            document.documentElement.style.setProperty('--bg-color', bgColor || (isDark ? '#1e1e1e' : '#ffffff'));
+            document.documentElement.style.setProperty('--text-color', textColor || (isDark ? '#e0e0e0' : '#1e1e1e'));
         }
 
         /** Reload code while preserving scroll position (for pagination). */

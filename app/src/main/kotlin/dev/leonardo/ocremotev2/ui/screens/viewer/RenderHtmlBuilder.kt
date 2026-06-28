@@ -7,9 +7,7 @@ object RenderHtmlBuilder {
 
     private val jsonPretty = Json { prettyPrint = true; prettyPrintIndent = "  " }
 
-    fun build(fileType: FileType, content: String, isDark: Boolean): String {
-        val bg = if (isDark) "#1a1a1a" else "#ffffff"
-        val fg = if (isDark) "#e0e0e0" else "#1a1a1a"
+    fun build(fileType: FileType, content: String, isDark: Boolean, bgHex: String, fgHex: String): String {
         val headerBg = if (isDark) "#2a2a2a" else "#f0f0f0"
         val borderColor = if (isDark) "#444" else "#ccc"
 
@@ -26,7 +24,7 @@ object RenderHtmlBuilder {
         <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
         <style>
-            body { margin:0; padding:12px 16px; background:$bg; color:$fg; font-family:monospace; font-size:14px; line-height:1.5; }
+            body { margin:0; padding:12px 16px; background:$bgHex; color:$fgHex; font-family:monospace; font-size:14px; line-height:1.5; }
             table { border-collapse:collapse; width:100%; }
             th, td { border:1px solid $borderColor; padding:6px 10px; text-align:left; }
             th { background:$headerBg; font-weight:bold; }
