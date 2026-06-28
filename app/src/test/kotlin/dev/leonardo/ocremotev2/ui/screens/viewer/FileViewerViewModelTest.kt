@@ -324,7 +324,7 @@ class FileViewerViewModelTest {
 
     // 10. init with md file sets isMarkdown true
     @Test
-    fun `init with md file sets isMarkdown true and keeps SOURCE renderMode`() = runTest {
+    fun `init with md file sets isMarkdown true and defaults to RENDER_PREVIEW`() = runTest {
         coEvery { getFileContent(any(), any(), any()) } returns Result.success(sampleMarkdownContent)
 
         val vm = FileViewerViewModel(
@@ -335,7 +335,7 @@ class FileViewerViewModelTest {
         )
 
         assert(vm.uiState.value.fileType == FileType.MARKDOWN) { "fileType should be MARKDOWN for .md" }
-        assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) { "renderMode should default to SOURCE" }
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) { "renderMode should default to RENDER_PREVIEW for renderable types" }
     }
 
     // 11. init with kt file sets isMarkdown false
@@ -348,9 +348,9 @@ class FileViewerViewModelTest {
         assert(vm.uiState.value.fileType == FileType.TEXT) { "fileType should be TEXT for .kt" }
     }
 
-    // 12. toggleRenderMode switches SOURCE to RENDER_PREVIEW
+    // 12. toggleRenderMode switches RENDER_PREVIEW to SOURCE (default is now RENDER_PREVIEW)
     @Test
-    fun `toggleRenderMode switches SOURCE to RENDER_PREVIEW for markdown files`() = runTest {
+    fun `toggleRenderMode switches RENDER_PREVIEW to SOURCE for markdown files`() = runTest {
         coEvery { getFileContent(any(), any(), any()) } returns Result.success(sampleMarkdownContent)
 
         val vm = FileViewerViewModel(
@@ -361,8 +361,8 @@ class FileViewerViewModelTest {
         )
         vm.toggleRenderMode()
 
-        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) {
-            "renderMode should be RENDER_PREVIEW after toggle"
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) {
+            "renderMode should be SOURCE after toggle from RENDER_PREVIEW"
         }
     }
 
@@ -397,7 +397,7 @@ class FileViewerViewModelTest {
         }
     }
 
-    // 15. toggleRenderMode toggles back to SOURCE
+    // 15. toggleRenderMode toggles from default RENDER_PREVIEW to SOURCE
     @Test
     fun `toggleRenderMode back from RENDER_PREVIEW to SOURCE`() = runTest {
         coEvery { getFileContent(any(), any(), any()) } returns Result.success(sampleMarkdownContent)
@@ -408,11 +408,11 @@ class FileViewerViewModelTest {
             toolSnapshotCache,
             submitAnnotations
         )
-        vm.toggleRenderMode()  // → RENDER_PREVIEW
-        vm.toggleRenderMode()  // → SOURCE
+        // Default is RENDER_PREVIEW for markdown, one toggle → SOURCE
+        vm.toggleRenderMode()
 
         assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) {
-            "renderMode should be SOURCE after second toggle"
+            "renderMode should be SOURCE after toggle from RENDER_PREVIEW"
         }
     }
 
@@ -675,7 +675,7 @@ class FileViewerViewModelTest {
     }
 
     @Test
-    fun `toggleRenderMode switches SOURCE to RENDER_PREVIEW for JSON`() = runTest {
+    fun `toggleRenderMode is no-op for JSON files`() = runTest {
         coEvery { getFileContent(any(), any(), any()) } returns Result.success(
             dev.leonardo.ocremotev2.domain.model.FileContent(
                 path = "config.json",
@@ -688,8 +688,8 @@ class FileViewerViewModelTest {
             getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
         )
         vm.toggleRenderMode()
-        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) {
-            "JSON should toggle to RENDER_PREVIEW"
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) {
+            "JSON should stay SOURCE (CodeWebView already has syntax highlight)"
         }
     }
 
@@ -727,8 +727,9 @@ class FileViewerViewModelTest {
             savedStateHandle(path = java.net.URLEncoder.encode("photo.png", "UTF-8")),
             getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
         )
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) { "IMAGE should default to RENDER_PREVIEW" }
         vm.toggleRenderMode()
-        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW)
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) { "toggle should switch to SOURCE" }
     }
 
     @Test
@@ -744,8 +745,9 @@ class FileViewerViewModelTest {
             savedStateHandle(path = java.net.URLEncoder.encode("data.csv", "UTF-8")),
             getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
         )
-        vm.toggleRenderMode()
         assert(vm.uiState.value.fileType == FileType.CSV)
-        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW)
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) { "CSV should default to RENDER_PREVIEW" }
+        vm.toggleRenderMode()
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) { "toggle should switch to SOURCE" }
     }
 }

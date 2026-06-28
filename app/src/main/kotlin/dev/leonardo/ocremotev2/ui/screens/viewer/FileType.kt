@@ -8,7 +8,7 @@ enum class FileType {
     CSV,
     JSON;
 
-    val supportsRender: Boolean get() = this != TEXT
+    val supportsRender: Boolean get() = this != TEXT && this != JSON
 
     companion object {
         private val EXT_MAP: Map<String, FileType> = mapOf(
