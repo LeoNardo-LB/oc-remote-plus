@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -192,21 +191,19 @@ fun FileViewerScreen(
                             initialScrollLine = uiState.initialScrollLine,
                         )
 
-                        // ── Render pane ── always composed for supported types
-                        if (uiState.fileType.supportsRender) {
+                        // ── Render pane ── conditionally composed to avoid touch interception
+                        if (showRender && uiState.fileType.supportsRender) {
                             when (uiState.fileType) {
                                 FileType.MARKDOWN -> MarkdownPreviewWithScrollAnchor(
                                     markdown = uiState.content,
                                     sourceScrollFraction = lastSourceFraction,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .then(if (showRender) Modifier else Modifier.alpha(0f))
+                                    modifier = Modifier.fillMaxSize()
                                 )
                                 FileType.IMAGE, FileType.SVG, FileType.CSV -> RenderWebView(
                                     content = uiState.content,
                                     fileType = uiState.fileType,
                                     mimeType = uiState.mimeType ?: "image/*",
-                                    visible = showRender
+                                    visible = true
                                 )
                                 else -> {} // no-op
                             }
