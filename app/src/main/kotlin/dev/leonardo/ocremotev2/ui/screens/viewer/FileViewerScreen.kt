@@ -194,10 +194,10 @@ fun FileViewerScreen(
                         // ── Render pane ── conditionally composed to avoid touch interception
                         if (showRender && uiState.fileType.supportsRender) {
                             when (uiState.fileType) {
-                                FileType.MARKDOWN -> MarkdownPreviewWithScrollAnchor(
-                                    markdown = uiState.content,
-                                    sourceScrollFraction = lastSourceFraction,
-                                    modifier = Modifier.fillMaxSize()
+                                FileType.MARKDOWN -> RenderWebView(
+                                    content = uiState.content,
+                                    fileType = FileType.MARKDOWN,
+                                    visible = true
                                 )
                                 FileType.IMAGE, FileType.SVG, FileType.CSV -> RenderWebView(
                                     content = uiState.content,

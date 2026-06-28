@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link id="theme-css" rel="stylesheet" href="highlight/github-dark.min.css">
+    <script src="marked/marked.min.js"></script>
+    <script src="highlight/highlight.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: var(--bg-color, #1e1e1e); }
+        body {
+            padding: 12px 16px;
+            color: var(--text-color, #e0e0e0);
+            font-family: -apple-system, 'Roboto', 'Helvetica', sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            -webkit-user-select: text;
+            user-select: text;
+            word-wrap: break-word;
+        }
+
+        /* Headings */
+        h1 { font-size: 1.8em; font-weight: 700; margin: 0.8em 0 0.4em; }
+        h2 { font-size: 1.5em; font-weight: 600; margin: 0.8em 0 0.4em; }
+        h3 { font-size: 1.25em; font-weight: 600; margin: 0.8em 0 0.4em; }
+        h4 { font-size: 1.1em; font-weight: 600; margin: 0.8em 0 0.4em; }
+        h5, h6 { font-size: 1em; font-weight: 600; margin: 0.8em 0 0.4em; }
+
+        /* Paragraphs & Lists */
+        p { margin: 0.5em 0; }
+        ul, ol { margin: 0.5em 0; padding-left: 1.5em; }
+        li { margin: 0.25em 0; }
+
+        /* Links */
+        a { color: #5b9eff; text-decoration: none; }
+
+        /* Inline code */
+        code:not(pre code) {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.875em;
+            background: rgba(128, 128, 128, 0.15);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+        }
+
+        /* Code blocks */
+        pre {
+            margin: 0.6em 0;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+        pre code {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.5;
+            background: transparent;
+            padding: 0;
+        }
+
+        /* Blockquote */
+        blockquote {
+            margin: 0.6em 0;
+            padding: 0.5em 1em;
+            border-left: 3px solid rgba(128, 128, 128, 0.4);
+            opacity: 0.85;
+        }
+        blockquote p { margin: 0.25em 0; }
+
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.6em 0;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px solid rgba(128, 128, 128, 0.3);
+            padding: 6px 10px;
+            text-align: left;
+        }
+        th { background: rgba(128, 128, 128, 0.12); font-weight: 600; }
+
+        /* Images */
+        img { max-width: 100%; height: auto; border-radius: 8px; }
+
+        /* Horizontal rule */
+        hr {
+            border: none;
+            border-top: 1px solid rgba(128, 128, 128, 0.3);
+            margin: 1em 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="content"></div>
+    <script>
+        var _bgColor = '#1e1e1e';
+        var _textColor = '#e0e0e0';
+        var _isDark = true;
+
+        function renderMarkdown(md, isDark, bgColor, textColor) {
+            _isDark = isDark;
+            _bgColor = bgColor || (isDark ? '#1e1e1e' : '#ffffff');
+            _textColor = textColor || (isDark ? '#e0e0e0' : '#1e1e1e');
+            document.documentElement.style.setProperty('--bg-color', _bgColor);
+            document.documentElement.style.setProperty('--text-color', _textColor);
+            document.getElementById('theme-css').href = isDark
+                ? 'highlight/github-dark.min.css'
+                : 'highlight/github.min.css';
+
+            // Parse markdown → HTML
+            var html = marked.parse(md);
+            document.getElementById('content').innerHTML = html;
+
+            // Highlight all code blocks
+            document.querySelectorAll('pre code').forEach(function(el) {
+                // Infer language from class (marked adds language-xxx)
+                var lang = null;
+                el.classList.forEach(function(c) {
+                    if (c.startsWith('language-')) lang = c.replace('language-', '');
+                });
+                if (lang && hljs.getLanguage(lang)) {
+                    el.className = 'hljs language-' + lang;
+                } else {
+                    el.className = 'hljs';
+                }
+                hljs.highlightElement(el);
+            });
+        }
+    </script>
+</body>
+</html>

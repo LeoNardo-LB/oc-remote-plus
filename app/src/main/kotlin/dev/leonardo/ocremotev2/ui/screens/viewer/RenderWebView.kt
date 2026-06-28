@@ -3,26 +3,20 @@ package dev.leonardo.ocremotev2.ui.screens.viewer
 import android.annotation.SuppressLint
 import android.view.View
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * Unified WebView-based renderer that **reuses a single WebView instance** across
- * render-mode toggles. When [content] or [fileType] changes (e.g., user taps the
- * toggle button), only [WebView.loadDataWithBaseURL] is called — no WebView
- * destruction/recreation, eliminating the blank-flash flicker.
+ * Unified WebView-based renderer. Reuses a single WebView instance — toggle only
+ * changes [View.VISIBLE]/[View.GONE], no destruction/recreation.
  *
- * Supports: IMAGE (base64 data-URI), SVG, CSV.
+ * Supports: MARKDOWN (marked.js + highlight.js), IMAGE (base64), SVG, CSV.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -39,13 +33,22 @@ fun RenderWebView(
     val bgHex = argbToHex(bgColorArgb)
     val fgHex = argbToHex(MaterialTheme.colorScheme.onSurface.toArgb())
 
-    // Build HTML from current fileType + content
+    // Escape markdown content for JS template literal
+    val escapedContent = remember(content) {
+        content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+    }
+
+    // Pre-built HTML for IMAGE/SVG/CSV (MARKDOWN uses asset template instead)
     val html = remember(content, fileType, mimeType, bgColorArgb) {
         when (fileType) {
             FileType.IMAGE -> buildImageHtml(content, mimeType, bgHex)
             FileType.SVG, FileType.CSV -> RenderHtmlBuilder.build(fileType, content, isDark, bgHex, fgHex)
-            else -> "" // fallback — should never reach here
+            else -> ""
         }
+    }
+
+    val jsCommand = remember(escapedContent, isDark, bgHex, fgHex) {
+        "renderMarkdown(`$escapedContent`, $isDark, '$bgHex', '$fgHex');"
     }
 
     AndroidView(
@@ -53,29 +56,38 @@ fun RenderWebView(
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.apply {
-                    when (fileType) {
-                        FileType.IMAGE -> {
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
-                        }
-                        else -> {
-                            javaScriptEnabled = false
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
+                    if (fileType == FileType.MARKDOWN) {
+                        javaScriptEnabled = true
+                    }
+                    if (fileType == FileType.IMAGE) {
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                    }
+                    loadWithOverviewMode = true
+                    useWideViewPort = true
+                }
+                setBackgroundColor(bgColorArgb)
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        if (fileType == FileType.MARKDOWN) {
+                            view?.evaluateJavascript(jsCommand, null)
                         }
                     }
                 }
-                setBackgroundColor(bgColorArgb)
-                webViewClient = android.webkit.WebViewClient()
-                loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+                if (fileType == FileType.MARKDOWN) {
+                    loadUrl("file:///android_asset/markdown_viewer.html")
+                } else {
+                    loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+                }
             }
         },
         update = { webView ->
             webView.visibility = if (visible) View.VISIBLE else View.GONE
-            // Content changed (toggle or new file) → reload in-place, no recreation
-            webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            if (fileType == FileType.MARKDOWN) {
+                webView.evaluateJavascript(jsCommand, null)
+            } else {
+                webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            }
         }
     )
 }
