@@ -714,4 +714,10 @@
     <string name="viewer_loading_progress">加载中：%1$d / %2$d 行</string>
     <string name="viewer_md_show_render">显示渲染预览</string>
     <string name="viewer_md_show_source">显示源代码</string>
+    <string name="chat_link_no_browser">没有可打开此链接的应用</string>
+    <string name="chat_link_no_workdir">无法解析链接 — 无工作目录</string>
+    <string name="chat_link_only_files">只能从绝对路径打开文件</string>
+    <string name="viewer_show_render">显示渲染预览</string>
+    <string name="viewer_show_source">显示源代码</string>
+    <string name="viewer_image_render_error">加载图片失败</string>
 </resources>
