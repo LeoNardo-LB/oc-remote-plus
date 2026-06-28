@@ -26,7 +26,7 @@ object RenderHtmlBuilder {
         <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
         <style>
-            body { margin:0; padding:12px; background:$bg; color:$fg; font-family:monospace; font-size:14px; line-height:1.5; }
+            body { margin:0; padding:12px 16px; background:$bg; color:$fg; font-family:monospace; font-size:14px; line-height:1.5; }
             table { border-collapse:collapse; width:100%; }
             th, td { border:1px solid $borderColor; padding:6px 10px; text-align:left; }
             th { background:$headerBg; font-weight:bold; }

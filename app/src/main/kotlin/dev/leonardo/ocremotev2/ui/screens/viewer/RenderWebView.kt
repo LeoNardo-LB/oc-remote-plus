@@ -86,7 +86,7 @@ private fun buildImageHtml(base64Data: String, mimeType: String, bgColorArgb: In
     <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
     <style>
-        body { margin:0; padding:0; background:$hex; display:flex; justify-content:center; align-items:center; min-height:100vh; }
+        body { margin:0; padding:12px 16px; background:$hex; display:flex; justify-content:center; align-items:center; min-height:100vh; }
         img { max-width:100%; height:auto; object-fit:contain; }
     </style>
     </head>
