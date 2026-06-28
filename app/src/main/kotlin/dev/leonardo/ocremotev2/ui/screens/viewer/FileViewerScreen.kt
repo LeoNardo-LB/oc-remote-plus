@@ -151,12 +151,28 @@ fun FileViewerScreen(
                     onPrevHunk = onPrevHunk
                 )
                 uiState.isEmpty -> MessageState(message = stringResource(R.string.viewer_empty_file))
-                // Phase 2: markdown render preview (before truncation check — preview shows full)
-                uiState.isMarkdown && uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW -> {
-                    MarkdownPreviewWithScrollAnchor(
-                        markdown = uiState.content,
-                        sourceScrollFraction = lastSourceFraction
-                    )
+                // Multi-format render preview (before truncation check — preview shows full)
+                uiState.fileType.supportsRender && uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW -> {
+                    when (uiState.fileType) {
+                        FileType.MARKDOWN -> MarkdownPreviewWithScrollAnchor(
+                            markdown = uiState.content,
+                            sourceScrollFraction = lastSourceFraction
+                        )
+                        FileType.IMAGE -> ImageViewer(
+                            base64Data = uiState.content,
+                            mimeType = uiState.mimeType ?: "image/*"
+                        )
+                        FileType.SVG, FileType.CSV, FileType.JSON -> FormatWebView(
+                            content = uiState.content,
+                            fileType = uiState.fileType
+                        )
+                        FileType.TEXT -> CodeWebView(
+                            content = uiState.content,
+                            filePath = uiState.filePath,
+                            onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
                 uiState.isExtremelyLarge -> Column(Modifier.fillMaxSize()) {
                     LargeFileWarningBanner(lineCount = uiState.totalLineCount)
@@ -309,17 +325,17 @@ private fun FileViewerTopBar(
                     Text(stringResource(R.string.viewer_diff_show_source))
                 }
             }
-            // Phase 2: md render toggle (hidden when annotations exist)
-            if (annotationCount == 0 && uiState.isMarkdown && uiState.mode != FileViewerMode.DIFF) {
+            // Multi-format render toggle (hidden when annotations exist)
+            if (annotationCount == 0 && uiState.fileType.supportsRender && uiState.mode != FileViewerMode.DIFF) {
                 val isRender = uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW
                 IconButton(
                     onClick = onToggleRenderMode,
-                    modifier = Modifier.testTag("viewer_md_render_button")
+                    modifier = Modifier.testTag("viewer_render_button")
                 ) {
                     Icon(
                         imageVector = if (isRender) Icons.Default.Description else Icons.Default.RemoveRedEye,
-                        contentDescription = if (isRender) stringResource(R.string.viewer_md_show_source)
-                        else stringResource(R.string.viewer_md_show_render),
+                        contentDescription = if (isRender) stringResource(R.string.viewer_show_source)
+                        else stringResource(R.string.viewer_show_render),
                         tint = if (isRender) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
