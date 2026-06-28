@@ -66,7 +66,14 @@ class FileViewerViewModel @Inject constructor(
         viewModelScope.launch {
             getFileContent(serverId, directory, filePath)
                 .onSuccess { c ->
-                    if (c.type == ContentType.BINARY) _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }
+                    if (c.type == ContentType.BINARY) {
+                        val ft = FileType.fromExtension(filePath)
+                        if (ft == FileType.IMAGE) {
+                            _uiState.update { it.copy(isLoading = false, isBinary = false, fileType = ft, content = c.content, mimeType = c.mimeType) }
+                        } else {
+                            _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }
+                        }
+                    }
                     else {
                         fullContentCache = c.content
                         val totalLines = if (c.content.isEmpty()) 0
@@ -86,7 +93,7 @@ class FileViewerViewModel @Inject constructor(
                                 mode = FileViewerMode.SOURCE,
                                 content = visible,
                                 isEmpty = visible.isBlank(),
-                                isMarkdown = isMarkdownFile(filePath),
+                                fileType = FileType.fromExtension(filePath),
                                 renderMode = FileViewerRenderMode.SOURCE,
                                 totalLineCount = totalLines,
                                 visibleLineCount = initialVisible,
@@ -229,7 +236,7 @@ class FileViewerViewModel @Inject constructor(
 
     fun toggleRenderMode() {
         val current = _uiState.value
-        if (!current.isMarkdown || current.mode == FileViewerMode.DIFF) return
+        if (!current.fileType.supportsRender || current.mode == FileViewerMode.DIFF) return
         _uiState.update {
             it.copy(
                 renderMode = if (it.renderMode == FileViewerRenderMode.SOURCE) FileViewerRenderMode.RENDER_PREVIEW
@@ -252,11 +259,6 @@ class FileViewerViewModel @Inject constructor(
             // Content already available → just switch mode
             _uiState.update { it.copy(mode = FileViewerMode.SOURCE) }
         }
-    }
-
-    private fun isMarkdownFile(filePath: String): Boolean {
-        val ext = filePath.substringAfterLast('.', "").lowercase()
-        return ext == "md" || ext == "markdown" || ext == "mdx"
     }
 
     // ============ Phase 2 Task 9: Tool snapshot ============
@@ -333,7 +335,7 @@ class FileViewerViewModel @Inject constructor(
                 mode = FileViewerMode.SOURCE,
                 content = visible,
                 isEmpty = content.isBlank(),
-                isMarkdown = isMarkdownFile(filePath),
+                fileType = FileType.fromExtension(filePath),
                 renderMode = FileViewerRenderMode.SOURCE,
                 isToolSnapshot = true,
                 toolSnapshotContent = first.content,

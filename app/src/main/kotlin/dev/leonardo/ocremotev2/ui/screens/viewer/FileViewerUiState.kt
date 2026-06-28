@@ -34,9 +34,9 @@ data class FileViewerUiState(
     val diff: VcsFileDiff? = null,
     val hunks: List<DiffHunk> = emptyList(),
     val currentHunkIndex: Int = 0,
-    // Phase 2: Markdown render toggle
+    // Phase 2: Markdown render toggle (now multi-format via FileType)
     val renderMode: FileViewerRenderMode = FileViewerRenderMode.SOURCE,
-    val isMarkdown: Boolean = false,
+    val fileType: FileType = FileType.TEXT,
     // Phase 2 Task 9: Tool snapshot
     val isToolSnapshot: Boolean = false,
     val toolSnapshotBefore: String? = null,
@@ -46,4 +46,7 @@ data class FileViewerUiState(
     val annotations: List<Annotation> = emptyList(),
     // Scroll to this line on initial load (-1 = no scroll, for Edit tool jump)
     val initialScrollLine: Int = -1
-)
+) {
+    /** Backward-compatible accessor for markdown check. */
+    val isMarkdown: Boolean get() = fileType == FileType.MARKDOWN
+}

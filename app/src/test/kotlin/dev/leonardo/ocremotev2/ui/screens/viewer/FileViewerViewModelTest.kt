@@ -334,7 +334,7 @@ class FileViewerViewModelTest {
             submitAnnotations
         )
 
-        assert(vm.uiState.value.isMarkdown) { "isMarkdown should be true for .md" }
+        assert(vm.uiState.value.fileType == FileType.MARKDOWN) { "fileType should be MARKDOWN for .md" }
         assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) { "renderMode should default to SOURCE" }
     }
 
@@ -345,7 +345,7 @@ class FileViewerViewModelTest {
 
         val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
 
-        assert(!vm.uiState.value.isMarkdown) { "isMarkdown should be false for .kt" }
+        assert(vm.uiState.value.fileType == FileType.TEXT) { "fileType should be TEXT for .kt" }
     }
 
     // 12. toggleRenderMode switches SOURCE to RENDER_PREVIEW
@@ -366,9 +366,9 @@ class FileViewerViewModelTest {
         }
     }
 
-    // 13. toggleRenderMode no-op for non-markdown
+    // 13. toggleRenderMode no-op for TEXT (non-renderable)
     @Test
-    fun `toggleRenderMode is no-op for non-markdown files`() = runTest {
+    fun `toggleRenderMode is no-op for TEXT files`() = runTest {
         coEvery { getFileContent(serverId, directory, filePath) } returns Result.success(sampleFileContent)
 
         val vm = FileViewerViewModel(savedStateHandle(), getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations)
@@ -654,5 +654,98 @@ class FileViewerViewModelTest {
         assertEquals(2, vm2.uiState.value.annotations.size)
         assertEquals("note1", vm2.uiState.value.annotations[0].note)
         assertEquals("note2", vm2.uiState.value.annotations[1].note)
+    }
+
+    // ===== Multi-format render tests =====
+
+    @Test
+    fun `init with json file sets fileType JSON`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "config.json",
+                type = ContentType.TEXT,
+                content = "{\"key\":\"value\"}"
+            )
+        )
+        val vm = FileViewerViewModel(
+            savedStateHandle(path = java.net.URLEncoder.encode("config.json", "UTF-8")),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        assert(vm.uiState.value.fileType == FileType.JSON) { "fileType should be JSON" }
+    }
+
+    @Test
+    fun `toggleRenderMode switches SOURCE to RENDER_PREVIEW for JSON`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "config.json",
+                type = ContentType.TEXT,
+                content = "{\"key\":\"value\"}"
+            )
+        )
+        val vm = FileViewerViewModel(
+            savedStateHandle(path = java.net.URLEncoder.encode("config.json", "UTF-8")),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        vm.toggleRenderMode()
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) {
+            "JSON should toggle to RENDER_PREVIEW"
+        }
+    }
+
+    @Test
+    fun `init with png binary sets fileType IMAGE and retains base64 content`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "photo.png",
+                type = ContentType.BINARY,
+                content = "iVBORw0KGgo=",
+                mimeType = "image/png"
+            )
+        )
+        val vm = FileViewerViewModel(
+            savedStateHandle(path = java.net.URLEncoder.encode("photo.png", "UTF-8")),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        assert(vm.uiState.value.fileType == FileType.IMAGE) { "fileType should be IMAGE" }
+        assert(!vm.uiState.value.isBinary) { "IMAGE should not be marked isBinary" }
+        assert(vm.uiState.value.content == "iVBORw0KGgo=") { "base64 content should be retained" }
+        assert(vm.uiState.value.mimeType == "image/png") { "mimeType should be preserved" }
+    }
+
+    @Test
+    fun `toggleRenderMode works for IMAGE files`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "photo.png",
+                type = ContentType.BINARY,
+                content = "iVBORw0KGgo=",
+                mimeType = "image/png"
+            )
+        )
+        val vm = FileViewerViewModel(
+            savedStateHandle(path = java.net.URLEncoder.encode("photo.png", "UTF-8")),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        vm.toggleRenderMode()
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW)
+    }
+
+    @Test
+    fun `toggleRenderMode works for CSV files`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "data.csv",
+                type = ContentType.TEXT,
+                content = "a,b\n1,2"
+            )
+        )
+        val vm = FileViewerViewModel(
+            savedStateHandle(path = java.net.URLEncoder.encode("data.csv", "UTF-8")),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        vm.toggleRenderMode()
+        assert(vm.uiState.value.fileType == FileType.CSV)
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW)
     }
 }
