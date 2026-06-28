@@ -753,6 +753,10 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <!-- File Viewer markdown toggle -->
     <string name="viewer_md_show_render">Show rendered preview</string>
     <string name="viewer_md_show_source">Show source code</string>
+    <!-- Multi-format render toggle -->
+    <string name="viewer_show_render">Show rendered preview</string>
+    <string name="viewer_show_source">Show source code</string>
+    <string name="viewer_image_render_error">Failed to load image</string>
     <string name="viewer_diff_show_source">Source</string>
 
     <!-- File Viewer tool snapshot -->
