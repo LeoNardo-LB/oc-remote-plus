@@ -42,4 +42,17 @@ object PathUtils {
         }
         return path
     }
+
+    /**
+     * Join two path segments with a `/` separator.
+     * Handles trailing/leading separators on both [base] and [relative].
+     * Returns [relative] unchanged if [base] is blank.
+     */
+    fun joinPath(base: String, relative: String): String {
+        if (base.isBlank()) return relative
+        if (relative.isBlank()) return base
+        val normalizedBase = base.trimEnd(*SEPARATORS)
+        val normalizedRelative = relative.trimStart(*SEPARATORS)
+        return "$normalizedBase/$normalizedRelative"
+    }
 }
