@@ -274,6 +274,9 @@
     <string name="chat_token_cache_read">Cache read</string>
     <string name="chat_token_cache_write">Cache write</string>
     <string name="chat_task_output_summary">Output summary</string>
+    <string name="chat_link_no_browser">No app available to open this link</string>
+    <string name="chat_link_no_workdir">Cannot resolve link — no working directory</string>
+    <string name="chat_link_only_files">Only files can be opened from absolute paths</string>
     
     <!-- Slash Commands -->
     <string name="cmd_new">Create a new session</string>
