@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -152,27 +153,20 @@ fun FileViewerScreen(
                 )
                 uiState.isEmpty -> MessageState(message = stringResource(R.string.viewer_empty_file))
                 // Source vs render preview with smooth crossfade transition
-                // Source vs render preview — WebView reuse for non-Markdown formats
+                // Dual-pane: both source and render views always composed, toggle = visibility switch
                 else -> {
-                    when {
-                        uiState.fileType == FileType.MARKDOWN &&
-                            uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW -> MarkdownPreviewWithScrollAnchor(
-                            markdown = uiState.content,
-                            sourceScrollFraction = lastSourceFraction
-                        )
-                        uiState.fileType in listOf(FileType.IMAGE, FileType.SVG, FileType.CSV) &&
-                            uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW -> RenderWebView(
-                            content = uiState.content,
-                            fileType = uiState.fileType,
-                            mimeType = uiState.mimeType ?: "image/*"
-                        )
-                        // Source mode (CodeWebView) or fallback
-                        else -> if (uiState.isExtremelyLarge) {
+                    val showRender = uiState.fileType.supportsRender &&
+                        uiState.renderMode == FileViewerRenderMode.RENDER_PREVIEW
+
+                    Box(Modifier.fillMaxSize()) {
+                        // ── Source pane (CodeWebView) ── always present, hidden when showing render
+                        if (uiState.isExtremelyLarge) {
                             Column(Modifier.fillMaxSize()) {
                                 LargeFileWarningBanner(lineCount = uiState.totalLineCount)
                                 CodeWebView(
                                     content = uiState.content,
                                     filePath = uiState.filePath,
+                                    visible = !showRender,
                                     onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
                                     annotationsJson = annotationsJson,
                                     onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
@@ -186,6 +180,7 @@ fun FileViewerScreen(
                         } else CodeWebView(
                             content = uiState.content,
                             filePath = uiState.filePath,
+                            visible = !showRender,
                             onAnnotate = { text, start, end -> pendingAnnotation = Triple(text, start, end) },
                             annotationsJson = annotationsJson,
                             onLoadMore = if (!uiState.isFullyLoaded) onLoadMoreLines else null,
@@ -195,8 +190,27 @@ fun FileViewerScreen(
                                 detailAnnotation = uiState.annotations.find { it.index == idx }
                             },
                             initialScrollLine = uiState.initialScrollLine,
-                            modifier = Modifier.fillMaxSize()
                         )
+
+                        // ── Render pane ── always composed for supported types
+                        if (uiState.fileType.supportsRender) {
+                            when (uiState.fileType) {
+                                FileType.MARKDOWN -> MarkdownPreviewWithScrollAnchor(
+                                    markdown = uiState.content,
+                                    sourceScrollFraction = lastSourceFraction,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(if (showRender) Modifier else Modifier.alpha(0f))
+                                )
+                                FileType.IMAGE, FileType.SVG, FileType.CSV -> RenderWebView(
+                                    content = uiState.content,
+                                    fileType = uiState.fileType,
+                                    mimeType = uiState.mimeType ?: "image/*",
+                                    visible = showRender
+                                )
+                                else -> {} // no-op
+                            }
+                        }
                     }
                 }
             }
@@ -371,7 +385,8 @@ private fun FileViewerTopBar(
 @Composable
 private fun MarkdownPreviewWithScrollAnchor(
     markdown: String,
-    sourceScrollFraction: Float
+    sourceScrollFraction: Float,
+    modifier: Modifier = Modifier
 ) {
     val renderScrollState = rememberScrollState()
     LaunchedEffect(sourceScrollFraction) {
@@ -382,7 +397,8 @@ private fun MarkdownPreviewWithScrollAnchor(
     }
     MarkdownPreview(
         markdown = markdown,
-        scrollState = renderScrollState
+        scrollState = renderScrollState,
+        modifier = modifier
     )
 }
 

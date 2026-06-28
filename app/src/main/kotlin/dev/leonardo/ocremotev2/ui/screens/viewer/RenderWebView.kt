@@ -1,6 +1,7 @@
 package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import android.annotation.SuppressLint
+import android.view.View
 import android.webkit.WebView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,7 @@ fun RenderWebView(
     content: String,
     fileType: FileType,
     mimeType: String = "image/*",
+    visible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -69,6 +71,7 @@ fun RenderWebView(
             }
         },
         update = { webView ->
+            webView.visibility = if (visible) View.VISIBLE else View.GONE
             // Content changed (toggle or new file) → reload in-place, no recreation
             webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
         }

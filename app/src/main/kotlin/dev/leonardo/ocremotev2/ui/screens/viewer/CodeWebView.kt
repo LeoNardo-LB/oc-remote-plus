@@ -8,6 +8,7 @@ import android.util.Log
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -150,6 +151,7 @@ fun CodeWebView(
     content: String,
     filePath: String,
     modifier: Modifier = Modifier,
+    visible: Boolean = true,
     onAnnotate: ((text: String, startOffset: Int, endOffset: Int) -> Unit)? = null,
     annotationsJson: String = "",
     onLoadMore: (() -> Unit)? = null,
@@ -237,6 +239,7 @@ fun CodeWebView(
             }
         },
         update = { webView ->
+            webView.visibility = if (visible) View.VISIBLE else View.GONE
             webView.post {
                 // Only update WebView when content actually changes — avoids
                 // rebuilding DOM during scroll (caused scroll jump/flicker)
