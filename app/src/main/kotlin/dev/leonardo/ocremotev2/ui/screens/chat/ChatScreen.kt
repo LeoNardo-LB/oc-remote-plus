@@ -97,6 +97,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
@@ -265,6 +266,7 @@ fun ChatScreen(
     onOpenInWebView: () -> Unit = {},
     onOpenWorkspace: () -> Unit = {},
     onOpenFile: (filePath: String) -> Unit = {},
+    onOpenDirectory: (directoryPath: String) -> Unit = {},
     initialSharedImages: List<Uri> = emptyList(),
     onSharedImagesConsumed: () -> Unit = {},
     startInTerminalMode: Boolean = false,
@@ -403,6 +405,13 @@ fun ChatScreen(
     var isTerminalMode by rememberSaveable { mutableStateOf(startInTerminalMode) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val linkUriHandler = rememberLinkUriHandler(
+        directory = directory,
+        onOpenFile = onOpenFile,
+        onOpenDirectory = onOpenDirectory,
+        snackbarHostState = snackbarHostState,
+        coroutineScope = coroutineScope,
+    )
     val context = LocalContext.current
     val isAmoled = isAmoledTheme()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -534,6 +543,7 @@ fun ChatScreen(
         LocalOnToggleToolExpanded provides { toolId, defaultExpanded -> viewModel.toggleToolExpanded(toolId, defaultExpanded) },
         LocalToolCardResolver provides viewModel.toolCardResolver,
         LocalSessionDiffs provides mapOf(viewModel.sessionId to sessionDiffs),
+        LocalUriHandler provides linkUriHandler,
     ) {
     Scaffold(
         snackbarHost = {
