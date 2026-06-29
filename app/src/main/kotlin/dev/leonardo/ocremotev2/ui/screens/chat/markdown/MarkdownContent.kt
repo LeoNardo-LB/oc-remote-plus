@@ -26,7 +26,10 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.annotator.annotatorSettings
 import com.mikepenz.markdown.annotator.buildMarkdownAnnotatedString
@@ -258,13 +261,36 @@ internal fun MarkdownContent(
         markdownComponents(
             paragraph = { model ->
                 val settings = annotatorSettings(linkInteractionListener = linkListener)
-                val annotated = model.content.buildMarkdownAnnotatedString(
+                val rawAnnotated = model.content.buildMarkdownAnnotatedString(
                     textNode = model.node,
                     style = model.typography.text,
                     annotatorSettings = settings,
                 )
                 val items = remember(model.content, model.node) {
                     extractClickableItems(model.content, model.node)
+                }
+                val codePaths = items.filterIsInstance<ClickableItem.CodePath>()
+                val annotated = if (codePaths.isEmpty()) rawAnnotated else {
+                    buildAnnotatedString {
+                        append(rawAnnotated.text)
+                        rawAnnotated.spanStyles.forEach { range ->
+                            addStyle(range.item, range.start, range.end)
+                        }
+                        var searchFrom = 0
+                        for (cp in codePaths) {
+                            val idx = rawAnnotated.text.indexOf(cp.text, searchFrom)
+                            if (idx >= 0) {
+                                addStyle(
+                                    SpanStyle(
+                                        textDecoration = TextDecoration.Underline,
+                                        color = linkColor,
+                                    ),
+                                    idx, idx + cp.text.length,
+                                )
+                                searchFrom = idx + cp.text.length
+                            }
+                        }
+                    }
                 }
                 var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
                 MarkdownBasicText(
