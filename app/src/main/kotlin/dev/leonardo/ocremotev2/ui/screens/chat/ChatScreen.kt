@@ -239,7 +239,11 @@ import dev.leonardo.ocremotev2.ui.screens.chat.components.RevertBanner
 import dev.leonardo.ocremotev2.ui.screens.chat.terminal.ChatTerminalView
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.RenameSessionDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.SendConfirmDialog
+import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnViewTool
 import dev.leonardo.ocremotev2.ui.screens.chat.util.snapToBottom
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerOverlay
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerParams
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerSource
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
 
@@ -259,6 +263,8 @@ private const val TAG_SCROLL = "ChatScroll"
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
+    serverId: String,
+    sessionId: String,
     onNavigateBack: () -> Unit,
     onNavigateToSession: (sessionId: String) -> Unit = {},
     onNavigateToChildSession: (String) -> Unit = {},
@@ -303,20 +309,22 @@ fun ChatScreen(
     var autoScrollEnabled by rememberSaveable { mutableStateOf(true) }
     var forceScrollTick by remember { mutableIntStateOf(0) }
 
+    // FileViewer overlay state — replaces navigation to FileViewerNav route.
+    var fileViewerRequest by remember { mutableStateOf<FileViewerParams?>(null) }
+    val handleOpenFile: (String) -> Unit = { filePath ->
+        fileViewerRequest = FileViewerParams(
+            serverId = serverId,
+            sessionId = sessionId,
+            filePath = filePath,
+            directory = directory,
+            source = FileViewerSource.LIVE
+        )
+    }
+
     val isAtBottom by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex == 0 &&
                 listState.firstVisibleItemScrollOffset < 100
-        }
-    }
-
-    // Save scroll position (key + offset) when leaving ChatScreen.
-    DisposableEffect(Unit) {
-        onDispose {
-            val firstVisible = listState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == listState.firstVisibleItemIndex }
-            viewModel.pendingScrollKey = firstVisible?.key?.toString()
-            viewModel.pendingScrollOffset = listState.firstVisibleItemScrollOffset
         }
     }
 
@@ -330,21 +338,6 @@ fun ChatScreen(
 
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
-        // Restore scroll position using saved key + requestScrollToItem.
-        // requestScrollToItem is non-suspend — sets position for the NEXT measure
-        // pass, overriding the normalization that scrollToItem suffers from.
-        val savedKey = viewModel.pendingScrollKey
-        if (savedKey != null && !autoScrollEnabled) {
-            viewModel.pendingScrollKey = null // consume
-            snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
-            val target = listState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.key?.toString() == savedKey }
-            if (target != null && target.index != listState.firstVisibleItemIndex) {
-                val cappedOffset = if (target.size > 0) viewModel.pendingScrollOffset.coerceAtMost(target.size - 1) else 0
-                listState.requestScrollToItem(target.index, cappedOffset)
-            }
-        }
-
         if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
             listState.scrollToItem(0)
         }
@@ -372,7 +365,7 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     val linkUriHandler = rememberLinkUriHandler(
         directory = directory,
-        onOpenFile = onOpenFile,
+        onOpenFile = handleOpenFile,
         onOpenDirectory = onOpenDirectory,
         fileChecker = checkFileExists,
         snackbarHostState = snackbarHostState,
@@ -506,6 +499,17 @@ fun ChatScreen(
         LocalToolCardResolver provides viewModel.toolCardResolver,
         LocalSessionDiffs provides mapOf(viewModel.sessionId to sessionDiffs),
         LocalUriHandler provides linkUriHandler,
+        LocalOnViewTool provides { request ->
+            viewModel.cacheToolPart(request.part)
+            fileViewerRequest = FileViewerParams(
+                serverId = serverId,
+                sessionId = sessionId,
+                filePath = request.filePath,
+                directory = directory,
+                source = request.source,
+                toolPartIds = listOf(request.part.id)
+            )
+        },
     ) {
     Scaffold(
         snackbarHost = {
@@ -1010,7 +1014,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = onNavigateToChildSession,
-                                onOpenFile = onOpenFile,
+                                onOpenFile = handleOpenFile,
                                 onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 
@@ -1035,7 +1039,7 @@ fun ChatScreen(
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
                                 navigateToChildSession = onNavigateToChildSession,
-                                onOpenFile = onOpenFile,
+                                onOpenFile = handleOpenFile,
                                 onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 
@@ -1092,6 +1096,14 @@ fun ChatScreen(
     }
     } // CompositionLocalProvider
     } // ChatSettingsProvider
+
+    // FileViewer overlay — rendered on top of ChatScreen when requested.
+    fileViewerRequest?.let { params ->
+        FileViewerOverlay(
+            params = params,
+            onDismiss = { fileViewerRequest = null }
+        )
+    }
 }
 
 /**

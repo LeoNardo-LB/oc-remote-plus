@@ -22,6 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -31,6 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerOverlay
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerParams
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerSource
 import dev.leonardo.ocremotev2.ui.screens.workspace.git.GitChangesPanel
 import dev.leonardo.ocremotev2.ui.screens.workspace.search.SearchOverlay
 import dev.leonardo.ocremotev2.ui.screens.workspace.search.SearchTopBar
@@ -39,11 +45,12 @@ import dev.leonardo.ocremotev2.ui.screens.workspace.tree.FileTreePanel
 @Composable
 fun WorkspaceRoute(
     viewModel: WorkspaceViewModel = hiltViewModel(),
-    onBack: () -> Unit,
-    onOpenFile: (filePath: String) -> Unit,
-    onOpenGitDiff: (filePath: String) -> Unit
+    serverId: String,
+    sessionId: String,
+    onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var fileViewerRequest by remember { mutableStateOf<FileViewerParams?>(null) }
     WorkspaceScreen(
         uiState = uiState,
         onBack = onBack,
@@ -52,13 +59,36 @@ fun WorkspaceRoute(
         onToggleShowIgnored = viewModel::toggleShowIgnored,
         onToggleExpand = viewModel::toggleExpand,
         onRefreshGit = viewModel::loadGitChanges,
-        onOpenFile = onOpenFile,
-        onOpenGitDiff = onOpenGitDiff,
+        onOpenFile = { filePath ->
+            fileViewerRequest = FileViewerParams(
+                serverId = serverId,
+                sessionId = sessionId,
+                filePath = filePath,
+                directory = uiState.directory,
+                source = FileViewerSource.LIVE
+            )
+        },
+        onOpenGitDiff = { filePath ->
+            fileViewerRequest = FileViewerParams(
+                serverId = serverId,
+                sessionId = sessionId,
+                filePath = filePath,
+                directory = uiState.directory,
+                source = FileViewerSource.GIT_DIFF
+            )
+        },
         // Phase 2: Search
         onEnterSearch = viewModel::enterSearch,
         onExitSearch = viewModel::exitSearch,
         onSearchQueryChange = viewModel::updateSearchQuery
     )
+
+    fileViewerRequest?.let { params ->
+        FileViewerOverlay(
+            params = params,
+            onDismiss = { fileViewerRequest = null }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

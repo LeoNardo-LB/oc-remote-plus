@@ -495,19 +495,10 @@ class ChatViewModel @Inject constructor(
     fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean =
         messageData.isToolExpanded(toolId, autoExpand)
 
-    // ============ Scroll State (hoisted to survive navigation) ============
-    // LazyListState lives in the ViewModel so it survives FileViewer/sub-session
-    // navigation. This preserves lastKnownFirstItemKey, allowing the LazyColumn's
-    // key-based position tracking to correct index shifts from conditional items
-    // (banners/questions/permissions) changing count while away.
+    // ============ Scroll State ============
+    // LazyListState lives in the ViewModel so it is retained across configuration
+    // changes and recomposition (key-based position tracking for conditional items).
     val listState = androidx.compose.foundation.lazy.LazyListState()
-
-    // Pending scroll restore: saved when leaving ChatScreen, consumed on return.
-    // Uses the first-visible item's KEY (not index) because conditional items
-    // (banners/questions/permissions) change count during navigation, causing
-    // raw index to drift.
-    var pendingScrollKey: String? = null
-    var pendingScrollOffset: Int = 0
 
     val expandReasoning = settingsRepository.getSettingsFlow().map { it.expandReasoning }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false

@@ -27,18 +27,15 @@ import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.ui.navigation.routes.*
 import kotlinx.coroutines.launch
 import dev.leonardo.ocremotev2.ui.screens.about.AboutScreen
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatScreen
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatViewModel
-import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnViewTool
 import dev.leonardo.ocremotev2.ui.screens.home.HomeRoute
 import dev.leonardo.ocremotev2.ui.screens.sessions.SessionListRoute
 import dev.leonardo.ocremotev2.ui.screens.server.ServerModelFilterRoute
 import dev.leonardo.ocremotev2.ui.screens.server.ServerProvidersRoute
 import dev.leonardo.ocremotev2.ui.screens.server.ServerSettingsRoute
 import dev.leonardo.ocremotev2.ui.screens.settings.SettingsRoute
-import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerRoute
 import dev.leonardo.ocremotev2.ui.screens.webview.WebViewScreen
 import dev.leonardo.ocremotev2.ui.screens.workspace.WorkspaceRoute
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -416,30 +413,9 @@ fun NavGraph(
             }
 
             val chatViewModel = hiltViewModel<ChatViewModel>()
-            CompositionLocalProvider(
-                LocalOnViewTool provides { request ->
-                    chatViewModel.cacheToolPart(request.part)
-                    scope.launch {
-                        val session = sessionRepository.getSession(params.server.serverId, params.sessionId).getOrNull()
-                        val dir = session?.directory ?: params.directory
-                        navController.navigate(
-                            FileViewerNav.createRoute(
-                                serverUrl = params.server.serverUrl,
-                                username = params.server.username,
-                                password = params.server.password,
-                                serverName = params.server.serverName,
-                                serverId = params.server.serverId,
-                                sessionId = params.sessionId,
-                                filePath = request.filePath,
-                                source = request.source,
-                                toolPartIds = request.part.id,
-                                directory = dir
-                            )
-                        )
-                    }
-                }
-            ) {
                 ChatScreen(
+                    serverId = params.server.serverId,
+                    sessionId = params.sessionId,
                     viewModel = chatViewModel,
                     onNavigateBack = {
                     navController.popBackStack()
@@ -508,25 +484,6 @@ fun NavGraph(
                         ) { launchSingleTop = true }
                     }
                 },
-                onOpenFile = { filePath ->
-                    scope.launch {
-                        val session = sessionRepository.getSession(params.server.serverId, params.sessionId).getOrNull()
-                        val dir = session?.directory ?: params.directory
-                        navController.navigate(
-                                FileViewerNav.createRoute(
-                                    serverUrl = params.server.serverUrl,
-                                    username = params.server.username,
-                                    password = params.server.password,
-                                    serverName = params.server.serverName,
-                                    serverId = params.server.serverId,
-                                    sessionId = params.sessionId,
-                                    filePath = filePath,
-                                    source = FileViewerNav.Source.LIVE,
-                                    directory = dir
-                                )
-                            )
-                    }
-                },
                 onOpenDirectory = { directoryPath ->
                     navController.navigate(
                         WorkspaceNav.createRoute(
@@ -553,7 +510,6 @@ fun NavGraph(
                 },
                 startInTerminalMode = params.openTerminal
             )
-            }
         }
 
         // ============ Workspace Screen ============
@@ -563,48 +519,9 @@ fun NavGraph(
         ) { entry ->
             val p = WorkspaceNav.fromEntry(entry)
             WorkspaceRoute(
-                onBack = { navController.popBackStack() },
-                onOpenFile = { filePath ->
-                    navController.navigate(
-                        FileViewerNav.createRoute(
-                            serverUrl = p.server.serverUrl,
-                            username = p.server.username,
-                            password = p.server.password,
-                            serverName = p.server.serverName,
-                            serverId = p.server.serverId,
-                            sessionId = p.sessionId,
-                            filePath = filePath,
-                            source = FileViewerNav.Source.LIVE,
-                            directory = p.directory
-                        )
-                    )
-                },
-                onOpenGitDiff = { filePath ->
-                    navController.navigate(
-                        FileViewerNav.createRoute(
-                            serverUrl = p.server.serverUrl,
-                            username = p.server.username,
-                            password = p.server.password,
-                            serverName = p.server.serverName,
-                            serverId = p.server.serverId,
-                            sessionId = p.sessionId,
-                            filePath = filePath,
-                            source = FileViewerNav.Source.GIT_DIFF,
-                            directory = p.directory
-                        )
-                    )
-                }
-            )
-        }
-
-        // ============ File Viewer Screen ============
-        composable(
-            route = FileViewerNav.routePattern,
-            arguments = FileViewerNav.navArguments
-        ) {
-            FileViewerRoute(
-                onBack = { navController.popBackStack() },
-                onSubmitted = { navController.popBackStack() }
+                serverId = p.server.serverId,
+                sessionId = p.sessionId,
+                onBack = { navController.popBackStack() }
             )
         }
     }

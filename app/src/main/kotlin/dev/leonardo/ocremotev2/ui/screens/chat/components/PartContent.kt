@@ -70,7 +70,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.markdown.MarkdownContent
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCallCard
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ViewToolRequest
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnViewTool
-import dev.leonardo.ocremotev2.ui.navigation.routes.FileViewerNav
+import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerSource
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.cards.PatchCard
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.cards.TodoListCard
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalCollapseTools
@@ -193,8 +193,8 @@ internal fun PartContent(
                 val isDiffTool = toolName in setOf("edit", "multiedit")
                 val effectiveOnOpenFile: ((String) -> Unit)? = if (viewTool != null && isFileTool) {
                     { filePath ->
-                        val source = if (isDiffTool) FileViewerNav.Source.TOOL_SNAPSHOT_DIFF
-                        else FileViewerNav.Source.TOOL_SNAPSHOT
+                        val source = if (isDiffTool) FileViewerSource.TOOL_SNAPSHOT_DIFF
+                        else FileViewerSource.TOOL_SNAPSHOT
                         viewTool(ViewToolRequest(filePath, source, part))
                     }
                 } else onOpenFile

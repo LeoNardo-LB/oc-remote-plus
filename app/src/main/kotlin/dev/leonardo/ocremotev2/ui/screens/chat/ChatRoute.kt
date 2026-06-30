@@ -47,6 +47,8 @@ fun NavGraphBuilder.chatScreen(
         val sharedImages = getPendingShare(args.sessionId)
 
         ChatScreen(
+            serverId = args.server.serverId,
+            sessionId = args.sessionId,
             onNavigateBack = onNavigateBack,
             onNavigateToSession = { newSessionId ->
                 onNavigateToSession(
