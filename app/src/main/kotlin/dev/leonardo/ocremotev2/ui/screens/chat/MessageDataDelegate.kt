@@ -266,7 +266,8 @@ internal class MessageDataDelegate(
         try {
             val messages = manageSessionUseCase.listMessages(serverId, sid, limit = currentMessageLimit)
             chatRepository.setMessages(sid, messages)
-            if (BuildConfig.DEBUG) Log.d(TAG, "V1 loaded ${messages.size} messages for session $sid")
+            _hasOlderMessages.value = messages.size >= currentMessageLimit
+            if (BuildConfig.DEBUG) Log.d(TAG, "V1 loaded ${messages.size} messages for session $sid (limit=$currentMessageLimit, hasOlder=${_hasOlderMessages.value})")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load messages", e)
         }

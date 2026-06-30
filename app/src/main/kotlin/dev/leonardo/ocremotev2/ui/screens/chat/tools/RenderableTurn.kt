@@ -4,12 +4,18 @@ import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.ui.screens.chat.ChatMessage
 import dev.leonardo.ocremotev2.ui.screens.chat.filterRenderableParts
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Pre-computed rendering data for one display item (one assistant turn bubble).
  *
  * All filtering, grouping, and metadata extraction happen in [computeRenderableTurn],
  * so the Composable only iterates [renderItems] — zero computation during composition.
+ *
+ * Marked @Immutable so Compose can skip recomposition for items whose RenderableTurn
+ * hasn't changed (e.g., during pagination, existing items' data is identical).
  */
+@Immutable
 data class RenderableTurn(
     val renderItems: List<RenderItem>,
     val isEmpty: Boolean,
@@ -22,8 +28,11 @@ data class RenderableTurn(
     val copyText: String?,
 )
 
+@Immutable
 sealed class RenderItem {
+    @Immutable
     data class TurnDivider(val msgId: String) : RenderItem()
+    @Immutable
     data class GroupedParts(val group: PartGroup) : RenderItem()
 }
 

@@ -35,6 +35,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -180,7 +182,6 @@ fun ChatMessageList(
                 .fillMaxWidth()
         ) {
             var showAlwaysDialog by remember { mutableStateOf<SseEvent.PermissionAsked?>(null) }
-            val pullToRefreshState = rememberPullToRefreshState()
 
             // Custom FlingBehavior: split large per-frame deltas into chunks below
             // LazyListMeasure's fast-scroll estimation threshold. Total scroll distance
@@ -226,14 +227,22 @@ fun ChatMessageList(
                 }
             }
 
-            PullToRefreshBox(
-                isRefreshing = messageState.isLoadingOlder,
-                onRefresh = {
-                    if (messageState.hasOlderMessages) viewModel.loadOlderMessages()
-                },
-                state = pullToRefreshState,
-                modifier = Modifier.fillMaxSize()
-            ) {
+            // Auto-pagination: trigger load when user is within 8 items of the top.
+            // Replaces PullToRefreshBox — seamless, no manual gesture needed.
+            val shouldPaginate by remember {
+                derivedStateOf {
+                    val layoutInfo = listState.layoutInfo
+                    val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    val total = layoutInfo.totalItemsCount
+                    !messageState.isLoadingOlder &&
+                    messageState.hasOlderMessages &&
+                    total - lastVisible <= 8
+                }
+            }
+            LaunchedEffect(shouldPaginate) {
+                if (shouldPaginate) viewModel.loadOlderMessages()
+            }
+
                 LazyColumn(
                     state = listState,
                     flingBehavior = safeFlingBehavior,
@@ -367,7 +376,13 @@ fun ChatMessageList(
                     // Visual result: oldest at top, newest at bottom.
                     itemsIndexed(
                         displayItems,
-                        key = { _, item -> item.second.message.id },
+                        key = { _, (rawIndex, msg) ->
+                            // Stable turn-based key: prevents item disposal when pagination
+                            // loads more messages from the same turn (the representative
+                            // message changes but the turn identity stays the same).
+                            if (msg.isUser) "u_${msg.message.id}"
+                            else "t_${rawMessages.getOrNull(rawIndex + 1)?.message?.id ?: "head"}"
+                        },
                         contentType = { _, item -> if (item.second.isUser) "user" else "assistant" }
                     ) { displayItemIndex, (rawIndex, msg) ->
                         val isStreamingMsg = (turnGroups[rawIndex] ?: listOf(msg)).any { it.message.id == streamingMsgId }
@@ -505,7 +520,6 @@ fun ChatMessageList(
                         } // Box freeze
                     }
                 }
-            } // PullToRefreshBox
 
             // Scroll-to-bottom FAB
             if (!isAtBottom) {
