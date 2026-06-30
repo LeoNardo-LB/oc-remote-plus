@@ -38,7 +38,11 @@ class EventDispatcher @Inject constructor(
     private val questionHandler: QuestionEventHandler,
     private val miscHandler: MiscEventHandler,
     private val sessionNextHandler: SessionNextEventHandler,
-    private val sessionStatusManager: SessionStatusManager
+    private val sessionStatusManager: SessionStatusManager,
+    // Transition bridge: Hilt injects a non-null instance (Dagger ignores the Kotlin default);
+    // the `= null` default only spares legacy test call sites from needing this param during the
+    // Task 7→12 parallel-run window. Deleted (made non-null) in Task 12 alongside SessionStatusManager.
+    private val sessionStateService: SessionStateService? = null
 ) {
     init {
         // L5 cross-validation: SessionStatusManager checks if Idle sessions have
@@ -53,6 +57,19 @@ class EventDispatcher @Inject constructor(
         // directory makes non-default-worktree sessions invisible and breaks the FSM recovery).
         sessionStatusManager.directoryResolver = { sessionId ->
             sessionHandler.sessions.value.find { it.id == sessionId }?.directory
+        }
+
+        // SessionStateService callbacks (new single source of truth; mirrors sessionStatusManager
+        // setup above). Wired here for the same circular-dep-breaking reason. Nullable-safe because
+        // legacy test call sites default the constructor param to null during the Task 7→12 window.
+        sessionStateService?.incompleteChecker = IncompleteAssistantChecker { sessionId ->
+            hasIncompleteAssistant(sessionId)
+        }
+        sessionStateService?.directoryResolver = DirectoryResolver { sessionId ->
+            sessionHandler.sessions.value.find { it.id == sessionId }?.directory
+        }
+        sessionStateService?.messageForceCompleter = MessageForceCompleter { sessionId ->
+            messageHandler.markSessionIdle(sessionId)
         }
     }
 
@@ -168,6 +185,7 @@ class EventDispatcher @Inject constructor(
             Log.w(TAG, "No handler registered for ${event::class.simpleName}")
         }
         forwardToStatusManager(event)
+        forwardToSessionStateService(event)
 
         // Cross-handler: SessionDeleted cascades cleanup to other handlers
         if (event is SseEvent.SessionDeleted) {
@@ -214,6 +232,21 @@ class EventDispatcher @Inject constructor(
         val fsmSessionId = extractSessionId(event)
         if (fsmSessionId != null) {
             sessionStatusManager.onSseEvent(event, fsmSessionId)
+        }
+    }
+
+    /**
+     * Forward SSE event to [SessionStateService] for parallel FSM processing (dual-write).
+     * Transition bridge: both [SessionStatusManager] and [SessionStateService] receive the same
+     * status-relevant events until Task 12 deletes the old manager. Reuses [extractSessionId]
+     * — the exact same sessionId extraction + filtering as [forwardToStatusManager] — so the two
+     * FSMs never diverge.
+     */
+    private fun forwardToSessionStateService(event: SseEvent) {
+        val service = sessionStateService ?: return
+        val fsmSessionId = extractSessionId(event)
+        if (fsmSessionId != null) {
+            service.onSseEvent(event, fsmSessionId)
         }
     }
 

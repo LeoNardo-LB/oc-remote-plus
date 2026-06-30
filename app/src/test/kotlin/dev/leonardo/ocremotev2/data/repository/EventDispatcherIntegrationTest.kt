@@ -3,12 +3,19 @@
 import dev.leonardo.ocremotev2.data.repository.handler.*
 import dev.leonardo.ocremotev2.domain.model.*
 import dev.leonardo.ocremotev2.domain.model.SseEvent
+import dev.leonardo.ocremotev2.domain.repository.SessionRepository
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import javax.inject.Provider
 
 /**
  * Integration test verifying full SSE event processing pipelines:
@@ -21,11 +28,22 @@ class EventDispatcherIntegrationTest {
 
     private lateinit var dispatcher: EventDispatcher
     private lateinit var sessionStatusManager: SessionStatusManager
+    // SessionStateService's statusFlow uses stateIn(scope, SharingStarted.Eagerly, …); Eagerly
+    // propagation needs an UnconfinedTestDispatcher + runCurrent() (see SessionStateServiceTest
+    // fixture note for why runTest's StandardTestDispatcher breaks). Each test gets a fresh scope
+    // so the staleness-guard coroutine from init doesn't leak across tests.
+    private lateinit var stateServiceScope: TestScope
+    private lateinit var sessionStateService: SessionStateService
 
     @Before
     fun setup() {
+        stateServiceScope = TestScope(UnconfinedTestDispatcher())
         val messageStore = MessageEventHandler()
         sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
+        sessionStateService = SessionStateService(
+            appScope = stateServiceScope,
+            sessionRepoProvider = Provider { mockk<SessionRepository>(relaxed = true) },
+        )
         dispatcher = EventDispatcher(
             sessionHandler = SessionEventHandler(),
             messageHandler = messageStore,
@@ -36,8 +54,14 @@ class EventDispatcherIntegrationTest {
             questionHandler = QuestionEventHandler(),
             miscHandler = MiscEventHandler(),
             sessionNextHandler = SessionNextEventHandler(),
-            sessionStatusManager = sessionStatusManager
+            sessionStatusManager = sessionStatusManager,
+            sessionStateService = sessionStateService
         )
+    }
+
+    @After
+    fun tearDown() {
+        stateServiceScope.cancel()
     }
 
     private fun testSession(id: String) = Session(
@@ -807,5 +831,14 @@ class EventDispatcherIntegrationTest {
         // not only the SessionEventHandler layer.
         verify(exactly = 1) { sessionStatusManager.onRestValidation("s1", SessionStatus.Busy) }
         verify(exactly = 1) { sessionStatusManager.onRestValidation("s2", SessionStatus.Idle) }
+    }
+
+    // ============ Scenario 11: SSE dual-write to SessionStateService ============
+
+    @Test
+    fun `SSE SessionStatus dual-writes to SessionStateService`() = runTest {
+        dispatcher.processEvent(SseEvent.SessionStatus(sessionId = "s1", status = SessionStatus.Busy), "svr1")
+        stateServiceScope.runCurrent()
+        assertEquals(SessionStatus.Busy, sessionStateService.statusFlow.value["s1"])
     }
 }
