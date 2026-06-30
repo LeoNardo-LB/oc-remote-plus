@@ -8,6 +8,7 @@ import dev.leonardo.ocremotev2.data.api.SseClient
 import dev.leonardo.ocremotev2.domain.model.AppSettings
 import dev.leonardo.ocremotev2.domain.model.ProvidersResponse
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.data.repository.SessionStatusManager
 import dev.leonardo.ocremotev2.service.SessionFocusHolder
 import dev.leonardo.ocremotev2.service.AppNotificationManager
@@ -76,6 +77,7 @@ class ChatViewModelQueuedTest {
     private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
     private val tokenStatsTracker = TokenStatsTracker()
     private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
+    private val sessionStateService: SessionStateService = mockk(relaxed = true)
     private val sessionFocusHolder = mockk<SessionFocusHolder>(relaxed = true)
     private val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
     private val toolSnapshotCache = ToolSnapshotCache()
@@ -111,6 +113,7 @@ class ChatViewModelQueuedTest {
             sessionStatusManager = sessionStatusManager
         )
         every { sessionStatusManager.statusFlow } returns testStatusFlow
+        every { sessionStateService.statusFlow } returns testStatusFlow
 
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
@@ -286,6 +289,7 @@ class ChatViewModelQueuedTest {
             httpClient = mockk(relaxed = true),
             sseClient = mockk(relaxed = true),
             sessionStatusManager = sessionStatusManager,
+            sessionStateService = sessionStateService,
             sessionFocusHolder = sessionFocusHolder,
             scrollSignal = SessionScrollSignal(),
             appNotificationManager = appNotificationManager,

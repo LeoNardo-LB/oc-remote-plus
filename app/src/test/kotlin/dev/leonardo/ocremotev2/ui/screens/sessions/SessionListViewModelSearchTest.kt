@@ -6,6 +6,7 @@ import dev.leonardo.ocremotev2.data.api.session.SessionApi
 import dev.leonardo.ocremotev2.data.api.system.SystemApi
 import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.domain.model.SessionStatus
 import dev.leonardo.ocremotev2.domain.repository.DraftRepository
@@ -31,6 +32,7 @@ class SessionListViewModelSearchTest {
     private val systemApi: SystemApi = mockk()
     private val terminalApi: TerminalApi = mockk()
     private val eventDispatcher: EventDispatcher = mockk(relaxed = true)
+    private val sessionStateService: SessionStateService = mockk(relaxed = true)
     private val manageSessionUseCase: ManageSessionUseCase = mockk()
     private val deleteSessionUseCase: DeleteSessionUseCase = mockk()
 
@@ -46,6 +48,7 @@ class SessionListViewModelSearchTest {
         every { eventDispatcher.sessions.value } returns emptyList()
         every { eventDispatcher.sessionStatuses.value } returns emptyMap<String, SessionStatus>()
         every { eventDispatcher.serverSessions.value } returns emptyMap<String, Set<String>>()
+        every { sessionStateService.statusFlow.value } returns emptyMap()
     }
 
     @After
@@ -87,6 +90,7 @@ class SessionListViewModelSearchTest {
         return SessionListViewModel(
             savedStateHandle = savedStateHandle,
             eventDispatcher = eventDispatcher,
+            sessionStateService = sessionStateService,
             sessionApi = sessionApi,
             fileApi = fileApi,
             systemApi = systemApi,

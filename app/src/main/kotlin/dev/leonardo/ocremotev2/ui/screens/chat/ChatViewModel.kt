@@ -16,6 +16,7 @@ import dev.leonardo.ocremotev2.domain.model.ModelSelection
 import dev.leonardo.ocremotev2.domain.model.PromptPart
 import dev.leonardo.ocremotev2.domain.model.ProviderCatalog
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.data.repository.SessionStatusManager
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCardResolver
 import dev.leonardo.ocremotev2.ui.screens.chat.util.ContextBreakdown
@@ -224,6 +225,7 @@ class ChatViewModel @Inject constructor(
     private val httpClient: io.ktor.client.HttpClient,
     private val sseClient: SseClient,
     private val sessionStatusManager: SessionStatusManager,
+    private val sessionStateService: SessionStateService,
     private val sessionFocusHolder: dev.leonardo.ocremotev2.service.SessionFocusHolder,
     private val appNotificationManager: dev.leonardo.ocremotev2.service.AppNotificationManager,
     private val toolSnapshotCache: dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache,
@@ -533,13 +535,13 @@ class ChatViewModel @Inject constructor(
     /**
      * Session metadata — changes when session info is updated (title, status, agent).
      * Includes [SessionLifecycleDelegate.sessionIdFlow] as a source so lazy-session creation triggers immediate recomputation.
-     * Session status is sourced from [SessionStatusManager.statusFlow] (FSM-driven),
+     * Session status is sourced from [SessionStateService.statusFlow] (FSM-driven),
      * the single source of truth for busy/idle/activity state.
      */
     val sessionMetaState: StateFlow<SessionMetaState> = combine(
         sessionLifecycle.sessionIdFlow,
         sessionRepository.getSessionsFlow(serverId),
-        sessionStatusManager.statusFlow,
+        sessionStateService.statusFlow,
         sessionRepository.getCurrentAgentFlow(serverId),
         sessionRepository.getCurrentModelFlow(serverId),
     ) { args ->

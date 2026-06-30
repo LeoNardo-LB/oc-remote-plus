@@ -4,6 +4,7 @@ import dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.data.repository.SessionStatusManager
 import dev.leonardo.ocremotev2.service.SessionFocusHolder
 import dev.leonardo.ocremotev2.service.AppNotificationManager
@@ -58,6 +59,7 @@ class ChatViewModelStreamingTest {
     private val messagePaging: MessagePaginationUseCase = mockk(relaxed = true)
     private val tokenStatsTracker = TokenStatsTracker()
     private val sessionStatusManager: SessionStatusManager = mockk(relaxed = true)
+    private val sessionStateService: SessionStateService = mockk(relaxed = true)
     private val sessionFocusHolder = mockk<SessionFocusHolder>(relaxed = true)
     private val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
     private val toolSnapshotCache = ToolSnapshotCache()
@@ -149,6 +151,7 @@ class ChatViewModelStreamingTest {
             coEvery { it.fetchSessionStatuses(any(), any()) } returns Result.success(emptyMap())
         }
         every { sessionStatusManager.statusFlow } returns MutableStateFlow(emptyMap())
+        every { sessionStateService.statusFlow } returns MutableStateFlow(emptyMap())
     }
 
     @After
@@ -215,6 +218,7 @@ class ChatViewModelStreamingTest {
             httpClient = mockk(relaxed = true),
             sseClient = mockk(relaxed = true),
             sessionStatusManager = sessionStatusManager,
+            sessionStateService = sessionStateService,
             sessionFocusHolder = sessionFocusHolder,
             scrollSignal = SessionScrollSignal(),
             appNotificationManager = appNotificationManager,

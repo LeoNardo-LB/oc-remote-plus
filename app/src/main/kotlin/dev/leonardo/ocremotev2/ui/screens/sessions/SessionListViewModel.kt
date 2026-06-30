@@ -18,6 +18,7 @@ import dev.leonardo.ocremotev2.data.api.system.SystemApi
 import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.domain.model.Project
 import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.domain.model.SessionStatus
@@ -76,6 +77,7 @@ data class SessionItem(
 class SessionListViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val eventDispatcher: EventDispatcher,
+    private val sessionStateService: SessionStateService,
     private val sessionApi: SessionApi,
     private val fileApi: FileApi,
     private val systemApi: SystemApi,
@@ -149,7 +151,7 @@ class SessionListViewModel @Inject constructor(
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<SessionListUiState> = combine(
         eventDispatcher.sessions,
-        eventDispatcher.sessionStatuses,
+        sessionStateService.statusFlow,
         eventDispatcher.serverSessions,
         eventDispatcher.lastUserMessageTime,
         _isLoading,
