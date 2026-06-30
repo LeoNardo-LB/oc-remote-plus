@@ -112,9 +112,9 @@ fun ChatMessageList(
     agents: List<dev.leonardo.ocremotev2.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    val turnGroups = remember(rawMessages.size) { computeTurnGroups(rawMessages) }
+    val turnGroups = remember(rawMessages) { computeTurnGroups(rawMessages) }
 
-    val streamingMsgId = remember(rawMessages.size) {
+    val streamingMsgId = remember(rawMessages) {
         rawMessages.lastOrNull {
             it.isAssistant && it.message.time.completed == null
         }?.message?.id
@@ -160,6 +160,23 @@ fun ChatMessageList(
             var showAlwaysDialog by remember { mutableStateOf<SseEvent.PermissionAsked?>(null) }
             val pullToRefreshState = rememberPullToRefreshState()
 
+            // Cap per-frame scroll delta. This serves a dual purpose:
+            // 1. Prevents LazyListMeasure from using fast-scroll estimation (which skips items)
+            // 2. Throttles scroll speed so LazyColumn has time to compose items entering viewport
+            val scrollDeltaLimiter = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        val maxPerFrame = 500f
+                        val y = available.y
+                        return when {
+                            y > maxPerFrame -> Offset(0f, y - maxPerFrame)
+                            y < -maxPerFrame -> Offset(0f, y + maxPerFrame)
+                            else -> Offset.Zero
+                        }
+                    }
+                }
+            }
+
             PullToRefreshBox(
                 isRefreshing = messageState.isLoadingOlder,
                 onRefresh = {
@@ -171,6 +188,7 @@ fun ChatMessageList(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize()
+                        .nestedScroll(scrollDeltaLimiter)
                         .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
                     contentPadding = PaddingValues(
                         start = SpacingTokens.MD.dp,

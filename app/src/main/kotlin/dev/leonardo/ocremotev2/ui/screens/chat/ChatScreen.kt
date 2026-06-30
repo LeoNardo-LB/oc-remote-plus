@@ -985,29 +985,23 @@ fun ChatScreen(
 
                         // messageListState returns oldest-first; normal layout renders
                         // index 0 (oldest) at top, last index (newest) at bottom.
-                        // asReversed() = O(1) view, no copy (vs .reversed() which is O(n))
                         val rawMessages = remember(messageState.messages) {
-                            messageState.messages.asReversed()
+                            messageState.messages.reversed()
                         }
 
                         // Filter: keep user messages + first assistant in each turn group
                         // to avoid zero-height items creating blank gaps from spacedBy.
-                        // Cache the index STRUCTURE by message count (only changes on add/remove),
-                        // then look up CURRENT message objects from rawMessages (always fresh).
-                        val displayIndices = remember(messageState.messages.size) {
+                        val displayItems = remember(rawMessages) {
                             rawMessages.mapIndexedNotNull { index, msg ->
                                 when {
-                                    msg.isUser -> index
+                                    msg.isUser -> index to msg
                                     msg.isAssistant -> {
                                         val nextMsg = rawMessages.getOrNull(index + 1)
-                                        if (nextMsg?.isAssistant != true) index else null
+                                        if (nextMsg?.isAssistant != true) index to msg else null
                                     }
                                     else -> null
                                 }
                             }
-                        }
-                        val displayItems = remember(rawMessages, displayIndices) {
-                            displayIndices.map { idx -> idx to rawMessages[idx] }
                         }
 
     // Stable lambda for LocalOnViewTool — must be remembered because LocalOnViewTool
