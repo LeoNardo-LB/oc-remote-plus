@@ -46,8 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -180,19 +182,46 @@ fun ChatMessageList(
             var showAlwaysDialog by remember { mutableStateOf<SseEvent.PermissionAsked?>(null) }
             val pullToRefreshState = rememberPullToRefreshState()
 
-            // Cap per-frame scroll delta. This serves a dual purpose:
-            // 1. Prevents LazyListMeasure from using fast-scroll estimation (which skips items)
-            // 2. Throttles scroll speed so LazyColumn has time to compose items entering viewport
-            val scrollDeltaLimiter = remember {
-                object : NestedScrollConnection {
-                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        val maxPerFrame = 500f
-                        val y = available.y
-                        return when {
-                            y > maxPerFrame -> Offset(0f, y - maxPerFrame)
-                            y < -maxPerFrame -> Offset(0f, y + maxPerFrame)
-                            else -> Offset.Zero
+            // Custom FlingBehavior: split large per-frame deltas into chunks below
+            // LazyListMeasure's fast-scroll estimation threshold. Total scroll distance
+            // is preserved — fling feels identical to native, just without item skipping.
+            // Only affects fling — drag scrolling is untouched.
+            val safeFlingBehavior = remember {
+                object : FlingBehavior {
+                    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+                        val absVel = kotlin.math.abs(initialVelocity)
+                        if (absVel < 1f) return initialVelocity
+
+                        var velocity = initialVelocity
+                        val friction = 2f
+                        val chunkSize = 300f
+                        val minVelocity = 50f
+                        var lastFrame = withFrameNanos { it }
+
+                        while (kotlin.math.abs(velocity) > minVelocity) {
+                            val frame = withFrameNanos { it }
+                            val dt = (frame - lastFrame).toFloat() / 1_000_000_000f
+                            lastFrame = frame
+                            if (dt <= 0f || dt > 0.1f) continue
+
+                            // Per-frame delta in pixels (velocity is in px/s)
+                            val delta = velocity * dt
+                            var remaining = delta
+
+                            // Split into sub-threshold chunks
+                            while (kotlin.math.abs(remaining) > chunkSize) {
+                                val chunk = remaining.coerceIn(-chunkSize, chunkSize)
+                                val consumed = scrollBy(chunk)
+                                if (kotlin.math.abs(consumed) < 0.5f) return velocity
+                                remaining -= chunk
+                            }
+                            val finalConsumed = scrollBy(remaining)
+                            if (kotlin.math.abs(finalConsumed) < 0.5f) return velocity
+
+                            // Exponential decay: v(t+dt) = v(t) * e^(-friction * dt)
+                            velocity *= kotlin.math.exp(-friction * dt)
                         }
+                        return velocity
                     }
                 }
             }
@@ -207,8 +236,8 @@ fun ChatMessageList(
             ) {
                 LazyColumn(
                     state = listState,
+                    flingBehavior = safeFlingBehavior,
                     modifier = Modifier.fillMaxSize()
-                        .nestedScroll(scrollDeltaLimiter)
                         .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
                     contentPadding = PaddingValues(
                         start = SpacingTokens.MD.dp,
