@@ -167,7 +167,6 @@ import android.graphics.BitmapFactory
 
 import android.os.Build
 import android.util.Base64
-import android.util.Log
 import android.view.MotionEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -298,25 +297,12 @@ fun ChatScreen(
             inputText = TextFieldValue(payload.text, TextRange(payload.text.length))
         }
     }
-    val listState = rememberLazyListState()
+    // listState is hoisted to ViewModel — survives navigation.
+    val listState = viewModel.listState
 
-    // Whether auto-scroll should follow new content.
-    // rememberSaveable so the value survives composition disposal when navigating to
-    // FileViewer / sub-session and back — otherwise it resets to true and forces scroll
-    // to bottom on return even when the user was browsing earlier messages.
     var autoScrollEnabled by rememberSaveable { mutableStateOf(true) }
-
-    // When returning from FileViewer, synchronously disable auto-scroll
-    // BEFORE any LaunchedEffect runs to prevent msgCount from racing to bottom.
-    if (viewModel.pendingScrollRestore) {
-        Log.d("ScrollDebug", "SYNC GUARD: pendingScrollRestore=true → autoScroll=false | current idx=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
-        autoScrollEnabled = false
-    }
-
-    // Force scroll trigger — incremented by user actions to force-scroll to bottom
     var forceScrollTick by remember { mutableIntStateOf(0) }
 
-    // True when the very bottom of the list is visible (50px tolerance)
     val isAtBottom by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex == 0 &&
@@ -324,95 +310,58 @@ fun ChatScreen(
         }
     }
 
-    // ORIGINAL logic (unchanged): disable auto-scroll when scrolling up,
-    // re-enable at bottom. This works correctly for normal chat.
-    // Key is ONLY isScrollInProgress — NOT isAtBottom — so SSE layout changes
-    // that briefly flip isAtBottom won't lock autoScrollEnabled=true.
+    // Save scroll position (key + offset) when leaving ChatScreen.
+    DisposableEffect(Unit) {
+        onDispose {
+            val firstVisible = listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == listState.firstVisibleItemIndex }
+            viewModel.pendingScrollKey = firstVisible?.key?.toString()
+            viewModel.pendingScrollOffset = listState.firstVisibleItemScrollOffset
+        }
+    }
+
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             autoScrollEnabled = false
-        } else if (isAtBottom && !viewModel.pendingScrollRestore) {
-            Log.d("ScrollDebug", "scrollEffect: atBottom & !pending → autoScroll=true")
+        } else if (isAtBottom) {
             autoScrollEnabled = true
         }
     }
 
-    // reverseLayout=true: item 0 = newest at bottom.
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
+        // Restore scroll position using saved key + requestScrollToItem.
+        // requestScrollToItem is non-suspend — sets position for the NEXT measure
+        // pass, overriding the normalization that scrollToItem suffers from.
+        val savedKey = viewModel.pendingScrollKey
+        if (savedKey != null && !autoScrollEnabled) {
+            viewModel.pendingScrollKey = null // consume
+            snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
+            val target = listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.key?.toString() == savedKey }
+            if (target != null && target.index != listState.firstVisibleItemIndex) {
+                val cappedOffset = if (target.size > 0) viewModel.pendingScrollOffset.coerceAtMost(target.size - 1) else 0
+                listState.requestScrollToItem(target.index, cappedOffset)
+            }
+        }
+
         if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
-            Log.d("ScrollDebug", "msgCountEffect: autoScroll=true → scrollToItem(0) [was idx=${listState.firstVisibleItemIndex}]")
             listState.scrollToItem(0)
         }
     }
 
-    // Force-scroll to bottom on explicit user actions (send, command, compact, etc.)
     LaunchedEffect(forceScrollTick) {
         if (forceScrollTick > 0) {
             listState.snapToBottom()
         }
     }
 
-    // Auto-scroll to bottom when a pending question/permission arrives,
-    // so the user immediately sees the newly rendered card.
     val pendingCount = interaction.pendingQuestions.size + interaction.pendingPermissions.size
     LaunchedEffect(pendingCount) {
-        if (pendingCount > 0) {
+        if (pendingCount > 0 && autoScrollEnabled) {
             snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
             listState.snapToBottom()
         }
-    }
-
-    // Restore scroll position when returning from FileViewer / sub-session navigation.
-    LaunchedEffect(viewModel.scrollRestoreVersion) {
-        val version = viewModel.scrollRestoreVersion
-        if (version > 0) {
-            Log.d("ScrollDebug", "RESTORE START: version=$version savedIdx=${viewModel.savedLazyIndex} savedOffset=${viewModel.savedScrollOffset}")
-            autoScrollEnabled = false
-            snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
-            snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
-            val savedIdx = viewModel.savedLazyIndex
-            val totalItems = listState.layoutInfo.totalItemsCount
-            val targetIdx = savedIdx.coerceIn(0, (totalItems - 1).coerceAtLeast(0))
-            Log.d("ScrollDebug", "RESTORE EXEC: scrollToItem(idx=$targetIdx, offset=${viewModel.savedScrollOffset}) | totalItems=$totalItems | before: idx=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
-            listState.scrollToItem(targetIdx, viewModel.savedScrollOffset)
-            Log.d("ScrollDebug", "RESTORE DONE: after: idx=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
-            autoScrollEnabled = (targetIdx == 0)
-            viewModel.clearPendingScrollRestore()
-        } else {
-            snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
-            listState.scrollToItem(0)
-            autoScrollEnabled = true
-        }
-    }
-
-    // Wrapper that saves scroll position before navigating to a sub-session.
-    // Saves raw LazyColumn index + offset for direct restoration (no index arithmetic).
-    val navigateToChildSessionWithSave: (String) -> Unit = { childSessionId ->
-        viewModel.saveScrollPosition(
-            lazyIndex = listState.firstVisibleItemIndex,
-            offset = listState.firstVisibleItemScrollOffset
-        )
-        onNavigateToChildSession(childSessionId)
-    }
-
-    // Save scroll position before opening a file in the viewer so the chat
-    // restores to the same position when the user returns.
-    val onOpenFileWithSave: (String) -> Unit = { filePath ->
-        viewModel.saveScrollPosition(
-            listState.firstVisibleItemIndex,
-            listState.firstVisibleItemScrollOffset
-        )
-        onOpenFile(filePath)
-    }
-
-    // Same save wrapper for directory navigation (workspace tree).
-    val onOpenDirectoryWithSave: (String) -> Unit = { dirPath ->
-        viewModel.saveScrollPosition(
-            listState.firstVisibleItemIndex,
-            listState.firstVisibleItemScrollOffset
-        )
-        onOpenDirectory(dirPath)
     }
 
     var showModelPicker by remember { mutableStateOf(false) }
@@ -424,14 +373,7 @@ fun ChatScreen(
     val linkUriHandler = rememberLinkUriHandler(
         directory = directory,
         onOpenFile = onOpenFile,
-        onOpenDirectory = onOpenDirectoryWithSave,
-        onSaveScrollPosition = {
-            Log.d("ScrollDebug", "onSaveScrollPosition CALLED: idx=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
-            viewModel.saveScrollPosition(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset
-            )
-        },
+        onOpenDirectory = onOpenDirectory,
         fileChecker = checkFileExists,
         snackbarHostState = snackbarHostState,
         coroutineScope = coroutineScope,
@@ -540,14 +482,10 @@ fun ChatScreen(
     }
 
     // Refresh session when returning from background (lock screen / app switch).
-    // Also re-trigger scroll restoration when returning from FileViewer / sub-session
-    // (only if a position was saved — plain background→foreground is ignored so the
-    // user's current browsing position is not disturbed).
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && viewModel.sessionId.isNotBlank()) {
                 viewModel.refreshIfNeeded()
-                viewModel.bumpScrollRestoreIfPending()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -1071,8 +1009,8 @@ fun ChatScreen(
                                 clipboard = clipboard,
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
-                                navigateToChildSession = navigateToChildSessionWithSave,
-                                onOpenFile = onOpenFileWithSave,
+                                navigateToChildSession = onNavigateToChildSession,
+                                onOpenFile = onOpenFile,
                                 onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 
@@ -1096,8 +1034,8 @@ fun ChatScreen(
                                 clipboard = clipboard,
                                 keyboardController = keyboardController,
                                 viewModel = viewModel,
-                                navigateToChildSession = navigateToChildSessionWithSave,
-                                onOpenFile = onOpenFileWithSave,
+                                navigateToChildSession = onNavigateToChildSession,
+                                onOpenFile = onOpenFile,
                                 onForceScrollToBottom = { forceScrollTick++ },
                                 agents = modelConfig.agents,
 

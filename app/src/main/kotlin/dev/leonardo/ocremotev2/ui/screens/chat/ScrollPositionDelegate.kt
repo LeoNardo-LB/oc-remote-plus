@@ -1,5 +1,6 @@
 package dev.leonardo.ocremotev2.ui.screens.chat
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -30,6 +31,10 @@ internal class ScrollPositionDelegate {
     var savedScrollOffset by mutableStateOf(0)
         private set
 
+    /** Key of the first visible item at save time — used to verify restore accuracy. */
+    var savedFirstVisibleKey by mutableStateOf<String?>(null)
+        private set
+
     /**
      * Incremented each time [saveScrollPosition] is called, and again by
      * [bumpScrollRestoreIfPending] when ChatScreen resumes with a pending restore.
@@ -54,12 +59,15 @@ internal class ScrollPositionDelegate {
     val pendingScrollRestore: Boolean get() = hasPendingScrollRestore
 
     fun clearPendingScrollRestore() {
+        Log.d("ScrollDebug", "clearPendingScrollRestore")
         hasPendingScrollRestore = false
     }
 
-    fun saveScrollPosition(lazyIndex: Int, offset: Int) {
+    fun saveScrollPosition(lazyIndex: Int, offset: Int, firstVisibleKey: String? = null) {
+        Log.d("ScrollDebug", "SAVE: idx=$lazyIndex offset=$offset key=$firstVisibleKey")
         savedLazyIndex = lazyIndex
         savedScrollOffset = offset
+        savedFirstVisibleKey = firstVisibleKey
         scrollRestoreVersion++
         hasPendingScrollRestore = true
     }
@@ -70,6 +78,7 @@ internal class ScrollPositionDelegate {
      * transitions are ignored so the user's current browsing position is not disturbed.
      */
     fun bumpScrollRestoreIfPending() {
+        Log.d("ScrollDebug", "bumpScrollRestoreIfPending: pending=$hasPendingScrollRestore")
         if (hasPendingScrollRestore) {
             scrollRestoreVersion++
         }

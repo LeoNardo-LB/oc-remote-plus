@@ -495,30 +495,20 @@ class ChatViewModel @Inject constructor(
     fun isToolExpanded(toolId: String, autoExpand: Boolean): Boolean =
         messageData.isToolExpanded(toolId, autoExpand)
 
-    // ============ Scroll Position Save/Restore ============
-    private val scrollPositionDelegate = ScrollPositionDelegate()
+    // ============ Scroll State (hoisted to survive navigation) ============
+    // LazyListState lives in the ViewModel so it survives FileViewer/sub-session
+    // navigation. This preserves lastKnownFirstItemKey, allowing the LazyColumn's
+    // key-based position tracking to correct index shifts from conditional items
+    // (banners/questions/permissions) changing count while away.
+    val listState = androidx.compose.foundation.lazy.LazyListState()
 
-    /** Saved scroll position for restoring after sub-session navigation. */
-    val savedMessageId: String? get() = scrollPositionDelegate.savedMessageId
-    /** Raw LazyColumn index at save time — used for direct restoration without index arithmetic. */
-    val savedLazyIndex: Int get() = scrollPositionDelegate.savedLazyIndex
-    val savedScrollOffset: Int get() = scrollPositionDelegate.savedScrollOffset
-    val scrollRestoreVersion: Int get() = scrollPositionDelegate.scrollRestoreVersion
+    // Pending scroll restore: saved when leaving ChatScreen, consumed on return.
+    // Uses the first-visible item's KEY (not index) because conditional items
+    // (banners/questions/permissions) change count during navigation, causing
+    // raw index to drift.
+    var pendingScrollKey: String? = null
+    var pendingScrollOffset: Int = 0
 
-    /** Public read-only flag: true when scroll position needs to be restored on return. */
-    val pendingScrollRestore: Boolean get() = scrollPositionDelegate.pendingScrollRestore
-
-    fun clearPendingScrollRestore() = scrollPositionDelegate.clearPendingScrollRestore()
-
-    fun saveScrollPosition(lazyIndex: Int, offset: Int) =
-        scrollPositionDelegate.saveScrollPosition(lazyIndex, offset)
-
-    /**
-     * Re-triggers scroll position restoration on ON_RESUME, but only when a save is pending
-     * (i.e. the user is returning from FileViewer or a sub-session). Plain background→foreground
-     * transitions are ignored so the user's current browsing position is not disturbed.
-     */
-    fun bumpScrollRestoreIfPending() = scrollPositionDelegate.bumpScrollRestoreIfPending()
     val expandReasoning = settingsRepository.getSettingsFlow().map { it.expandReasoning }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )

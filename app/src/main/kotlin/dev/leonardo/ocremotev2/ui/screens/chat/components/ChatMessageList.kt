@@ -45,6 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.Clipboard
@@ -53,6 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Velocity
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.CompactionStateInfo
 import dev.leonardo.ocremotev2.domain.model.Part
@@ -155,6 +158,24 @@ fun ChatMessageList(
         ) {
             var showAlwaysDialog by remember { mutableStateOf<SseEvent.PermissionAsked?>(null) }
             val pullToRefreshState = rememberPullToRefreshState()
+
+            // Cap fling velocity to prevent LazyColumn from skipping tall items.
+            // Compose's LazyListMeasure advances firstVisibleItemIndex when a single-frame
+            // fling delta exceeds item height (issuetracker.google.com/issues/179593134).
+            // Capping at 5000px/s = ~80px/frame at 60fps, safely below any item height.
+            val flingVelocityLimiter = remember {
+                object : NestedScrollConnection {
+                    override suspend fun onPreFling(available: Velocity): Velocity {
+                        val max = 5000f
+                        return when {
+                            available.y > max -> Velocity(0f, available.y - max)
+                            available.y < -max -> Velocity(0f, available.y + max)
+                            else -> Velocity.Zero
+                        }
+                    }
+                }
+            }
+
             PullToRefreshBox(
                 isRefreshing = messageState.isLoadingOlder,
                 onRefresh = {
@@ -166,6 +187,7 @@ fun ChatMessageList(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize()
+                        .nestedScroll(flingVelocityLimiter)
                         .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
                     contentPadding = PaddingValues(
                         start = SpacingTokens.MD.dp,
