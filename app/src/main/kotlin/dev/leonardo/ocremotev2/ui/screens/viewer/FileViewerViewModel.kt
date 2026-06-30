@@ -1,9 +1,10 @@
 ﻿package dev.leonardo.ocremotev2.ui.screens.viewer
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.domain.model.Annotation
 import dev.leonardo.ocremotev2.domain.model.ContentType
@@ -12,32 +13,26 @@ import dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache
 import dev.leonardo.ocremotev2.domain.usecase.GetFileContentUseCase
 import dev.leonardo.ocremotev2.domain.usecase.GetFileDiffUseCase
 import dev.leonardo.ocremotev2.domain.usecase.SubmitAnnotationsUseCase
-import dev.leonardo.ocremotev2.ui.navigation.routes.FileViewerNav
-import dev.leonardo.ocremotev2.ui.navigation.routes.ServerRouteParams
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
 import javax.inject.Inject
 
-@HiltViewModel
-class FileViewerViewModel @Inject constructor(
-    private val savedStateHandle: SavedStateHandle,
+class FileViewerViewModel @AssistedInject constructor(
+    @Assisted private val params: FileViewerParams,
     private val getFileContent: GetFileContentUseCase,
     private val getFileDiff: GetFileDiffUseCase,
     private val toolSnapshotCache: ToolSnapshotCache,
     private val submitAnnotationsUseCase: SubmitAnnotationsUseCase
 ) : ViewModel() {
-    private val serverId = savedStateHandle.get<String>(ServerRouteParams.PARAM_SERVER_ID).orEmpty()
-    private val directory = URLDecoder.decode(savedStateHandle.get<String>(FileViewerNav.PARAM_DIRECTORY).orEmpty(), "UTF-8")
-    private val filePath = URLDecoder.decode(savedStateHandle.get<String>(FileViewerNav.PARAM_FILE_PATH).orEmpty(), "UTF-8")
-    private val source = savedStateHandle.get<String>(FileViewerNav.PARAM_SOURCE) ?: FileViewerNav.Source.LIVE
-    private val sessionId = URLDecoder.decode(savedStateHandle.get<String>(FileViewerNav.PARAM_SESSION_ID).orEmpty(), "UTF-8")
-    private val toolPartIds = URLDecoder.decode(
-        savedStateHandle.get<String>(FileViewerNav.PARAM_TOOL_PART_IDS).orEmpty(), "UTF-8"
-    ).split(",").filter { it.isNotBlank() }
+    private val serverId = params.serverId
+    private val directory = params.directory
+    private val filePath = params.filePath
+    private val source = params.source
+    private val sessionId = params.sessionId
+    private val toolPartIds = params.toolPartIds
     private val _uiState = MutableStateFlow(FileViewerUiState(filePath = filePath, directory = directory))
     val uiState: StateFlow<FileViewerUiState> = _uiState.asStateFlow()
     private val diffParser = DiffParser()
@@ -45,6 +40,11 @@ class FileViewerViewModel @Inject constructor(
 
     // Phase 4: pagination — cache full content for loadMore slicing
     private var fullContentCache: String = ""
+
+    @AssistedFactory
+    interface Factory {
+        fun create(params: FileViewerParams): FileViewerViewModel
+    }
 
     private companion object {
         const val INITIAL_PAGE_SIZE = 500
@@ -55,10 +55,10 @@ class FileViewerViewModel @Inject constructor(
 
     init {
         when (source) {
-            FileViewerNav.Source.LIVE -> loadLive()
-            FileViewerNav.Source.GIT_DIFF -> loadGitDiff()
-            FileViewerNav.Source.TOOL_SNAPSHOT -> loadToolSnapshot()
-            FileViewerNav.Source.TOOL_SNAPSHOT_DIFF -> loadToolSnapshotDiff()
+            FileViewerSource.LIVE -> loadLive()
+            FileViewerSource.GIT_DIFF -> loadGitDiff()
+            FileViewerSource.TOOL_SNAPSHOT -> loadToolSnapshot()
+            FileViewerSource.TOOL_SNAPSHOT_DIFF -> loadToolSnapshotDiff()
         }
     }
 
@@ -84,9 +84,6 @@ class FileViewerViewModel @Inject constructor(
                         val visible = takeFirstLines(c.content, initialVisible)
                         // AnnotationManager uses full content so line numbers stay correct after loadMore
                         annotationManager = AnnotationManager(fullContentCache)
-                        // Phase 4: restore annotations from SavedStateHandle (rotation survival)
-                        val restored = restoreAnnotationsFromHandle()
-                        if (restored.isNotEmpty()) annotationManager?.restore(restored)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -165,7 +162,6 @@ class FileViewerViewModel @Inject constructor(
         manager.add(selectedText, startChar, endChar, note)
         val all = manager.getAll()
         _uiState.update { it.copy(annotations = all) }
-        saveAnnotationsToHandle(all)
     }
 
     fun deleteAnnotation(id: String) {
@@ -173,7 +169,6 @@ class FileViewerViewModel @Inject constructor(
         manager.delete(id)
         val all = manager.getAll()
         _uiState.update { it.copy(annotations = all) }
-        saveAnnotationsToHandle(all)
     }
 
     fun updateAnnotation(id: String, note: String) {
@@ -181,7 +176,6 @@ class FileViewerViewModel @Inject constructor(
         manager.update(id, note)
         val all = manager.getAll()
         _uiState.update { it.copy(annotations = all) }
-        saveAnnotationsToHandle(all)
     }
 
     suspend fun submitAnnotations(overallNote: String, editedNotes: Map<String, String> = emptyMap()): Result<Unit> {
@@ -196,40 +190,8 @@ class FileViewerViewModel @Inject constructor(
             annotationManager = null
             fullContentCache = ""
             _uiState.update { it.copy(annotations = emptyList(), content = "", isEmpty = true) }
-            savedStateHandle.remove<Any>("annotations_flat")
         }
         return result
-    }
-
-    // ============ Phase 4: Annotation SavedStateHandle persistence ============
-
-    private fun saveAnnotationsToHandle(annotations: List<Annotation>) {
-        if (annotations.isEmpty()) {
-            savedStateHandle.remove<Any>("annotations_flat")
-            return
-        }
-        val flat = ArrayList<Any>(annotations.size * 11)
-        annotations.forEach { ann ->
-            flat.add(ann.id); flat.add(ann.index); flat.add(ann.startChar); flat.add(ann.endChar)
-            flat.add(ann.startLine); flat.add(ann.startCol); flat.add(ann.endLine); flat.add(ann.endCol)
-            flat.add(ann.selectedText); flat.add(ann.note); flat.add(ann.createdAt)
-        }
-        savedStateHandle["annotations_flat"] = flat
-    }
-
-    private fun restoreAnnotationsFromHandle(): List<Annotation> {
-        val raw = savedStateHandle.get<ArrayList<*>>("annotations_flat") ?: return emptyList()
-        if (raw.isEmpty()) return emptyList()
-        return raw.chunked(11).map { items ->
-            Annotation(
-                id = items[0] as String, index = items[1] as Int,
-                startChar = items[2] as Int, endChar = items[3] as Int,
-                startLine = items[4] as Int, startCol = items[5] as Int,
-                endLine = items[6] as Int, endCol = items[7] as Int,
-                selectedText = items[8] as String, note = items[9] as String,
-                createdAt = items[10] as Long
-            )
-        }
     }
 
     // ============ Phase 2: Multi-format render toggle ============
