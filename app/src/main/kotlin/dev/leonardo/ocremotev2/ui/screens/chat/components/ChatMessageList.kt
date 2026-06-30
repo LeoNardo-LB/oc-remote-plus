@@ -112,9 +112,9 @@ fun ChatMessageList(
     agents: List<dev.leonardo.ocremotev2.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    val turnGroups = remember(rawMessages) { computeTurnGroups(rawMessages) }
+    val turnGroups = remember(rawMessages.size) { computeTurnGroups(rawMessages) }
 
-    val streamingMsgId = remember(rawMessages) {
+    val streamingMsgId = remember(rawMessages.size) {
         rawMessages.lastOrNull {
             it.isAssistant && it.message.time.completed == null
         }?.message?.id
@@ -160,25 +160,6 @@ fun ChatMessageList(
             var showAlwaysDialog by remember { mutableStateOf<SseEvent.PermissionAsked?>(null) }
             val pullToRefreshState = rememberPullToRefreshState()
 
-            // Limit per-frame scroll delta to prevent LazyColumn from skipping tall items.
-            // Unlike onPreFling (which caps initial velocity → feels like "grabbing"),
-            // onPreScroll lets the fling start at full speed but caps each frame's delta.
-            // Compose's LazyListMeasure advances firstVisibleItemIndex when a single-frame
-            // delta exceeds item height (issuetracker.google.com/issues/179593134).
-            val scrollDeltaLimiter = remember {
-                object : NestedScrollConnection {
-                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        val maxPerFrame = 500f
-                        val y = available.y
-                        return when {
-                            y > maxPerFrame -> Offset(0f, y - maxPerFrame)
-                            y < -maxPerFrame -> Offset(0f, y + maxPerFrame)
-                            else -> Offset.Zero
-                        }
-                    }
-                }
-            }
-
             PullToRefreshBox(
                 isRefreshing = messageState.isLoadingOlder,
                 onRefresh = {
@@ -190,7 +171,6 @@ fun ChatMessageList(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize()
-                        .nestedScroll(scrollDeltaLimiter)
                         .pointerInput(Unit) { detectTapGestures(onTap = { keyboardController?.hide() }) },
                     contentPadding = PaddingValues(
                         start = SpacingTokens.MD.dp,

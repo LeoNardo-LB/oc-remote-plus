@@ -240,6 +240,7 @@ import dev.leonardo.ocremotev2.ui.screens.chat.terminal.ChatTerminalView
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.RenameSessionDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.dialog.SendConfirmDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.util.LocalOnViewTool
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.ViewToolRequest
 import dev.leonardo.ocremotev2.ui.screens.chat.util.snapToBottom
 import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerOverlay
 import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerParams
@@ -485,21 +486,10 @@ fun ChatScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-
-
-    // CompositionLocalProvider collects settings flows here (sunk from ChatScreen level).
-    // ChatScreen itself does NOT read these settings, so setting changes don't trigger
-    // ChatScreen recomposition — only this wrapper recomposes.
-    ChatSettingsProvider(viewModel = viewModel) {
-    CompositionLocalProvider(
-        LocalHapticFeedbackEnabled provides hapticEnabled,
-        LocalImageSaveRequest provides attachmentHandler.requestSaveImage,
-        LocalToolExpandedStates provides messageState.toolExpandedStates,
-        LocalOnToggleToolExpanded provides { toolId, defaultExpanded -> viewModel.toggleToolExpanded(toolId, defaultExpanded) },
-        LocalToolCardResolver provides viewModel.toolCardResolver,
-        LocalSessionDiffs provides mapOf(viewModel.sessionId to sessionDiffs),
-        LocalUriHandler provides linkUriHandler,
-        LocalOnViewTool provides { request ->
+    // Stable lambdas / values for CompositionLocals — prevents unnecessary recomposition
+    // of all consumers when ChatScreen recomposes (e.g. each SSE token).
+    val onViewToolLambda = remember(viewModel, serverId, sessionId, directory) {
+        { request: ViewToolRequest ->
             viewModel.cacheToolPart(request.part)
             fileViewerRequest = FileViewerParams(
                 serverId = serverId,
@@ -509,7 +499,28 @@ fun ChatScreen(
                 source = request.source,
                 toolPartIds = listOf(request.part.id)
             )
-        },
+        }
+    }
+    val onToggleToolExpandedLambda = remember(viewModel) {
+        { toolId: String, defaultExpanded: Boolean -> viewModel.toggleToolExpanded(toolId, defaultExpanded) }
+    }
+    val sessionDiffsMap = remember(viewModel.sessionId, sessionDiffs) {
+        mapOf(viewModel.sessionId to sessionDiffs)
+    }
+
+    // CompositionLocalProvider collects settings flows here (sunk from ChatScreen level).
+    // ChatScreen itself does NOT read these settings, so setting changes don't trigger
+    // ChatScreen recomposition — only this wrapper recomposes.
+    ChatSettingsProvider(viewModel = viewModel) {
+    CompositionLocalProvider(
+        LocalHapticFeedbackEnabled provides hapticEnabled,
+        LocalImageSaveRequest provides attachmentHandler.requestSaveImage,
+        LocalToolExpandedStates provides messageState.toolExpandedStates,
+        LocalOnToggleToolExpanded provides onToggleToolExpandedLambda,
+        LocalToolCardResolver provides viewModel.toolCardResolver,
+        LocalSessionDiffs provides sessionDiffsMap,
+        LocalUriHandler provides linkUriHandler,
+        LocalOnViewTool provides onViewToolLambda,
     ) {
     Scaffold(
         snackbarHost = {
@@ -974,24 +985,47 @@ fun ChatScreen(
 
                         // messageListState returns oldest-first; normal layout renders
                         // index 0 (oldest) at top, last index (newest) at bottom.
+                        // asReversed() = O(1) view, no copy (vs .reversed() which is O(n))
                         val rawMessages = remember(messageState.messages) {
-                            messageState.messages.reversed()
+                            messageState.messages.asReversed()
                         }
 
                         // Filter: keep user messages + first assistant in each turn group
-                       // to avoid zero-height items creating blank gaps from spacedBy
-                       val displayItems = remember(rawMessages) {
-                           rawMessages.mapIndexedNotNull { index, msg ->
-                               when {
-                                   msg.isUser -> index to msg
-                                   msg.isAssistant -> {
-                                       val nextMsg = rawMessages.getOrNull(index + 1)
-                                       if (nextMsg?.isAssistant != true) index to msg else null
-                                   }
-                                   else -> null
-                               }
-                           }
-                       }
+                        // to avoid zero-height items creating blank gaps from spacedBy.
+                        // Cache the index STRUCTURE by message count (only changes on add/remove),
+                        // then look up CURRENT message objects from rawMessages (always fresh).
+                        val displayIndices = remember(messageState.messages.size) {
+                            rawMessages.mapIndexedNotNull { index, msg ->
+                                when {
+                                    msg.isUser -> index
+                                    msg.isAssistant -> {
+                                        val nextMsg = rawMessages.getOrNull(index + 1)
+                                        if (nextMsg?.isAssistant != true) index else null
+                                    }
+                                    else -> null
+                                }
+                            }
+                        }
+                        val displayItems = remember(rawMessages, displayIndices) {
+                            displayIndices.map { idx -> idx to rawMessages[idx] }
+                        }
+
+    // Stable lambda for LocalOnViewTool — must be remembered because LocalOnViewTool
+    // is staticCompositionLocalOf: a new lambda instance forces ALL PartContent
+    // consumers to recompose on every ChatScreen recomposition (e.g. each SSE token).
+    val onViewToolLambda = remember(viewModel, serverId, sessionId, directory) {
+        { request: ViewToolRequest ->
+            viewModel.cacheToolPart(request.part)
+            fileViewerRequest = FileViewerParams(
+                serverId = serverId,
+                sessionId = sessionId,
+                filePath = request.filePath,
+                directory = directory,
+                source = request.source,
+                toolPartIds = listOf(request.part.id)
+            )
+        }
+    }
 
 
 
