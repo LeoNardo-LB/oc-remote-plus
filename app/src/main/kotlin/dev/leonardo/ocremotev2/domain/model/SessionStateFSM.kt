@@ -1,4 +1,4 @@
-﻿package dev.leonardo.ocremotev2.domain.model
+package dev.leonardo.ocremotev2.domain.model
 
 /**
  * Pure-function Finite State Machine for session status.
@@ -8,12 +8,12 @@
  * - Layer 2 (Activity): Waiting / Streaming / ToolCalling / Compacting — derived detail
  *
  * Statelessness: This object holds no mutable state. All state lives in
- * [SessionStatusManager]'s Map<sessionId, SessionFSMState>.
+ * [dev.leonardo.ocremotev2.data.repository.SessionStateService]'s Map<sessionId, SessionFSMState>.
  *
  * Testability: transition() is a pure function — given (state, event), always
  * produces the same TransitionResult. No side effects.
  */
-object SessionStatusFSM {
+object SessionStateFSM {
 
     data class TransitionResult(
         val newState: SessionFSMState,

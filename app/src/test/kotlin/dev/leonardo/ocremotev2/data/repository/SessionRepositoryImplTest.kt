@@ -43,7 +43,7 @@ class SessionRepositoryImplTest {
             questionHandler = questionHandler,
             miscHandler = miscHandler,
             sessionNextHandler = SessionNextEventHandler(),
-            sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
+            sessionStateService = mockk<SessionStateService>(relaxed = true)
         )
         repo = SessionRepositoryImpl(sessionApi, messageApi, eventDispatcher, serverRepo)
     }

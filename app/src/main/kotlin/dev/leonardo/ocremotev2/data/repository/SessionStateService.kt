@@ -88,6 +88,14 @@ class SessionStateService @Inject constructor(
 
     fun setServerId(serverId: String) { currentServerId = serverId }
 
+    /**
+     * Public wrapper for [triggerRestValidation] — lets external callers (e.g.
+     * [SessionActionsDelegate] single-session entry/resume) request an authoritative
+     * REST status check for one session. The FSM's forceComplete mechanism handles
+     * incomplete-message fixing automatically when REST confirms Idle.
+     */
+    fun requestValidation(sessionId: String) = triggerRestValidation(sessionId)
+
     // ============ Event entry points ============
     fun onClientSendParts(sessionId: String) = applyTransition(sessionId, FsmEvent.ClientSendParts)
     fun onClientAbort(sessionId: String) = applyTransition(sessionId, FsmEvent.ClientAbort)
@@ -124,7 +132,7 @@ class SessionStateService @Inject constructor(
     // ============ Core pipeline ============
     fun applyTransition(sessionId: String, event: FsmEvent) {
         val current = _fsmStates.value[sessionId] ?: SessionFSMState.initial()
-        val result = SessionStatusFSM.transition(current, event)
+        val result = SessionStateFSM.transition(current, event)
         _fsmStates.update { it + (sessionId to result.newState) }
         recordHistory(sessionId, current, result, event)
         if (BuildConfig.DEBUG) logTransition(sessionId, current, result, event)
@@ -133,7 +141,7 @@ class SessionStateService @Inject constructor(
         if (result.isSuspicious) triggerRestValidation(sessionId)
     }
 
-    private fun recordHistory(sessionId: String, from: SessionFSMState, result: SessionStatusFSM.TransitionResult, event: FsmEvent) {
+    private fun recordHistory(sessionId: String, from: SessionFSMState, result: SessionStateFSM.TransitionResult, event: FsmEvent) {
         val record = TransitionRecord(
             sessionId = sessionId,
             timestamp = System.currentTimeMillis(),
@@ -152,7 +160,7 @@ class SessionStateService @Inject constructor(
         }
     }
 
-    private fun logTransition(sessionId: String, from: SessionFSMState, result: SessionStatusFSM.TransitionResult, event: FsmEvent) {
+    private fun logTransition(sessionId: String, from: SessionFSMState, result: SessionStateFSM.TransitionResult, event: FsmEvent) {
         val actFrom = from.activity?.let { "/${it::class.simpleName}" } ?: ""
         val actTo = result.newState.activity?.let { "/${it::class.simpleName}" } ?: ""
         val flags = buildString {

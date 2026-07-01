@@ -17,7 +17,6 @@ import dev.leonardo.ocremotev2.domain.model.PromptPart
 import dev.leonardo.ocremotev2.domain.model.ProviderCatalog
 import dev.leonardo.ocremotev2.data.repository.ServerTerminalRegistry
 import dev.leonardo.ocremotev2.data.repository.SessionStateService
-import dev.leonardo.ocremotev2.data.repository.SessionStatusManager
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolCardResolver
 import dev.leonardo.ocremotev2.ui.screens.chat.util.ContextBreakdown
 import dev.leonardo.ocremotev2.ui.screens.chat.util.ContextDetailState
@@ -226,7 +225,6 @@ class ChatViewModel @Inject constructor(
     private val tokenStatsTracker: TokenStatsTracker,
     private val httpClient: io.ktor.client.HttpClient,
     private val sseClient: SseClient,
-    private val sessionStatusManager: SessionStatusManager,
     private val sessionStateService: SessionStateService,
     private val sessionFocusHolder: dev.leonardo.ocremotev2.service.SessionFocusHolder,
     private val appNotificationManager: dev.leonardo.ocremotev2.service.AppNotificationManager,
@@ -358,7 +356,7 @@ class ChatViewModel @Inject constructor(
     }
 
     init {
-        sessionStatusManager.setServerId(serverId)
+        sessionStateService.setServerId(serverId)
     }
 
     // ============ Model Config Delegate (Phase 3 Task 4 — A cluster) ============
@@ -394,7 +392,7 @@ class ChatViewModel @Inject constructor(
         managePermissionUseCase = managePermissionUseCase,
         chatRepository = chatRepository,
         messagePaging = messagePaging,
-        sessionStatusManager = sessionStatusManager,
+        sessionStateService = sessionStateService,
         sessionRepository = sessionRepository,
         settingsRepository = settingsRepository,
         serverId = serverId,
@@ -455,6 +453,7 @@ class ChatViewModel @Inject constructor(
         manageTerminalUseCase = manageTerminalUseCase,
         sessionRepository = sessionRepository,
         chatRepository = chatRepository,
+        sessionStateService = sessionStateService,
         serverId = serverId,
         scope = viewModelScope,
         sessionIdProvider = { sessionLifecycle.sessionId },
@@ -465,7 +464,6 @@ class ChatViewModel @Inject constructor(
         loadSessionInfo = { sessionLifecycle.loadSession() },
         awaitSessionLoaded = { sessionLifecycle.sessionLoaded.await() },
         refreshMessages = { messageData.refreshMessages() },
-        fixIncompleteMessagesIfIdle = { messageData.fixIncompleteMessagesIfIdle(it) },
         loadPendingQuestions = { messageData.loadPendingQuestions() },
         loadPendingPermissions = { messageData.loadPendingPermissions() },
         restoreRevertedDraft = { draftDelegate.restoreRevertedDraft(it) },
@@ -961,7 +959,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val currentSessionId = sessionLifecycle.ensureSession()
-                sessionStatusManager.onSendParts(currentSessionId)
+                sessionStateService.onClientSendParts(currentSessionId)
                 // P5-5: read from modelConfigState (resolved effective value) instead of
                 // raw _selectedProviderId which may be null on new session's first send.
                 val modelCfg = modelConfigState.value
@@ -1018,7 +1016,7 @@ class ChatViewModel @Inject constructor(
      * SSE job cancel/restart (B↔C↔G orchestration).
      */
     fun abortSession() {
-        sessionStatusManager.onAbort(sessionId)
+        sessionStateService.onClientAbort(sessionId)
         viewModelScope.launch {
             try {
                 messageData.cancelSseJob()
@@ -1078,13 +1076,12 @@ class ChatViewModel @Inject constructor(
             try {
                 // Halt: if session is busy (AI generating), abort first before reverting.
                 // Same pattern as OpenCode WebUI: halt(sessionID).then(() => revert(input))
-                val currentStatus = sessionStatusManager.statusFlow.value[sessionId]
+                val currentStatus = sessionStateService.statusFlow.value[sessionId]
                 if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "Revert: halting busy session $sessionId")
-                    sessionStatusManager.onAbort(sessionId)
+                    sessionStateService.onClientAbort(sessionId)
                     messageData.cancelSseJob()
                     runCatching { sessionRepository.abort(serverId, sessionId, sessionLifecycle.sessionDirectory) }
-                    sessionRepository.markSessionIdle(sessionId)
                     // NOTE: startObservingMessages deferred to after setRevert below
                 }
 

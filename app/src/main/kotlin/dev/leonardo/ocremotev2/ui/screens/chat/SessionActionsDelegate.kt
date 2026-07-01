@@ -3,11 +3,11 @@ package dev.leonardo.ocremotev2.ui.screens.chat
 import android.util.Log
 import dev.leonardo.ocremotev2.BuildConfig
 import dev.leonardo.ocremotev2.R
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.domain.model.AutoApproveRule
 import dev.leonardo.ocremotev2.domain.model.ModelSelection
 import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.domain.model.Session
-import dev.leonardo.ocremotev2.domain.model.SessionStatus
 import dev.leonardo.ocremotev2.domain.model.SseEvent
 import dev.leonardo.ocremotev2.domain.repository.ChatRepository
 import dev.leonardo.ocremotev2.domain.repository.SessionRepository
@@ -51,6 +51,7 @@ internal class SessionActionsDelegate(
     private val manageTerminalUseCase: ManageTerminalUseCase,
     private val sessionRepository: SessionRepository,
     private val chatRepository: ChatRepository,
+    private val sessionStateService: SessionStateService,
     private val serverId: String,
     private val scope: CoroutineScope,
     private val sessionIdProvider: () -> String,
@@ -61,7 +62,6 @@ internal class SessionActionsDelegate(
     private val loadSessionInfo: suspend () -> Unit,
     private val awaitSessionLoaded: suspend () -> Unit,
     private val refreshMessages: suspend () -> Unit,
-    private val fixIncompleteMessagesIfIdle: (String) -> Unit,
     private val loadPendingQuestions: suspend () -> Unit,
     private val loadPendingPermissions: suspend () -> Unit,
     private val restoreRevertedDraft: (RevertedDraftPayload) -> Unit,
@@ -97,26 +97,19 @@ internal class SessionActionsDelegate(
     }
 
     /**
-     * Query the OpenCode server for actual session statuses and correct
+     * Query the OpenCode server for the actual session status and correct
      * any UI state drift caused by missed SSE events.
      *
      * Triggered on entering a session and resuming from background.
+     * Delegates to [SessionStateService.requestValidation] — the FSM's
+     * forceComplete mechanism handles incomplete-message fixing when REST
+     * confirms Idle.
      */
     fun syncSessionStatus() {
         scope.launch {
             if (sessionId.isNotBlank()) {
                 awaitSessionLoaded()
-            }
-            val result = sessionRepository.fetchSessionStatuses(
-                serverId, directory = sessionDirectoryProvider()
-            )
-            result.onSuccess { statusMap ->
-                sessionRepository.syncAllSessionStatuses(statusMap)
-                val currentStatus = statusMap[sessionId]
-                if (currentStatus is SessionStatus.Idle) {
-                    sessionRepository.markSessionIdleProtected(sessionId)
-                    fixIncompleteMessagesIfIdle(sessionId)
-                }
+                sessionStateService.requestValidation(sessionId)
             }
         }
     }
@@ -124,23 +117,16 @@ internal class SessionActionsDelegate(
     /**
      * Combined refresh + sync — runs in a single coroutine to avoid
      * state conflicts between parallel REST responses.
+     *
+     * Status validation delegates to [SessionStateService.requestValidation];
+     * the FSM's forceComplete mechanism handles incomplete-message fixing.
      */
     private suspend fun refreshAndSync() {
         loadSessionInfo()
         refreshMessages()
         if (sessionId.isNotBlank()) {
             awaitSessionLoaded()
-        }
-        val result = sessionRepository.fetchSessionStatuses(
-            serverId, directory = sessionDirectoryProvider()
-        )
-        result.onSuccess { statusMap ->
-            sessionRepository.syncAllSessionStatuses(statusMap)
-            val currentStatus = statusMap[sessionId]
-            if (currentStatus is SessionStatus.Idle) {
-                sessionRepository.markSessionIdleProtected(sessionId)
-                fixIncompleteMessagesIfIdle(sessionId)
-            }
+            sessionStateService.requestValidation(sessionId)
         }
         loadPendingQuestions()
         loadPendingPermissions()
@@ -496,13 +482,14 @@ internal class SessionActionsDelegate(
     }
 
     /**
-     * Abort REST call — cancels the session on the server and marks it idle.
+     * Abort REST call — cancels the session on the server and marks it idle
+     * via the FSM (ClientAbort → Idle + forceComplete messages).
      * SSE job cancel/restart is handled by [ChatViewModel.abortSession] coordinator.
      */
     suspend fun abortSession() {
         sessionRepository.abort(serverId, sessionId, sessionDirectoryProvider())
         if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
-        sessionRepository.markSessionIdle(sessionId)
+        sessionStateService.onClientAbort(sessionId)
     }
 
     // ============ Commands ============

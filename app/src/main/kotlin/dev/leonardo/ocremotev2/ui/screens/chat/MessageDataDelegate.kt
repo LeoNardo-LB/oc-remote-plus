@@ -2,7 +2,7 @@ package dev.leonardo.ocremotev2.ui.screens.chat
 
 import android.util.Log
 import dev.leonardo.ocremotev2.BuildConfig
-import dev.leonardo.ocremotev2.data.repository.SessionStatusManager
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.domain.model.Message
 import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.domain.model.Session
@@ -58,7 +58,7 @@ internal class MessageDataDelegate(
     private val managePermissionUseCase: ManagePermissionUseCase,
     private val chatRepository: ChatRepository,
     private val messagePaging: MessagePaginationUseCase,
-    private val sessionStatusManager: SessionStatusManager,
+    private val sessionStateService: SessionStateService,
     private val sessionRepository: SessionRepository,
     private val settingsRepository: SettingsRepository,
     private val serverId: String,
@@ -122,7 +122,7 @@ internal class MessageDataDelegate(
             _isLoadingOlder,
             _toolExpandedStates,
             _pendingMessageIds,
-            sessionStatusManager.statusFlow,
+            sessionStateService.statusFlow,
         ) { args ->
             @Suppress("UNCHECKED_CAST")
             val allSessions = args[0] as List<Session>
@@ -363,13 +363,17 @@ internal class MessageDataDelegate(
      * but the database preserves interrupted messages with finished_at = NULL.
      * We must NOT call this during periodic polling — only on explicit user actions
      * (entering session, aborting) to avoid breaking premature-idle protection.
+     *
+     * Routes through [SessionStateService.onRestValidation] — the FSM's forceComplete
+     * mechanism triggers [MessageEventHandler.markSessionIdle] via the callback wired
+     * in [EventDispatcher]'s init block.
      */
     fun fixIncompleteMessagesIfIdle(sid: String) {
         val messages = _rawMessagesList.value
         val hasIncomplete = messages.any { it is Message.Assistant && it.time.completed == null }
         if (hasIncomplete) {
             if (BuildConfig.DEBUG) Log.d(TAG, "Fixing incomplete messages for session $sid (server confirmed idle)")
-            sessionRepository.markSessionIdle(sid)
+            sessionStateService.onRestValidation(sid, SessionStatus.Idle)
         }
     }
 

@@ -153,30 +153,6 @@ interface SessionRepository {
      */
     fun setSessions(serverId: String, sessions: List<Session>)
 
-    /**
-     * Update a single session's status optimistically.
-     */
-    fun updateSessionStatus(sessionId: String, status: SessionStatus)
-
-    /**
-     * Batch-update all session statuses from a REST response.
-     */
-    fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>)
-
-    /**
-     * Mark a session as idle with SSE-freshness protection.
-     * Won't overwrite a recent SSE Busy/Retry status (within 5s).
-     * Does NOT modify messages — safe for periodic REST polling.
-     */
-    fun markSessionIdleProtected(sessionId: String)
-
-    /**
-     * Force-mark a session as idle: sets status AND completes all incomplete messages.
-     * Use ONLY for explicit terminal actions (abort, server-restart fix).
-     * Do NOT call from periodic polling — breaks premature-idle protection.
-     */
-    fun markSessionIdle(sessionId: String)
-
     // ============ Session Status Sync ============
 
     /**

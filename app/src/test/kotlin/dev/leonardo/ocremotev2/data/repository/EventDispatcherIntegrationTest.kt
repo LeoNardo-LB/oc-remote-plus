@@ -5,7 +5,6 @@ import dev.leonardo.ocremotev2.domain.model.*
 import dev.leonardo.ocremotev2.domain.model.SseEvent
 import dev.leonardo.ocremotev2.domain.repository.SessionRepository
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,7 +26,6 @@ import javax.inject.Provider
 class EventDispatcherIntegrationTest {
 
     private lateinit var dispatcher: EventDispatcher
-    private lateinit var sessionStatusManager: SessionStatusManager
     // SessionStateService's statusFlow uses stateIn(scope, SharingStarted.Eagerly, …); Eagerly
     // propagation needs an UnconfinedTestDispatcher + runCurrent() (see SessionStateServiceTest
     // fixture note for why runTest's StandardTestDispatcher breaks). Each test gets a fresh scope
@@ -39,7 +37,6 @@ class EventDispatcherIntegrationTest {
     fun setup() {
         stateServiceScope = TestScope(UnconfinedTestDispatcher())
         val messageStore = MessageEventHandler()
-        sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
         sessionStateService = SessionStateService(
             appScope = stateServiceScope,
             sessionRepoProvider = Provider { mockk<SessionRepository>(relaxed = true) },
@@ -54,8 +51,7 @@ class EventDispatcherIntegrationTest {
             questionHandler = QuestionEventHandler(),
             miscHandler = MiscEventHandler(),
             sessionNextHandler = SessionNextEventHandler(),
-            sessionStatusManager = sessionStatusManager,
-            sessionStateService = sessionStateService
+            sessionStateService = sessionStateService,
         )
     }
 
@@ -329,7 +325,8 @@ class EventDispatcherIntegrationTest {
 
         // Set up state across all handlers for session s1
         dispatcher.processEvent(SseEvent.SessionCreated(session), "svr1")
-        dispatcher.updateSessionStatus("s1", SessionStatus.Busy)
+        dispatcher.processEvent(SseEvent.SessionStatus(sessionId = "s1", status = SessionStatus.Busy), "svr1")
+        stateServiceScope.runCurrent()
 
         dispatcher.processEvent(SseEvent.MessageUpdated(
             Message.User(id = "m1", sessionId = "s1", time = TimeInfo(1000L))
@@ -813,24 +810,6 @@ class EventDispatcherIntegrationTest {
         assertFalse(dispatcher.serverSessions.value.containsKey("svr1"))
         assertTrue(dispatcher.serverSessions.value.containsKey("svr2"))
         assertEquals(setOf("s3", "s4"), dispatcher.serverSessions.value["svr2"])
-    }
-
-    // ============ syncAllSessionStatuses → SessionStatusManager FSM sync ============
-
-    @Test
-    fun `syncAllSessionStatuses propagates each status to SessionStatusManager FSM`() = runTest {
-        val statuses = mapOf(
-            "s1" to SessionStatus.Busy,
-            "s2" to SessionStatus.Idle
-        )
-
-        dispatcher.syncAllSessionStatuses(statuses)
-
-        // The FSM must be corrected in lockstep so the ChatScreen progress bar (which
-        // reads SessionStatusManager.statusFlow) reflects REST authoritative state,
-        // not only the SessionEventHandler layer.
-        verify(exactly = 1) { sessionStatusManager.onRestValidation("s1", SessionStatus.Busy) }
-        verify(exactly = 1) { sessionStatusManager.onRestValidation("s2", SessionStatus.Idle) }
     }
 
     // ============ Scenario 11: SSE dual-write to SessionStateService ============

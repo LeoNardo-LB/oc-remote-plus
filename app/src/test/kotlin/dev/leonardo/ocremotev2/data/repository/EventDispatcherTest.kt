@@ -3,11 +3,18 @@
 import dev.leonardo.ocremotev2.data.repository.handler.*
 import dev.leonardo.ocremotev2.domain.model.*
 import dev.leonardo.ocremotev2.domain.model.SseEvent
+import dev.leonardo.ocremotev2.domain.repository.SessionRepository
 import io.mockk.mockk
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import javax.inject.Provider
 
 class EventDispatcherTest {
 
@@ -18,15 +25,22 @@ class EventDispatcherTest {
     private lateinit var questionHandler: QuestionEventHandler
     private lateinit var miscHandler: MiscEventHandler
     private lateinit var sessionNextHandler: SessionNextEventHandler
+    private lateinit var stateServiceScope: TestScope
+    private lateinit var sessionStateService: SessionStateService
 
     @Before
     fun setup() {
+        stateServiceScope = TestScope(UnconfinedTestDispatcher())
         sessionHandler = SessionEventHandler()
         messageHandler = MessageEventHandler()
         permissionHandler = PermissionEventHandler()
         questionHandler = QuestionEventHandler()
         miscHandler = MiscEventHandler()
         sessionNextHandler = SessionNextEventHandler()
+        sessionStateService = SessionStateService(
+            appScope = stateServiceScope,
+            sessionRepoProvider = Provider { mockk<SessionRepository>(relaxed = true) },
+        )
 
         dispatcher = EventDispatcher(
             sessionHandler = sessionHandler,
@@ -38,8 +52,13 @@ class EventDispatcherTest {
             questionHandler = questionHandler,
             miscHandler = miscHandler,
             sessionNextHandler = sessionNextHandler,
-            sessionStatusManager = mockk<SessionStatusManager>(relaxed = true)
+            sessionStateService = sessionStateService,
         )
+    }
+
+    @After
+    fun tearDown() {
+        stateServiceScope.cancel()
     }
 
     private fun testSession(id: String) = Session(
@@ -121,9 +140,12 @@ class EventDispatcherTest {
     fun `CommandExecuted does NOT reset session status to Idle`() = runTest {
         val session = testSession("s1")
         dispatcher.processEvent(SseEvent.SessionCreated(session), "server1")
-        dispatcher.updateSessionStatus("s1", SessionStatus.Busy)
+        // Set status to Busy via SSE (the authoritative path)
+        dispatcher.processEvent(SseEvent.SessionStatus(sessionId = "s1", status = SessionStatus.Busy), "server1")
+        stateServiceScope.runCurrent()
 
         dispatcher.processEvent(SseEvent.CommandExecuted(name = "bash", sessionId = "s1"), "server1")
+        stateServiceScope.runCurrent()
 
         // P0-4 fix: CommandExecuted no longer forces Idle — session.status SSE event controls state
         assertEquals(SessionStatus.Busy, dispatcher.sessionStatuses.value["s1"])
@@ -257,12 +279,6 @@ class EventDispatcherTest {
         assertTrue(dispatcher.serverSessions.value["server1"]!!.contains("s1"))
     }
 
-    @Test
-    fun `delegated updateSessionStatus works`() {
-        dispatcher.updateSessionStatus("s1", SessionStatus.Busy)
-        assertEquals(SessionStatus.Busy, dispatcher.sessionStatuses.value["s1"])
-    }
-
     // ============ Initial State ============
 
     @Test
@@ -297,7 +313,7 @@ class EventDispatcherTest {
     @Test
     fun `SessionError does not change sessions`() = runTest {
         dispatcher.processEvent(SseEvent.SessionError("s1", "something failed"), "server1")
-        assertTrue(dispatcher.sessionStatuses.value.isEmpty())
+        assertTrue(dispatcher.sessions.value.isEmpty())
     }
 
     // ============ SessionNext Event Integration ============

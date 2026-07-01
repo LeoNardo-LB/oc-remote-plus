@@ -11,16 +11,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Handles session lifecycle events: created, updated, deleted, status, idle, diff, error, compacted.
- * Manages: sessions, sessionStatuses, serverSessions, sessionDiffs, vcsBranch, projectInfo
+ * Handles session lifecycle events: created, updated, deleted, diff, error, compacted.
+ * Manages: sessions, serverSessions, sessionDiffs, vcsBranch, projectInfo
+ *
+ * Session STATUS is no longer tracked here — [dev.leonardo.ocremotev2.data.repository.SessionStateService]
+ * is the single source of truth. SessionStatus/SessionIdle events are acknowledged here
+ * (so the dispatcher's registry routes them) but the actual FSM transition happens in
+ * [dev.leonardo.ocremotev2.data.repository.EventDispatcher.forwardToSessionStateService].
  */
 @Singleton
 class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     companion object {
         private const val TAG = "SessionEventHandler"
-        /** SSE status is considered fresh within this window. REST won't overwrite. */
-        private const val SSE_FRESH_THRESHOLD_MS = 5000L
     }
 
     private val _serverSessions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
@@ -28,12 +31,6 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
 
     private val _sessions = MutableStateFlow<List<Session>>(emptyList())
     val sessions: StateFlow<List<Session>> = _sessions.asStateFlow()
-
-    private val _sessionStatuses = MutableStateFlow<Map<String, SessionStatus>>(emptyMap())
-    val sessionStatuses: StateFlow<Map<String, SessionStatus>> = _sessionStatuses.asStateFlow()
-
-    /** Tracks when each session's status was last updated by SSE events. */
-    private val _sseTimestamps = MutableStateFlow<Map<String, Long>>(emptyMap())
 
     private val _sessionDiffs = MutableStateFlow<Map<String, List<FileDiff>>>(emptyMap())
     val sessionDiffs: StateFlow<Map<String, List<FileDiff>>> = _sessionDiffs.asStateFlow()
@@ -62,8 +59,10 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
             is SseEvent.SessionCreated -> { handleSessionCreated(event, serverId); true }
             is SseEvent.SessionUpdated -> { handleSessionUpdated(event, serverId); true }
             is SseEvent.SessionDeleted -> { handleSessionDeleted(event); true }
-            is SseEvent.SessionStatus -> { handleSessionStatus(event); true }
-            is SseEvent.SessionIdle -> { handleSessionIdle(event); true }
+            // Status/idle events are acknowledged here but processed by SessionStateService
+            // via EventDispatcher.forwardToSessionStateService — no local state to update.
+            is SseEvent.SessionStatus -> true
+            is SseEvent.SessionIdle -> true
             is SseEvent.SessionDiff -> { handleSessionDiff(event); true }
             is SseEvent.SessionError -> { handleSessionError(event); true }
             is SseEvent.SessionCompacted -> {
@@ -92,8 +91,6 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
                 (current + event.info).sortedByDescending { s -> s.time.updated }
             }
         }
-        _sessionStatuses.update { it + (event.info.id to SessionStatus.Idle) }
-        _sseTimestamps.update { it + (event.info.id to System.currentTimeMillis()) }
     }
 
     private fun handleSessionUpdated(event: SseEvent.SessionUpdated, serverId: String) {
@@ -114,20 +111,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
     private fun handleSessionDeleted(event: SseEvent.SessionDeleted) {
         val sessionId = event.info.id
         _sessions.update { it.filter { s -> s.id != sessionId } }
-        _sessionStatuses.update { it - sessionId }
-        _sseTimestamps.update { it - sessionId }
         _sessionDiffs.update { it - sessionId }
-    }
-
-    private fun handleSessionStatus(event: SseEvent.SessionStatus) {
-        _sessionStatuses.update { it + (event.sessionId to event.status) }
-        _sseTimestamps.update { it + (event.sessionId to System.currentTimeMillis()) }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Session ${event.sessionId} status: ${event.status}")
-    }
-
-    private fun handleSessionIdle(event: SseEvent.SessionIdle) {
-        _sessionStatuses.update { it + (event.sessionId to SessionStatus.Idle) }
-        _sseTimestamps.update { it + (event.sessionId to System.currentTimeMillis()) }
     }
 
     private fun handleSessionDiff(event: SseEvent.SessionDiff) {
@@ -160,73 +144,6 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         }
     }
 
-    fun updateSessionStatus(sessionId: String, status: SessionStatus) {
-        _sessionStatuses.update { it + (sessionId to status) }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Manually updated session $sessionId status to $status")
-    }
-
-    /**
-     * Batch-update session statuses from REST data.
-     * REST is the authoritative source — always overwrites local state.
-     * SSE freshness protection is NOT applied here because REST directly
-     * queries the server's in-memory status, which is the ground truth.
-     *
-     * Sessions absent from REST response are NOT touched here — the caller
-     * (EventDispatcher.syncAllSessionStatuses) handles that logic.
-     */
-    fun updateAllSessionStatuses(statuses: Map<String, SessionStatus>) {
-        _sessionStatuses.update { current ->
-            val merged = current.toMutableMap()
-            for ((sessionId, newStatus) in statuses) {
-                merged[sessionId] = newStatus
-            }
-            merged.toMap()
-        }
-        if (BuildConfig.DEBUG) Log.d(TAG, "Batch updated ${statuses.size} session statuses")
-    }
-
-    /**
-     * Update a single session's status with SSE-freshness protection.
-     * Won't overwrite Busy/Retry with Idle if SSE updated it recently.
-     */
-    fun updateSessionStatusProtected(sessionId: String, newStatus: SessionStatus) {
-        val now = System.currentTimeMillis()
-        val existing = _sessionStatuses.value[sessionId]
-        val lastSseUpdate = _sseTimestamps.value[sessionId]
-        if (shouldOverwrite(existing, newStatus, lastSseUpdate, now)) {
-            _sessionStatuses.update { it + (sessionId to newStatus) }
-        }
-    }
-
-    /**
-     * Determine if REST data should overwrite existing status.
-     * Rules:
-     * - No existing status → always overwrite (cold start)
-     * - REST says Busy/Retry → always overwrite (upgrade)
-     * - REST says Idle but SSE recently said Busy/Retry → don't overwrite (protect)
-     * - REST says Idle and SSE data is stale (>5s) → overwrite (trust REST)
-     */
-    private fun shouldOverwrite(
-        existing: SessionStatus?,
-        newStatus: SessionStatus,
-        lastSseUpdate: Long?,
-        now: Long
-    ): Boolean {
-        if (existing == null) return true // Cold start, no data yet
-        if (newStatus !is SessionStatus.Idle) return true // REST says active, always trust
-        // REST says Idle. Check if SSE recently said active.
-        if (existing !is SessionStatus.Idle && lastSseUpdate != null) {
-            val age = now - lastSseUpdate
-            if (age < SSE_FRESH_THRESHOLD_MS) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Protecting ${existing::class.simpleName} status (SSE age=${age}ms < ${SSE_FRESH_THRESHOLD_MS}ms)")
-                }
-                return false
-            }
-        }
-        return true
-    }
-
     fun clearForServer(serverId: String) {
         val sessionIds = _serverSessions.value[serverId] ?: emptySet()
         if (sessionIds.isEmpty()) {
@@ -236,8 +153,6 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         if (BuildConfig.DEBUG) Log.d(TAG, "Clearing state for server $serverId (${sessionIds.size} sessions)")
         _serverSessions.update { it - serverId }
         _sessions.update { it.filter { s -> s.id !in sessionIds } }
-        _sessionStatuses.update { it - sessionIds }
-        _sseTimestamps.update { it - sessionIds }
         _sessionDiffs.update { it - sessionIds }
         _lastUserMessageTime.update { it - sessionIds }
     }
@@ -278,8 +193,6 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
     fun clearAll() {
         _serverSessions.value = emptyMap()
         _sessions.value = emptyList()
-        _sessionStatuses.value = emptyMap()
-        _sseTimestamps.value = emptyMap()
         _sessionDiffs.value = emptyMap()
         _lastUserMessageTime.value = emptyMap()
         _vcsBranch.value = null

@@ -31,7 +31,6 @@ class SessionEventHandlerTest {
 
         assertTrue(handled)
         assertEquals(listOf(session), handler.sessions.value)
-        assertEquals(SessionStatus.Idle, handler.sessionStatuses.value["s1"])
     }
 
     @Test
@@ -62,26 +61,24 @@ class SessionEventHandlerTest {
 
         assertEquals(1, handler.sessions.value.size)
         assertEquals("s2", handler.sessions.value[0].id)
-        assertFalse(handler.sessionStatuses.value.containsKey("s1"))
     }
 
     @Test
-    fun `handles SessionStatus`() = runTest {
+    fun `handles SessionStatus - acknowledged, no local status state`() = runTest {
         handler.handle(SseEvent.SessionCreated(testSession("s1")), "server1")
 
-        handler.handle(SseEvent.SessionStatus("s1", SessionStatus.Busy), "server1")
-
-        assertEquals(SessionStatus.Busy, handler.sessionStatuses.value["s1"])
+        // SessionStatus is acknowledged (returns true) but no longer tracked locally —
+        // SessionStateService is the single source of truth for status.
+        val handled = handler.handle(SseEvent.SessionStatus("s1", SessionStatus.Busy), "server1")
+        assertTrue(handled)
     }
 
     @Test
-    fun `handles SessionIdle`() = runTest {
+    fun `handles SessionIdle - acknowledged, no local status state`() = runTest {
         handler.handle(SseEvent.SessionCreated(testSession("s1")), "server1")
-        handler.handle(SseEvent.SessionStatus("s1", SessionStatus.Busy), "server1")
 
-        handler.handle(SseEvent.SessionIdle("s1"), "server1")
-
-        assertEquals(SessionStatus.Idle, handler.sessionStatuses.value["s1"])
+        val handled = handler.handle(SseEvent.SessionIdle("s1"), "server1")
+        assertTrue(handled)
     }
 
     @Test
@@ -156,12 +153,6 @@ class SessionEventHandlerTest {
 
         val serverSessionMap = handler.serverSessions.value
         assertEquals(setOf("s1", "s2"), serverSessionMap["server1"])
-    }
-
-    @Test
-    fun `updateSessionStatus manually sets status`() = runTest {
-        handler.updateSessionStatus("s1", SessionStatus.Busy)
-        assertEquals(SessionStatus.Busy, handler.sessionStatuses.value["s1"])
     }
 
     @Test

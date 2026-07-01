@@ -38,37 +38,19 @@ class EventDispatcher @Inject constructor(
     private val questionHandler: QuestionEventHandler,
     private val miscHandler: MiscEventHandler,
     private val sessionNextHandler: SessionNextEventHandler,
-    private val sessionStatusManager: SessionStatusManager,
-    // Transition bridge: Hilt injects a non-null instance (Dagger ignores the Kotlin default);
-    // the `= null` default only spares legacy test call sites from needing this param during the
-    // Task 7→12 parallel-run window. Deleted (made non-null) in Task 12 alongside SessionStatusManager.
-    private val sessionStateService: SessionStateService? = null
+    private val sessionStateService: SessionStateService,
 ) {
     init {
-        // L5 cross-validation: SessionStatusManager checks if Idle sessions have
-        // incomplete assistant messages (time.completed == null), which indicates
-        // a missed SSE event. The callback is set here because SessionStatusManager
-        // cannot inject EventDispatcher (constructor simplified to avoid circular deps).
-        sessionStatusManager.incompleteAssistantChecker = { sessionId ->
+        // SessionStateService callbacks — wired here to break the circular dep
+        // (EventDispatcher ← SessionStateService via Provider, but callbacks
+        // need messageHandler which lives in EventDispatcher's scope).
+        sessionStateService.incompleteChecker = IncompleteAssistantChecker { sessionId ->
             hasIncompleteAssistant(sessionId)
         }
-        // Resolve a session's directory so SessionStatusManager's REST self-healing
-        // targets the correct server instance (status is isolated per-directory; a null
-        // directory makes non-default-worktree sessions invisible and breaks the FSM recovery).
-        sessionStatusManager.directoryResolver = { sessionId ->
+        sessionStateService.directoryResolver = DirectoryResolver { sessionId ->
             sessionHandler.sessions.value.find { it.id == sessionId }?.directory
         }
-
-        // SessionStateService callbacks (new single source of truth; mirrors sessionStatusManager
-        // setup above). Wired here for the same circular-dep-breaking reason. Nullable-safe because
-        // legacy test call sites default the constructor param to null during the Task 7→12 window.
-        sessionStateService?.incompleteChecker = IncompleteAssistantChecker { sessionId ->
-            hasIncompleteAssistant(sessionId)
-        }
-        sessionStateService?.directoryResolver = DirectoryResolver { sessionId ->
-            sessionHandler.sessions.value.find { it.id == sessionId }?.directory
-        }
-        sessionStateService?.messageForceCompleter = MessageForceCompleter { sessionId ->
+        sessionStateService.messageForceCompleter = MessageForceCompleter { sessionId ->
             messageHandler.markSessionIdle(sessionId)
         }
     }
@@ -145,7 +127,8 @@ class EventDispatcher @Inject constructor(
 
     val serverSessions: StateFlow<Map<String, Set<String>>> get() = sessionHandler.serverSessions
     val sessions: StateFlow<List<Session>> get() = sessionHandler.sessions
-    val sessionStatuses: StateFlow<Map<String, SessionStatus>> get() = sessionHandler.sessionStatuses
+    /** Facade over [SessionStateService.statusFlow] — the single source of truth for session status. */
+    val sessionStatuses: StateFlow<Map<String, SessionStatus>> get() = sessionStateService.statusFlow
     val messages: StateFlow<Map<String, List<Message>>> get() = messageHandler.messages
     val parts: StateFlow<Map<String, List<Part>>> get() = messageHandler.parts
     val sessionDiffs: StateFlow<Map<String, List<FileDiff>>> get() = sessionHandler.sessionDiffs
@@ -184,7 +167,6 @@ class EventDispatcher @Inject constructor(
         } else if (BuildConfig.DEBUG) {
             Log.w(TAG, "No handler registered for ${event::class.simpleName}")
         }
-        forwardToStatusManager(event)
         forwardToSessionStateService(event)
 
         // Cross-handler: SessionDeleted cascades cleanup to other handlers
@@ -195,6 +177,7 @@ class EventDispatcher @Inject constructor(
             questionHandler.clearForSession(sessionId)
             miscHandler.clearForSession(sessionId)
             sessionNextHandler.clearForSession(sessionId)
+            sessionStateService.clearSession(sessionId)
         }
 
         // Cross-handler: CommandExecuted — only mark messages as completed.
@@ -222,31 +205,15 @@ class EventDispatcher @Inject constructor(
             .any { it.time.completed == null }
     }
 
-    // ============ FSM Forwarding (P1: parallel run) ============
+    // ============ FSM Forwarding ============
 
     /**
-     * Forward SSE event to [SessionStatusManager] for parallel FSM processing.
-     * P1: Manager logs transitions only, no UI impact.
-     */
-    private fun forwardToStatusManager(event: SseEvent) {
-        val fsmSessionId = extractSessionId(event)
-        if (fsmSessionId != null) {
-            sessionStatusManager.onSseEvent(event, fsmSessionId)
-        }
-    }
-
-    /**
-     * Forward SSE event to [SessionStateService] for parallel FSM processing (dual-write).
-     * Transition bridge: both [SessionStatusManager] and [SessionStateService] receive the same
-     * status-relevant events until Task 12 deletes the old manager. Reuses [extractSessionId]
-     * — the exact same sessionId extraction + filtering as [forwardToStatusManager] — so the two
-     * FSMs never diverge.
+     * Forward SSE event to [SessionStateService] (the single source of truth) for FSM processing.
      */
     private fun forwardToSessionStateService(event: SseEvent) {
-        val service = sessionStateService ?: return
         val fsmSessionId = extractSessionId(event)
         if (fsmSessionId != null) {
-            service.onSseEvent(event, fsmSessionId)
+            sessionStateService.onSseEvent(event, fsmSessionId)
         }
     }
 
@@ -309,9 +276,6 @@ class EventDispatcher @Inject constructor(
     fun setSessions(serverId: String, sessions: List<Session>) =
         sessionHandler.setSessions(serverId, sessions)
 
-    fun updateSessionStatus(sessionId: String, status: SessionStatus) =
-        sessionHandler.updateSessionStatus(sessionId, status)
-
     fun clearRevert(sessionId: String) {
         // Prune reverted messages from cache BEFORE clearing the filter.
         // Otherwise the filter drops, reverted messages briefly reappear,
@@ -335,65 +299,6 @@ class EventDispatcher @Inject constructor(
 
     fun replaceMessages(sessionId: String, messages: List<MessageWithParts>) =
         messageHandler.replaceMessages(sessionId, messages)
-
-    /**
-     * Batch-update session statuses from REST data.
-     *
-     * Trusts REST as the authoritative source: if REST says a session is idle,
-     * it IS idle. The server's in-memory status (`AgentCoordinator`) is the
-     * ground truth, and REST queries it directly.
-     *
-     * When REST confirms idle for a session that was locally Busy, also
-     * force-complete any incomplete assistant messages — this handles the
-     * case where SSE completion events were lost (network glitch, reordering).
-     */
-    fun syncAllSessionStatuses(statuses: Map<String, SessionStatus>) {
-        // Fix incomplete messages for sessions confirmed idle by REST
-        for ((sessionId, status) in statuses) {
-            if (status is SessionStatus.Idle && hasIncompleteAssistant(sessionId)) {
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "REST confirmed idle for $sessionId with incomplete messages — fixing")
-                }
-                messageHandler.markSessionIdle(sessionId)
-            }
-        }
-
-        // Also handle sessions absent from REST response.
-        // Server deletes idle sessions from its status map, so absence means idle.
-        // Only force-fix if there are no incomplete messages (otherwise SSE may still be streaming).
-        val currentStatuses = sessionHandler.sessionStatuses.value
-        val mergedStatuses = statuses.toMutableMap()
-        for ((sessionId, currentStatus) in currentStatuses) {
-            if (currentStatus !is SessionStatus.Idle && sessionId !in statuses) {
-                if (hasIncompleteAssistant(sessionId)) {
-                    // Incomplete messages — SSE may still be active. Keep current status.
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "Protecting absent session $sessionId (has incomplete messages, was ${currentStatus::class.simpleName})")
-                    }
-                    mergedStatuses[sessionId] = currentStatus
-                } else {
-                    // No incomplete messages and absent from REST — confirmed idle.
-                    // Must explicitly set Idle: updateAllSessionStatuses only updates keys
-                    // present in its input map, so without this the stale Busy persists.
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "Session $sessionId absent from REST, no incomplete messages — marking Idle")
-                    }
-                    mergedStatuses[sessionId] = SessionStatus.Idle
-                }
-            }
-        }
-
-        sessionHandler.updateAllSessionStatuses(mergedStatuses)
-
-        // Sync to SessionStatusManager FSM so UI consumers reading statusFlow (e.g.
-        // ChatScreen's busy progress bar) are corrected in lockstep with this REST
-        // authoritative update — not only the SessionEventHandler layer. Without this,
-        // a REST-confirmed Idle would fix the session list but leave the in-chat
-        // progress bar stuck on Busy (read from the FSM).
-        for ((sessionId, status) in mergedStatuses) {
-            sessionStatusManager.onRestValidation(sessionId, status)
-        }
-    }
 
     fun removePermission(permissionId: String) =
         permissionHandler.removePermission(permissionId)
@@ -432,6 +337,7 @@ class EventDispatcher @Inject constructor(
         questionHandler.clearAll()
         miscHandler.clearAll()
         sessionNextHandler.clearAll()
+        sessionStateService.clearAll()
     }
 
     fun clearForServer(serverId: String) {
@@ -442,26 +348,5 @@ class EventDispatcher @Inject constructor(
         questionHandler.clearForServer(sessionIds)
         miscHandler.clearForServer(sessionIds)
         sessionNextHandler.clearForServer(sessionIds)
-    }
-
-    // ============ State Correction ============
-
-    /**
-     * Force-mark all streaming messages in a session as completed AND set Idle.
-     * Used only for explicit terminal actions: abort, or entering a session
-     * where the server confirms idle but local data has stale incomplete messages.
-     */
-    fun markSessionIdle(sessionId: String) {
-        messageHandler.markSessionIdle(sessionId)
-        sessionHandler.updateSessionStatus(sessionId, SessionStatus.Idle)
-    }
-
-    /**
-     * Update session status to Idle with SSE-freshness protection.
-     * Does NOT modify messages.
-     * Used by periodic REST polling when server confirms a session is idle.
-     */
-    fun markSessionIdleProtected(sessionId: String) {
-        sessionHandler.updateSessionStatusProtected(sessionId, SessionStatus.Idle)
     }
 }
