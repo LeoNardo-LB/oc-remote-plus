@@ -7,14 +7,13 @@ import dev.leonardo.ocremotev2.data.api.NetworkMonitor
 import dev.leonardo.ocremotev2.data.api.file.FileApi
 import dev.leonardo.ocremotev2.data.api.message.MessageApi
 import dev.leonardo.ocremotev2.data.api.session.SessionApi
-import dev.leonardo.ocremotev2.data.api.RestSessionStatusInfo
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
 import dev.leonardo.ocremotev2.data.api.SseClient
 import dev.leonardo.ocremotev2.data.api.SseReadTimeoutTracker
 import dev.leonardo.ocremotev2.data.repository.EventDispatcher
+import dev.leonardo.ocremotev2.data.repository.SessionStateService
 import dev.leonardo.ocremotev2.domain.model.Project
 import dev.leonardo.ocremotev2.domain.model.ServerConfig
-import dev.leonardo.ocremotev2.domain.model.SessionStatus
 import dev.leonardo.ocremotev2.domain.model.SseEvent
 import dev.leonardo.ocremotev2.data.repository.SettingsDataStore
 import kotlinx.coroutines.*
@@ -59,7 +58,8 @@ class SseConnectionManager @Inject constructor(
     private val sseClient: SseClient,
     private val eventDispatcher: EventDispatcher,
     private val settingsRepository: SettingsDataStore,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val sessionStateService: SessionStateService,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -280,8 +280,10 @@ class SseConnectionManager @Inject constructor(
                 }
                 Log.i(TAG, "[${server.displayName}] Pre-loaded $totalSessions sessions across ${projects.size} projects")
             }
-            // Initialize session statuses from server
-            syncSessionStatuses(conn)
+            // Initialize session statuses from server via the unified FSM pipeline
+            // (aggregate across project worktrees + absence=idle + incomplete-protection).
+            sessionStateService.setServerId(server.id)
+            sessionStateService.syncFromRest(projects)
         } catch (e: Exception) {
             Log.w(TAG, "[${server.displayName}] Failed to pre-load sessions: ${e.message}")
         }
@@ -310,55 +312,10 @@ class SseConnectionManager @Inject constructor(
         }
         Log.i(TAG, "[${server.displayName}] Recovered messages for $recoveredCount/${sessionIds.size} sessions")
 
-        // Phase 2: Sync real session statuses from server
-        syncSessionStatuses(conn)
-    }
-
-    /**
-     * Fetch real session statuses from REST API and update the dispatcher.
-     * Only marks sessions as idle when the server confirms they are idle.
-     */
-    private suspend fun syncSessionStatuses(conn: ServerConnection) {
-        try {
-            // Aggregate across ALL project worktrees: the server isolates status
-            // per-directory, so a single null-directory query would miss non-default
-            // worktrees' active sessions (treated as idle). See session-status-sync
-            // investigation for root cause.
-            val projects = fileApi.listProjects(conn)
-            val aggregated = mutableMapOf<String, RestSessionStatusInfo>()
-            if (projects.isEmpty()) {
-                sessionApi.fetchSessionStatus(conn).onSuccess { aggregated.putAll(it) }
-            } else {
-                for (project in projects) {
-                    sessionApi.fetchSessionStatus(conn, directory = project.worktree)
-                        .onSuccess { aggregated.putAll(it) }
-                }
-            }
-            val statusMap = aggregated.mapValues { (_, info) ->
-                when (info.type) {
-                    "busy" -> SessionStatus.Busy
-                    "retry" -> SessionStatus.Retry(
-                        attempt = info.attempt ?: 0,
-                        message = info.message ?: "",
-                        next = info.next ?: 0L
-                    )
-                    else -> SessionStatus.Idle
-                }
-            }
-            eventDispatcher.syncAllSessionStatuses(statusMap)
-
-                // Mark idle sessions with SSE-freshness protection (status only, no message fix).
-                // syncAllSessionStatuses already prevents downgrade for sessions with
-                // incomplete assistant messages (hasIncompleteAssistant check).
-                for ((sessionId, status) in statusMap) {
-                    if (status is SessionStatus.Idle) {
-                        eventDispatcher.markSessionIdleProtected(sessionId)
-                    }
-                }
-                Log.i(TAG, "Synced statuses for ${statusMap.size} sessions from REST across ${projects.size} projects")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to sync session statuses: ${e.message}")
-        }
+        // Phase 2: Sync real session statuses from server via the unified FSM pipeline.
+        val projects = fileApi.listProjects(conn)
+        sessionStateService.setServerId(server.id)
+        sessionStateService.syncFromRest(projects)
     }
 
     private fun updateServerConnected(serverId: String, connected: Boolean) {

@@ -13,7 +13,6 @@ import dev.leonardo.ocremotev2.data.dto.response.FileNodeDto
 import dev.leonardo.ocremotev2.data.dto.response.ServerPaths
 import dev.leonardo.ocremotev2.data.api.file.FileApi
 import dev.leonardo.ocremotev2.data.api.session.SessionApi
-import dev.leonardo.ocremotev2.data.api.RestSessionStatusInfo
 import dev.leonardo.ocremotev2.data.api.system.SystemApi
 import dev.leonardo.ocremotev2.data.api.terminal.TerminalApi
 import dev.leonardo.ocremotev2.domain.model.ServerConnection
@@ -282,8 +281,10 @@ class SessionListViewModel @Inject constructor(
                     }
                     if (BuildConfig.DEBUG) Log.d(TAG, "Total: loaded $totalSessions sessions across ${projects.size} projects for server $serverId")
                 }
-                // Sync session statuses from server (one-time, no polling)
-                syncSessionStatusesFromServer()
+                // Sync session statuses from server via the unified FSM pipeline
+                // (aggregate across project worktrees + absence=idle + incomplete-protection).
+                sessionStateService.setServerId(serverId)
+                sessionStateService.syncFromRest(_projects.value)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load sessions", e)
                 _error.value = e.message ?: "Failed to load sessions"
@@ -330,57 +331,15 @@ class SessionListViewModel @Inject constructor(
                         }
                     }
                 }
-                // Sync session statuses from server
-                syncSessionStatusesFromServer()
+                // Sync session statuses from server via the unified FSM pipeline.
+                sessionStateService.setServerId(serverId)
+                sessionStateService.syncFromRest(_projects.value)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to refresh sessions", e)
                 _error.value = e.message ?: "Failed to refresh sessions"
             } finally {
                 _isRefreshing.value = false
             }
-        }
-    }
-
-    private fun RestSessionStatusInfo.toStatus(): SessionStatus = when (type) {
-        "busy" -> SessionStatus.Busy
-        "retry" -> SessionStatus.Retry(attempt = attempt ?: 0, message = message ?: "", next = next ?: 0L)
-        else -> SessionStatus.Idle
-    }
-
-    private suspend fun syncSessionStatuses(directory: String? = null) {
-        try {
-            val result = sessionApi.fetchSessionStatus(conn, directory = directory)
-            result.onSuccess { statuses ->
-                if (BuildConfig.DEBUG) Log.d(TAG, "Polled ${statuses.size} session statuses for directory: ${directory ?: "all"}")
-                eventDispatcher.syncAllSessionStatuses(statuses.mapValues { it.value.toStatus() })
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to sync session statuses: ${e.message}")
-        }
-    }
-
-    /**
-     * Aggregate session statuses across ALL project worktrees. The server isolates
-     * status per-directory (per server instance); a single null-directory query only
-     * returns the default instance's sessions, leaving other worktrees' active
-     * sessions invisible (treated as idle). Must query each project worktree.
-     */
-    private suspend fun syncSessionStatusesFromServer() {
-        val projects = _projects.value
-        val aggregated = mutableMapOf<String, RestSessionStatusInfo>()
-        try {
-            if (projects.isEmpty()) {
-                sessionApi.fetchSessionStatus(conn).onSuccess { aggregated.putAll(it) }
-            } else {
-                for (project in projects) {
-                    sessionApi.fetchSessionStatus(conn, directory = project.worktree)
-                        .onSuccess { aggregated.putAll(it) }
-                }
-            }
-            if (BuildConfig.DEBUG) Log.d(TAG, "Aggregated ${aggregated.size} session statuses across ${projects.size} projects")
-            eventDispatcher.syncAllSessionStatuses(aggregated.mapValues { it.value.toStatus() })
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to sync session statuses: ${e.message}")
         }
     }
 
