@@ -118,6 +118,26 @@ class SessionNextEventTest {
     }
 
     @Test
+    fun `ToolProgress parses with content`() {
+        val eventJson = """{"type":"session.next.tool.progress","sessionID":"s1","messageID":"m1","partID":"p3","callID":"c1","progress":"50%","title":"Running...","content":[{"type":"text","text":"line1\n"}]}"""
+        val event = json.decodeFromString<SessionNextEvent>(eventJson)
+        assertTrue(event is SessionNextEvent.ToolProgress)
+        val progress = event as SessionNextEvent.ToolProgress
+        assertEquals("c1", progress.callId)
+        assertEquals(1, progress.content.size)
+        assertEquals("text", progress.content[0].type)
+        assertEquals("line1\n", progress.content[0].text)
+    }
+
+    @Test
+    fun `ToolProgress without content defaults to empty`() {
+        val eventJson = """{"type":"session.next.tool.progress","sessionID":"s1","messageID":"m1","partID":"p3","callID":"c1","progress":"50%"}"""
+        val event = json.decodeFromString<SessionNextEvent>(eventJson)
+        val progress = event as SessionNextEvent.ToolProgress
+        assertTrue(progress.content.isEmpty())
+    }
+
+    @Test
     fun `ToolSuccess parses correctly`() {
         val eventJson = """{"type":"session.next.tool.success","sessionID":"s1","messageID":"m1","partID":"p3","callID":"c1","output":"done"}"""
         val event = json.decodeFromString<SessionNextEvent>(eventJson)

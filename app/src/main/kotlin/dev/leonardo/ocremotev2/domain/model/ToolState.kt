@@ -38,6 +38,7 @@ sealed class ToolState {
     @Serializable
     data class Running(
         val input: Map<String, JsonElement> = emptyMap(),
+        val output: String = "",
         val title: String? = null,
         val metadata: Map<String, JsonElement>? = null,
         val time: Time? = null

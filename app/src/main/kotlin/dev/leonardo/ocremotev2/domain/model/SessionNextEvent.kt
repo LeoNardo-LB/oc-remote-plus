@@ -151,6 +151,13 @@ sealed class SessionNextEvent {
         val input: Map<String, JsonElement> = emptyMap()
     ) : SessionNextEvent()
 
+    /** OpenCode ToolOutput.Content 元素 —— 工具输出内容块。 */
+    @Serializable
+    data class ToolOutputContent(
+        val type: String = "text",
+        val text: String = ""
+    )
+
     @Serializable
     data class ToolProgress(
         @SerialName("sessionID") override val sessionId: String,
@@ -158,7 +165,8 @@ sealed class SessionNextEvent {
         @SerialName("partID") val partId: String,
         @SerialName("callID") val callId: String,
         val progress: String? = null,
-        val title: String? = null
+        val title: String? = null,
+        val content: List<ToolOutputContent> = emptyList()
     ) : SessionNextEvent()
 
     @Serializable
