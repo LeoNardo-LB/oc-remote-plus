@@ -265,6 +265,7 @@ class ChatViewModelQueuedTest {
                 every { chatRepo.getMessagesFlow(any()) } answers { eventDispatcher.messages.map { it[firstArg<String>()] ?: emptyList() } }
                 every { chatRepo.getParts(any()) } answers { eventDispatcher.parts.map { it[firstArg<String>()] ?: emptyList() } }
                 every { chatRepo.getAllPartsMap() } returns eventDispatcher.parts
+                every { chatRepo.getActiveToolProgressForSession(any()) } returns flowOf(emptyList())
                 every { chatRepo.setMessages(any(), any()) } answers { eventDispatcher.setMessages(firstArg(), secondArg()) }
                 every { chatRepo.mergeMessages(any(), any()) } answers { eventDispatcher.mergeMessages(firstArg(), secondArg()) }
                 every { chatRepo.replaceMessages(any(), any()) } answers { eventDispatcher.replaceMessages(firstArg(), secondArg()) }

@@ -8,12 +8,14 @@ import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.domain.model.Session
 import dev.leonardo.ocremotev2.domain.model.SessionStatus
 import dev.leonardo.ocremotev2.domain.model.SseEvent
+import dev.leonardo.ocremotev2.domain.model.ToolProgressInfo
 import dev.leonardo.ocremotev2.domain.repository.ChatRepository
 import dev.leonardo.ocremotev2.domain.repository.SessionRepository
 import dev.leonardo.ocremotev2.domain.repository.SettingsRepository
 import dev.leonardo.ocremotev2.domain.usecase.ManagePermissionUseCase
 import dev.leonardo.ocremotev2.domain.usecase.ManageSessionUseCase
 import dev.leonardo.ocremotev2.domain.usecase.MessagePaginationUseCase
+import dev.leonardo.ocremotev2.ui.screens.chat.tools.ToolProgressOutputInjector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -123,6 +125,7 @@ internal class MessageDataDelegate(
             _toolExpandedStates,
             _pendingMessageIds,
             sessionStateService.statusFlow,
+            chatRepository.getActiveToolProgressForSession(sid),
         ) { args ->
             @Suppress("UNCHECKED_CAST")
             val allSessions = args[0] as List<Session>
@@ -139,6 +142,13 @@ internal class MessageDataDelegate(
             val pendingMessageIds = args[7] as Set<String>
             @Suppress("UNCHECKED_CAST")
             val statuses = args[8] as Map<String, SessionStatus>
+
+            // Tool progress output injection: accumulate tool.progress content into
+            // Running tools' output field. callId is globally unique, so a single
+            // progressOutputs map is safe across all messages in this session.
+            @Suppress("UNCHECKED_CAST")
+            val progressList = args[9] as? List<ToolProgressInfo>
+            val progressOutputs = progressList.orEmpty().associate { it.callId to it.output }
 
             val session = allSessions.find { it.id == sid }
             val revertState = session?.revert
@@ -185,9 +195,10 @@ internal class MessageDataDelegate(
                     msg is Message.User || (msg is Message.Assistant && allParts[msg.id]?.isNotEmpty() == true)
                 }
                 .map { msg ->
+                    val rawParts = allParts[msg.id] ?: emptyList()
                     ChatMessage(
                         message = msg,
-                        parts = allParts[msg.id] ?: emptyList()
+                        parts = ToolProgressOutputInjector.inject(rawParts, progressOutputs)
                     )
                 }
 

@@ -124,6 +124,7 @@ class ChatViewModelStreamingTest {
                 }
             }
             every { it.getAllPartsMap() } returns partsFlow
+            every { it.getActiveToolProgressForSession(any()) } returns flowOf(emptyList())
             every { it.setMessages(any(), any()) } answers {
                 val sid = firstArg<String>()
                 val msgs = secondArg<List<dev.leonardo.ocremotev2.domain.model.MessageWithParts>>()

@@ -374,7 +374,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     private fun DataToolProgressInfo.toDomain() = ToolProgressInfo(
         callId = callId, partId = partId, tool = tool,
-        status = status, progress = progress, title = title
+        status = status, progress = progress, title = title, output = output
     )
 
     private fun DataStepProgressInfo.toDomain() = StepProgressInfo(

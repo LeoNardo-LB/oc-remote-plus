@@ -196,6 +196,7 @@ internal fun ToolCallCard(
                     }
                     val output = when (val s = tool.state) {
                         is ToolState.Completed -> s.output
+                        is ToolState.Running -> s.output
                         is ToolState.Error -> s.error
                         else -> ""
                     }
@@ -234,6 +235,7 @@ internal fun extractToolInput(tool: Part.Tool): Map<String, kotlinx.serializatio
 internal fun extractToolOutput(tool: Part.Tool): String {
     return when (val s = tool.state) {
         is ToolState.Completed -> s.output
+        is ToolState.Running -> s.output
         is ToolState.Error -> s.error
         else -> ""
     }

@@ -10,5 +10,6 @@ data class ToolProgressInfo(
     val tool: String,
     val status: String,
     val progress: String? = null,
-    val title: String? = null
+    val title: String? = null,
+    val output: String = ""
 )
