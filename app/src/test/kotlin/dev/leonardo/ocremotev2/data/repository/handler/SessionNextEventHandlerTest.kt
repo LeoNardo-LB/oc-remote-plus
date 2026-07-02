@@ -1,6 +1,7 @@
 ﻿package dev.leonardo.ocremotev2.data.repository.handler
 
 import dev.leonardo.ocremotev2.domain.model.SessionNextEvent
+import dev.leonardo.ocremotev2.domain.model.SessionNextEvent.ToolOutputContent
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -70,6 +71,30 @@ class SessionNextEventHandlerTest {
         val tools = handler.activeToolProgress.value["s1"]!!
         assertEquals("50%", tools[0].progress)
         assertEquals("Running ls", tools[0].title)
+    }
+
+    @Test
+    fun `ToolProgress accumulates content into output`() {
+        handler.handleSessionNextEvent(
+            SessionNextEvent.ToolInputStarted(
+                sessionId = "s1", messageId = "m1", partId = "p1",
+                callId = "c1", tool = "bash"
+            )
+        )
+        handler.handleSessionNextEvent(
+            SessionNextEvent.ToolProgress(
+                sessionId = "s1", messageId = "m1", partId = "p1", callId = "c1",
+                content = listOf(ToolOutputContent(text = "line1\n"))
+            )
+        )
+        handler.handleSessionNextEvent(
+            SessionNextEvent.ToolProgress(
+                sessionId = "s1", messageId = "m1", partId = "p1", callId = "c1",
+                content = listOf(ToolOutputContent(text = "line2\n"))
+            )
+        )
+        val tool = handler.activeToolProgress.value["s1"]!![0]
+        assertEquals("line1\nline2\n", tool.output)
     }
 
     @Test

@@ -20,7 +20,8 @@ data class ToolProgressInfo(
     val tool: String,
     val status: String,
     val progress: String? = null,
-    val title: String? = null
+    val title: String? = null,
+    val output: String = ""
 )
 
 /**
@@ -169,12 +170,14 @@ class SessionNextEventHandler @Inject constructor() : SseEventHandler {
     private fun handleToolProgress(event: SessionNextEvent.ToolProgress) {
         _activeToolProgress.update { current ->
             val sessionTools = current[event.sessionId] ?: return@update current
+            val outputDelta = event.content.joinToString("") { it.text }
             val updated = sessionTools.map { tool ->
                 if (tool.callId == event.callId) {
                     tool.copy(
                         status = "running",
                         progress = event.progress,
-                        title = event.title
+                        title = event.title,
+                        output = tool.output + outputDelta
                     )
                 } else tool
             }
