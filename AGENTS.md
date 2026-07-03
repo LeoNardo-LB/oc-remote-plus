@@ -86,6 +86,7 @@ di/                Hilt modules (NetworkModule, DomainModule)
 - Repository implementations bridge EventDispatcher (state) + API (network).
 - DI uses **KSP** (not kapt) for Hilt annotation processing.
 - Terminal uses WebSocket transport for PTY streams; SSE for events.
+- **SessionStateService is the single source of truth for session status & streaming activity** (idle/busy/retry + Waiting/Streaming/ToolCalling). All UI reads `statusFlow`/`activityFlow`; all status writes flow through its pure-function FSM (`SessionStateFSM`) with an exhaustive transition matrix + self-driven staleness/REST recovery loop. Do NOT reintroduce per-handler status state — `SessionStatusManager` and `SessionEventHandler._sessionStatuses` were removed for this reason. See `docs/research/session-status-sync-investigation.md` for the redesign rationale.
 
 ## OpenCode Server API Reference
 
