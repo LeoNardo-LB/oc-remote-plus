@@ -524,6 +524,7 @@ fun ChatScreen(
         LocalOnViewTool provides onViewToolLambda,
         LocalSessionStreaming provides sessionMeta.isStreaming,
     ) {
+    var showQuickNavigate by remember { mutableStateOf(false) }
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
@@ -624,6 +625,7 @@ fun ChatScreen(
                             attachmentHandler.launchExport("$slug.json")
                         },
                         onOpenWorkspace = onOpenWorkspace,
+                        onQuickNavigate = { showQuickNavigate = true },
 
                     )
                     // Indeterminate progress bar under the top bar when busy
@@ -1046,6 +1048,8 @@ fun ChatScreen(
                                 navigateToChildSession = onNavigateToChildSession,
                                 onOpenFile = handleOpenFile,
                                 onForceScrollToBottom = { forceScrollTick++ },
+                                showQuickNavigate = showQuickNavigate,
+                                onQuickNavigateDismiss = { showQuickNavigate = false },
                                 agents = modelConfig.agents,
 
                                 modifier = Modifier.fillMaxSize(),
@@ -1071,6 +1075,8 @@ fun ChatScreen(
                                 navigateToChildSession = onNavigateToChildSession,
                                 onOpenFile = handleOpenFile,
                                 onForceScrollToBottom = { forceScrollTick++ },
+                                showQuickNavigate = false,
+                                onQuickNavigateDismiss = {},
                                 agents = modelConfig.agents,
 
                                 modifier = Modifier.fillMaxSize(),

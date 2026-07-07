@@ -1,9 +1,11 @@
-﻿package dev.leonardo.ocremotev2.di
+package dev.leonardo.ocremotev2.di
 
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import android.util.Log
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +22,10 @@ object CoroutinesModule {
     @Provides
     @Singleton
     @ApplicationScope
-    fun provideApplicationScope(): CoroutineScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun provideApplicationScope(): CoroutineScope {
+        val handler = CoroutineExceptionHandler { _, exception ->
+            Log.e("ApplicationScope", "Unhandled coroutine exception", exception)
+        }
+        return CoroutineScope(SupervisorJob() + Dispatchers.Default + handler)
+    }
 }

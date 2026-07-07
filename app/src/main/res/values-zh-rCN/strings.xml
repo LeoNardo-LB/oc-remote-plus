@@ -243,6 +243,7 @@
     <string name="chat_load_earlier">加载更早的消息</string>
     <string name="chat_loading_earlier">加载中…</string>
     <string name="chat_menu_open_workspace">查看工作空间</string>
+    <string name="menu_quick_navigate">快速定位</string>
     <string name="menu_open_in_web">在 Web 中打开</string>
     <string name="menu_new_session">新会话</string>
     <string name="menu_fork_session">分叉会话</string>

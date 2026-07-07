@@ -1,4 +1,4 @@
-﻿package dev.leonardo.ocremotev2.service
+package dev.leonardo.ocremotev2.service
 
 import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
@@ -61,7 +61,17 @@ class SseConnectionManager @Inject constructor(
     private val networkMonitor: NetworkMonitor,
     private val sessionStateService: SessionStateService,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, exception ->
+            // Defense-in-depth: ensures uncaught exceptions during SSE connection
+            // lifecycle (DNS failures, reconnect races) do not crash the process.
+            // The launch in startSseConnection wraps network calls in try/catch,
+            // but this catches anything that escapes — particularly important because
+            // reconnectServer() cancels the running job then starts a new one, which can
+            // race with an in-flight DNS resolution and surface as UnknownHostException.
+            Log.e(TAG, "Unhandled coroutine exception in SSE connection scope", exception)
+        }
+    )
 
     /** All active/pending server connections keyed by serverId. */
     val connections = ConcurrentHashMap<String, ServerConnectionState>()
@@ -313,9 +323,17 @@ class SseConnectionManager @Inject constructor(
         Log.i(TAG, "[${server.displayName}] Recovered messages for $recoveredCount/${sessionIds.size} sessions")
 
         // Phase 2: Sync real session statuses from server via the unified FSM pipeline.
-        val projects = fileApi.listProjects(conn)
-        sessionStateService.setServerId(server.id)
-        sessionStateService.syncFromRest(projects)
+        // Wrap in try-catch: listProjects / syncFromRest may throw NoTransformationFoundException
+        // when the server returns a non-JSON error response (e.g. 502 Bad Gateway from a reverse
+        // proxy). Phase 1 message recovery is already complete at this point, so a Phase 2 failure
+        // should not propagate and abort the reconnect cycle.
+        try {
+            val projects = fileApi.listProjects(conn)
+            sessionStateService.setServerId(server.id)
+            sessionStateService.syncFromRest(projects)
+        } catch (e: Exception) {
+            Log.w(TAG, "[${server.displayName}] Failed to sync session statuses during recovery: ${e.message}")
+        }
     }
 
     private fun updateServerConnected(serverId: String, connected: Boolean) {

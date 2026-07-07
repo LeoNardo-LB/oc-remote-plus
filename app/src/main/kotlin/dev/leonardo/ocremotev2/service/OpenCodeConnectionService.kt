@@ -1,4 +1,4 @@
-﻿package dev.leonardo.ocremotev2.service
+package dev.leonardo.ocremotev2.service
 
 import android.app.NotificationManager
 import android.app.Service
@@ -83,7 +83,16 @@ class OpenCodeConnectionService : Service() {
     lateinit var sessionFocusHolder: SessionFocusHolder
 
     private val binder = LocalBinder()
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, exception ->
+            // Defense-in-depth: ensures uncaught exceptions (e.g. UnknownHostException
+            // during auto-connect to unreachable servers like Tailscale nodes) do not
+            // propagate to the thread UncaughtExceptionHandler and crash the process.
+            // Individual launches already wrap network calls in try/catch; this catches
+            // anything that escapes (race conditions during reconnect, R8 inlining, etc.).
+            Log.e(TAG, "Unhandled coroutine exception in serviceScope", exception)
+        }
+    )
 
     private var notificationWatchdogJob: Job? = null
     private var networkRecoveryJob: Job? = null

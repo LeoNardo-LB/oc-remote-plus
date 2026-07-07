@@ -80,7 +80,10 @@ import dev.leonardo.ocremotev2.ui.screens.chat.components.AlwaysConfirmDialog
 import dev.leonardo.ocremotev2.ui.screens.chat.util.snapToBottom
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.RenderableTurn
 import dev.leonardo.ocremotev2.ui.screens.chat.tools.computeRenderableTurn
+import dev.leonardo.ocremotev2.ui.screens.chat.util.JumpTarget
 import dev.leonardo.ocremotev2.ui.screens.chat.util.computeTurnGroups
+import dev.leonardo.ocremotev2.ui.screens.chat.util.extractJumpTargets
+import dev.leonardo.ocremotev2.ui.screens.chat.util.findCurrentQuestionRawIndex
 import dev.leonardo.ocremotev2.ui.screens.chat.util.formatAssistantErrorMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -116,6 +119,8 @@ fun ChatMessageList(
     navigateToChildSession: (String) -> Unit,
     onOpenFile: (filePath: String) -> Unit,
     onForceScrollToBottom: () -> Unit,
+    showQuickNavigate: Boolean,
+    onQuickNavigateDismiss: () -> Unit,
     agents: List<dev.leonardo.ocremotev2.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -173,6 +178,43 @@ fun ChatMessageList(
     }
     val currentCompaction = compactionState?.let { 
         CompactionStateInfo(isActive = it.isActive, reason = it.reason)
+    }
+
+    // Quick Navigate: extract jump targets + track current question
+    val jumpTargets = remember(rawMessages) { extractJumpTargets(rawMessages) }
+
+    val currentQuestionRawIndex by remember(rawMessages) {
+        derivedStateOf { findCurrentQuestionRawIndex(listState, rawMessages) }
+    }
+
+    // Number of non-message items rendered before itemsIndexed in the LazyColumn.
+    // MUST mirror the conditional `item { ... }` blocks below (see banner rendering).
+    val bannerCount = remember(
+        sessionMeta.revert,
+        currentCompaction,
+        sessionMeta.sessionStatus,
+        activeTools,
+        currentStep,
+        interaction.pendingQuestions,
+        interaction.pendingPermissions,
+    ) {
+        (if (sessionMeta.revert != null) 1 else 0) +
+        (if (currentCompaction != null && currentCompaction.isActive) 1 else 0) +
+        (if (sessionMeta.sessionStatus is SessionStatus.Retry) 1 else 0) +
+        (if (activeTools.isNotEmpty()) 1 else 0) +
+        (if (currentStep != null) 1 else 0) +
+        (if (interaction.pendingQuestions.isNotEmpty()) 1 else 0) +
+        (if (interaction.pendingPermissions.isNotEmpty()) 1 else 0)
+    }
+
+    fun jumpToMessage(msgId: String) {
+        val displayItemIndex = displayItems.indexOfFirst { it.second.message.id == msgId }
+        if (displayItemIndex < 0) return
+        val lazyIndex = bannerCount + displayItemIndex
+        coroutineScope.launch {
+            LazyListReflection.requestScrollToItemNoCancel(listState, lazyIndex, 0)
+        }
+        onQuickNavigateDismiss()
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -551,6 +593,15 @@ fun ChatMessageList(
                     )
                 }
             }
+
+            // Quick navigate bottom sheet
+            QuickNavigateSheet(
+                show = showQuickNavigate,
+                jumpTargets = jumpTargets,
+                currentRawIndex = currentQuestionRawIndex,
+                onJump = { msgId -> jumpToMessage(msgId) },
+                onDismiss = onQuickNavigateDismiss,
+            )
 
             // Always-allow confirmation dialog
             showAlwaysDialog?.let { perm ->
