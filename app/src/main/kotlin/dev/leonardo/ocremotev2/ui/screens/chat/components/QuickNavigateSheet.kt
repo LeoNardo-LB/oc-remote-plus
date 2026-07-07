@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -26,6 +27,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,18 @@ fun QuickNavigateSheet(
     if (!show) return
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetListState = rememberLazyListState()
+
+    // Auto-scroll to the currently-highlighted question when the sheet opens,
+    // so the user sees their current position instead of Q1.
+    LaunchedEffect(show, currentRawIndex) {
+        if (currentRawIndex != null) {
+            val targetIndex = jumpTargets.indexOfFirst { it.rawIndex == currentRawIndex }
+            if (targetIndex >= 0) {
+                sheetListState.scrollToItem(targetIndex)
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -99,6 +113,7 @@ fun QuickNavigateSheet(
         }
 
         LazyColumn(
+            state = sheetListState,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(bottom = SpacingTokens.XXL.dp),
         ) {
