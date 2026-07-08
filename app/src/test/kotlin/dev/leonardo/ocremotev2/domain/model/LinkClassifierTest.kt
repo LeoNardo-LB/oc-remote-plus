@@ -128,4 +128,56 @@ class LinkClassifierTest {
     fun `boolean literal is not likely file path`() {
         assertFalse(LinkClassifier.isLikelyFilePath("true"))
     }
+
+    // === Whitelist behavior tests ===
+
+    @Test
+    fun `package name is not likely file path`() {
+        assertFalse(LinkClassifier.isLikelyFilePath("com.example.foo"))
+    }
+
+    @Test
+    fun `multi-segment package name is not likely file path`() {
+        assertFalse(LinkClassifier.isLikelyFilePath("org.springframework.boot"))
+    }
+
+    @Test
+    fun `version string is not likely file path`() {
+        assertFalse(LinkClassifier.isLikelyFilePath("1.0.0-beta"))
+    }
+
+    @Test
+    fun `unknown extension is not likely file path`() {
+        assertFalse(LinkClassifier.isLikelyFilePath("unknown.xyz"))
+    }
+
+    @Test
+    fun `Makefile is likely file path`() {
+        assertTrue(LinkClassifier.isLikelyFilePath("Makefile"))
+    }
+
+    @Test
+    fun `Dockerfile is likely file path`() {
+        assertTrue(LinkClassifier.isLikelyFilePath("Dockerfile"))
+    }
+
+    @Test
+    fun `gitignore is likely file path`() {
+        assertTrue(LinkClassifier.isLikelyFilePath(".gitignore"))
+    }
+
+    @Test
+    fun `yaml extension is likely file path`() {
+        assertTrue(LinkClassifier.isLikelyFilePath("config.yaml"))
+    }
+
+    @Test
+    fun `toml extension is likely file path`() {
+        assertTrue(LinkClassifier.isLikelyFilePath("Cargo.toml"))
+    }
+
+    @Test
+    fun `path to unknown file is likely file path`() {
+        assertTrue(LinkClassifier.isLikelyFilePath("src/unknown"))
+    }
 }
