@@ -6,9 +6,14 @@ enum class FileType {
     IMAGE,
     SVG,
     CSV,
-    JSON;
+    JSON,
+    HTML,
+    PDF;
 
-    val supportsRender: Boolean get() = this != TEXT && this != JSON
+    val supportsRender: Boolean get() = this != TEXT
+
+    /** PDF 的源码模式对 base64 数据无意义，不显示切换按钮 */
+    val supportsSourceView: Boolean get() = this != PDF
 
     companion object {
         private val EXT_MAP: Map<String, FileType> = mapOf(
@@ -17,7 +22,9 @@ enum class FileType {
             "gif" to IMAGE, "webp" to IMAGE, "bmp" to IMAGE,
             "svg" to SVG,
             "csv" to CSV, "tsv" to CSV,
-            "json" to JSON
+            "json" to JSON,
+            "html" to HTML, "htm" to HTML,
+            "pdf" to PDF
         )
 
         fun fromExtension(filePath: String): FileType =

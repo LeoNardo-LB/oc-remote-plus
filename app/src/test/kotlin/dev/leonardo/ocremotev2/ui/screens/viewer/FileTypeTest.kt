@@ -50,12 +50,41 @@ class FileTypeTest {
         assertEquals(FileType.TEXT, FileType.fromExtension("Makefile"))
     }
     @Test
-    fun `supportsRender is false for TEXT and JSON`() {
+    fun `supportsRender is false for TEXT only`() {
         assertFalse(FileType.TEXT.supportsRender)
-        assertFalse(FileType.JSON.supportsRender)
+        assertTrue(FileType.JSON.supportsRender)
         assertTrue(FileType.MARKDOWN.supportsRender)
         assertTrue(FileType.IMAGE.supportsRender)
         assertTrue(FileType.SVG.supportsRender)
         assertTrue(FileType.CSV.supportsRender)
+    }
+    @Test
+    fun `html extension maps to HTML`() {
+        assertEquals(FileType.HTML, FileType.fromExtension("index.html"))
+    }
+    @Test
+    fun `htm extension maps to HTML`() {
+        assertEquals(FileType.HTML, FileType.fromExtension("page.htm"))
+    }
+    @Test
+    fun `uppercase HTML maps to HTML`() {
+        assertEquals(FileType.HTML, FileType.fromExtension("page.HTML"))
+    }
+    @Test
+    fun `pdf extension maps to PDF`() {
+        assertEquals(FileType.PDF, FileType.fromExtension("report.pdf"))
+    }
+    @Test
+    fun `supportsRender is true for HTML and PDF`() {
+        assertTrue(FileType.HTML.supportsRender)
+        assertTrue(FileType.PDF.supportsRender)
+    }
+    @Test
+    fun `supportsSourceView is false for PDF and true for all others`() {
+        assertFalse(FileType.PDF.supportsSourceView)
+        assertTrue(FileType.TEXT.supportsSourceView)
+        assertTrue(FileType.HTML.supportsSourceView)
+        assertTrue(FileType.MARKDOWN.supportsSourceView)
+        assertTrue(FileType.IMAGE.supportsSourceView)
     }
 }
