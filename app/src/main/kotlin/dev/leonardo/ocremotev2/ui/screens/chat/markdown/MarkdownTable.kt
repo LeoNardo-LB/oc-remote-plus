@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
@@ -21,12 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.annotator.annotatorSettings
-import com.mikepenz.markdown.annotator.buildMarkdownAnnotatedString
 import com.mikepenz.markdown.compose.elements.material.MarkdownBasicText
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes.HEADER as GFMHeader
@@ -56,6 +58,8 @@ internal fun SimpleMarkdownTable(
     content: String,
     tableNode: ASTNode,
     style: TextStyle,
+    uriHandler: UriHandler,
+    linkColor: Color,
 ) {
     val headerBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = AlphaTokens.MUTED)
     val rowBgOdd = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = AlphaTokens.MUTED)
@@ -144,13 +148,15 @@ internal fun SimpleMarkdownTable(
                                 )
                                 .padding(horizontal = pad, vertical = if (row.isHeader) 8.dp else 6.dp)
                         ) {
+                            val cellResult = remember(content, cell) {
+                                buildClickableMarkdown(content, cell, cellStyle, annotator, linkColor)
+                            }
+                            var cellLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
                             MarkdownBasicText(
-                                text = content.buildMarkdownAnnotatedString(
-                                    textNode = cell,
-                                    style = cellStyle,
-                                    annotatorSettings = annotator,
-                                ),
+                                text = cellResult.annotatedString,
                                 style = cellStyle,
+                                onTextLayout = { cellLayoutResult = it },
+                                modifier = Modifier.clickableMarkdown(cellResult, { cellLayoutResult }, uriHandler),
                             )
                         }
                     }

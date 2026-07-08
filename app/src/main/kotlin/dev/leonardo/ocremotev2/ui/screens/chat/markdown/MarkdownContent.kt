@@ -325,7 +325,7 @@ internal fun MarkdownContent(
                 }
             },
             table = { model ->
-                SimpleMarkdownTable(model.content, model.node, model.typography.table)
+                SimpleMarkdownTable(model.content, model.node, model.typography.table, uriHandler, linkColor)
             },
         )
     }
