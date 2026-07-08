@@ -725,4 +725,81 @@ class FileViewerViewModelTest {
         vm.toggleRenderMode()
         assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) { "toggle should switch to SOURCE" }
     }
+
+    // ===== Task 3: HTML + PDF tests =====
+
+    @Test
+    fun `init with html file sets fileType HTML and renderMode RENDER_PREVIEW`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "index.html",
+                type = ContentType.TEXT,
+                content = "<!DOCTYPE html><html><body><h1>Hello</h1></body></html>"
+            )
+        )
+        val vm = FileViewerViewModel(
+            fileViewerParams(path = "index.html"),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        assert(vm.uiState.value.fileType == FileType.HTML) { "fileType should be HTML" }
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) { "HTML should default to RENDER_PREVIEW (supportsRender=true)" }
+    }
+
+    @Test
+    fun `toggleRenderMode works for HTML files`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "index.html",
+                type = ContentType.TEXT,
+                content = "<!DOCTYPE html><html></html>"
+            )
+        )
+        val vm = FileViewerViewModel(
+            fileViewerParams(path = "index.html"),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) { "HTML defaults to RENDER_PREVIEW" }
+        vm.toggleRenderMode()
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.SOURCE) { "toggle to SOURCE" }
+    }
+
+    @Test
+    fun `init with pdf binary sets fileType PDF and retains base64 content`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "report.pdf",
+                type = ContentType.BINARY,
+                content = "JVBERi0xLjcKJeLjz9MK",
+                mimeType = "application/pdf"
+            )
+        )
+        val vm = FileViewerViewModel(
+            fileViewerParams(path = "report.pdf"),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        assert(vm.uiState.value.fileType == FileType.PDF) { "fileType should be PDF" }
+        assert(!vm.uiState.value.isBinary) { "PDF should not be marked isBinary" }
+        assert(vm.uiState.value.content == "JVBERi0xLjcKJeLjz9MK") { "base64 content should be retained" }
+        assert(vm.uiState.value.mimeType == "application/pdf") { "mimeType should be preserved" }
+        assert(vm.uiState.value.renderMode == FileViewerRenderMode.RENDER_PREVIEW) { "PDF should default to RENDER_PREVIEW" }
+    }
+
+    @Test
+    fun `toggleRenderMode is no-op for PDF files`() = runTest {
+        coEvery { getFileContent(any(), any(), any()) } returns Result.success(
+            dev.leonardo.ocremotev2.domain.model.FileContent(
+                path = "report.pdf",
+                type = ContentType.BINARY,
+                content = "JVBERi0xLjcKJeLjz9MK",
+                mimeType = "application/pdf"
+            )
+        )
+        val vm = FileViewerViewModel(
+            fileViewerParams(path = "report.pdf"),
+            getFileContent, getFileDiff, toolSnapshotCache, submitAnnotations
+        )
+        val modeBefore = vm.uiState.value.renderMode
+        vm.toggleRenderMode()
+        assert(vm.uiState.value.renderMode == modeBefore) { "PDF toggle should be no-op" }
+    }
 }

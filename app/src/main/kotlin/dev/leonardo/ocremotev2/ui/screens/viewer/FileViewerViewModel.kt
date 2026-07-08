@@ -66,10 +66,16 @@ class FileViewerViewModel @AssistedInject constructor(
                 .onSuccess { c ->
                     if (c.type == ContentType.BINARY) {
                         val ft = FileType.fromExtension(filePath)
-                        if (ft == FileType.IMAGE) {
-                            _uiState.update { it.copy(isLoading = false, isBinary = false, fileType = ft, content = c.content, mimeType = c.mimeType, renderMode = FileViewerRenderMode.RENDER_PREVIEW) }
-                        } else {
-                            _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }
+                        when (ft) {
+                            FileType.IMAGE -> {
+                                _uiState.update { it.copy(isLoading = false, isBinary = false, fileType = ft, content = c.content, mimeType = c.mimeType, renderMode = FileViewerRenderMode.RENDER_PREVIEW) }
+                            }
+                            FileType.PDF -> {
+                                _uiState.update { it.copy(isLoading = false, isBinary = false, fileType = ft, content = c.content, mimeType = c.mimeType, renderMode = FileViewerRenderMode.RENDER_PREVIEW) }
+                            }
+                            else -> {
+                                _uiState.update { it.copy(isLoading = false, isBinary = true, mimeType = c.mimeType) }
+                            }
                         }
                     }
                     else {
@@ -200,7 +206,7 @@ class FileViewerViewModel @AssistedInject constructor(
 
     fun toggleRenderMode() {
         val current = _uiState.value
-        if (!current.fileType.supportsRender || current.mode == FileViewerMode.DIFF) return
+        if (!current.fileType.supportsRender || !current.fileType.supportsSourceView || current.mode == FileViewerMode.DIFF) return
         _uiState.update {
             it.copy(
                 renderMode = if (it.renderMode == FileViewerRenderMode.SOURCE) FileViewerRenderMode.RENDER_PREVIEW
