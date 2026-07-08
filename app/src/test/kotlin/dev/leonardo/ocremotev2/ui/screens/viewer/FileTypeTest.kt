@@ -50,9 +50,9 @@ class FileTypeTest {
         assertEquals(FileType.TEXT, FileType.fromExtension("Makefile"))
     }
     @Test
-    fun `supportsRender is false for TEXT only`() {
+    fun `supportsRender is false for TEXT and JSON`() {
         assertFalse(FileType.TEXT.supportsRender)
-        assertTrue(FileType.JSON.supportsRender)
+        assertFalse(FileType.JSON.supportsRender)
         assertTrue(FileType.MARKDOWN.supportsRender)
         assertTrue(FileType.IMAGE.supportsRender)
         assertTrue(FileType.SVG.supportsRender)

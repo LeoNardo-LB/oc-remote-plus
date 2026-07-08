@@ -10,7 +10,7 @@ enum class FileType {
     HTML,
     PDF;
 
-    val supportsRender: Boolean get() = this != TEXT
+    val supportsRender: Boolean get() = this != TEXT && this != JSON
 
     /** PDF 的源码模式对 base64 数据无意义，不显示切换按钮 */
     val supportsSourceView: Boolean get() = this != PDF
