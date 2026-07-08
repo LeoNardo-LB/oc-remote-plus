@@ -21,7 +21,6 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.annotator.annotatorSettings
@@ -300,7 +299,7 @@ internal fun MarkdownContent(
                     buildClickableMarkdown(
                         content = model.content,
                         node = model.node,
-                        style = model.typography.text,
+                        style = model.typography.h1,
                         annotatorSettings = settings,
                         linkColor = linkColor,
                     )
