@@ -1,6 +1,8 @@
 package dev.leonardo.ocremotev2.ui.screens.viewer
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.webkit.ConsoleMessage
@@ -67,7 +69,10 @@ fun PdfViewer(
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     val escapedBase64 = remember(base64Data) {
-        base64Data.replace("\\", "\\\\").replace("'", "\\'")
+        // 移除换行符：MIME base64 每 76 字符插入 \n（RFC 2045），
+        // 换行符在 JS 字符串字面量中导致 SyntaxError。
+        // atob() 解码时自动忽略换行符，所以移除是安全的。
+        base64Data.replace("\n", "").replace("\r", "")
     }
 
     // Clean up WebView when composable leaves composition
@@ -104,26 +109,37 @@ fun PdfViewer(
                     }
 
                     // JS Interface for callbacks from pdf_viewer.html
+                    // NOTE: @JavascriptInterface methods run on WebView's JavaBridge
+                    // thread, NOT the main thread. Must post to main thread to safely
+                    // modify Compose state.
+                    val mainHandler = Handler(Looper.getMainLooper())
+
                     addJavascriptInterface(
                         object {
                             @android.webkit.JavascriptInterface
                             fun onPdfLoaded(total: Int) {
-                                totalPages = total
-                                isLoading = false
+                                mainHandler.post {
+                                    totalPages = total
+                                    isLoading = false
+                                }
                             }
 
                             @android.webkit.JavascriptInterface
                             fun onPageRendered(current: Int, total: Int) {
-                                currentPage = current
-                                totalPages = total
+                                mainHandler.post {
+                                    currentPage = current
+                                    totalPages = total
+                                }
                             }
 
                             @android.webkit.JavascriptInterface
                             fun onError(message: String) {
                                 Log.e(TAG, "PDF.js error: $message")
-                                isLoading = false
-                                hasError = true
-                                errorMessage = message
+                                mainHandler.post {
+                                    isLoading = false
+                                    hasError = true
+                                    errorMessage = message
+                                }
                             }
                         },
                         "PdfViewerInterface"
