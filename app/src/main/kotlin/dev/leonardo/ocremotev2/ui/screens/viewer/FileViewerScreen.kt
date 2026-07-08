@@ -205,7 +205,12 @@ fun FileViewerScreen(
                                     mimeType = uiState.mimeType ?: "image/*",
                                     visible = true
                                 )
-                                else -> {} // no-op
+                                FileType.HTML -> RenderWebView(
+                                    content = uiState.content,
+                                    fileType = FileType.HTML,
+                                    visible = true
+                                )
+                                else -> {} // no-op (PDF handled in Task 6)
                             }
                         }
                     }

@@ -43,6 +43,7 @@ fun RenderWebView(
         when (fileType) {
             FileType.IMAGE -> buildImageHtml(content, mimeType, bgHex)
             FileType.SVG, FileType.CSV -> RenderHtmlBuilder.build(fileType, content, isDark, bgHex, fgHex)
+            FileType.HTML -> content   // 原始 HTML 直接加载
             else -> ""
         }
     }
@@ -56,12 +57,19 @@ fun RenderWebView(
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.apply {
-                    if (fileType == FileType.MARKDOWN) {
+                    if (fileType == FileType.MARKDOWN || fileType == FileType.HTML) {
                         javaScriptEnabled = true
                     }
                     if (fileType == FileType.IMAGE) {
                         builtInZoomControls = true
                         displayZoomControls = false
+                    }
+                    if (fileType == FileType.HTML) {
+                        // 安全限制：禁止访问本地文件系统
+                        allowFileAccess = false
+                        allowContentAccess = false
+                        domStorageEnabled = true   // 某些 HTML 需要 localStorage
+                        saveFormData = false
                     }
                     loadWithOverviewMode = true
                     useWideViewPort = true
