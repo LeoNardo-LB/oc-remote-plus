@@ -79,6 +79,25 @@ class FileViewerViewModel @AssistedInject constructor(
                         }
                     }
                     else {
+                        val ft = FileType.fromExtension(filePath)
+                        // OpenCode 服务器可能把 PDF 当作 TEXT 返回（type="text"），
+                        // 内容是原始 PDF 文本而非 base64。用 ISO-8859-1 无损转回字节再 base64 编码。
+                        if (ft == FileType.PDF) {
+                            val base64Content = android.util.Base64.encodeToString(
+                                c.content.toByteArray(Charsets.ISO_8859_1),
+                                android.util.Base64.NO_WRAP
+                            )
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    fileType = ft,
+                                    content = base64Content,
+                                    mimeType = "application/pdf",
+                                    renderMode = FileViewerRenderMode.RENDER_PREVIEW
+                                )
+                            }
+                            return@launch
+                        }
                         fullContentCache = c.content
                         val totalLines = if (c.content.isEmpty()) 0
                                          else c.content.count { it == '\n' } + if (c.content.endsWith('\n')) 0 else 1
