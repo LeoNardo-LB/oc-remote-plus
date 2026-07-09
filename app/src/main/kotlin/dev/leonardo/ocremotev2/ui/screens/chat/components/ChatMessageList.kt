@@ -90,6 +90,7 @@ import kotlinx.coroutines.launch
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.util.ScrollDiagLogger
 
 /**
  * Shared composable for both main-session and sub-session message lists.
@@ -148,10 +149,16 @@ fun ChatMessageList(
             it.isAssistant && it.message.time.completed == null
         }?.message?.id
     }?.takeIf { sessionMeta.isStreaming }
+    LaunchedEffect(streamingMsgId) {
+        ScrollDiagLogger.log("STREAM_ID", "streamingMsgId", streamingMsgId?.take(12) ?: "null", "isStreaming", sessionMeta.isStreaming)
+    }
 
     // Key on streamingMsgId so state resets when streaming message changes (new message
     // or completion). This is simpler and more correct than heightMap + session-scope clear.
-    val compensateState = remember(streamingMsgId) { CompensateState() }
+    val compensateState = remember(streamingMsgId) {
+        ScrollDiagLogger.log("COMP_STATE", "event", "compensateState recreated", "streamingMsgId", streamingMsgId?.take(12) ?: "null")
+        CompensateState()
+    }
     val toolCompensateState = remember(streamingMsgId) { CompensateState() }
 
     // Track whether user has scrolled away from bottom.
@@ -163,10 +170,14 @@ fun ChatMessageList(
     // This dual-key form is the beta.360-verified behavior; do NOT remove
     // isAtBottom from the key (see docs/research/sse-scroll-stability-iron-laws.md).
     LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
+        val prev = compensateState.shouldCompensate
         if (listState.isScrollInProgress) {
             compensateState.shouldCompensate = true
         } else if (isAtBottom) {
             compensateState.shouldCompensate = false
+        }
+        if (prev != compensateState.shouldCompensate) {
+            ScrollDiagLogger.log("COMP_TOGGLE", "shouldCompensate", compensateState.shouldCompensate, "prev", prev, "scrollProg", listState.isScrollInProgress, "bottom", isAtBottom, "idx", listState.firstVisibleItemIndex, "off", listState.firstVisibleItemScrollOffset)
         }
     }
 
@@ -363,13 +374,15 @@ fun ChatMessageList(
                                         )
                                         val realHeight = placeable.height
                                         val delta = realHeight - toolCompensateState.lastHeight
-                                        if (compensateState.shouldCompensate && toolCompensateState.lastHeight > 0 && delta > 0) {
+                                        val willCompensate = compensateState.shouldCompensate && toolCompensateState.lastHeight > 0 && delta > 0
+                                        if (willCompensate) {
                                             LazyListReflection.requestScrollToItemNoCancel(
                                                 listState,
                                                 listState.firstVisibleItemIndex,
                                                 listState.firstVisibleItemScrollOffset + delta
                                             )
                                         }
+                                        ScrollDiagLogger.log("TOOL_LAYOUT", "h", realHeight, "lastH", toolCompensateState.lastHeight, "delta", delta, "shouldComp", compensateState.shouldCompensate, "compensated", willCompensate, "visIdx", listState.firstVisibleItemIndex, "visOff", listState.firstVisibleItemScrollOffset)
                                         toolCompensateState.lastHeight = realHeight
                                         layout(placeable.width, realHeight) {
                                             placeable.placeRelative(0, 0)
@@ -454,13 +467,15 @@ fun ChatMessageList(
                                     )
                                     val realHeight = placeable.height
                                     val delta = realHeight - compensateState.lastHeight
-                                    if (compensateState.shouldCompensate && compensateState.lastHeight > 0 && delta > 0) {
+                                    val willCompensate = compensateState.shouldCompensate && compensateState.lastHeight > 0 && delta > 0
+                                    if (willCompensate) {
                                         LazyListReflection.requestScrollToItemNoCancel(
                                             listState,
                                             listState.firstVisibleItemIndex,
                                             listState.firstVisibleItemScrollOffset + delta
                                         )
                                     }
+                                    ScrollDiagLogger.log("MSG_LAYOUT", "isStreaming", true, "displayIdx", displayItemIndex, "rawIdx", rawIndex, "h", realHeight, "lastH", compensateState.lastHeight, "delta", delta, "shouldComp", compensateState.shouldCompensate, "compensated", willCompensate, "visIdx", listState.firstVisibleItemIndex, "visOff", listState.firstVisibleItemScrollOffset, "visN", listState.layoutInfo.visibleItemsInfo.size)
                                     compensateState.lastHeight = realHeight
 
                                     layout(placeable.width, realHeight) {

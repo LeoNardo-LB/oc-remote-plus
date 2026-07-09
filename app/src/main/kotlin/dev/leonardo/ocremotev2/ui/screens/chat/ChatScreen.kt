@@ -248,6 +248,7 @@ import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerParams
 import dev.leonardo.ocremotev2.ui.screens.viewer.FileViewerSource
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
+import dev.leonardo.ocremotev2.util.ScrollDiagLogger
 
 
 /**
@@ -338,31 +339,41 @@ fun ChatScreen(
     // behavior; do NOT remove isAtBottom from the key (see
     // docs/research/sse-scroll-stability-iron-laws.md).
     LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
+        ScrollDiagLogger.log("AUTO_KEY", "scrollProg", listState.isScrollInProgress, "bottom", isAtBottom, "idx", listState.firstVisibleItemIndex, "off", listState.firstVisibleItemScrollOffset)
         if (listState.isScrollInProgress) {
             autoScrollEnabled = false
+            ScrollDiagLogger.log("AUTO_SET", "autoScroll", false, "reason", "scrollInProgress")
         } else if (isAtBottom) {
             autoScrollEnabled = true
+            ScrollDiagLogger.log("AUTO_SET", "autoScroll", true, "reason", "atBottom")
         }
     }
 
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
-        if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
+        val willScroll = messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress
+        ScrollDiagLogger.log("MCOUNT", "n", messageCount, "auto", autoScrollEnabled, "scrollProg", listState.isScrollInProgress, "idx", listState.firstVisibleItemIndex, "off", listState.firstVisibleItemScrollOffset, "willScrollTo0", willScroll)
+        if (willScroll) {
             listState.scrollToItem(0)
+            ScrollDiagLogger.log("MCOUNT_SCROLL", "scrolledToItem", 0)
         }
     }
 
     LaunchedEffect(forceScrollTick) {
+        ScrollDiagLogger.log("FORCE_TICK", "tick", forceScrollTick)
         if (forceScrollTick > 0) {
             listState.snapToBottom()
+            ScrollDiagLogger.log("FORCE_SNAP", "snapToBottom done", "idx", listState.firstVisibleItemIndex)
         }
     }
 
     val pendingCount = interaction.pendingQuestions.size + interaction.pendingPermissions.size
     LaunchedEffect(pendingCount) {
+        ScrollDiagLogger.log("PENDING", "n", pendingCount, "auto", autoScrollEnabled)
         if (pendingCount > 0 && autoScrollEnabled) {
             snapshotFlow { messageState.messages.isNotEmpty() }.first { it }
             listState.snapToBottom()
+            ScrollDiagLogger.log("PENDING_SNAP", "snapToBottom done", "idx", listState.firstVisibleItemIndex)
         }
     }
 
@@ -381,6 +392,8 @@ fun ChatScreen(
         coroutineScope = coroutineScope,
     )
     val context = LocalContext.current
+    ScrollDiagLogger.init(context)
+    LaunchedEffect(sessionId) { ScrollDiagLogger.reset() }
     val isAmoled = isAmoledTheme()
     val keyboardController = LocalSoftwareKeyboardController.current
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
