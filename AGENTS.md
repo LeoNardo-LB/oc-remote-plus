@@ -246,7 +246,7 @@ The SSE → UI pipeline is: **48ms token batching** → **height compensation** 
 - **`Markdown()` must use `rememberMarkdownState(content, retainState=true)`** — stateless `Markdown(content=...)` re-parses every recomposition → height oscillation → flicker.
 - **`scheduleFlush()` must NOT cancel an in-flight timer** — cancelling on every token starves flushes when rate > 20/s → chunky burst output.
 - **`layout{}` compensation applies to streaming message ONLY** (`if (isStreamingMsg)`) — applying to all assistant messages exposes completed messages to unstable measurement.
-- **`LaunchedEffect` for autoScroll keys on `isScrollInProgress` ONLY** — adding `isAtBottom` lets SSE layout transient flips lock `autoScrollEnabled=true` → viewport snaps to bottom.
+- **`LaunchedEffect` for autoScroll/shouldCompensate MUST key on BOTH `isScrollInProgress` AND `isAtBottom`** — `isAtBottom` as a key is the self-healing mechanism that resets `shouldCompensate=false` / `autoScrollEnabled=true` when the user returns to the bottom via non-drag means (fling inertia, SSE content push). Keying on `isScrollInProgress` ALONE leaves these flags stuck stale → viewport jitter every SSE token. This is the beta.360-verified behavior. **Do NOT remove `isAtBottom` from the key.** See `docs/research/sse-scroll-stability-iron-laws.md` for the full regression history.
 
 ### Ktor Engine
 Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to other engines.**

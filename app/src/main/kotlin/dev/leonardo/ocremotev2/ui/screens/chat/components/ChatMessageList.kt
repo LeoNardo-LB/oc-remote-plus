@@ -155,9 +155,14 @@ fun ChatMessageList(
     val toolCompensateState = remember(streamingMsgId) { CompensateState() }
 
     // Track whether user has scrolled away from bottom.
-    // Key is ONLY isScrollInProgress — NOT isAtBottom — so SSE layout changes
-    // that briefly flip isAtBottom won't incorrectly toggle shouldCompensate.
-    LaunchedEffect(listState.isScrollInProgress) {
+    // IMPORTANT: key on BOTH isScrollInProgress AND isAtBottom.
+    // isAtBottom as a key is REQUIRED so shouldCompensate resets to false when
+    // the user returns to the bottom via non-drag means (fling inertia, SSE
+    // content push). Without it, shouldCompensate stays true at the bottom and
+    // every SSE token fires requestScrollToItemNoCancel → viewport jitter.
+    // This dual-key form is the beta.360-verified behavior; do NOT remove
+    // isAtBottom from the key (see docs/research/sse-scroll-stability-iron-laws.md).
+    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
         if (listState.isScrollInProgress) {
             compensateState.shouldCompensate = true
         } else if (isAtBottom) {

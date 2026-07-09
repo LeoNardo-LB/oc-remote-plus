@@ -330,7 +330,14 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(listState.isScrollInProgress) {
+    // IMPORTANT: key on BOTH isScrollInProgress AND isAtBottom.
+    // isAtBottom as a key lets this effect re-evaluate when the user returns to
+    // the bottom via non-drag means (fling inertia, SSE content push, compensation
+    // scroll) — isScrollInProgress alone misses those transitions, leaving
+    // autoScrollEnabled stuck stale. This dual-key form is the beta.360-verified
+    // behavior; do NOT remove isAtBottom from the key (see
+    // docs/research/sse-scroll-stability-iron-laws.md).
+    LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
         if (listState.isScrollInProgress) {
             autoScrollEnabled = false
         } else if (isAtBottom) {
