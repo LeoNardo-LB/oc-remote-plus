@@ -144,11 +144,17 @@ fun ChatMessageList(
         }
     }
 
+    // Determine which message is currently streaming — based SOLELY on the
+    // completed timestamp, NOT on sessionMeta.isStreaming. The latter was added
+    // in 668384e3 but can fail to reflect active streaming (observed stuck
+    // false in production), which forces streamingMsgId=null and disables ALL
+    // height compensation → viewport dragged to bottom. v360 used completed
+    // timestamp only and worked correctly. Do NOT re-add takeIf(sessionMeta).
     val streamingMsgId = remember(rawMessages) {
         rawMessages.lastOrNull {
             it.isAssistant && it.message.time.completed == null
         }?.message?.id
-    }?.takeIf { sessionMeta.isStreaming }
+    }
     LaunchedEffect(streamingMsgId) {
         ScrollDiagLogger.log("STREAM_ID", "streamingMsgId", streamingMsgId?.take(12) ?: "null", "isStreaming", sessionMeta.isStreaming)
     }
