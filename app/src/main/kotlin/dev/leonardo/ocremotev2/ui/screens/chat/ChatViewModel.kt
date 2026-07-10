@@ -565,65 +565,17 @@ class ChatViewModel @Inject constructor(
     )
 
     /**
-     * Aggregated context detail — provider/model, timestamps, message count, breakdown,
-     * cache hit rate, and per-call token metrics. Built from the last assistant message
-     * (with token-bearing StepFinish) plus session-level stats. Drives [ContextDetailDialog].
+     * Aggregated context detail — extracted to ContextDetailDelegate.
      */
-    val contextDetailState: StateFlow<ContextDetailState> = sessionLifecycle.sessionIdFlow.flatMapLatest { sid ->
-        combine(
-            messageListState,
-            tokenStatsState,
-            sessionRepository.getSessionsFlow(serverId),
-            modelConfigState,
-        ) { msgList, stats, sessions, modelCfg ->
-            val session = sessions.find { it.id == sid }
-            buildContextDetailState(msgList.messages, stats, session, modelCfg.contextWindow)
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        ContextDetailState()
+    private val contextDetailDelegate = ContextDetailDelegate(
+        sessionIdFlow = sessionLifecycle.sessionIdFlow,
+        messageListState = messageListState,
+        tokenStatsState = tokenStatsState,
+        sessionsFlow = sessionRepository.getSessionsFlow(serverId),
+        modelConfigContextWindow = modelConfigState.map { it.contextWindow },
+        scope = viewModelScope,
     )
-
-    private fun buildContextDetailState(
-        messages: List<ChatMessage>,
-        stats: TokenStatsState,
-        session: Session?,
-        contextWindow: Int,
-    ): ContextDetailState {
-        // Use stats-derived values (single source of truth, avoids re-scanning messages)
-        val realInput = stats.totalInputTokens
-        // Estimate role-breakdown only when we have a real input to anchor percentages against
-        val breakdown: ContextBreakdown? = if (realInput > 0) {
-            // ChatMessage uses .message, estimateContextBreakdown expects MessageWithParts (.info)
-            val mwp = messages.map { MessageWithParts(it.message, it.parts) }
-            estimateContextBreakdown(mwp, realInput)
-        } else null
-        val messageCount: MessageCount = countMessages(messages.map { it.message })
-        // provider/model from last assistant message (not available in stats)
-        val providerModel: ProviderModel? =
-            (messages.lastOrNull { it.message is Message.Assistant }?.message as? Message.Assistant)
-                ?.let { ProviderModel(it.providerId, it.modelId) }
-        val timestamps: SessionTimestamps? = session?.time
-            ?.let { SessionTimestamps(it.created, it.updated) }
-        // Cache hit rate = cacheRead / input (only meaningful when there is real input)
-        val cacheHitRateVal: Float? = cacheHitRate(stats.totalCacheReadTokens, stats.totalInputTokens)
-        return ContextDetailState(
-            inputTokens = stats.totalInputTokens,
-            outputTokens = stats.totalOutputTokens,
-            reasoningTokens = stats.totalReasoningTokens,
-            cacheReadTokens = stats.totalCacheReadTokens,
-            cacheWriteTokens = stats.totalCacheWriteTokens,
-            totalCost = stats.totalCost,
-            contextWindow = contextWindow,
-            contextTokens = stats.lastContextTokens,
-            messageCount = messageCount,
-            providerModel = providerModel,
-            timestamps = timestamps,
-            cacheHitRate = cacheHitRateVal,
-            breakdown = breakdown,
-        )
-    }
+    val contextDetailState: StateFlow<ContextDetailState> get() = contextDetailDelegate.state
 
     /**
      * Legacy uiState for backward compatibility (tests).
