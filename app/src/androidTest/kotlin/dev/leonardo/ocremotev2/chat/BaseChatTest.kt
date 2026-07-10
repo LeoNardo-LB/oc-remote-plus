@@ -38,6 +38,8 @@ abstract class BaseChatTest {
     @Inject lateinit var chatRepo: ChatRepository
     @Inject lateinit var sessionRepo: SessionRepository
     @Inject lateinit var settingsRepo: SettingsRepository
+    @Inject lateinit var sessionStateService: dev.leonardo.ocremotev2.data.repository.SessionStateService
+    @Inject lateinit var tokenStatsTracker: dev.leonardo.ocremotev2.domain.tracker.TokenStatsTracker
 
     protected val fakeChat get() = chatRepo as FakeChatRepository
     protected val fakeSession get() = sessionRepo as FakeSessionRepository
@@ -69,6 +71,9 @@ abstract class BaseChatTest {
             )
             statusesState.value = emptyMap()
         }
+        // Note: SessionStateService and TokenStatsTracker are @Singleton — their state
+        // persists across tests. Tests that depend on specific FSM/token state should
+        // set it explicitly AFTER renderChatScreen(), not rely on @Before defaults.
     }
 
     /**

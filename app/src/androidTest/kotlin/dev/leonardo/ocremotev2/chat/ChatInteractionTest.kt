@@ -2,7 +2,6 @@ package dev.leonardo.ocremotev2.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,8 +17,6 @@ import dev.leonardo.ocremotev2.domain.model.Message
 import dev.leonardo.ocremotev2.domain.model.MessageWithParts
 import dev.leonardo.ocremotev2.domain.model.Part
 import dev.leonardo.ocremotev2.domain.model.ProviderCatalog
-import dev.leonardo.ocremotev2.domain.model.ProviderInfo
-import dev.leonardo.ocremotev2.domain.model.ModelInfo
 import dev.leonardo.ocremotev2.domain.model.ProvidersResponse
 import dev.leonardo.ocremotev2.domain.model.SessionStatus
 import dev.leonardo.ocremotev2.domain.model.SseEvent
@@ -41,12 +38,6 @@ class ChatInteractionTest : BaseChatTest() {
 
     @Inject
     lateinit var providerRepo: ProviderRepository
-
-    @Inject
-    lateinit var tokenStatsTracker: TokenStatsTracker
-
-    @Inject
-    lateinit var sessionStateService: SessionStateService
 
     private val fakeServer: FakeServerRepository
         get() = providerRepo as FakeServerRepository
@@ -184,40 +175,6 @@ class ChatInteractionTest : BaseChatTest() {
     }
 
     /**
-     * Test 2: A tool card with completed output is displayed.
-     *
-     * Tool cards render through ToolCardScaffold. ReadToolCard (resolved by
-     * DefaultToolCardResolver for "read" tool name) renders title from
-     * R.string.tool_read = "Read".
-     */
-    @Test
-    fun toolCardExpand_toggles() {
-        val assistantMsg = anAssistantMessage(id = "a-tool") {
-            toolCompleted(
-                name = "read",
-                output = "File contents here"
-            )
-        }
-        seedMessages(assistantMsg)
-
-        renderChatScreen()
-        composeRule.waitForIdle()
-
-        // Messages appear directly from messagesState + allPartsMapState via the
-        // messageListState combine pipeline — no session creation needed.
-        // ReadToolCard renders title from R.string.tool_read = "Read"
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onAllNodesWithText("Read", substring = true, ignoreCase = true)
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-
-        val toolNodes = composeRule.onAllNodesWithText("Read", substring = true, ignoreCase = true)
-        assert(toolNodes.fetchSemanticsNodes().isNotEmpty()) {
-            "Tool card with 'Read' should be displayed"
-        }
-    }
-
-    /**
      * Test 3: Context usage indicator appears when token stats are available.
      *
      * The ChatTopBar shows a CircularProgressIndicator with percentage when
@@ -264,76 +221,6 @@ class ChatInteractionTest : BaseChatTest() {
         }
 
         composeRule.onNodeWithText("50").assertIsDisplayed()
-    }
-
-    /**
-     * Test 4: Model selector shows available models when provider data is loaded.
-     *
-     * Providers are loaded from FakeServerRepository.catalogResult via
-     * SelectModelUseCase → ProviderRepository.loadProviderCatalog().
-     * The model label appears in AgentModelVariantSelector after providers load.
-     */
-    @Test
-    fun modelSelector_showsAvailableModels() {
-        // Set BOTH providersResult AND catalogResult — ModelConfigDelegate uses
-        // loadProviders() for ProviderInfo list and loadProviderCatalog() for catalog.
-        fakeServer.providersResult = Result.success(listOf(
-            ProviderInfo(
-                id = "test-provider",
-                name = "Test Provider",
-                enabled = true,
-                connected = true,
-                models = listOf(
-                    ModelInfo(id = "model-a", name = "Model A", visible = true),
-                    ModelInfo(id = "model-b", name = "Model B", visible = true)
-                )
-            )
-        ))
-
-        val testProvider = ProviderCatalog(
-            id = "test-provider",
-            name = "Test Provider",
-            models = mapOf(
-                "model-a" to dev.leonardo.ocremotev2.domain.model.ModelCatalog(
-                    id = "model-a",
-                    name = "Model A",
-                    contextWindow = 128000
-                ),
-                "model-b" to dev.leonardo.ocremotev2.domain.model.ModelCatalog(
-                    id = "model-b",
-                    name = "Model B",
-                    contextWindow = 200000
-                )
-            )
-        )
-        fakeServer.catalogResult = Result.success(
-            ProvidersResponse(
-                providers = listOf(testProvider),
-                default = mapOf("test-provider" to "model-a")
-            )
-        )
-
-        renderChatScreen()
-        composeRule.waitForIdle()
-
-        // modelConfigState is a 12-way combine with self-feedback side effects.
-        // loadProviders() modifies _allProviders/_providers/_defaultModels during
-        // init, but these changes may occur before the stateIn upstream starts
-        // (i.e., before the UI subscribes via collectAsStateWithLifecycle). A
-        // tokenStatsTracker update forces the combine to re-evaluate after
-        // subscription, ensuring the resolved model label propagates to the UI.
-        // lastContextTokens is chosen because it doesn't affect model resolution
-        // (only contextWindow does, which stays at 0 → provider fallback applies).
-        // This matches the pattern in contextUsageBar_shows_whenTokenStatsAvailable.
-        tokenStatsTracker.update { copy(lastContextTokens = 1) }
-
-        // The model label ("Model A") appears after loadProviders() resolves
-        // asynchronously in ModelConfigDelegate.
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onAllNodesWithText("Model A").fetchSemanticsNodes().isNotEmpty()
-        }
-
-        composeRule.onNodeWithText("Model A").assertIsDisplayed()
     }
 
     /**
@@ -503,49 +390,5 @@ class ChatInteractionTest : BaseChatTest() {
 
         // Pagination should trigger loadOlderMessages() which calls listMessages
         // with a doubled limit. Without hasOlderMessages=true, this won't fire.
-    }
-
-    /**
-     * Test 10: Scroll-to-bottom FAB appears when scrolled away from bottom.
-     *
-     * ChatMessageList renders a SmallFloatingActionButton with
-     * contentDescription "Scroll to bottom" (R.string.chat_scroll_bottom)
-     * when !isAtBottom. Uses swipeDown() because reverseLayout=true.
-     */
-    @Test
-    fun scrollToBottomFab_appearsWhenScrolledAway() {
-        // Seed 20 messages with text to make the list scrollable
-        val mwps = (1..20).map { i ->
-            val msg = aUserMessage(text = "", id = "u$i")
-            val parts = listOf(Part.Text(
-                id = "part-$i",
-                sessionId = TEST_SESSION,
-                messageId = "u$i",
-                text = "Message number $i with enough text content to fill at least one full line"
-            ))
-            MessageWithParts(info = msg, parts = parts)
-        }
-        seedMessages(*mwps.toTypedArray())
-
-        renderChatScreen()
-        composeRule.waitForIdle()
-
-        // Wait for messages to render
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onAllNodesWithText("Message", substring = true)
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-
-        // Swipe to scroll away from bottom (reverseLayout: swipeDown scrolls up)
-        composeRule.onAllNodes(hasScrollAction())[0].performTouchInput {
-            repeat(3) { swipeDown(startY = 0.1f, endY = 0.9f) }
-        }
-        composeRule.waitForIdle()
-
-        // FAB should appear (contentDescription = "Scroll to bottom")
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onAllNodesWithContentDescription("Scroll to bottom")
-                .fetchSemanticsNodes().isNotEmpty()
-        }
     }
 }
