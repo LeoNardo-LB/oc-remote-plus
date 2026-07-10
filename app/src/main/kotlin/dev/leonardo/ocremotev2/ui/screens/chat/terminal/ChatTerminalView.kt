@@ -5,52 +5,28 @@ import android.media.AudioManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -66,11 +42,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -78,10 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.leonardo.ocremotev2.BuildConfig
@@ -89,7 +59,6 @@ import dev.leonardo.ocremotev2.MainActivity
 import dev.leonardo.ocremotev2.R
 import dev.leonardo.ocremotev2.ui.screens.chat.util.isAmoledTheme
 import kotlinx.coroutines.launch
-import dev.leonardo.ocremotev2.ui.theme.ButtonTokens
 import dev.leonardo.ocremotev2.ui.theme.ShapeTokens
 import dev.leonardo.ocremotev2.ui.theme.AlphaTokens
 import dev.leonardo.ocremotev2.ui.theme.SpacingTokens
@@ -359,164 +328,45 @@ fun ChatTerminalView(
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             items(terminalTabs, key = { it.id }) { tab ->
-                                val selected = tab.id == activeTerminalTabId
-                                val drawerItemShape = ShapeTokens.medium
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(drawerItemShape)
-                                        .then(
-                                            if (isAmoled && selected) {
-                                                Modifier.border(
-                                                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED)),
-                                                    drawerItemShape
-                                                )
-                                            } else Modifier
-                                        )
-                                ) {
-                                    NavigationDrawerItem(
-                                        label = {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.weight(1f),
-                                                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                                                ) {
-                                                    Text(
-                                                        text = tab.title,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.SemiBold
-                                                    )
-                                                    if (!tab.connected) {
-                                                        Surface(
-                                                            shape = CircleShape,
-                                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.MUTED),
-                                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = AlphaTokens.MUTED))
-                                                        ) {
-                                                            Row(
-                                                                modifier = Modifier.padding(horizontal = SpacingTokens.SM.dp, vertical = 2.dp),
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                                            ) {
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(6.dp)
-                                                                        .background(MaterialTheme.colorScheme.error, CircleShape)
-                                                                )
-                                                                Text(
-                                                                    text = "Offline",
-                                                                    style = MaterialTheme.typography.labelSmall,
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                if (!tab.connected) {
-                                                    IconButton(
-                                                        onClick = {
-                                                            viewModel.reconnectTerminalTab(tab.id) { ok ->
-                                                                if (!ok) {
-                                                                    coroutineScope.launch {
-                                                                        snackbarHostState.showSnackbar(context.getString(R.string.chat_terminal_connect_failed))
-                                                                    }
-                                                                }
-                                                            }
-                                                        },
-                                                        modifier = Modifier.size(34.dp),
-                                                        colors = IconButtonDefaults.iconButtonColors(
-                                                            containerColor = if (isAmoled) {
-                                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.FAINT)
-                                                            } else {
-                                                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AlphaTokens.MEDIUM)
-                                                            }
-                                                        )
-                                                    ) {
-                                                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.terminal_reconnect_tab))
-                                                    }
-                                                }
-                                                IconButton(
-                                                    onClick = { viewModel.closeTerminalTab(tab.id) },
-                                                    modifier = Modifier.size(34.dp),
-                                                    colors = IconButtonDefaults.iconButtonColors(
-                                                        containerColor = if (isAmoled) {
-                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.FAINT)
-                                                        } else {
-                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AlphaTokens.MEDIUM)
-                                                        }
-                                                    )
-                                                ) {
-                                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.terminal_close_tab))
+                                TerminalTabItem(
+                                    tab = tab,
+                                    selected = tab.id == activeTerminalTabId,
+                                    isAmoled = isAmoled,
+                                    onReconnect = {
+                                        viewModel.reconnectTerminalTab(tab.id) { ok ->
+                                            if (!ok) {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(context.getString(R.string.chat_terminal_connect_failed))
                                                 }
                                             }
-                                        },
-                                        selected = selected,
-                                        shape = drawerItemShape,
-                                        colors = NavigationDrawerItemDefaults.colors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AlphaTokens.MUTED),
-                                            unselectedContainerColor = Color.Transparent,
-                                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                            unselectedTextColor = MaterialTheme.colorScheme.onSurface
-                                        ),
-                                        onClick = {
-                                            viewModel.switchTerminalTab(tab.id)
-                                            coroutineScope.launch { terminalDrawerState.close() }
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
+                                        }
+                                    },
+                                    onClose = { viewModel.closeTerminalTab(tab.id) },
+                                    onClick = {
+                                        viewModel.switchTerminalTab(tab.id)
+                                        coroutineScope.launch { terminalDrawerState.close() }
+                                    },
+                                )
                             }
                         }
 
                         HorizontalDivider()
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = SpacingTokens.MD.dp, vertical = SpacingTokens.XS.dp),
-                            horizontalArrangement = Arrangement.spacedBy(SpacingTokens.SM.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    viewModel.createTerminalTab { ok ->
-                                        if (!ok) {
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(context.getString(R.string.chat_terminal_connect_failed))
-                                            }
+                        TerminalDrawerActionsRow(
+                            onNewTab = {
+                                viewModel.createTerminalTab { ok ->
+                                    if (!ok) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(context.getString(R.string.chat_terminal_connect_failed))
                                         }
                                     }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(40.dp),
-                                colors = ButtonTokens.filledColors(),
-                                border = ButtonTokens.amoledBorder(),
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.a11y_icon_add_tab))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.terminal_new_tab))
-                            }
-                            Button(
-                                onClick = {
-                                    keyboardController?.show()
-                                    coroutineScope.launch { terminalDrawerState.close() }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(40.dp),
-                                colors = ButtonTokens.filledColors(),
-                                border = ButtonTokens.amoledBorder(),
-                            ) {
-                                Icon(Icons.Default.Keyboard, contentDescription = stringResource(R.string.a11y_icon_keyboard_toggle))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.terminal_keyboard))
-                            }
-                        }
+                                }
+                            },
+                            onShowKeyboard = {
+                                keyboardController?.show()
+                                coroutineScope.launch { terminalDrawerState.close() }
+                            },
+                        )
 
                     }
 
@@ -549,37 +399,10 @@ fun ChatTerminalView(
                 modifier = Modifier.fillMaxSize()
             )
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxHeight()
-                    .padding(bottom = overlayHeightDp + imeBottomDp)
-                    .width(18.dp)
-                    .zIndex(0f)
-                    .pointerInput(terminalDrawerState) {
-                        detectTapGestures(
-                            onLongPress = {
-                                if (!terminalDrawerState.isOpen) {
-                                    coroutineScope.launch { terminalDrawerState.open() }
-                                }
-                            }
-                        )
-                    }
-                    .pointerInput(terminalDrawerState) {
-                        var dragged = 0f
-                        detectHorizontalDragGestures(
-                            onHorizontalDrag = { _, dragAmount ->
-                                if (terminalDrawerState.isOpen) return@detectHorizontalDragGestures
-                                dragged += dragAmount
-                                if (dragged > 2f) {
-                                    coroutineScope.launch { terminalDrawerState.open() }
-                                    dragged = 0f
-                                }
-                            },
-                            onDragEnd = { dragged = 0f },
-                            onDragCancel = { dragged = 0f }
-                        )
-                    }
+            TerminalDrawerEdgeGesture(
+                drawerState = terminalDrawerState,
+                bottomPadding = overlayHeightDp + imeBottomDp,
+                modifier = Modifier.align(Alignment.CenterStart)
             )
 
             TerminalKeyboardOverlay(
