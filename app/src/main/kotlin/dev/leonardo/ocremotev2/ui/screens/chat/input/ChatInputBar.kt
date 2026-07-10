@@ -34,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
@@ -354,6 +355,7 @@ internal fun ChatInputBar(
                             value = textFieldValue,
                             onValueChange = onTextFieldValueChange,
                             modifier = Modifier
+                                .testTag("chat-input")
                                 .fillMaxWidth(),
                             textStyle = MaterialTheme.typography.bodyLarge.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -384,6 +386,7 @@ internal fun ChatInputBar(
                 val showStop = isBusy && text.isBlank()
                 Box(
                     modifier = Modifier
+                        .testTag("chat-send")
                         .size(44.dp)
                         .clip(ShapeTokens.largeMedium)
                         .background(
