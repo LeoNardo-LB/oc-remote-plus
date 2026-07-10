@@ -1,6 +1,8 @@
 package dev.leonardo.ocremotev2.chat
 
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.performTextReplacement
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dev.leonardo.ocremotev2.HiltComponentActivity
@@ -49,10 +51,24 @@ abstract class BaseChatTest {
     @Before
     open fun setup() {
         hiltRule.inject()
-        // Seed a basic session so ChatViewModel doesn't crash on empty state
-        fakeSession.sessionsState.value = listOf(
-            aSession(id = TEST_SESSION, title = "Test", status = SessionStatus.Idle)
-        )
+        // Reset ALL fake state — Hilt singletons persist across tests in the same class
+        fakeChat.apply {
+            messagesState.value = emptyList()
+            partsState.value = emptyList()
+            allPartsMapState.value = emptyMap()
+            permissionsState.value = emptyList()
+            questionsState.value = emptyList()
+            allPermissionsMapState.value = emptyMap()
+            allQuestionsMapState.value = emptyMap()
+            sentMessages.clear()
+            promptAsyncCalls.clear()
+        }
+        fakeSession.apply {
+            sessionsState.value = listOf(
+                aSession(id = TEST_SESSION, title = "Test", status = SessionStatus.Idle)
+            )
+            statusesState.value = emptyMap()
+        }
     }
 
     /**
@@ -71,6 +87,22 @@ abstract class BaseChatTest {
                 )
             }
         }
+        composeRule.waitForIdle()
+    }
+
+    /**
+     * Type text into the chat input field.
+     *
+     * Uses [hasSetTextAction] to find the actual editable node inside BasicTextField's
+     * decorationBox — the outer testTag node may not have the SetText semantics action
+     * due to semantics merge timing.
+     */
+    protected fun typeInput(text: String) {
+        // Wait for the editable text node to be ready (ViewModel init is async)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(text)
         composeRule.waitForIdle()
     }
 }

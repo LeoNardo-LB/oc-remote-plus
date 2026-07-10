@@ -263,6 +263,8 @@ class FakeChatRepository @Inject constructor() : ChatRepository {
 
     override fun setPermissions(sessionId: String, permissions: List<SseEvent.PermissionAsked>) {
         permissionsStore[sessionId] = permissions.toMutableList()
+        // Must emit on allPermissionsMapState so the ViewModel's combine flow re-triggers
+        allPermissionsMapState.value = permissionsStore.mapValues { it.value.toList() }
     }
 
     override fun removeQuestion(questionId: String) {
@@ -272,6 +274,8 @@ class FakeChatRepository @Inject constructor() : ChatRepository {
 
     override fun setQuestions(sessionId: String, questions: List<SseEvent.QuestionAsked>) {
         questionsStore[sessionId] = questions.toMutableList()
+        // Must emit on allQuestionsMapState so the ViewModel's combine flow re-triggers
+        allQuestionsMapState.value = questionsStore.mapValues { it.value.toList() }
     }
 
     override fun getPermissionsWithChildren(
