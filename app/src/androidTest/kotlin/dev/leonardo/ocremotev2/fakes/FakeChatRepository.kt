@@ -83,6 +83,7 @@ class FakeChatRepository @Inject constructor() : ChatRepository {
     // ============ Call Recording ============
 
     val sentMessages = mutableListOf<Pair<String, List<Part>>>()
+    val promptAsyncCalls = mutableListOf<Pair<String, List<PromptPart>>>()
     val repliedPermissions = mutableListOf<Pair<String, String>>()
     val repliedQuestions = mutableListOf<Pair<String, String>>()
     val undoRedoCalls = mutableListOf<Triple<String, String, String>>()
@@ -145,7 +146,10 @@ class FakeChatRepository @Inject constructor() : ChatRepository {
         agent: String?,
         variant: String?,
         directory: String?
-    ): Result<Unit> = promptAsyncResult
+    ): Result<Unit> {
+        promptAsyncCalls.add(sessionId to parts)
+        return promptAsyncResult
+    }
 
     override suspend fun revertSession(serverId: String, sessionId: String, messageId: String): Result<Unit> =
         revertResult
