@@ -231,65 +231,12 @@ class ChatViewModel @Inject constructor(
     private val toolSnapshotCache: dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache,
 ) : ViewModel() {
 
-    // ============ Phase 2 Task 9: Tool snapshot cache ============
+    // ============ Tool snapshot cache (extracted to ToolCacheDelegate) ============
 
-    fun cacheToolPart(part: dev.leonardo.ocremotev2.domain.model.Part.Tool) {
-        val state = part.state
-        val input = when (state) {
-            is dev.leonardo.ocremotev2.domain.model.ToolState.Completed -> state.input
-            is dev.leonardo.ocremotev2.domain.model.ToolState.Running -> state.input
-            is dev.leonardo.ocremotev2.domain.model.ToolState.Pending -> state.input
-            is dev.leonardo.ocremotev2.domain.model.ToolState.Error -> state.input
-        }
-        val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
-            ?: input["path"]?.jsonPrimitive?.contentOrNull ?: return
-        val metadata = (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.metadata
-        val filediff = metadata?.get("filediff") as? JsonObject
-        // Fallback: server may omit filediff — use oldString/newString from tool input
-        val before = filediff?.get("before")?.jsonPrimitive?.contentOrNull
-            ?: input["oldString"]?.jsonPrimitive?.contentOrNull
-        val after = filediff?.get("after")?.jsonPrimitive?.contentOrNull
-            ?: input["newString"]?.jsonPrimitive?.contentOrNull
-        val content = when (part.tool.lowercase()) {
-            "read" -> {
-                val raw = (state as? dev.leonardo.ocremotev2.domain.model.ToolState.Completed)?.output ?: ""
-                cleanReadToolOutput(raw)
-            }
-            "write" -> input["content"]?.jsonPrimitive?.contentOrNull
-            "edit" -> after
-            else -> null
-        }
-        toolSnapshotCache.put(
-            part.id,
-            dev.leonardo.ocremotev2.domain.repository.ToolSnapshotCache.Snapshot(
-                filePath = filePath, content = content, before = before, after = after, toolName = part.tool
-            )
-        )
-    }
+    private val toolCacheDelegate = ToolCacheDelegate(toolSnapshotCache)
 
-    /**
-     * Strip Read tool output wrappers (<path>, <content> tags) and embedded
-     * line-number prefixes ("291: text" → "text") to avoid double line numbers
-     * in the file viewer (which adds its own gutter).
-     */
-    private fun cleanReadToolOutput(raw: String): String {
-        var result = raw
-        // Extract <content>...</content> if present
-        val contentMatch = Regex("<content>(?:\\r?\\n)?(.*?)(?:\\r?\\n)?</content>", RegexOption.DOT_MATCHES_ALL).find(result)
-        result = if (contentMatch != null) {
-            contentMatch.groupValues[1]
-        } else {
-            // Remove known XML-like wrapper lines
-            result.lines().filter { line ->
-                !line.startsWith("<path>") && !line.startsWith("</path>") &&
-                !line.startsWith("<type>") && !line.startsWith("</type>") &&
-                !line.startsWith("<content>") && !line.startsWith("</content>")
-            }.joinToString("\n")
-        }
-        // Strip embedded line numbers: "291: text" → "text"
-        result = result.replace(Regex("(?m)^\\s*\\d+:\\s"), "")
-        return result.trim()
-    }
+    fun cacheToolPart(part: dev.leonardo.ocremotev2.domain.model.Part.Tool) =
+        toolCacheDelegate.cacheToolPart(part)
 
     /** Snapshot of message IDs at the time of revert. Used to distinguish
      *  old messages (should be hidden) from new messages (should be shown). */
