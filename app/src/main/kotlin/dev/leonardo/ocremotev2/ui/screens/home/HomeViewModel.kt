@@ -8,9 +8,7 @@ import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.annotation.StringRes
 import dev.leonardo.ocremotev2.BuildConfig
-import dev.leonardo.ocremotev2.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.leonardo.ocremotev2.data.repository.LocalServerManager
@@ -24,7 +22,6 @@ import dev.leonardo.ocremotev2.domain.usecase.UpdateSettingsUseCase
 import dev.leonardo.ocremotev2.service.OpenCodeConnectionService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +31,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val TAG = "HomeViewModel"
-private const val LOCAL_SERVER_NAME = "Local OpenCode"
 
 enum class LocalRuntimeStatus {
     Unavailable,
@@ -73,13 +69,6 @@ data class HomeUiState(
     val localServerStartupTimeoutSec: Int = 30,
 )
 
-private data class LocalRuntimeErrorInfo(
-    val message: String,
-    val fixCommand: String? = null,
-    val status: LocalRuntimeStatus = LocalRuntimeStatus.Error,
-    val requiresOverlaySettings: Boolean = false,
-)
-
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     application: Application,
@@ -99,7 +88,18 @@ class HomeViewModel @Inject constructor(
     private var serviceBinder: OpenCodeConnectionService.LocalBinder? = null
     private var sseObserverJob: Job? = null
     private val serverSettingsCheckJobs = mutableMapOf<String, Job>()
-    private var localAutoStartTriggered = false
+
+    private val localServerDelegate = LocalServerDelegate(
+        application = getApplication(),
+        scope = viewModelScope,
+        localServerManager = localServerManager,
+        updateSettingsUseCase = updateSettingsUseCase,
+        serverRepository = serverRepository,
+        uiState = _uiState,
+        currentSettingsProvider = { currentSettings },
+        connectToServer = ::connectToServer,
+        disconnectFromServer = ::disconnectFromServer,
+    )
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -365,72 +365,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshLocalRuntimeState() {
-        viewModelScope.launch {
-            val termuxInstalled = localServerManager.isTermuxInstalled()
-            if (!termuxInstalled) {
-                _uiState.update {
-                    it.copy(
-                        termuxInstalled = false,
-                        localRuntimeStatus = LocalRuntimeStatus.Unavailable,
-                        localRuntimeMessage = null,
-                        localRuntimeFixCommand = null,
-                        localRuntimeNeedsOverlaySettings = false,
-                        setupCommand = null,
-                    )
-                }
-                return@launch
-            }
-
-            val serverUsername = _uiState.value.localServerUsername.trim().ifBlank { "opencode" }
-            val serverPassword = _uiState.value.localServerPassword.trim().takeIf { it.isNotBlank() }
-            val healthy = localServerManager.isServerHealthy(
-                username = serverUsername,
-                password = serverPassword,
-            )
-            if (healthy) {
-                // Server is running — mark setup as done (in case flag was never set)
-                updateSettingsUseCase(currentSettings.copy(localSetupCompleted = true))
-                _uiState.update {
-                    it.copy(
-                        termuxInstalled = true,
-                        localRuntimeStatus = LocalRuntimeStatus.Running,
-                        localRuntimeMessage = null,
-                        localRuntimeFixCommand = null,
-                        localRuntimeNeedsOverlaySettings = false,
-                        setupCommand = null,
-                    )
-                }
-                // Auto-create local server entry and connect
-                val localServer = ensureLocalServerExists()
-                if (!_uiState.value.connectedServerIds.contains(localServer.id) &&
-                    !_uiState.value.connectingServerIds.contains(localServer.id)
-                ) {
-                    connectToServer(localServer.id)
-                }
-                return@launch
-            }
-
-            // Server not healthy — check if setup was ever completed
-            val setupDone = currentSettings.localSetupCompleted
-            _uiState.update {
-                it.copy(
-                    termuxInstalled = true,
-                    localRuntimeStatus = if (setupDone) LocalRuntimeStatus.Stopped else LocalRuntimeStatus.NeedsSetup,
-                    localRuntimeMessage = null,
-                    localRuntimeFixCommand = null,
-                    localRuntimeNeedsOverlaySettings = false,
-                    setupCommand = if (!setupDone) localServerManager.getSetupCommand() else null,
-                )
-            }
-
-            if (setupDone && !localAutoStartTriggered &&
-                currentSettings.localServerRunInBackground &&
-                currentSettings.localServerAutoStart
-            ) {
-                localAutoStartTriggered = true
-                startLocalServer(getApplication())
-            }
-        }
+        localServerDelegate.refreshLocalRuntimeState()
     }
 
     /**
@@ -443,163 +378,11 @@ class HomeViewModel @Inject constructor(
     fun getLocalSetupCommand(): String = localServerManager.getSetupCommand()
 
     fun startLocalServer(callerContext: Context) {
-        _uiState.update {
-            it.copy(
-                localRuntimeStatus = LocalRuntimeStatus.Starting,
-                localRuntimeMessage = null,
-                localRuntimeFixCommand = null,
-                localRuntimeNeedsOverlaySettings = false,
-            )
-        }
-
-        viewModelScope.launch {
-            if (!localServerManager.isTermuxInstalled()) {
-                _uiState.update {
-                    it.copy(
-                        termuxInstalled = false,
-                        localRuntimeStatus = LocalRuntimeStatus.Unavailable,
-                        localRuntimeMessage = null,
-                        localRuntimeFixCommand = null,
-                        localRuntimeNeedsOverlaySettings = false,
-                    )
-                }
-                return@launch
-            }
-
-            val proxyUrl = _uiState.value.localProxyUrl.trim().takeIf {
-                _uiState.value.localProxyEnabled && it.isNotBlank()
-            }
-            val noProxyList = _uiState.value.localProxyNoProxy
-            val hostName = if (_uiState.value.localServerAllowLan) "0.0.0.0" else "127.0.0.1"
-            val serverUsername = _uiState.value.localServerUsername.trim().takeIf { it.isNotBlank() }
-            val serverPassword = _uiState.value.localServerPassword.trim().takeIf { it.isNotBlank() }
-            val runInBackground = _uiState.value.localServerRunInBackground
-            val startResult = localServerManager.startServer(
-                callerContext = callerContext,
-                proxyUrl = proxyUrl,
-                noProxyList = noProxyList,
-                hostName = hostName,
-                serverUsername = serverUsername,
-                serverPassword = serverPassword,
-                runInBackground = runInBackground,
-            )
-            if (startResult.isFailure) {
-                val errorInfo = mapLocalRuntimeError(startResult.exceptionOrNull()?.message)
-                if (errorInfo.status == LocalRuntimeStatus.NeedsSetup) {
-                    updateSettingsUseCase(currentSettings.copy(localSetupCompleted = false))
-                }
-                _uiState.update {
-                    it.copy(
-                        termuxInstalled = true,
-                        localRuntimeStatus = errorInfo.status,
-                        localRuntimeMessage = errorInfo.message,
-                        localRuntimeFixCommand = errorInfo.fixCommand,
-                        localRuntimeNeedsOverlaySettings = errorInfo.requiresOverlaySettings,
-                        setupCommand = if (errorInfo.status == LocalRuntimeStatus.NeedsSetup) {
-                            localServerManager.getSetupCommand()
-                        } else null,
-                    )
-                }
-                return@launch
-            }
-
-            val startupTimeoutMs = _uiState.value.localServerStartupTimeoutSec.coerceIn(10, 120) * 1000L
-            val ready = waitForLocalServerReady(
-                timeoutMs = startupTimeoutMs,
-                username = serverUsername ?: "opencode",
-                password = serverPassword,
-            )
-            if (!ready) {
-                _uiState.update {
-                    it.copy(
-                        termuxInstalled = true,
-                        localRuntimeStatus = LocalRuntimeStatus.Error,
-                        localRuntimeMessage = s(R.string.home_local_error_timeout),
-                        localRuntimeFixCommand = null,
-                        localRuntimeNeedsOverlaySettings = false,
-                    )
-                }
-                return@launch
-            }
-
-            updateSettingsUseCase(currentSettings.copy(localSetupCompleted = true))
-            val localServer = ensureLocalServerExists()
-            _uiState.update {
-                it.copy(
-                    termuxInstalled = true,
-                    localRuntimeStatus = LocalRuntimeStatus.Running,
-                    localRuntimeMessage = null,
-                    localRuntimeFixCommand = null,
-                    localRuntimeNeedsOverlaySettings = false,
-                )
-            }
-
-            if (!_uiState.value.connectedServerIds.contains(localServer.id) &&
-                !_uiState.value.connectingServerIds.contains(localServer.id)
-            ) {
-                connectToServer(localServer.id)
-            }
-        }
+        localServerDelegate.startLocalServer(callerContext)
     }
 
     fun stopLocalServer(callerContext: Context) {
-        _uiState.update {
-            it.copy(
-                localRuntimeStatus = LocalRuntimeStatus.Stopping,
-                localRuntimeMessage = null,
-                localRuntimeFixCommand = null,
-                localRuntimeNeedsOverlaySettings = false,
-            )
-        }
-
-        viewModelScope.launch {
-            val stopResult = localServerManager.stopServer(callerContext)
-            if (stopResult.isFailure) {
-                val errorInfo = mapLocalRuntimeError(stopResult.exceptionOrNull()?.message)
-                _uiState.update {
-                    it.copy(
-                        localRuntimeStatus = LocalRuntimeStatus.Error,
-                        localRuntimeMessage = errorInfo.message,
-                        localRuntimeFixCommand = errorInfo.fixCommand,
-                        localRuntimeNeedsOverlaySettings = errorInfo.requiresOverlaySettings,
-                    )
-                }
-                return@launch
-            }
-
-            val localServerId = _uiState.value.servers.firstOrNull {
-                it.url == LocalServerManager.LOCAL_SERVER_URL
-            }?.id
-            if (localServerId != null) {
-                disconnectFromServer(localServerId)
-            }
-
-            repeat(6) {
-                delay(1000)
-                val username = _uiState.value.localServerUsername.trim().ifBlank { "opencode" }
-                val password = _uiState.value.localServerPassword.trim().takeIf { it.isNotBlank() }
-                if (!localServerManager.isServerHealthy(username = username, password = password)) {
-                    _uiState.update {
-                        it.copy(
-                            localRuntimeStatus = LocalRuntimeStatus.Stopped,
-                            localRuntimeMessage = null,
-                            localRuntimeFixCommand = null,
-                            localRuntimeNeedsOverlaySettings = false,
-                        )
-                    }
-                    return@launch
-                }
-            }
-
-            _uiState.update {
-                it.copy(
-                    localRuntimeStatus = LocalRuntimeStatus.Stopped,
-                    localRuntimeMessage = s(R.string.home_local_message_stop_sent),
-                    localRuntimeFixCommand = null,
-                    localRuntimeNeedsOverlaySettings = false,
-                )
-            }
-        }
+        localServerDelegate.stopLocalServer(callerContext)
     }
 
     // ── Settings setters via UpdateSettingsUseCase ──
@@ -665,95 +448,6 @@ class HomeViewModel @Inject constructor(
             updateSettingsUseCase(currentSettings.copy(localServerStartupTimeoutSec = value))
         }
     }
-
-    // ── Private helpers ──
-
-    private suspend fun waitForLocalServerReady(
-        timeoutMs: Long = 30000L,
-        username: String,
-        password: String?,
-    ): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            if (localServerManager.isServerHealthy(username = username, password = password)) {
-                return true
-            }
-            delay(1500)
-        }
-        return false
-    }
-
-    private suspend fun ensureLocalServerExists(): ServerConfig {
-        val desiredUsername = _uiState.value.localServerUsername.trim().ifBlank { "opencode" }
-        val desiredPassword = _uiState.value.localServerPassword.trim().takeIf { it.isNotBlank() }
-
-        val existing = _uiState.value.servers.firstOrNull {
-            it.url == LocalServerManager.LOCAL_SERVER_URL
-        }
-        if (existing != null) {
-            if (existing.username != desiredUsername || existing.password != desiredPassword) {
-                val updated = existing.copy(
-                    username = desiredUsername,
-                    password = desiredPassword,
-                )
-                serverRepository.updateServer(updated)
-                return updated
-            }
-            return existing
-        }
-
-        val newServer = ServerConfig(
-            id = UUID.randomUUID().toString(),
-            url = LocalServerManager.LOCAL_SERVER_URL,
-            username = desiredUsername,
-            password = desiredPassword,
-            name = LOCAL_SERVER_NAME,
-            autoConnect = false,
-        )
-        serverRepository.addServer(newServer)
-        return newServer
-    }
-
-    private fun mapLocalRuntimeError(rawMessage: String?): LocalRuntimeErrorInfo {
-        val raw = rawMessage.orEmpty()
-        val lower = raw.lowercase()
-        return when {
-            "allow-external-apps" in lower -> {
-                LocalRuntimeErrorInfo(
-                    message = s(R.string.home_local_error_termux_blocked_external),
-                    fixCommand = "mkdir -p ~/.termux && (grep -q '^allow-external-apps' ~/.termux/termux.properties 2>/dev/null && sed -i 's/^allow-external-apps.*/allow-external-apps = true/' ~/.termux/termux.properties || echo 'allow-external-apps = true' >> ~/.termux/termux.properties) && termux-reload-settings",
-                    status = LocalRuntimeStatus.NeedsSetup,
-                )
-            }
-
-            "display over other apps" in lower || "draw over other apps" in lower -> {
-                LocalRuntimeErrorInfo(
-                    message = s(R.string.home_local_error_termux_overlay_permission),
-                    requiresOverlaySettings = true,
-                )
-            }
-
-            "run_command" in lower && "without permission" in lower -> {
-                LocalRuntimeErrorInfo(s(R.string.home_local_error_run_command_permission))
-            }
-
-            "app is in background" in lower -> {
-                LocalRuntimeErrorInfo(s(R.string.home_local_error_background_launch))
-            }
-
-            "regular file not found" in lower && "opencode-local" in lower -> {
-                LocalRuntimeErrorInfo(
-                    message = s(R.string.home_local_error_not_installed),
-                    status = LocalRuntimeStatus.NeedsSetup,
-                )
-            }
-
-            raw.isNotBlank() -> LocalRuntimeErrorInfo(raw)
-            else -> LocalRuntimeErrorInfo(s(R.string.home_local_error_launch_failed))
-        }
-    }
-
-    private fun s(@StringRes id: Int): String = getApplication<Application>().getString(id)
 
     /**
      * Disconnect from a specific server.
