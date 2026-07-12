@@ -597,7 +597,7 @@ Tokens: ~%4$d -&gt; ~%5$d</string>
     <string name="about_description">Android client for OpenCode servers</string>
     <string name="about_unofficial">This is an unofficial community project, not affiliated with the OpenCode team.</string>
     <string name="about_github">GitHub</string>
-    <string name="about_github_url">https://github.com/LeoNardo-LB/oc-remote-v2</string>
+    <string name="about_github_url">https://github.com/LeoNardo-LB/oc-remote-plus</string>
     <string name="about_opencode">OpenCode</string>
     <string name="about_opencode_url">https://github.com/anomalyco/opencode</string>
     <string name="about_license">License</string>

@@ -269,7 +269,7 @@ Uses **OkHttp engine** explicitly for correct SSE streaming. Do not switch to ot
 
 _| Remote | URL | Role |
 |--------|-----|------|
-| `origin` | `github.com:LeoNardo-LB/oc-remote-v2` | Fork (push access, current default) |
+| `origin` | `github.com:LeoNardo-LB/oc-remote-plus` | Fork (push access, current default) |
 | upstream | `github.com:crim50n/oc-remote` | Upstream (owner: crim50n) — add manually if needed |
 
 - `master` — stable, matches upstream

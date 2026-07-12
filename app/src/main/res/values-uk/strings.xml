@@ -314,7 +314,7 @@
     <string name="about_description">Android клієнт для серверів OpenCode</string>
     <string name="about_unofficial">Це неофіційний проект спільноти, не пов’язаний з командою OpenCode.</string>
     <string name="about_github">GitHub</string>
-    <string name="about_github_url">https://github.com/LeoNardo-LB/oc-remote-v2</string>
+    <string name="about_github_url">https://github.com/LeoNardo-LB/oc-remote-plus</string>
     <string name="about_opencode">OpenCode</string>
     <string name="about_opencode_url">https://github.com/anomalyco/opencode</string>
     <string name="about_license">Ліцензія</string>
