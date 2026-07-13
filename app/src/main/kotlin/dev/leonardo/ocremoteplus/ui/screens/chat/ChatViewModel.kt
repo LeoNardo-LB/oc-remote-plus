@@ -710,22 +710,10 @@ class ChatViewModel @Inject constructor(
         // Load initial message count from settings, then load data
         if (!isNewSession) {
             viewModelScope.launch {
-                try {
-                    sessionLifecycle.loadSession()
-                } catch (e: Exception) {
-                }
-                try {
-                    messageData.loadMessages()
-                } catch (e: Exception) {
-                }
-                try {
-                    messageData.loadPendingQuestions()
-                } catch (e: Exception) {
-                }
-                try {
-                    messageData.loadPendingPermissions()
-                } catch (e: Exception) {
-                }
+                try { sessionLifecycle.loadSession() } catch (e: Exception) { Log.e(TAG, "loadSession failed", e) }
+                try { messageData.loadMessages() } catch (e: Exception) { Log.e(TAG, "loadMessages failed", e) }
+                try { messageData.loadPendingQuestions() } catch (e: Exception) { Log.e(TAG, "loadPendingQuestions failed", e) }
+                try { messageData.loadPendingPermissions() } catch (e: Exception) { Log.e(TAG, "loadPendingPermissions failed", e) }
             }
         } else {
             // New session: set directory from route param, skip loading
@@ -852,6 +840,13 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun sendParts(parts: List<PromptPart>) {
+        // RS-007 fix: guard against rapid double-tap. _isSending is set synchronously
+        // by onSendStarted, but Compose recomposition (which disables the button)
+        // has a 1-frame delay. This check closes the race window.
+        if (messageData.isSendingValue) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "sendParts: already sending, ignoring duplicate")
+            return
+        }
         scrollSignal.requestScrollToTop()
         val pendingId = "pending-${java.util.UUID.randomUUID()}"
         messageData.onSendStarted(pendingId)
@@ -915,10 +910,14 @@ class ChatViewModel @Inject constructor(
      * SSE job cancel/restart (B↔C↔G orchestration).
      */
     fun abortSession() {
+        // RS-006 fix: cancel SSE job BEFORE updating FSM. The old order
+        // (FSM first, then cancel) left a window where in-flight SSE events
+        // arrived in Idle state, triggering isSuspicious transitions and
+        // unnecessary REST validation calls.
+        messageData.cancelSseJob()
         sessionStateService.onClientAbort(sessionId)
         viewModelScope.launch {
             try {
-                messageData.cancelSseJob()
                 sessionActions.abortSession()
                 if (BuildConfig.DEBUG) Log.d(TAG, "Aborted session $sessionId")
                 // P5-2: restart sseJob to avoid _rawMessagesList freeze.
@@ -976,24 +975,26 @@ class ChatViewModel @Inject constructor(
                 // Halt: if session is busy (AI generating), abort first before reverting.
                 // Same pattern as OpenCode WebUI: halt(sessionID).then(() => revert(input))
                 val currentStatus = sessionStateService.statusFlow.value[sessionId]
-                if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
+                val wasBusy = currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry
+
+                // RS-008 fix: set revert filter BEFORE cancelling SSE job.
+                // The old order (cancel → revert REST → setRevert) left a window
+                // where buffered SSE events drained into the message store without
+                // the revert filter active, causing post-revert message flicker.
+                chatRepository.setRevert(sessionId, messageId)
+
+                if (wasBusy) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "Revert: halting busy session $sessionId")
                     sessionStateService.onClientAbort(sessionId)
                     messageData.cancelSseJob()
                     runCatching { sessionRepository.abort(serverId, sessionId, sessionLifecycle.sessionDirectory) }
-                    // NOTE: startObservingMessages deferred to after setRevert below
                 }
 
                 undoRedoUseCase.revertSession(serverId, sessionId, messageId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Reverted session $sessionId to message $messageId")
 
-                // Set local revert state BEFORE reconnecting SSE.
-                // This ensures the message filter (id < revertState.messageId)
-                // is active when the new SSE connection pushes messages.
-                chatRepository.setRevert(sessionId, messageId)
-
                 // Reconnect SSE now — old messages will be filtered by revert state.
-                if (currentStatus is SessionStatus.Busy || currentStatus is SessionStatus.Retry) {
+                if (wasBusy) {
                     runCatching { messageData.startObservingMessages() }
                 }
 

@@ -73,6 +73,8 @@ internal class MessageDataDelegate(
     private val _isRefreshing = MutableStateFlow(false)  // Background refresh — no UI wipe
     private val _error = MutableStateFlow<String?>(null)
     private val _isSending = MutableStateFlow(false)
+    /** Synchronous read of [_isSending] for race-condition guards (RS-007). */
+    internal val isSendingValue: Boolean get() = _isSending.value
 
     // ============ V1 Message State ============
     private val _messagesList = MutableStateFlow<List<Message>>(emptyList())
