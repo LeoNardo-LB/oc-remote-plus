@@ -34,7 +34,6 @@ import dev.leonardo.ocremoteplus.domain.repository.SettingsRepository
 import dev.leonardo.ocremoteplus.domain.tracker.TokenStatsTracker
 import dev.leonardo.ocremoteplus.domain.usecase.*
 import dev.leonardo.ocremoteplus.data.api.SseClient
-import dev.leonardo.ocremoteplus.ui.WhileSubscribed5s
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
