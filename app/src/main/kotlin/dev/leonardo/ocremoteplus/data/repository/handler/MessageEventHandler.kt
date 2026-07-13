@@ -35,8 +35,18 @@ class MessageEventHandler @Inject constructor() {
     private val _parts = MutableStateFlow<Map<String, List<Part>>>(emptyMap())
     val parts: StateFlow<Map<String, List<Part>>> = _parts.asStateFlow()
 
-    /** Set of assistant message IDs for fast O(1) lookup in PartUpdated handler. */
-    private val assistantMessageIds = mutableSetOf<String>()
+    /**
+     * Set of assistant message IDs for fast O(1) lookup in PartUpdated handler.
+     *
+     * RS-009 fix: uses ConcurrentHashMap.newKeySet() instead of mutableSetOf().
+     * The old LinkedHashSet is not thread-safe — concurrent access from
+     * multiple SSE server coroutines (each running on Dispatchers.IO) could
+     * corrupt the internal linked-list structure or cause
+     * ConcurrentModificationException. The concurrent key-set view backed by
+     * ConcurrentHashMap provides thread-safe add/remove/contains/clear
+     * without explicit locking, and iterators are weakly consistent (never throw CME).
+     */
+    private val assistantMessageIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     // ── SSE delta batching (48ms window) ──────────────────────────────
     // Buffers incoming deltas and flushes every 48ms to reduce
