@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -45,6 +46,14 @@ class SessionStateService @Inject constructor(
     @Volatile private var currentServerId: String? = null
 
     private var stalenessJob: Job? = null
+
+    /**
+     * RS-012 fix: Dedup map for in-flight REST validations. Keyed by sessionId.
+     * When a new validation is requested for a session that already has one in flight,
+     * the old job is cancelled and replaced. This prevents REST request storms when
+     * multiple triggers fire rapidly (staleness guard + suspicious transition + external).
+     */
+    private val activeValidations = ConcurrentHashMap<String, Job>()
 
     init { startStalenessGuard() }
 
@@ -130,15 +139,30 @@ class SessionStateService @Inject constructor(
     }
 
     // ============ Core pipeline ============
+    //
+    // RS-010 fix: The entire read-compute-write happens inside `.update{}` so that
+    // concurrent transitions participate in CAS retries. The previous pattern
+    // (read outside, compute outside, write via `.update{}`) lost transitions when
+    // two threads read the same stale snapshot and one overwrote the other.
     fun applyTransition(sessionId: String, event: FsmEvent) {
-        val current = _fsmStates.value[sessionId] ?: SessionFSMState.initial()
-        val result = SessionStateFSM.transition(current, event)
-        _fsmStates.update { it + (sessionId to result.newState) }
-        recordHistory(sessionId, current, result, event)
-        if (BuildConfig.DEBUG) logTransition(sessionId, current, result, event)
+        // Holders for values captured inside the CAS-protected lambda; used by the
+        // post-update side effects (history logging, forceComplete, etc.).
+        var fromState: SessionFSMState? = null
+        var result: SessionStateFSM.TransitionResult? = null
+        _fsmStates.update { states ->
+            val current = states[sessionId] ?: SessionFSMState.initial()
+            val transitionResult = SessionStateFSM.transition(current, event)
+            fromState = current
+            result = transitionResult
+            states + (sessionId to transitionResult.newState)
+        }
+        val from = fromState!!
+        val res = result!!
+        recordHistory(sessionId, from, res, event)
+        if (BuildConfig.DEBUG) logTransition(sessionId, from, res, event)
         // Side effects
-        if (result.forceComplete) messageForceCompleter.markIdle(sessionId)
-        if (result.isSuspicious) triggerRestValidation(sessionId)
+        if (res.forceComplete) messageForceCompleter.markIdle(sessionId)
+        if (res.isSuspicious) triggerRestValidation(sessionId)
     }
 
     private fun recordHistory(sessionId: String, from: SessionFSMState, result: SessionStateFSM.TransitionResult, event: FsmEvent) {
@@ -174,16 +198,27 @@ class SessionStateService @Inject constructor(
     fun clearSession(sessionId: String) {
         _fsmStates.update { it - sessionId }
         _histories.update { it - sessionId }
+        // Cancel in-flight REST validation for this session (RS-012)
+        activeValidations.remove(sessionId)?.cancel()
     }
 
     fun clearForServer(sessionIds: Set<String>) {
         _fsmStates.update { it - sessionIds }
         _histories.update { it - sessionIds }
+        // Cancel in-flight REST validations for cleared sessions (RS-012)
+        for (sessionId in sessionIds) {
+            activeValidations.remove(sessionId)?.cancel()
+        }
     }
 
     fun clearAll() {
-        _fsmStates.value = emptyMap()
-        _histories.value = emptyMap()
+        // RS-011 fix: use .update{} to participate in CAS, preventing a concurrent
+        // applyTransition from resurrecting cleared state via its own CAS write.
+        _fsmStates.update { emptyMap() }
+        _histories.update { emptyMap() }
+        // Cancel all in-flight REST validations (RS-012)
+        activeValidations.values.forEach { it.cancel() }
+        activeValidations.clear()
     }
 
     // ============ L3: REST validation (absence=idle closed loop) ============
@@ -200,7 +235,11 @@ class SessionStateService @Inject constructor(
     internal fun triggerRestValidation(sessionId: String) {
         val sid = currentServerId ?: return
         val directory = directoryResolver.resolve(sessionId)
-        appScope.launch {
+        // RS-012 fix: deduplicate concurrent validations for the same session.
+        // Pattern: launch → merge (atomic replace, cancels previous) → invokeOnCompletion (cleanup).
+        // The merge function only cancels the old job and returns the new one — it does NOT
+        // modify activeValidations, avoiding ConcurrentHashMap.compute() deadlock.
+        val job = appScope.launch {
             try {
                 val result = sessionRepoProvider.get().fetchSessionStatuses(sid, directory)
                 result.onSuccess { statuses ->
@@ -220,6 +259,15 @@ class SessionStateService @Inject constructor(
                 Log.w(TAG, "[$sessionId] L3 REST validation failed: ${e.message}")
             }
         }
+        // Atomically replace any existing job for this session (cancels the old one)
+        activeValidations.merge(sessionId, job) { oldJob, newJob ->
+            oldJob.cancel()
+            newJob
+        }
+        // Cleanup: remove this job from the dedup map when it completes.
+        // invokeOnCompletion fires even if the job is already complete.
+        // Uses remove(key, value) so it only removes its own entry, not a newer job's.
+        job.invokeOnCompletion { activeValidations.remove(sessionId, job) }
     }
 
     // ============ L4: Full REST sync (unify recovery) ============
