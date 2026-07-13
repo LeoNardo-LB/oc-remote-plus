@@ -77,7 +77,10 @@ internal fun PartContent(
         }
         is Part.Reasoning -> {
             if (part.text.isNotBlank()) {
-                val isStreaming = LocalSessionStreaming.current && (part.time?.end == null)
+                // Reasoning streams during the Waiting phase (before TextStarted).
+                // Must check part.time?.end directly, NOT LocalSessionStreaming —
+                // the FSM activity is "Waiting" during reasoning, not "Streaming".
+                val isStreaming = part.time?.end == null
                 val startTimeMs = part.time?.start
                 val reasoningDuration = part.time?.let { t ->
                     t.end?.let { end -> end - t.start }

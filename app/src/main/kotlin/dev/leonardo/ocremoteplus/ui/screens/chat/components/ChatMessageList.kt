@@ -27,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -596,6 +597,22 @@ fun ChatMessageList(
                             }
                         }
                         } // Box freeze
+                    }
+
+                    // Pagination loading indicator — appears at visual top (reverseLayout)
+                    // when older messages are being fetched.
+                    if (messageState.isLoadingOlder) {
+                        item(key = "loading_older") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = SpacingTokens.MD.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            }
+                        }
                     }
                 }
 
