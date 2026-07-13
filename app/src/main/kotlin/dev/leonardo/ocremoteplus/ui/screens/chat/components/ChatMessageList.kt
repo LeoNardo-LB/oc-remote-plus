@@ -269,12 +269,11 @@ fun ChatMessageList(
                         if (absVel < 1f) return initialVelocity
 
                         var velocity = initialVelocity
-                        val friction = 2f
+                        val friction = 3f
                         val minVelocity = 50f
                         // Safely below viewport/2 on typical phones (viewport ≈ 600-800px).
-                        // At 60fps with v=15000px/s, per-frame delta = 250px — just at cap.
-                        // At 120fps, per-frame delta = 125px — well below cap.
-                        val maxPerFrame = 250f
+                        // 200px ensures no fast-scroll estimation triggers for either direction.
+                        val maxPerFrame = 200f
                         var carry = 0f
                         var lastFrame = withFrameNanos { it }
 
