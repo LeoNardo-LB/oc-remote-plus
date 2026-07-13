@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -87,10 +86,8 @@ internal fun MessageCardAssistant(
                 ),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else SpacingTokens.XS.dp)
             ) {
-                // Single SelectionContainer for consistent long-press behavior across all parts.
-                SelectionContainer {
-                    // Render pre-computed items — zero filtering/grouping during composition.
-                    for (item in renderableTurn.renderItems) {
+                // Render pre-computed items — zero filtering/grouping during composition.
+                for (item in renderableTurn.renderItems) {
                     when (item) {
                         is RenderItem.TurnDivider -> {
                             if (showTurnDividers) {
@@ -124,8 +121,6 @@ internal fun MessageCardAssistant(
                         }
                     }
                 }
-
-                } // close SelectionContainer
 
                 // Pre-computed metadata
                 val agentName = renderableTurn.agentName

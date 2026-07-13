@@ -64,14 +64,14 @@ internal fun PartContent(
                 if (part.text.contains("questions:") && part.text.contains("User has answered")) {
                     CollapsibleQuestionPart(question = part.text)
                 } else {
-                    // SelectionContainer moved to caller (AssistantTurnBubble / MessageCardAssistant)
-                    // to provide a single consistent selection context for the entire message.
-                    MarkdownContent(
-                        markdown = part.text,
-                        textColor = textColor,
-                        isUser = isUser,
-                        immediate = !isUser
-                    )
+                    SelectionContainer {
+                        MarkdownContent(
+                            markdown = part.text,
+                            textColor = textColor,
+                            isUser = isUser,
+                            immediate = !isUser
+                        )
+                    }
                 }
             }
         }

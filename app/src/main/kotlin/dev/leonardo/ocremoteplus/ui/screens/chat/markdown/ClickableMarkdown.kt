@@ -1,10 +1,7 @@
 package dev.leonardo.ocremoteplus.ui.screens.chat.markdown
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -125,12 +122,10 @@ internal fun Modifier.clickableMarkdown(
     layoutResultProvider: () -> TextLayoutResult?,
     uriHandler: UriHandler,
 ): Modifier {
-    val interactionSource = remember { MutableInteractionSource() }
+    // NOTE: the old implementation had an empty .clickable { } modifier here that
+    // intercepted long-press gestures, preventing SelectionContainer from showing
+    // the copy/select toolbar. Only .pointerInput is needed for link tap handling.
     return this
-        .clickable(
-            interactionSource = interactionSource,
-            indication = null,
-        ) { }
         .pointerInput(result.annotatedString) {
             detectTapGestures { pos ->
                 val layout = layoutResultProvider() ?: return@detectTapGestures

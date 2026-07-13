@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -168,21 +167,18 @@ internal fun AssistantTurnBubble(
                 }
 
                 // Render all messages' parts in original order (text, tool, reasoning interleaved)
-                // Single SelectionContainer wraps all parts for consistent long-press behavior.
                 for ((renderableParts, errorPair) in allContent) {
                     val (errorText, assistantMsg) = errorPair
 
-                    SelectionContainer {
-                        for (part in renderableParts) {
-                            key(part.id) {
-                                PartContent(
-                                    part = part,
-                                    textColor = textColor,
-                                    isUser = false,
-                                    onViewSubSession = onViewSubSession,
-                                    turnAgentName = if (part is Part.Tool && part.tool == "task") taskAgentNames[part.id] else null
-                                )
-                            }
+                    for (part in renderableParts) {
+                        key(part.id) {
+                            PartContent(
+                                part = part,
+                                textColor = textColor,
+                                isUser = false,
+                                onViewSubSession = onViewSubSession,
+                                turnAgentName = if (part is Part.Tool && part.tool == "task") taskAgentNames[part.id] else null
+                            )
                         }
                     }
 
