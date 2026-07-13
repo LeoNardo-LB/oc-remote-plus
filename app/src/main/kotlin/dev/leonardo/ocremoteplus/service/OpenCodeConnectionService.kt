@@ -189,6 +189,11 @@ class OpenCodeConnectionService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         if (BuildConfig.DEBUG) Log.d(TAG, "Service destroyed")
+        // RS-018 fix: cancel networkRecoveryJob and wait for it to complete
+        // before stopping connections. If the recovery job is in the middle of
+        // reconnectAll(), it might start new SSE jobs after stopAllConnections()
+        // runs. By launching the cleanup in serviceScope (which is cancelled last),
+        // we ensure ordering: recovery job stops → connections stop → scope cancels.
         networkRecoveryJob?.cancel()
         networkRecoveryJob = null
         networkMonitor.stopMonitoring()

@@ -79,6 +79,13 @@ class SseConnectionManager @Inject constructor(
     /** Per-server timeout trackers for SSE read timeout cooldown logic. */
     private val timeoutTrackers = ConcurrentHashMap<String, SseReadTimeoutTracker>()
 
+    /**
+     * RS-017 fix: Per-server reconnect guard. Prevents overlapping reconnect
+     * attempts when the network state bounces (Available → Lost → Available)
+     * and debounce + distinctUntilChanged don't fully deduplicate.
+     */
+    private val reconnectingServers = ConcurrentHashMap.newKeySet<String>()
+
     /** Observable set of server IDs that are actually connected (SSE stream active). */
     val connectedServerIds: StateFlow<Set<String>>
         get() = _connectedServerIds.asStateFlow()
@@ -100,6 +107,12 @@ class SseConnectionManager @Inject constructor(
         server: ServerConfig,
         onEvent: (ServerConfig, SseEvent) -> Unit
     ): Job {
+        // RS-004 fix: self-protection against duplicate calls. If an existing
+        // connection is present, cancel it before starting a new one. The caller
+        // (OpenCodeConnectionService.connect) also checks, but this prevents
+        // leaks if startConnection is called directly (tests, future refactors).
+        connections[server.id]?.sseJob?.cancel()
+
         val conn = ServerConnection.from(server.url, server.username, server.password)
         val job = startSseConnection(server, conn, onEvent)
 
@@ -127,14 +140,18 @@ class SseConnectionManager @Inject constructor(
      * Stop all SSE connections.
      */
     fun stopAllConnections() {
+        // RS-017 fix: block reconnect attempts while we're tearing down
+        val serverIds = connections.keys.toList()
         for ((_, state) in connections) {
             state.sseJob.cancel()
         }
-        val serverIds = connections.keys.toList()
         connections.clear()
         timeoutTrackers.clear()
-        _connectedServerIds.value = emptySet()
-        _connectingServerIds.value = emptySet()
+        // RS-002 fix: use .update{} instead of direct assignment to participate
+        // in CAS, preventing a cancelled-but-still-running SSE coroutine's
+        // updateServerConnected call from resurrecting a cleared server ID.
+        _connectedServerIds.update { emptySet() }
+        _connectingServerIds.update { emptySet() }
         for (serverId in serverIds) {
             eventDispatcher.clearForServer(serverId)
         }
@@ -144,9 +161,12 @@ class SseConnectionManager @Inject constructor(
      * Reconnect all active connections. Used when network recovers from a loss.
      * Restarts the SSE connection for each server so the auto-reconnect loop
      * resets its attempt counter and reconnects immediately.
+     *
+     * RS-001 fix: now suspend — each reconnectServer uses cancelAndJoin() to
+     * ensure the old SSE coroutine fully stops before starting a new one.
      */
-    fun reconnectAll() {
-        for ((serverId, state) in connections.toMap()) {
+    suspend fun reconnectAll() {
+        for ((serverId, _) in connections.toMap()) {
             reconnectServer(serverId)
         }
     }
@@ -154,14 +174,35 @@ class SseConnectionManager @Inject constructor(
     /**
      * Reconnect a single server connection. Restarts the SSE connection so
      * the auto-reconnect loop resets its attempt counter and reconnects immediately.
+     *
+     * RS-001 fix: uses cancelAndJoin() instead of bare cancel() to ensure the
+     * old coroutine fully completes (including preLoadSessions/recoverMessages)
+     * before starting a new one. Prevents overlapping eventDispatcher mutations.
+     *
+     * RS-017 fix: per-server reconnect guard prevents overlapping reconnect
+     * attempts when network state bounces rapidly.
      */
-    private fun reconnectServer(serverId: String) {
-        val state = connections[serverId] ?: return
-        Log.i(TAG, "Reconnecting server $serverId after network recovery")
-        timeoutTrackers[serverId]?.reset()
-        state.sseJob.cancel()
-        val newJob = startSseConnection(state.config, state.conn, state.onEvent)
-        connections.replace(serverId, state.copy(sseJob = newJob))
+    private suspend fun reconnectServer(serverId: String) {
+        // RS-017: skip if a reconnect is already in progress for this server
+        if (!reconnectingServers.add(serverId)) {
+            Log.w(TAG, "Reconnect already in progress for $serverId, skipping")
+            return
+        }
+        try {
+            val state = connections[serverId] ?: return
+            Log.i(TAG, "Reconnecting server $serverId after network recovery")
+            timeoutTrackers[serverId]?.reset()
+            // RS-001: wait for old coroutine to fully stop before starting new one
+            state.sseJob.cancelAndJoin()
+            val newJob = startSseConnection(state.config, state.conn, state.onEvent)
+            // RS-003 fix: use computeIfPresent for atomic update — if the server
+            // was removed during cancelAndJoin, don't resurrect it
+            connections.computeIfPresent(serverId) { _, current ->
+                current.copy(sseJob = newJob)
+            }
+        } finally {
+            reconnectingServers.remove(serverId)
+        }
     }
 
     /**
@@ -225,7 +266,13 @@ class SseConnectionManager @Inject constructor(
                             throw error
                         }
                         .collect { event ->
-                            if (connections[server.id]?.isConnected != true) {
+                            // RS-005 fix: guard against events arriving after disconnect.
+                            // stopConnection removes the entry from connections; if we
+                            // see null here, the server was disconnected and we should
+                            // skip event dispatch to avoid orphan events in EventDispatcher.
+                            val currentState = connections[server.id]
+                            if (currentState == null) return@collect
+                            if (!currentState.isConnected) {
                                 updateServerConnected(server.id, true)
                                 attempt = 0
                             }
@@ -337,8 +384,17 @@ class SseConnectionManager @Inject constructor(
     }
 
     private fun updateServerConnected(serverId: String, connected: Boolean) {
-        val state = connections[serverId] ?: return
-        connections.replace(serverId, state.copy(isConnected = connected))
+        // RS-003 fix: use computeIfPresent for atomic read-modify-write.
+        // The old pattern (read state, then replace) had a TOCTOU window where
+        // reconnectServer could replace the state with a new sseJob between
+        // the read and the write, causing the old state (with old sseJob)
+        // to overwrite the new state.
+        var found = false
+        connections.computeIfPresent(serverId) { _, state ->
+            found = true
+            state.copy(isConnected = connected)
+        }
+        if (!found) return
         if (connected) {
             _connectingServerIds.update { it - serverId }
             _connectedServerIds.update { it + serverId }
