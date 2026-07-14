@@ -191,12 +191,12 @@ internal class MessageDataDelegate(
                 }
             }
 
-            // P5-3: filter out assistant messages with no parts to prevent
-            // empty bubble flash (MessageUpdated arrives before MessagePartUpdated).
+            // Assistant messages are always visible — do NOT filter out messages
+            // with no parts. The old P5-3 filter (allParts[msg.id]?.isNotEmpty())
+            // caused messages to be permanently hidden when SSE part events were
+            // delayed or lost. A brief empty bubble is acceptable; invisible
+            // messages are not.
             val chatMessages = visible
-                .filter { msg ->
-                    msg is Message.User || (msg is Message.Assistant && allParts[msg.id]?.isNotEmpty() == true)
-                }
                 .map { msg ->
                     val rawParts = allParts[msg.id] ?: emptyList()
                     ChatMessage(
