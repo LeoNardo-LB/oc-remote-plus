@@ -300,7 +300,7 @@ internal fun MessageCardAssistant(
                 }
 
                 // Fallback footer: no StepFinish but still show Agent Tag + time
-                if (stepFinishes.isEmpty() && isTurnLast && !agentName.isNullOrBlank()) {
+                if (stepFinishes.isEmpty() && !isStreaming && isTurnLast && !agentName.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(if (compact) SpacingTokens.XS.dp else SpacingTokens.SM.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
