@@ -61,6 +61,7 @@ data class MessageListState(
     val toolExpandedStates: Map<String, Boolean> = emptyMap(),
     val queuedMessageIds: Set<String> = emptySet(),
     val pendingMessageIds: Set<String> = emptySet(),
+    val userMsgStatuses: Map<String, UserMsgStatus> = emptyMap(),
 )
 
 /**

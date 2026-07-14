@@ -16,6 +16,7 @@ import dev.leonardo.ocremoteplus.domain.usecase.ManagePermissionUseCase
 import dev.leonardo.ocremoteplus.domain.usecase.ManageSessionUseCase
 import dev.leonardo.ocremoteplus.domain.usecase.MessagePaginationUseCase
 import dev.leonardo.ocremoteplus.ui.screens.chat.tools.ToolProgressOutputInjector
+import dev.leonardo.ocremoteplus.ui.screens.chat.util.calculateAllUserMsgStatuses
 import dev.leonardo.ocremoteplus.ui.WhileSubscribed5s
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -191,6 +192,13 @@ internal class MessageDataDelegate(
                 }
             }
 
+            // Compute user message statuses for per-message indicator
+            val userMsgStatuses = calculateAllUserMsgStatuses(
+                messages = visible,
+                queuedMessageIds = queuedMessageIds,
+                fsmStatus = fsmStatus,
+            )
+
             // Assistant messages are always visible — do NOT filter out messages
             // with no parts. The old P5-3 filter (allParts[msg.id]?.isNotEmpty())
             // caused messages to be permanently hidden when SSE part events were
@@ -213,6 +221,7 @@ internal class MessageDataDelegate(
                 toolExpandedStates = toolExpandedStates,
                 queuedMessageIds = queuedMessageIds,
                 pendingMessageIds = pendingMessageIds,
+                userMsgStatuses = userMsgStatuses,
             )
             state
         }
