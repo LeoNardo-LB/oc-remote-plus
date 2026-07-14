@@ -193,6 +193,7 @@ Tag = `v` + VERSION_NAME：
 - **beta flavor** (`dev.leonardo.ocremoteplus.beta`)：公开测试版，独立 applicationId，可与正式版共存。
 - **stable flavor** (`dev.leonardo.ocremoteplus`)：正式包名，覆盖安装。
 - **只发一个包**：每次发版只创建一个 GitHub Release，不重复发多个。发新版前**先删除旧版 Release 和 Tag**（`gh release delete <old> --yes && git push origin --delete <old>`），确保 Releases 页面只保留最新版本。
+- **默认发预发布版**：除非用户明确说明"正式发版"或"发 stable"，否则一律发 beta 或 dev 预发布版（`--prerelease`）。
 - `gh` CLI 不走代理，直接用直连（不加 `HTTP_PROXY`）。
 - APK 路径：
   - stable → `app/build/outputs/apk/stable/release/app-stable-release.apk`
