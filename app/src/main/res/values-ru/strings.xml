@@ -525,6 +525,7 @@
     <string name="chat_system_prompt_title">Системный промпт</string>
     <string name="chat_system_prompt_empty">Системный промпт не настроен для этой сессии.</string>
     <string name="chat_queued">В очереди</string>
+    <string name="chat_retry_send">Повторить</string>
     <string name="chat_child_session">Дочерняя сессия</string>
     <string name="chat_title_placeholder">Чат</string>
     <string name="chat_view_details">Подробности</string>

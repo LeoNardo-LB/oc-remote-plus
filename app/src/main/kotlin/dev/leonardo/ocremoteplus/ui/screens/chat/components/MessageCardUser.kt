@@ -1,10 +1,5 @@
 package dev.leonardo.ocremoteplus.ui.screens.chat.components
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.RateReview
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +50,6 @@ import dev.leonardo.ocremoteplus.ui.screens.chat.util.performHaptic
 import dev.leonardo.ocremoteplus.ui.screens.chat.util.resolveUserCommandLabel
 import dev.leonardo.ocremoteplus.ui.theme.ShapeTokens
 import dev.leonardo.ocremoteplus.ui.theme.AlphaTokens
-import dev.leonardo.ocremoteplus.ui.theme.AppMotion
 import dev.leonardo.ocremoteplus.ui.theme.SpacingTokens
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -63,7 +58,9 @@ import java.util.Locale
 @Composable
 internal fun MessageCardUser(
     currentMessage: ChatMessage,
-    userMsgStatus: UserMsgStatus,
+    isQueued: Boolean,
+    pendingStatus: UserMsgStatus?,
+    onRetry: (() -> Unit)?,
     onRevert: (() -> Unit)?,
     onCopyText: (() -> Unit)?,
     isAmoled: Boolean,
@@ -209,17 +206,31 @@ internal fun MessageCardUser(
                         // 弹性空白
                         Spacer(modifier = Modifier.weight(1f))
 
-                        // 右侧：状态指示器（QUEUED 徽章 与 圆环 互换）
-                        AnimatedContent(
-                            targetState = userMsgStatus,
-                            transitionSpec = {
-                                fadeIn(animationSpec = tween(AppMotion.SHORT)) togetherWith
-                                fadeOut(animationSpec = tween(AppMotion.SHORT))
-                            },
-                            label = "user_msg_status"
-                        ) { status ->
-                            when (status) {
-                                UserMsgStatus.Queued -> {
+                        // 右侧：状态指示器（送达状态 / QUEUED 徽章）
+                        when (pendingStatus) {
+                            UserMsgStatus.Sending -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                            }
+                            UserMsgStatus.Failed -> {
+                                if (onRetry != null) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.chat_retry_send),
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { onRetry() },
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                            null -> {
+                                // Real message — show QUEUED badge if queued
+                                if (isQueued) {
                                     Surface(
                                         shape = ShapeTokens.extraSmall,
                                         color = QueuedBadgeColor
@@ -235,16 +246,8 @@ internal fun MessageCardUser(
                                         )
                                     }
                                 }
-                                UserMsgStatus.Waiting -> {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.outline,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    )
-                                }
-                                UserMsgStatus.Completed -> { /* nothing */ }
                             }
+                            UserMsgStatus.Sent -> { /* nothing — briefly visible before removal */ }
                         }
 
                         // Undo 按钮（仅主会话，onRevert != null 时显示）

@@ -68,7 +68,6 @@ import dev.leonardo.ocremoteplus.domain.model.Part
 import dev.leonardo.ocremoteplus.domain.model.SessionStatus
 import dev.leonardo.ocremoteplus.domain.model.StepProgressInfo
 import dev.leonardo.ocremoteplus.domain.model.ToolProgressInfo
-import dev.leonardo.ocremoteplus.domain.model.UserMsgStatus
 import dev.leonardo.ocremoteplus.ui.components.ConfirmDialog
 import dev.leonardo.ocremoteplus.domain.model.SseEvent
 import dev.leonardo.ocremoteplus.ui.screens.chat.ChatMessage
@@ -565,7 +564,9 @@ fun ChatMessageList(
                                 MessageCard(
                                     role = MessageCardRole.USER,
                                     currentMessage = chatMessage,
-                                    userMsgStatus = messageState.userMsgStatuses[chatMessage.message.id] ?: UserMsgStatus.Completed,
+                                    isQueued = chatMessage.message.id in messageState.queuedMessageIds,
+                                    pendingStatus = messageState.pendingMessages.find { it.pendingId == chatMessage.message.id }?.status,
+                                    onRetry = { viewModel.retrySendMessage(chatMessage.message.id) },
                                     onViewSubSession = navigateToChildSession,
                                     onRevert = if (isMainSession) {
                                         {

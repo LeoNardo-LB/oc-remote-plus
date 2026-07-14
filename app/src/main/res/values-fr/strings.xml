@@ -522,6 +522,7 @@
     <string name="chat_system_prompt_title">Prompt système</string>
     <string name="chat_system_prompt_empty">Aucun prompt système configuré pour cette session.</string>
     <string name="chat_queued">EN ATTENTE</string>
+    <string name="chat_retry_send">Réessayer</string>
     <string name="chat_child_session">Sous-session</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">Voir les détails</string>

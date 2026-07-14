@@ -524,6 +524,7 @@
     <string name="chat_system_prompt_title">시스템 프롬프트</string>
     <string name="chat_system_prompt_empty">이 세션에 구성된 시스템 프롬프트가 없습니다.</string>
     <string name="chat_queued">대기중</string>
+    <string name="chat_retry_send">재시도</string>
     <string name="chat_child_session">하위 세션</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">세부 정보 보기</string>

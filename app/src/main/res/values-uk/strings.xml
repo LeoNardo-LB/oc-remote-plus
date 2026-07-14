@@ -524,6 +524,7 @@
     <string name="chat_system_prompt_title">Системний промпт</string>
     <string name="chat_system_prompt_empty">Системний промпт не налаштовано для цієї сесії.</string>
     <string name="chat_queued">У черзі</string>
+    <string name="chat_retry_send">Повторити</string>
     <string name="chat_child_session">Підсесія</string>
     <string name="chat_title_placeholder">Чат</string>
     <string name="chat_view_details">Подробиці</string>

@@ -524,6 +524,7 @@
     <string name="chat_system_prompt_title">システムプロンプト</string>
     <string name="chat_system_prompt_empty">このセッションにシステムプロンプトは設定されていません。</string>
     <string name="chat_queued">キュー中</string>
+    <string name="chat_retry_send">再試行</string>
     <string name="chat_child_session">子セッション</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">詳細を見る</string>

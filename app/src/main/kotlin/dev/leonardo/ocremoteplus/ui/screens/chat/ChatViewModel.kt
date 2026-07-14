@@ -61,7 +61,7 @@ data class MessageListState(
     val toolExpandedStates: Map<String, Boolean> = emptyMap(),
     val queuedMessageIds: Set<String> = emptySet(),
     val pendingMessageIds: Set<String> = emptySet(),
-    val userMsgStatuses: Map<String, UserMsgStatus> = emptyMap(),
+    val pendingMessages: List<OptimisticMessage> = emptyList(),
 )
 
 /**
@@ -851,7 +851,23 @@ class ChatViewModel @Inject constructor(
         }
         scrollSignal.requestScrollToTop()
         val pendingId = "pending-${java.util.UUID.randomUUID()}"
-        messageData.onSendStarted(pendingId)
+
+        // Create optimistic message for immediate display
+        val now = System.currentTimeMillis()
+        val optimisticMsg = Message.User(
+            id = pendingId,
+            sessionId = "", // Will be filled by real message
+            time = TimeInfo(created = now),
+        )
+        val optimisticParts = parts.mapIndexed { index, pp ->
+            Part.Text(
+                id = "${pendingId}-part-$index",
+                sessionId = "",
+                messageId = pendingId,
+                text = pp.text ?: "",
+            )
+        }
+        messageData.onSendStarted(pendingId, optimisticMsg, optimisticParts)
         viewModelScope.launch {
             try {
                 val currentSessionId = sessionLifecycle.ensureSession()
@@ -892,6 +908,16 @@ class ChatViewModel @Inject constructor(
                 messageData.onSendError(e.message ?: "Failed to send message", pendingId)
             }
         }
+    }
+
+    /** Retry sending a failed optimistic message by its pending ID. */
+    fun retrySendMessage(pendingId: String) {
+        val pending = messageData.getPendingMessage(pendingId) ?: return
+        val parts = pending.parts.mapNotNull { part ->
+            (part as? Part.Text)?.let { PromptPart(type = "text", text = it.text) }
+        }
+        messageData.removePendingMessage(pendingId)
+        sendParts(parts)
     }
 
     /**

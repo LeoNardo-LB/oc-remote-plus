@@ -524,6 +524,7 @@ Token: ~%4$d -&gt; ~%5$d</string>
     <string name="chat_system_prompt_title">Sistem İstemi</string>
     <string name="chat_system_prompt_empty">Bu oturum için sistem isteği yapılandırılmamış.</string>
     <string name="chat_queued">SIRADA</string>
+    <string name="chat_retry_send">Yeniden dene</string>
     <string name="chat_child_session">Alt oturum</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">Detayları göster</string>

@@ -4,11 +4,13 @@ import android.util.Log
 import dev.leonardo.ocremoteplus.BuildConfig
 import dev.leonardo.ocremoteplus.data.repository.SessionStateService
 import dev.leonardo.ocremoteplus.domain.model.Message
+import dev.leonardo.ocremoteplus.domain.model.OptimisticMessage
 import dev.leonardo.ocremoteplus.domain.model.Part
 import dev.leonardo.ocremoteplus.domain.model.Session
 import dev.leonardo.ocremoteplus.domain.model.SessionStatus
 import dev.leonardo.ocremoteplus.domain.model.SseEvent
 import dev.leonardo.ocremoteplus.domain.model.ToolProgressInfo
+import dev.leonardo.ocremoteplus.domain.model.UserMsgStatus
 import dev.leonardo.ocremoteplus.domain.repository.ChatRepository
 import dev.leonardo.ocremoteplus.domain.repository.SessionRepository
 import dev.leonardo.ocremoteplus.domain.repository.SettingsRepository
@@ -16,10 +18,10 @@ import dev.leonardo.ocremoteplus.domain.usecase.ManagePermissionUseCase
 import dev.leonardo.ocremoteplus.domain.usecase.ManageSessionUseCase
 import dev.leonardo.ocremoteplus.domain.usecase.MessagePaginationUseCase
 import dev.leonardo.ocremoteplus.ui.screens.chat.tools.ToolProgressOutputInjector
-import dev.leonardo.ocremoteplus.ui.screens.chat.util.calculateAllUserMsgStatuses
 import dev.leonardo.ocremoteplus.ui.WhileSubscribed5s
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -89,6 +91,8 @@ internal class MessageDataDelegate(
     // ============ Optimistic Send ============
     /** Locally-generated IDs for optimistic messages. Used to distinguish from server-confirmed. */
     private val _pendingMessageIds = MutableStateFlow<Set<String>>(emptySet())
+    /** Optimistic messages awaiting server confirmation via SSE. */
+    private val _pendingMessages = MutableStateFlow<List<OptimisticMessage>>(emptyList())
 
     // ============ Tool Expand State ============
     private val _toolExpandedStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -130,7 +134,9 @@ internal class MessageDataDelegate(
             _pendingMessageIds,
             sessionStateService.statusFlow,
             chatRepository.getActiveToolProgressForSession(sid),
+            _pendingMessages,
         ) { args ->
+         try {
             @Suppress("UNCHECKED_CAST")
             val allSessions = args[0] as List<Session>
             @Suppress("UNCHECKED_CAST")
@@ -153,6 +159,9 @@ internal class MessageDataDelegate(
             @Suppress("UNCHECKED_CAST")
             val progressList = args[9] as? List<ToolProgressInfo>
             val progressOutputs = progressList.orEmpty().associate { it.callId to it.output }
+
+            @Suppress("UNCHECKED_CAST")
+            val pendingMessages = args[10] as List<OptimisticMessage>
 
             val session = allSessions.find { it.id == sid }
             val revertState = session?.revert
@@ -192,13 +201,6 @@ internal class MessageDataDelegate(
                 }
             }
 
-            // Compute user message statuses for per-message indicator
-            val userMsgStatuses = calculateAllUserMsgStatuses(
-                messages = visible,
-                queuedMessageIds = queuedMessageIds,
-                fsmStatus = fsmStatus,
-            )
-
             // Assistant messages are always visible — do NOT filter out messages
             // with no parts. The old P5-3 filter (allParts[msg.id]?.isNotEmpty())
             // caused messages to be permanently hidden when SSE part events were
@@ -213,17 +215,27 @@ internal class MessageDataDelegate(
                     )
                 }
 
+            // Merge optimistic pending messages with real messages
+            val activePending = pendingMessages.map { om ->
+                ChatMessage(message = om.message, parts = om.parts)
+            }
+            val mergedChatMessages = chatMessages + activePending
+
             val state = MessageListState(
-                messages = chatMessages,
-                messageCount = chatMessages.size,
+                messages = mergedChatMessages,
+                messageCount = mergedChatMessages.size,
                 hasOlderMessages = hasOlderMessages,
                 isLoadingOlder = isLoadingOlder,
                 toolExpandedStates = toolExpandedStates,
                 queuedMessageIds = queuedMessageIds,
                 pendingMessageIds = pendingMessageIds,
-                userMsgStatuses = userMsgStatuses,
+                pendingMessages = pendingMessages,
             )
             state
+         } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.e("MessageDataDelegate", "messageListState combine error", e)
+            MessageListState()
+         }
         }
     }.stateIn(
         scope,
@@ -539,28 +551,58 @@ internal class MessageDataDelegate(
     // ============ Send Lifecycle (intent methods for ChatViewModel.sendParts) ============
 
     /**
-     * Mark the start of an optimistic send: flip [_isSending] and register the
-     * [pendingId] so the UI can render the pending message bubble.
+     * Mark the start of an optimistic send: flip [_isSending], register the
+     * [pendingId], and store the optimistic message for immediate display.
      */
-    fun onSendStarted(pendingId: String) {
+    fun onSendStarted(pendingId: String, optimisticMsg: Message.User, optimisticParts: List<Part>) {
         _isSending.value = true
         _pendingMessageIds.update { it + pendingId }
+        _pendingMessages.update { it + OptimisticMessage(pendingId, optimisticMsg, optimisticParts, UserMsgStatus.Sending) }
     }
 
-    /** Mark a successful send: clear [_isSending] and deregister the [pendingId]. */
+    /** Mark a successful send: mark as Sent, then remove after 3s (real message arrives via SSE). */
     fun onSendSuccess(pendingId: String) {
         _isSending.value = false
         _pendingMessageIds.update { it - pendingId }
+        _pendingMessages.update { pending ->
+            pending.map { if (it.pendingId == pendingId) it.copy(status = UserMsgStatus.Sent) else it }
+        }
+        // Remove after 3 seconds — real message should arrive via SSE by then
+        scope.launch {
+            delay(3000)
+            _pendingMessages.update { it.filter { p -> p.pendingId != pendingId } }
+        }
     }
 
     /**
-     * Mark a failed send: clear [_isSending], set [_error], and deregister the
-     * [pendingId].
+     * Mark a failed send: clear [_isSending], set [_error], mark the message as Failed.
      */
     fun onSendError(message: String, pendingId: String) {
         _isSending.value = false
-        _error.value = message
         _pendingMessageIds.update { it - pendingId }
+        _pendingMessages.update { pending ->
+            pending.map { if (it.pendingId == pendingId) it.copy(status = UserMsgStatus.Failed) else it }
+        }
+        _error.value = message
+    }
+
+    /** Mark a retry in progress: flip the pending message back to Sending. */
+    fun onRetryStarted(pendingId: String) {
+        _pendingMessages.update { pending ->
+            pending.map { if (it.pendingId == pendingId) it.copy(status = UserMsgStatus.Sending) else it }
+        }
+        _pendingMessageIds.update { it + pendingId }
+        _isSending.value = true
+    }
+
+    /** Get a pending optimistic message by ID (for retry content extraction). */
+    fun getPendingMessage(pendingId: String): OptimisticMessage? {
+        return _pendingMessages.value.find { it.pendingId == pendingId }
+    }
+
+    /** Remove a pending message (used after retry extracts content and re-sends). */
+    fun removePendingMessage(pendingId: String) {
+        _pendingMessages.update { it.filter { p -> p.pendingId != pendingId } }
     }
 
     // ============ SSE Observer Management (for ChatViewModel.abort/revert) ============

@@ -12,7 +12,9 @@ enum class MessageCardRole { USER, ASSISTANT }
 internal fun MessageCard(
     role: MessageCardRole,
     currentMessage: ChatMessage,
-    userMsgStatus: UserMsgStatus = UserMsgStatus.Completed,
+    isQueued: Boolean = false,
+    pendingStatus: UserMsgStatus? = null,
+    onRetry: (() -> Unit)? = null,
     renderableTurn: RenderableTurn? = null,
     onViewSubSession: ((String) -> Unit)? = null,
     onOpenFile: ((String) -> Unit)? = null,
@@ -25,7 +27,9 @@ internal fun MessageCard(
     when (role) {
         MessageCardRole.USER -> MessageCardUser(
             currentMessage = currentMessage,
-            userMsgStatus = userMsgStatus,
+            isQueued = isQueued,
+            pendingStatus = pendingStatus,
+            onRetry = onRetry,
             onRevert = onRevert,
             onCopyText = onCopyText,
             isAmoled = isAmoled,

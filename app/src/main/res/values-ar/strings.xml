@@ -524,6 +524,7 @@
     <string name="chat_system_prompt_title">ملف النظام</string>
     <string name="chat_system_prompt_empty">لم يتم تكوين ملف النظام لهذه الجلسة.</string>
     <string name="chat_queued">في الانتظار</string>
+    <string name="chat_retry_send">إعادة المحاولة</string>
     <string name="chat_child_session">جلسة فرعية</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">عرض التفاصيل</string>

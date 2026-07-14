@@ -539,6 +539,7 @@
     <string name="chat_system_prompt_title">系统提示词</string>
     <string name="chat_system_prompt_empty">此会话未配置系统提示词。</string>
     <string name="chat_queued">排队中</string>
+    <string name="chat_retry_send">重试</string>
     <string name="chat_child_session">子会话</string>
     <string name="chat_title_placeholder">Chat</string>
     <string name="chat_view_details">查看详情</string>
