@@ -24,12 +24,15 @@ Unofficial OpenCode Android client. Jetpack Compose + Kotlin + Hilt + Ktor.
 
 ## Product Flavors
 
-| Flavor | applicationId | Purpose |
-|--------|---------------|---------|
-| `dev` | `dev.leonardo.ocremoteplus.dev` | Development build, coexists with beta |
-| `beta` | `dev.leonardo.ocremoteplus` | Production release |
+三 flavor 体系，三个包可同时安装共存：
 
-Always specify the flavor in gradle tasks: `assembleDevRelease`, `assembleBetaDebug`, etc. The CI workflow only builds `assembleRelease` (no flavor — needs updating).
+| Flavor | applicationId | 应用名 | 用途 |
+|--------|---------------|--------|------|
+| `dev` | `dev.leonardo.ocremoteplus.dev` | OC Remote Dev | 开发预览（worktree 构建） |
+| `beta` | `dev.leonardo.ocremoteplus.beta` | OC Remote Beta | 公开测试版 |
+| `stable` | `dev.leonardo.ocremoteplus` | OC Remote | 正式发布 |
+
+Always specify the flavor in gradle tasks: `assembleDevRelease`, `assembleBetaRelease`, `assembleStableRelease`, etc.
 
 ## Architecture
 
@@ -182,15 +185,19 @@ Tag = `v` + VERSION_NAME：
 
 | 类型 | 分支 | Flavor | 版本号示例 | Tag | GitHub Release |
 |------|------|--------|-----------|-----|----------------|
-| 正式版 | master | `assembleBetaRelease` | `1.0.1` | `v1.0.1` | `gh release create`（正式） |
+| 正式版 | master | `assembleStableRelease` | `1.0.1` | `v1.0.1` | `gh release create`（正式） |
 | Beta | master | `assembleBetaRelease` | `1.0.1-beta.1` | `v1.0.1-beta.1` | `--prerelease` |
 | Dev | worktree | `assembleDevRelease` | `1.0.1-dev.1` | `v1.0.1-dev.1` | `--prerelease` |
 
 - **dev flavor** (`dev.leonardo.ocremoteplus.dev`)：开发预览，独立 applicationId，可与正式版共存。
-- **beta flavor** (`dev.leonardo.ocremoteplus`)：正式包名，覆盖安装。
+- **beta flavor** (`dev.leonardo.ocremoteplus.beta`)：公开测试版，独立 applicationId，可与正式版共存。
+- **stable flavor** (`dev.leonardo.ocremoteplus`)：正式包名，覆盖安装。
 - **只发一个包**：每次发版只创建一个 GitHub Release，不重复发多个。
 - `gh` CLI 不走代理，直接用直连（不加 `HTTP_PROXY`）。
-- APK 路径：beta → `app/build/outputs/apk/beta/release/app-beta-release.apk`；dev → `app/build/outputs/apk/dev/release/app-dev-release.apk`。
+- APK 路径：
+  - stable → `app/build/outputs/apk/stable/release/app-stable-release.apk`
+  - beta → `app/build/outputs/apk/beta/release/app-beta-release.apk`
+  - dev → `app/build/outputs/apk/dev/release/app-dev-release.apk`。
 
 #### 完整发版步骤
 
