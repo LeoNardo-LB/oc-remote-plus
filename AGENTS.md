@@ -123,91 +123,90 @@ Remote file paths can use `/` or `\` depending on server OS. **Always use `PathU
 | Relative path | `PathUtils.relativePath(path, prefix)` | manual `removePrefix` |
 
 JDK APIs (`File.name`, `Path.of`) only recognize `/` on Android — `\` paths from Windows servers break.
-
 ### Signing
 - Release keystore lives at `app/keystore/release.jks` with password in `signing.properties`
 - When `signing.properties` exists → release builds use release keystore
 - When absent → release builds fall back to debug signing (line 67 of `build.gradle.kts`)
 - CI uses GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_ALIAS`, `KEYSTORE_PASSWORD`)
+- Debug-signed APKs are installable but cannot overwrite a release-signed installation (different signatures)
 
 ### Version Management
-- **Single source of truth**: `version.properties` at project root
+
+遵循 [Semantic Versioning 2.0.0](https://semver.org/) 规范，适配 Android 双 flavor 场景。
+
+#### 版本号格式
+
+```
+MAJOR.MINOR.PATCH[-LABEL.NUMBER]
+```
+
+| 字段 | 含义 | 递进条件 |
+|------|------|---------|
+| MAJOR | 大版本 | 不兼容的架构变更、完整重写、品牌重塑 |
+| MINOR | 功能版本 | 新功能、新屏幕、新 API 对接（向下兼容） |
+| PATCH | 修复版本 | Bug 修复、性能优化、UI 调整（向下兼容） |
+| LABEL | 预发布标签 | `beta`（公开测试）或 `dev`（开发预览） |
+| NUMBER | 预发布序号 | 同一版本的第 N 次预发布，从 1 开始 |
+
+#### 版本号示例
+
+```
+1.0.0              ← 正式稳定版
+1.0.1-beta.1       ← 1.0.1 的第一个 beta 测试版
+1.0.1-beta.2       ← 1.0.1 的第二个 beta（修复测试反馈）
+1.0.1              ← 1.0.1 正式版（beta 结束后发布）
+1.1.0-beta.1       ← 1.1.0 新功能 beta
+1.1.0-dev.3        ← 1.1.0 的第三个开发预览（worktree 构建）
+```
+
+#### 单一真相源
+
+- **`version.properties`** at project root（唯一来源）:
   ```properties
-  VERSION_CODE=373
-  VERSION_NAME=2.0.0-beta.173
+  VERSION_CODE=10
+  VERSION_NAME=1.0.1
   ```
-- `app/build.gradle.kts` reads from `version.properties` — never hardcode version there
-- CI extracts version by grepping `version.properties` — **do not change the format**
-- Tags follow `v2.0.0-beta.XX` (beta) or `v2.0.0-dev` (dev) pattern
+- `VERSION_CODE`：整数，**永远只增不减**，每次构建 +1。Android 用此判断更新顺序。
+- `VERSION_NAME`：显示字符串，遵循上述 SemVer 格式。
+- `app/build.gradle.kts` 从 `version.properties` 读取 — 禁止在 build.gradle.kts 中硬编码版本号。
+- CI 通过 grep `version.properties` 提取版本 — **不要改变文件格式**。
 
-### Release & Publish
+#### Git Tag 格式
 
-**发布流程分为两种场景：**
+Tag = `v` + VERSION_NAME：
+- `v1.0.0` — 正式版
+- `v1.0.1-beta.1` — beta 预发布
+- `v1.1.0-dev.3` — dev 预览
 
-#### 场景 A：Master 分支发正式 Release
+#### 发版规则速查
 
-从主仓库 `master` 发布正式版：
+| 类型 | 分支 | Flavor | 版本号示例 | Tag | GitHub Release |
+|------|------|--------|-----------|-----|----------------|
+| 正式版 | master | `assembleBetaRelease` | `1.0.1` | `v1.0.1` | `gh release create`（正式） |
+| Beta | master | `assembleBetaRelease` | `1.0.1-beta.1` | `v1.0.1-beta.1` | `--prerelease` |
+| Dev | worktree | `assembleDevRelease` | `1.0.1-dev.1` | `v1.0.1-dev.1` | `--prerelease` |
 
-```bash
-# 1. 确认在 master，工作区干净
-git checkout master && git pull origin master
+- **dev flavor** (`dev.leonardo.ocremoteplus.dev`)：开发预览，独立 applicationId，可与正式版共存。
+- **beta flavor** (`dev.leonardo.ocremoteplus`)：正式包名，覆盖安装。
+- **只发一个包**：每次发版只创建一个 GitHub Release，不重复发多个。
+- `gh` CLI 不走代理，直接用直连（不加 `HTTP_PROXY`）。
+- APK 路径：beta → `app/build/outputs/apk/beta/release/app-beta-release.apk`；dev → `app/build/outputs/apk/dev/release/app-dev-release.apk`。
 
-# 2. Bump 版本号（修改 version.properties 中的 VERSION_CODE 和 VERSION_NAME）
-#    VERSION_CODE += 1, VERSION_NAME = "2.0.0-beta.XX"
+#### 完整发版步骤
 
-# 3. 提交版本号变更（可单独 commit 或与代码合并一起）
-git add version.properties && git commit -m "chore: bump version to v2.0.0-beta.XX"
+**步骤顺序（严禁颠倒 bump 和 build）：**
 
-# 4. 构建 Release APK（beta flavor 正式版，使用 release keystore）
-.\gradlew --stop
-.\gradlew :app:assembleBetaRelease
-
-# 5. 推送到 remote
-git push origin master
-
-# 6. 打 tag（格式: v2.0.0-beta.XX 或 v2.0.0-dev）
-git tag -a "v2.0.0-beta.XX" -m "v2.0.0-beta.XX — 简要说明"
-git push origin "v2.0.0-beta.XX"
-
-# 7. 创建 GitHub Release 并上传 APK
-gh release create "v2.0.0-beta.XX" \
-  "app/build/outputs/apk/beta/release/app-beta-release.apk" \
-  --title "v2.0.0-beta.XX — 标题" \
-  --notes "详细 changelog"
+```
+1. bump version → 修改 version.properties
+2. commit → git commit -m "chore: bump version to vX.Y.Z"
+3. build → .\gradlew --stop && .\gradlew :app:assembleBetaRelease
+4. push → git push origin master
+5. tag → git tag -a "vX.Y.Z" -m "vX.Y.Z — 简要说明"
+6. push tag → git push origin "vX.Y.Z"
+7. release → gh release create "vX.Y.Z" "APK路径" --prerelease(可选) --title --notes
 ```
 
-#### 场景 B：Worktree 分支推送预览版
-
-从 worktree 的非 master 分支推送预览/草稿版（不覆盖正式 Release）：
-
-```bash
-# 1. Worktree 分支 build（dev flavor，debug 签名可用）
-.\gradlew :app:assembleDevRelease
-
-# 2. 用 gh 创建 Draft Release（非正式）
-gh release create "v2.0.0-beta.XX-dev" \
-  "app/build/outputs/apk/dev/release/app-dev-release.apk" \
-  --title "v2.0.0-beta.XX-dev — worktree预览" \
-  --notes "预览版，仅供测试" \
-  --draft
-
-# 或者直接用 `--prerelease` 标记为预发布
-gh release create "v2.0.0-beta.XX-dev" \
-  ... \
-  --prerelease
-```
-
-**规则速查：**
-
-| 场景 | 分支 | Flavor | Tag | Release |
-|------|------|--------|-----|---------|
-| 正式版 | master | `assembleBetaRelease` | `v2.0.0-beta.XX` | `gh release create` + APK |
-| 预览版 | worktree | `assembleDevRelease` | `v2.0.0-beta.XX-dev` | `--draft` 或 `--prerelease` |
-
-- `gh` CLI 不走代理，直接用直连（不加 `HTTP_PROXY`）
-- APK 路径：beta → `app/build/outputs/apk/beta/release/app-beta-release.apk`；dev → `app/build/outputs/apk/dev/release/app-dev-release.apk`
-- **完整步骤顺序**：bump version → commit → build → push master → tag → push tag → `gh release create`（附 APK）
-  - **严禁颠倒 bump 和 build 的顺序**：必须在 `version.properties` 修改完成后再执行 `assemble*`，否则 APK 内嵌的版本号与 tag/release 名称不一致
+**严禁在 `version.properties` 修改前执行 `assemble*`**，否则 APK 内嵌的版本号与 tag/release 名称不一致。
 
 ### Gradle Timeout
 执行 Gradle 命令时必须设置合理的超时时间，禁止无超时裸跑：
