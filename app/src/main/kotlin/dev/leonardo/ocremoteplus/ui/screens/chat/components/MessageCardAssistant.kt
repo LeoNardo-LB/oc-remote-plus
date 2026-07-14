@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,7 +37,6 @@ import dev.leonardo.ocremoteplus.ui.screens.chat.util.LocalHapticFeedbackEnabled
 import dev.leonardo.ocremoteplus.ui.screens.chat.util.LocalShowTurnDividers
 import dev.leonardo.ocremoteplus.ui.screens.chat.util.agentColor
 import dev.leonardo.ocremoteplus.ui.screens.chat.util.formatDuration
-import dev.leonardo.ocremoteplus.ui.screens.chat.util.formatTokenCount
 import dev.leonardo.ocremoteplus.ui.theme.AlphaTokens
 import dev.leonardo.ocremoteplus.ui.theme.ChatDensity
 import dev.leonardo.ocremoteplus.ui.theme.LocalChatDensity
@@ -67,6 +67,7 @@ internal fun MessageCardAssistant(
 
     // Keep for footer display (time, provider icon)
     val assistantMsg = currentMessage.message as? Message.Assistant
+    val isStreaming = assistantMsg?.time?.completed == null
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -127,17 +128,55 @@ internal fun MessageCardAssistant(
                 val stepFinishes = renderableTurn.stepFinishes
                 val copyText = renderableTurn.copyText
 
+                // Streaming footer — minimal: time + agent + spinning circle
+                if (isStreaming && isTurnLast) {
+                    Spacer(modifier = Modifier.height(if (compact) SpacingTokens.XS.dp else SpacingTokens.SM.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        assistantMsg?.time?.created?.let { createdMs ->
+                            val timeText = remember(createdMs) {
+                                SimpleDateFormat("HH:mm", Locale.getDefault())
+                                    .format(Date(createdMs))
+                            }
+                            Text(
+                                text = timeText,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
+                            )
+                        }
+                        if (!agentName.isNullOrBlank()) {
+                            val tagColor = agentColor(agentName, agents)
+                            Surface(
+                                shape = ShapeTokens.smallMedium,
+                                color = tagColor.copy(alpha = AlphaTokens.FAINT)
+                            ) {
+                                Text(
+                                    text = agentName.replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = tagColor,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    }
+                }
+
                 // Token/cost/duration footer — only on the last message of a turn
                 if (stepFinishes.isNotEmpty()) {
-                    val lastTokens = stepFinishes.lastOrNull()?.tokens
-                    val totalInput = lastTokens?.input ?: 0
-                    val totalOutput = lastTokens?.output ?: 0
-                    val hasTokenStats = totalInput > 0 || totalOutput > 0
-
                     val durationMs = renderableTurn.durationMs
                     val modelId = renderableTurn.modelId
 
-                    val hasFooter = hasTokenStats || (durationMs ?: 0) > 0 || !modelId.isNullOrBlank() || !agentName.isNullOrBlank()
+                    val hasFooter = (durationMs ?: 0) > 0 || !modelId.isNullOrBlank() || !agentName.isNullOrBlank()
 
                     if (hasFooter) {
                         Spacer(modifier = Modifier.height(if (compact) SpacingTokens.XS.dp else SpacingTokens.SM.dp))
@@ -197,13 +236,6 @@ internal fun MessageCardAssistant(
                                         )
                                     }
                                 }
-                            }
-                            if (totalInput > 0 || totalOutput > 0) {
-                                Text(
-                                    text = "↑${formatTokenCount(totalInput)} ↓${formatTokenCount(totalOutput)}",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = AlphaTokens.FAINT)
-                                )
                             }
                             if (durationMs != null && durationMs > 0) {
                                 Text(
