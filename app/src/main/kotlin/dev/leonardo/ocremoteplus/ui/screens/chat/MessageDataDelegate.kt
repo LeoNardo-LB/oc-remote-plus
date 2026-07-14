@@ -215,9 +215,21 @@ internal class MessageDataDelegate(
                     )
                 }
 
-            // Merge optimistic pending messages with real messages
-            val activePending = pendingMessages.map { om ->
-                ChatMessage(message = om.message, parts = om.parts)
+            // Merge optimistic pending messages with real messages.
+            // Sent pending messages are filtered out when the real message arrives
+            // (detected by timestamp proximity ±30s) to prevent duplicates.
+            val activePending = pendingMessages.mapNotNull { om ->
+                when (om.status) {
+                    UserMsgStatus.Sending -> ChatMessage(message = om.message, parts = om.parts)
+                    UserMsgStatus.Failed -> ChatMessage(message = om.message, parts = om.parts)
+                    UserMsgStatus.Sent -> {
+                        val pendingTime = om.message.time.created
+                        val realExists = visible.any { realMsg ->
+                            realMsg is Message.User && kotlin.math.abs(realMsg.time.created - pendingTime) < 30_000L
+                        }
+                        if (!realExists) ChatMessage(message = om.message, parts = om.parts) else null
+                    }
+                }
             }
             val mergedChatMessages = chatMessages + activePending
 
@@ -567,9 +579,10 @@ internal class MessageDataDelegate(
         _pendingMessages.update { pending ->
             pending.map { if (it.pendingId == pendingId) it.copy(status = UserMsgStatus.Sent) else it }
         }
-        // Remove after 3 seconds — real message should arrive via SSE by then
+        // Safety-net cleanup: remove after 60s in case SSE never delivers the real message.
+        // Primary dedup is the timestamp-proximity filter in the combine block.
         scope.launch {
-            delay(3000)
+            delay(60_000)
             _pendingMessages.update { it.filter { p -> p.pendingId != pendingId } }
         }
     }
