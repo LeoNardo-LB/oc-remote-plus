@@ -2,6 +2,7 @@ package dev.leonardo.ocremoteplus.ui.screens.chat.components
 
 import androidx.compose.runtime.Composable
 import dev.leonardo.ocremoteplus.domain.model.AgentInfo
+import dev.leonardo.ocremoteplus.domain.model.UserMsgStatus
 import dev.leonardo.ocremoteplus.ui.screens.chat.ChatMessage
 import dev.leonardo.ocremoteplus.ui.screens.chat.tools.RenderableTurn
 
@@ -11,7 +12,7 @@ enum class MessageCardRole { USER, ASSISTANT }
 internal fun MessageCard(
     role: MessageCardRole,
     currentMessage: ChatMessage,
-    isQueued: Boolean = false,
+    userMsgStatus: UserMsgStatus = UserMsgStatus.Completed,
     renderableTurn: RenderableTurn? = null,
     onViewSubSession: ((String) -> Unit)? = null,
     onOpenFile: ((String) -> Unit)? = null,
@@ -24,7 +25,7 @@ internal fun MessageCard(
     when (role) {
         MessageCardRole.USER -> MessageCardUser(
             currentMessage = currentMessage,
-            isQueued = isQueued,
+            userMsgStatus = userMsgStatus,
             onRevert = onRevert,
             onCopyText = onCopyText,
             isAmoled = isAmoled,
