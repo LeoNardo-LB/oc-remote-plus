@@ -855,15 +855,16 @@ class ChatViewModel @Inject constructor(
 
         // Create optimistic message for immediate display
         val now = System.currentTimeMillis()
+        val currentSid = sessionLifecycle.sessionId
         val optimisticMsg = Message.User(
             id = pendingId,
-            sessionId = "", // Will be filled by real message
+            sessionId = currentSid,
             time = TimeInfo(created = now),
         )
         val optimisticParts = parts.mapIndexed { index, pp ->
             Part.Text(
                 id = "${pendingId}-part-$index",
-                sessionId = "",
+                sessionId = currentSid,
                 messageId = pendingId,
                 text = pp.text ?: "",
             )
