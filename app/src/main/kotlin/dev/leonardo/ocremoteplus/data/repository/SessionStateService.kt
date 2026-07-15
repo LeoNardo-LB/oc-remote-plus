@@ -110,7 +110,6 @@ class SessionStateService @Inject constructor(
 
     // ============ Event entry points ============
     fun onClientSendParts(sessionId: String) {
-        Log.d("MsgPipeline", "[FSM] onClientSendParts: sessionId=$sessionId")
         applyTransition(sessionId, FsmEvent.ClientSendParts)
     }
     fun onClientAbort(sessionId: String) = applyTransition(sessionId, FsmEvent.ClientAbort)
@@ -118,7 +117,6 @@ class SessionStateService @Inject constructor(
         applyTransition(sessionId, FsmEvent.RestValidation(status))
 
     fun onSseEvent(event: SseEvent, sessionId: String) {
-        Log.d("MsgPipeline", "[FSM] event=${event::class.simpleName}, sessionId=$sessionId")
         val fsmEvent = mapSseEventToFsm(event) ?: return
         applyTransition(sessionId, fsmEvent)
     }
@@ -313,3 +311,4 @@ class SessionStateService @Inject constructor(
         return SyncResult(aggregated.size, aggregated.count { it.value is SessionStatus.Busy })
     }
 }
+

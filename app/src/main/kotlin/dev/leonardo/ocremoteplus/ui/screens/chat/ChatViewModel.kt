@@ -842,7 +842,6 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun sendParts(parts: List<PromptPart>) {
-        Log.d("MsgPipeline", "[ViewModel] sendParts called, parts=${parts.size}")
         // RS-007 fix: guard against rapid double-tap. _isSending is set synchronously
         // by onSendStarted, but Compose recomposition (which disables the button)
         // has a 1-frame delay. This check closes the race window.
@@ -874,7 +873,6 @@ class ChatViewModel @Inject constructor(
             try {
                 val currentSessionId = sessionLifecycle.ensureSession()
                 sessionStateService.onClientSendParts(currentSessionId)
-                Log.d("MsgPipeline", "[ViewModel] calling sendPrompt, sessionId=$currentSessionId")
                 // P5-5: read from modelConfigState (resolved effective value) instead of
                 // raw _selectedProviderId which may be null on new session's first send.
                 val modelCfg = modelConfigState.value
@@ -898,13 +896,11 @@ class ChatViewModel @Inject constructor(
                     variant = modelConfig.selectedVariantValue,
                     directory = sessionLifecycle.sessionDirectory
                 )
-                Log.d("MsgPipeline", "[ViewModel] sendPrompt succeeded")
                 messageData.onSendSuccess(pendingId)
                 if (BuildConfig.DEBUG) Log.d(TAG, "Sent prompt to session $currentSessionId (${parts.size} parts)")
                 refreshSessionTitleDelayed(currentSessionId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send message", e)
-                Log.d("MsgPipeline", "[ViewModel] sendPrompt failed: ${e.message}", e)
                 // Restore draft from the failed send
                 val failedText = parts.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("\n")
                 if (failedText.isNotBlank()) {
@@ -1135,3 +1131,4 @@ data class ConnectionParams(
     val serverName: String,
     val serverId: String
 )
+

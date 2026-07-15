@@ -163,7 +163,6 @@ internal class MessageDataDelegate(
             @Suppress("UNCHECKED_CAST")
             val pendingMessages = args[10] as List<OptimisticMessage>
 
-            Log.d("MsgPipeline", "[Combine] triggered: sessionMessages=${sessionMessages.size}, pendingMessages=${pendingMessages.size}")
 
             val session = allSessions.find { it.id == sid }
             val revertState = session?.revert
@@ -222,7 +221,6 @@ internal class MessageDataDelegate(
             // _pendingMessages is kept only for status tracking (Sending/Sent/Failed indicator).
             val mergedChatMessages = chatMessages
 
-            Log.d("MsgPipeline", "[Combine] output: merged=${mergedChatMessages.size}, visible=${visible.size}, pending=${pendingMessages.size}, userMsgs=${visible.count { it is Message.User }}, assistantMsgs=${visible.count { it is Message.Assistant }}")
 
             val state = MessageListState(
                 messages = mergedChatMessages,
@@ -236,7 +234,6 @@ internal class MessageDataDelegate(
             )
             state
          } catch (e: Exception) {
-            Log.e("MsgPipeline", "[Combine] ERROR: ${e.javaClass.simpleName}: ${e.message}", e)
             if (BuildConfig.DEBUG) Log.e("MessageDataDelegate", "messageListState combine error", e)
             MessageListState()
          }
@@ -559,7 +556,6 @@ internal class MessageDataDelegate(
      * [pendingId], and store the optimistic message for immediate display.
      */
     fun onSendStarted(pendingId: String, optimisticMsg: Message.User, optimisticParts: List<Part>) {
-        Log.d("MsgPipeline", "[Send] onSendStarted: pendingId=$pendingId, msgId=${optimisticMsg.id}")
         _isSending.value = true
         _pendingMessageIds.update { it + pendingId }
         _pendingMessages.update { it + OptimisticMessage(pendingId, optimisticMsg, optimisticParts, UserMsgStatus.Sending) }
@@ -571,7 +567,6 @@ internal class MessageDataDelegate(
     /** Mark a successful send: flip status to Sent. The optimistic message stays in the cache
      *  with its stable key — only the status (and thus the indicator) changes. */
     fun onSendSuccess(pendingId: String) {
-        Log.d("MsgPipeline", "[Send] onSendSuccess: pendingId=$pendingId")
         _isSending.value = false
         _pendingMessageIds.update { it - pendingId }
         _pendingMessages.update { pending ->
@@ -585,7 +580,6 @@ internal class MessageDataDelegate(
      * Mark a failed send: clear [_isSending], set [_error], mark the message as Failed.
      */
     fun onSendError(message: String, pendingId: String) {
-        Log.d("MsgPipeline", "[Send] onSendError: pendingId=$pendingId, error=$message")
         _isSending.value = false
         _pendingMessageIds.update { it - pendingId }
         _pendingMessages.update { pending ->
@@ -631,3 +625,4 @@ internal class MessageDataDelegate(
         _isLoading.value = false
     }
 }
+

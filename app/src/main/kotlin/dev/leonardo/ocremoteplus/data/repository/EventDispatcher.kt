@@ -161,7 +161,6 @@ class EventDispatcher @Inject constructor(
      * - CommandExecuted: resets session status to Idle
      */
     fun processEvent(event: SseEvent, serverId: String) {
-        Log.d("MsgPipeline", "[Dispatch] event=${event::class.simpleName}, serverId=$serverId")
         // Registry dispatch: route event to its single registered handler (O(1) lookup).
         // Replaces the previous broadcast model where every event was sent to all 6
         // handlers and each filtered internally via its own `when` block.
@@ -171,7 +170,6 @@ class EventDispatcher @Inject constructor(
         } else if (BuildConfig.DEBUG) {
             Log.w(TAG, "No handler registered for ${event::class.simpleName}")
         }
-        Log.d("MsgPipeline", "[Dispatch] handled=${handler != null}, event=${event::class.simpleName}")
         forwardToSessionStateService(event)
 
         // Cross-handler: SessionDeleted cascades cleanup to other handlers
@@ -358,3 +356,4 @@ class EventDispatcher @Inject constructor(
         sessionNextHandler.clearForServer(sessionIds)
     }
 }
+

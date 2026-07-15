@@ -59,12 +59,10 @@ internal class ScrollPositionDelegate {
     val pendingScrollRestore: Boolean get() = hasPendingScrollRestore
 
     fun clearPendingScrollRestore() {
-        Log.d("ScrollDebug", "clearPendingScrollRestore")
         hasPendingScrollRestore = false
     }
 
     fun saveScrollPosition(lazyIndex: Int, offset: Int, firstVisibleKey: String? = null) {
-        Log.d("ScrollDebug", "SAVE: idx=$lazyIndex offset=$offset key=$firstVisibleKey")
         savedLazyIndex = lazyIndex
         savedScrollOffset = offset
         savedFirstVisibleKey = firstVisibleKey
@@ -78,9 +76,9 @@ internal class ScrollPositionDelegate {
      * transitions are ignored so the user's current browsing position is not disturbed.
      */
     fun bumpScrollRestoreIfPending() {
-        Log.d("ScrollDebug", "bumpScrollRestoreIfPending: pending=$hasPendingScrollRestore")
         if (hasPendingScrollRestore) {
             scrollRestoreVersion++
         }
     }
 }
+

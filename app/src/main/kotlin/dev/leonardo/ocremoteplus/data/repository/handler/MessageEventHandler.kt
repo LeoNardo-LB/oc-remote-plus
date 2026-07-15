@@ -140,7 +140,6 @@ class MessageEventHandler @Inject constructor() {
     internal fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }
-        Log.d("MsgPipeline", "[MsgHandler] handleMessageUpdated: id=${event.info.id}, role=$role, completed=${event.info.time.completed}, sessionId=$sessionId")
         var replacedTempId: String? = null
         _messages.update { current ->
             val msgs = current[sessionId]?.toMutableList() ?: mutableListOf()
@@ -173,7 +172,6 @@ class MessageEventHandler @Inject constructor() {
         replacedTempId?.let { tempId ->
             _parts.update { current -> current - tempId }
         }
-        Log.d("MsgPipeline", "[MsgHandler] messages cache updated: total=${_messages.value.size}, session msgs=${_messages.value[sessionId]?.size ?: 0}")
         if (event.info is Message.Assistant) {
             assistantMessageIds.add(event.info.id)
         }
@@ -592,3 +590,4 @@ class MessageEventHandler @Inject constructor() {
         }
     }
 }
+
