@@ -125,6 +125,7 @@ class MessageEventHandler @Inject constructor() {
     internal fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }
+        Log.d("MsgPipeline", "[MsgHandler] handleMessageUpdated: id=${event.info.id}, role=$role, completed=${event.info.time.completed}, sessionId=$sessionId")
         _messages.update { current ->
             val sessionMessages = current[sessionId]?.toMutableList() ?: mutableListOf()
             val idx = sessionMessages.indexOfFirst { it.id == event.info.id }
@@ -140,6 +141,7 @@ class MessageEventHandler @Inject constructor() {
                 "${if (isUpdate) "UPDATE" else "NEW"} total=$total")
             current + (sessionId to sessionMessages)
         }
+        Log.d("MsgPipeline", "[MsgHandler] messages cache updated: total=${_messages.value.size}, session msgs=${_messages.value[sessionId]?.size ?: 0}")
         if (event.info is Message.Assistant) {
             assistantMessageIds.add(event.info.id)
         }

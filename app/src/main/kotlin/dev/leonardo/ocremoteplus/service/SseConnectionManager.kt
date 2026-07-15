@@ -266,6 +266,7 @@ class SseConnectionManager @Inject constructor(
                             throw error
                         }
                         .collect { event ->
+                            Log.d("MsgPipeline", "[SSE] event received: type=${event::class.simpleName}, serverId=${server.id}")
                             // RS-005 fix: guard against events arriving after disconnect.
                             // stopConnection removes the entry from connections; if we
                             // see null here, the server was disconnected and we should

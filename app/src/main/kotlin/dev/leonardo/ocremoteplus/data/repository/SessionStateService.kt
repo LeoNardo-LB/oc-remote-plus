@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
+import dev.leonardo.ocremoteplus.domain.model.MessageWithParts
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -24,6 +25,7 @@ import javax.inject.Singleton
 fun interface DirectoryResolver { fun resolve(sessionId: String): String? }
 fun interface IncompleteAssistantChecker { fun hasIncomplete(sessionId: String): Boolean }
 fun interface MessageForceCompleter { fun markIdle(sessionId: String) }
+fun interface MessageRefresher { fun replaceMessages(sessionId: String, messages: List<MessageWithParts>) }
 
 private const val TAG = "SessionStateService"
 private const val HISTORY_MAX = 20
@@ -42,6 +44,7 @@ class SessionStateService @Inject constructor(
     var directoryResolver: DirectoryResolver = DirectoryResolver { null }
     var incompleteChecker: IncompleteAssistantChecker = IncompleteAssistantChecker { false }
     var messageForceCompleter: MessageForceCompleter = MessageForceCompleter {}
+    var messageRefresher: MessageRefresher = MessageRefresher { _, _ -> }
 
     @Volatile private var currentServerId: String? = null
 
@@ -106,12 +109,16 @@ class SessionStateService @Inject constructor(
     fun requestValidation(sessionId: String) = triggerRestValidation(sessionId)
 
     // ============ Event entry points ============
-    fun onClientSendParts(sessionId: String) = applyTransition(sessionId, FsmEvent.ClientSendParts)
+    fun onClientSendParts(sessionId: String) {
+        Log.d("MsgPipeline", "[FSM] onClientSendParts: sessionId=$sessionId")
+        applyTransition(sessionId, FsmEvent.ClientSendParts)
+    }
     fun onClientAbort(sessionId: String) = applyTransition(sessionId, FsmEvent.ClientAbort)
     fun onRestValidation(sessionId: String, status: SessionStatus) =
         applyTransition(sessionId, FsmEvent.RestValidation(status))
 
     fun onSseEvent(event: SseEvent, sessionId: String) {
+        Log.d("MsgPipeline", "[FSM] event=${event::class.simpleName}, sessionId=$sessionId")
         val fsmEvent = mapSseEventToFsm(event) ?: return
         applyTransition(sessionId, fsmEvent)
     }
@@ -254,6 +261,14 @@ class SessionStateService @Inject constructor(
                         onRestValidation(sessionId, SessionStatus.Idle)
                     }
                     // directory == null + absent -> skip (avoid false idle on unknown instance)
+
+                    // Also refresh messages — staleness/suspicious recovery should catch up
+                    // on any messages SSE missed during the stale period.
+                    sessionRepoProvider.get().listMessages(sid, sessionId, limit = 0)
+                        .onSuccess { messages ->
+                            messageRefresher.replaceMessages(sessionId, messages)
+                            if (BuildConfig.DEBUG) Log.d(TAG, "[$sessionId] L3 REST message refresh: ${messages.size} msgs")
+                        }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "[$sessionId] L3 REST validation failed: ${e.message}")
