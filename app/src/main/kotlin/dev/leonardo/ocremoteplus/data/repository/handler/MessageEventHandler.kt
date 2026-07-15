@@ -141,20 +141,7 @@ class MessageEventHandler @Inject constructor() {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }
         Log.d("MsgPipeline", "[MsgHandler] handleMessageUpdated: id=${event.info.id}, role=$role, completed=${event.info.time.completed}, sessionId=$sessionId")
-
-        // If this is a new user message and an optimistic ("pending-*") message exists,
-        // SKIP — don't add the real message. The optimistic entry is already displaying
-        // the correct content with a stable key. Only the status changes (Sending → Sent).
-        // The optimistic entry is replaced by REST data on next session load/refresh.
-        val sessionMsgs = _messages.value[sessionId] ?: emptyList()
-        val hasTempMessage = sessionMsgs.any { it.id.startsWith("pending-") }
-        val isExistingMessage = sessionMsgs.any { it.id == event.info.id }
-        if (hasTempMessage && !isExistingMessage && event.info is Message.User) {
-            Log.i(TAG, "[MsgUpdated] Skipping real user msg ${event.info.id.take(20)} — optimistic entry exists, no replacement")
-            Log.d("MsgPipeline", "[MsgHandler] messages cache unchanged (optimistic skip)")
-            return
-        }
-
+        var replacedTempId: String? = null
         _messages.update { current ->
             val msgs = current[sessionId]?.toMutableList() ?: mutableListOf()
             val idx = msgs.indexOfFirst { it.id == event.info.id }
@@ -162,13 +149,31 @@ class MessageEventHandler @Inject constructor() {
             if (idx >= 0) {
                 msgs[idx] = event.info
             } else {
-                msgs.add(event.info)
-                msgs.sortBy { it.time.created }
+                // Check for optimistic ("pending-*") message to UPDATE in-place.
+                // Same position, same list slot — just replace content (ID, metadata)
+                // with the server's authoritative data. No new entry, no duplicate.
+                val tempIdx = msgs.indexOfFirst { it.id.startsWith("pending-") }
+                if (tempIdx >= 0 && event.info is Message.User) {
+                    replacedTempId = msgs[tempIdx].id
+                    msgs[tempIdx] = event.info
+                    Log.i(TAG, "[MsgUpdated] Updated optimistic ${replacedTempId} → ${event.info.id.take(20)} (in-place)")
+                } else {
+                    msgs.add(event.info)
+                    msgs.sortBy { it.time.created }
+                }
             }
             val total = msgs.size
             Log.i(TAG, "[MsgUpdated] id=${event.info.id.take(12)} role=$role session=${sessionId.take(12)} " +
                 "${if (isUpdate) "UPDATE" else "NEW"} total=$total")
             current + (sessionId to msgs)
+        }
+        // Move parts from temp ID to real ID
+        replacedTempId?.let { tempId ->
+            _parts.update { current ->
+                val tempParts = current[tempId] ?: return@update current
+                (current - tempId) + (event.info.id to tempParts)
+            }
+            // Clean up pending status — message is now confirmed by server
         }
         Log.d("MsgPipeline", "[MsgHandler] messages cache updated: total=${_messages.value.size}, session msgs=${_messages.value[sessionId]?.size ?: 0}")
         if (event.info is Message.Assistant) {
@@ -392,11 +397,15 @@ class MessageEventHandler @Inject constructor() {
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
             // Merge strategy:
+            // - Optimistic ("pending-*") messages: removed if REST has any user messages
+            //   (the real message replaces the temp)
             // - Messages present in both: prefer SSE version (fresher) unless REST has completed=true
             //   and SSE has completed=null (edge case: SSE missed the completion event)
             // - Messages only in SSE: preserved (may be actively streaming)
             // - Messages only in REST: added (missed by SSE)
-            val merged = (existing + newMessages.map { it.info })
+            val hasRestUserMsgs = newMessages.any { it.info is Message.User }
+            val filtered = if (hasRestUserMsgs) existing.filterNot { it.id.startsWith("pending-") } else existing
+            val merged = (filtered + newMessages.map { it.info })
                 .distinctBy { it.id }
                 .map { msg ->
                     val incoming = incomingById[msg.id]
@@ -451,7 +460,10 @@ class MessageEventHandler @Inject constructor() {
         newMessages.forEach { if (it.info is Message.Assistant) assistantMessageIds.add(it.info.id) }
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
-            val existingById = existing.associateBy { it.id }
+            // Remove optimistic messages if REST brings new user messages
+            val hasNewUserMsgs = incoming.any { it is Message.User }
+            val filtered = if (hasNewUserMsgs) existing.filterNot { it.id.startsWith("pending-") } else existing
+            val existingById = filtered.associateBy { it.id }
             current + (sessionId to incoming.map { newMsg -> existingById[newMsg.id] ?: newMsg })
         }
     }
@@ -470,7 +482,12 @@ class MessageEventHandler @Inject constructor() {
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
-            val merged = (existing + newMessages.map { it.info })
+            // Remove optimistic ("pending-*") messages — REST is authoritative.
+            // If the real message arrived via REST, the temp message is redundant.
+            // If it didn't arrive yet (API in flight), the temp message is stale anyway
+            // and will be re-injected on next send.
+            val realExisting = existing.filterNot { it.id.startsWith("pending-") }
+            val merged = (realExisting + newMessages.map { it.info })
                 .distinctBy { it.id }
                 .map { msg -> incomingById[msg.id]?.info ?: msg }
                 .sortedBy { it.time.created }
