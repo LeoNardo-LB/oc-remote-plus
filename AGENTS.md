@@ -245,6 +245,7 @@ environment:
 - opencode username: opencode
 - opencode password: save as environment variables ${OPENCODE_SERVER_PASSWORD}
 - emulator host access: use `10.0.2.2` to reach the host machine from Android emulator
+- **模拟器调试应使用 subagent 执行**：UI 交互（tap/input/scroll）、截图、logcat 读取等操作上下文占用大，派给 `task` subagent 处理可避免主会话上下文溢出。主 Agent 只下发测试指令、接收结果摘要。
 
 ### SSE Scroll Stability
 
