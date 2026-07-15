@@ -36,6 +36,21 @@ class MessageEventHandler @Inject constructor() {
     val parts: StateFlow<Map<String, List<Part>>> = _parts.asStateFlow()
 
     /**
+     * Inject an optimistic user message into the cache for immediate display.
+     * The message has a temp ID ("pending-*"). When SSE delivers the real
+     * message, [handleMessageUpdated] replaces it in-place (same list position).
+     */
+    fun addOptimisticMessage(sessionId: String, message: Message.User, optimisticParts: List<Part>) {
+        _messages.update { current ->
+            val sessionMsgs = current[sessionId] ?: emptyList()
+            current + (sessionId to (sessionMsgs + message))
+        }
+        if (optimisticParts.isNotEmpty()) {
+            _parts.update { it + (message.id to optimisticParts) }
+        }
+    }
+
+    /**
      * Set of assistant message IDs for fast O(1) lookup in PartUpdated handler.
      *
      * RS-009 fix: uses ConcurrentHashMap.newKeySet() instead of mutableSetOf().
@@ -126,20 +141,34 @@ class MessageEventHandler @Inject constructor() {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }
         Log.d("MsgPipeline", "[MsgHandler] handleMessageUpdated: id=${event.info.id}, role=$role, completed=${event.info.time.completed}, sessionId=$sessionId")
+
+        // If this is a new user message and an optimistic ("pending-*") message exists,
+        // SKIP — don't add the real message. The optimistic entry is already displaying
+        // the correct content with a stable key. Only the status changes (Sending → Sent).
+        // The optimistic entry is replaced by REST data on next session load/refresh.
+        val sessionMsgs = _messages.value[sessionId] ?: emptyList()
+        val hasTempMessage = sessionMsgs.any { it.id.startsWith("pending-") }
+        val isExistingMessage = sessionMsgs.any { it.id == event.info.id }
+        if (hasTempMessage && !isExistingMessage && event.info is Message.User) {
+            Log.i(TAG, "[MsgUpdated] Skipping real user msg ${event.info.id.take(20)} — optimistic entry exists, no replacement")
+            Log.d("MsgPipeline", "[MsgHandler] messages cache unchanged (optimistic skip)")
+            return
+        }
+
         _messages.update { current ->
-            val sessionMessages = current[sessionId]?.toMutableList() ?: mutableListOf()
-            val idx = sessionMessages.indexOfFirst { it.id == event.info.id }
+            val msgs = current[sessionId]?.toMutableList() ?: mutableListOf()
+            val idx = msgs.indexOfFirst { it.id == event.info.id }
             val isUpdate = idx >= 0
             if (idx >= 0) {
-                sessionMessages[idx] = event.info
+                msgs[idx] = event.info
             } else {
-                sessionMessages.add(event.info)
-                sessionMessages.sortBy { it.time.created }
+                msgs.add(event.info)
+                msgs.sortBy { it.time.created }
             }
-            val total = sessionMessages.size
+            val total = msgs.size
             Log.i(TAG, "[MsgUpdated] id=${event.info.id.take(12)} role=$role session=${sessionId.take(12)} " +
                 "${if (isUpdate) "UPDATE" else "NEW"} total=$total")
-            current + (sessionId to sessionMessages)
+            current + (sessionId to msgs)
         }
         Log.d("MsgPipeline", "[MsgHandler] messages cache updated: total=${_messages.value.size}, session msgs=${_messages.value[sessionId]?.size ?: 0}")
         if (event.info is Message.Assistant) {

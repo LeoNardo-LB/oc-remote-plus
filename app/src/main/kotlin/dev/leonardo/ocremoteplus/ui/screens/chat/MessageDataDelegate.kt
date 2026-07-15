@@ -217,25 +217,12 @@ internal class MessageDataDelegate(
                     )
                 }
 
-            // Merge optimistic pending messages with real messages.
-            // Sent pending messages are filtered out when the real message arrives
-            // (detected by timestamp proximity ±30s) to prevent duplicates.
-            val activePending = pendingMessages.mapNotNull { om ->
-                when (om.status) {
-                    UserMsgStatus.Sending -> ChatMessage(message = om.message, parts = om.parts)
-                    UserMsgStatus.Failed -> ChatMessage(message = om.message, parts = om.parts)
-                    UserMsgStatus.Sent -> {
-                        val pendingTime = om.message.time.created
-                        val realExists = visible.any { realMsg ->
-                            realMsg is Message.User && kotlin.math.abs(realMsg.time.created - pendingTime) < 30_000L
-                        }
-                        if (!realExists) ChatMessage(message = om.message, parts = om.parts) else null
-                    }
-                }
-            }
-            val mergedChatMessages = chatMessages + activePending
+            // Optimistic messages are now injected directly into EventDispatcher._messages
+            // (same cache as real messages). No merge/filter needed here.
+            // _pendingMessages is kept only for status tracking (Sending/Sent/Failed indicator).
+            val mergedChatMessages = chatMessages
 
-            Log.d("MsgPipeline", "[Combine] output: merged=${mergedChatMessages.size}, visible=${visible.size}, activePending=${activePending.size}, userMsgs=${visible.count { it is Message.User }}, assistantMsgs=${visible.count { it is Message.Assistant }}")
+            Log.d("MsgPipeline", "[Combine] output: merged=${mergedChatMessages.size}, visible=${visible.size}, pending=${pendingMessages.size}, userMsgs=${visible.count { it is Message.User }}, assistantMsgs=${visible.count { it is Message.Assistant }}")
 
             val state = MessageListState(
                 messages = mergedChatMessages,
@@ -576,9 +563,13 @@ internal class MessageDataDelegate(
         _isSending.value = true
         _pendingMessageIds.update { it + pendingId }
         _pendingMessages.update { it + OptimisticMessage(pendingId, optimisticMsg, optimisticParts, UserMsgStatus.Sending) }
+        // Inject into EventDispatcher cache — same list as real messages.
+        // SSE will replace it in-place when the real message arrives.
+        chatRepository.addOptimisticMessage(optimisticMsg.sessionId, optimisticMsg, optimisticParts)
     }
 
-    /** Mark a successful send: mark as Sent, then remove after 3s (real message arrives via SSE). */
+    /** Mark a successful send: flip status to Sent. The optimistic message stays in the cache
+     *  with its stable key — only the status (and thus the indicator) changes. */
     fun onSendSuccess(pendingId: String) {
         Log.d("MsgPipeline", "[Send] onSendSuccess: pendingId=$pendingId")
         _isSending.value = false
@@ -586,12 +577,8 @@ internal class MessageDataDelegate(
         _pendingMessages.update { pending ->
             pending.map { if (it.pendingId == pendingId) it.copy(status = UserMsgStatus.Sent) else it }
         }
-        // Safety-net cleanup: remove after 60s in case SSE never delivers the real message.
-        // Primary dedup is the timestamp-proximity filter in the combine block.
-        scope.launch {
-            delay(60_000)
-            _pendingMessages.update { it.filter { p -> p.pendingId != pendingId } }
-        }
+        // No timer cleanup — the optimistic message stays with its stable key until
+        // session change (natural cache clear + REST reload with real IDs).
     }
 
     /**

@@ -240,6 +240,13 @@ interface ChatRepository {
     fun replaceMessages(sessionId: String, messages: List<MessageWithParts>)
 
     /**
+     * Inject an optimistic user message into the message cache for immediate display.
+     * The message uses a temp ID ("pending-*") that gets replaced in-place when
+     * SSE delivers the real message.
+     */
+    fun addOptimisticMessage(sessionId: String, message: Message.User, parts: List<Part>)
+
+    /**
      * Clear the revert state for a session.
      * Called when the user sends a new message after revert — the server
      * consumes the revert but may not notify the client via SSE.
