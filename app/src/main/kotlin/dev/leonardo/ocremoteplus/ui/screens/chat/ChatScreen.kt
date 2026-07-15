@@ -334,16 +334,19 @@ fun ChatScreen(
     // behavior; do NOT remove isAtBottom from the key (see
     // docs/research/sse-scroll-stability-iron-laws.md).
     LaunchedEffect(listState.isScrollInProgress, isAtBottom) {
+        android.util.Log.d("ScrollDebug", "[AutoScroll] isScrolling=${listState.isScrollInProgress} isAtBottom=$isAtBottom → autoScroll was $autoScrollEnabled")
         if (listState.isScrollInProgress) {
             autoScrollEnabled = false
         } else if (isAtBottom) {
             autoScrollEnabled = true
         }
+        android.util.Log.d("ScrollDebug", "[AutoScroll] → autoScroll now $autoScrollEnabled")
     }
 
     val messageCount = messageState.messages.size
     LaunchedEffect(messageCount) {
         if (messageCount > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
+            android.util.Log.w("ScrollDebug", "[messageCount effect] SNAP TO BOTTOM! count=$messageCount autoScroll=$autoScrollEnabled")
             listState.scrollToItem(0)
         }
     }

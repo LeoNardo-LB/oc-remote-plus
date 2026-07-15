@@ -290,7 +290,15 @@ fun ChatMessageList(
                             val delta = rawDelta.coerceIn(-maxPerFrame, maxPerFrame)
                             carry = rawDelta - delta
 
+                            val prevIndex = listState.firstVisibleItemIndex
+                            val prevOffset = listState.firstVisibleItemScrollOffset
                             val consumed = scrollBy(delta)
+                            // Log if scroll position changed unexpectedly (jump detection)
+                            val newIndex = listState.firstVisibleItemIndex
+                            val newOffset = listState.firstVisibleItemScrollOffset
+                            if (kotlin.math.abs(newOffset - prevOffset) > maxPerFrame + 50 || newIndex != prevIndex) {
+                                android.util.Log.w("ScrollDebug", "[Fling] idx:$prevIndex→$newIndex off:$prevOffset→$newOffset delta=$delta consumed=$consumed vel=$velocity")
+                            }
                             if (kotlin.math.abs(consumed) < 0.5f) return velocity
 
                             // Exponential decay: v(t+dt) = v(t) * e^(-friction * dt)
