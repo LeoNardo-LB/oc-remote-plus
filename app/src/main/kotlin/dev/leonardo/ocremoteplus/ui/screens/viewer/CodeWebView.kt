@@ -18,6 +18,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -173,6 +174,16 @@ fun CodeWebView(
         annotationsJson.replace("\\", "\\\\").replace("'", "\\'")
     }
 
+    // rememberUpdatedState: factory's onPageFinished reads these .value refs
+    // to always get the LATEST content, not the stale factory-closure capture.
+    // Without this, onPageFinished applies the content from the first composition,
+    // which may differ from the current content if the ViewModel updated mid-load.
+    val currentEscaped = rememberUpdatedState(escapedContent)
+    val currentLang = rememberUpdatedState(language)
+    val currentDark = rememberUpdatedState(isDark)
+    val currentJson = rememberUpdatedState(safeAnnotationsJson)
+    val currentScroll = rememberUpdatedState(initialScrollLine)
+
     val bridge = remember { SelectionBridge() }
     bridge.callback = onAnnotate
     bridge.annotationClickCallback = onAnnotationClick
@@ -182,6 +193,7 @@ fun CodeWebView(
     var lastEscaped by remember { mutableStateOf("") }
     var lastIsDark by remember { mutableStateOf(!isDark) }
     var lastJson by remember { mutableStateOf("") }
+    var pageLoaded by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -220,16 +232,28 @@ fun CodeWebView(
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
+                        pageLoaded = true
+                        // Use rememberUpdatedState refs — guarantees the LATEST content
+                        // even if the ViewModel updated between factory creation and now.
+                        val ec = currentEscaped.value
+                        val lang = currentLang.value
+                        val dark = currentDark.value
+                        val json = currentJson.value
+                        val scroll = currentScroll.value
                         view?.evaluateJavascript(
-                            "setCode(`$escapedContent`, '$language'); setTheme($isDark, '$bgHex', '$textHex');",
+                            "setCode(`$ec`, '$lang'); setTheme($dark, '$bgHex', '$textHex');",
                             null
                         )
-                        if (initialScrollLine > 0) {
-                            view?.evaluateJavascript("scrollToLine($initialScrollLine);", null)
+                        if (scroll > 0) {
+                            view?.evaluateJavascript("scrollToLine($scroll);", null)
                         }
-                        if (safeAnnotationsJson.isNotBlank() && safeAnnotationsJson != "[]") {
-                            view?.evaluateJavascript("applyAnnotations('$safeAnnotationsJson');", null)
+                        if (json.isNotBlank() && json != "[]") {
+                            view?.evaluateJavascript("applyAnnotations('$json');", null)
                         }
+                        // Sync tracking vars so the next update() doesn't re-apply redundantly
+                        lastEscaped = ec
+                        lastIsDark = dark
+                        lastJson = json
                     }
                 }
 
@@ -243,6 +267,11 @@ fun CodeWebView(
         update = { webView ->
             webView.visibility = if (visible) View.VISIBLE else View.GONE
             webView.post {
+                // Skip JS calls until the HTML page has loaded (onPageFinished).
+                // Before that, setCode/setTheme don't exist → evaluateJavascript
+                // silently fails. onPageFinished handles the initial content apply.
+                if (!pageLoaded) return@post
+
                 // Only update WebView when content actually changes — avoids
                 // rebuilding DOM during scroll (caused scroll jump/flicker)
                 if (escapedContent != lastEscaped) {

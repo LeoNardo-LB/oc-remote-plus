@@ -216,10 +216,20 @@ internal class MessageDataDelegate(
                     )
                 }
 
-            // Optimistic messages are now injected directly into EventDispatcher._messages
-            // (same cache as real messages). No merge/filter needed here.
-            // _pendingMessages is kept only for status tracking (Sending/Sent/Failed indicator).
-            val mergedChatMessages = chatMessages
+            // Append optimistic messages that haven't been server-confirmed yet.
+            // A pending message is "confirmed" when the server delivers any message
+            // (user or assistant) with a timestamp at or after the pending's send time.
+            // Optimistic messages are NEVER injected into the shared _messages/_parts
+            // cache — they live only in [_pendingMessages] and are merged here.
+            // Display pending only while its ID is in [_pendingMessageIds] — i.e.,
+            // while the POST is in flight. Once onSendSuccess removes the ID, the
+            // server message (already in _messages via SSE) takes over seamlessly.
+            val activePending = pendingMessages.filter { it.pendingId in pendingMessageIds }
+            val mergedChatMessages = if (activePending.isEmpty()) {
+                chatMessages
+            } else {
+                chatMessages + activePending.map { ChatMessage(it.message, it.parts) }
+            }
 
 
             val state = MessageListState(
@@ -232,6 +242,17 @@ internal class MessageDataDelegate(
                 pendingMessageIds = pendingMessageIds,
                 pendingMessages = pendingMessages,
             )
+            // DIAG: log combine output to detect stale emissions
+            val lastMsgId = mergedChatMessages.lastOrNull()?.message?.id?.take(12) ?: "none"
+            Log.d("MsgDiag", "[combine] msgs=${sessionMessages.size} visible=${visible.size} " +
+                "merged=${mergedChatMessages.size} revert=${revertState != null} " +
+                "lastMsg=$lastMsgId pending=${pendingMessages.size}")
+            // DIAG: log last 3 messages' parts detail
+            mergedChatMessages.takeLast(3).forEach { cm ->
+                val textLen = cm.parts.filterIsInstance<Part.Text>().sumOf { it.text.length }
+                val role = if (cm.message is Message.User) "U" else "A"
+                Log.d("MsgDiag", "  [$role] id=${cm.message.id.take(12)} parts=${cm.parts.size} textLen=$textLen")
+            }
             state
          } catch (e: Exception) {
             if (BuildConfig.DEBUG) Log.e("MessageDataDelegate", "messageListState combine error", e)
@@ -559,9 +580,10 @@ internal class MessageDataDelegate(
         _isSending.value = true
         _pendingMessageIds.update { it + pendingId }
         _pendingMessages.update { it + OptimisticMessage(pendingId, optimisticMsg, optimisticParts, UserMsgStatus.Sending) }
-        // Inject into EventDispatcher cache — same list as real messages.
-        // SSE will replace it in-place when the real message arrives.
-        chatRepository.addOptimisticMessage(optimisticMsg.sessionId, optimisticMsg, optimisticParts)
+        // NOTE: Optimistic messages are NOT injected into the shared _messages/_parts
+        // cache. They are merged into the display list in [messageListState]'s combine
+        // body (see `activePending` below) and removed once the server delivers any
+        // message with a timestamp at or after the pending's send time.
     }
 
     /** Mark a successful send: flip status to Sent. The optimistic message stays in the cache

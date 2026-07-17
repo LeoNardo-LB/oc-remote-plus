@@ -125,7 +125,17 @@ fun ChatMessageList(
     agents: List<dev.leonardo.ocremoteplus.domain.model.AgentInfo> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    val turnGroups = remember(rawMessages) { computeTurnGroups(rawMessages) }
+    // Structural signature — only changes when messages are added/removed/role-changed.
+    // During SSE token streaming, part content updates every 48ms but message
+    // structure stays the same → this signature prevents unnecessary recompute
+    // of turnGroups and streamingMsgId during scrolling.
+    val msgStructKey = remember(rawMessages) {
+        rawMessages.size.toString() + rawMessages.joinToString(",") {
+            it.message.id.take(12) + it.message.role.first().toString()
+        }
+    }
+
+    val turnGroups = remember(msgStructKey) { computeTurnGroups(rawMessages) }
 
     // Pre-compute all rendering data for assistant display items.
     // Single remember block — runs only when rawMessages/displayItems change, not during composition.
@@ -150,8 +160,13 @@ fun ChatMessageList(
     // false in production), which forces streamingMsgId=null and disables ALL
     // height compensation → viewport dragged to bottom. v360 used completed
     // timestamp only and worked correctly. Do NOT re-add takeIf(sessionMeta).
-    val streamingMsgId = remember(rawMessages) {
-        rawMessages.lastOrNull {
+    // Key on structural signature — streamingMsgId only changes when a new
+    // streaming message starts or completes, not on every token batch.
+    // Uses firstOrNull (not lastOrNull) because rawMessages is reversed
+    // (newest first) — we want the NEWEST incomplete assistant, which is
+    // the one currently streaming.
+    val streamingMsgId = remember(msgStructKey, rawMessages.firstOrNull()?.message?.time?.completed) {
+        rawMessages.firstOrNull {
             it.isAssistant && it.message.time.completed == null
         }?.message?.id
     }

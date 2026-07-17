@@ -99,10 +99,17 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
         _sessions.update { current ->
             val idx = current.indexOfFirst { it.id == event.info.id }
             if (idx >= 0) {
-                Log.i(TAG, "SessionUpdated: replacing existing session at index $idx (oldTitle=${current[idx].title}, newTitle=${event.info.title})")
-                current.toMutableList().apply { set(idx, event.info) }
+                // Don't let stale SSE restore a revert we just cleared locally.
+                // The server will eventually send revert=null after processing
+                // our new message, at which point we accept and clear the flag.
+                val merged = if (event.info.id in locallyClearedReverts && event.info.revert != null) {
+                    event.info.copy(revert = null)
+                } else {
+                    if (event.info.revert == null) locallyClearedReverts.remove(event.info.id)
+                    event.info
+                }
+                current.toMutableList().apply { set(idx, merged) }
             } else {
-                Log.i(TAG, "SessionUpdated: session ${event.info.id} not found, upserting (title=${event.info.title})")
                 (current + event.info).sortedByDescending { s -> s.time.updated }
             }
         }
@@ -164,7 +171,15 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
      * to notify the client. This ensures the message list filter stops
      * hiding new messages.
      */
+    /**
+     * Sessions whose revert was locally cleared (user sent a new message).
+     * Prevents stale SessionUpdated SSE events from restoring the revert
+     * before the server confirms it's cleared.
+     */
+    private val locallyClearedReverts = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     fun clearRevert(sessionId: String) {
+        locallyClearedReverts.add(sessionId)
         _sessions.update { current ->
             val idx = current.indexOfFirst { it.id == sessionId }
             if (idx >= 0 && current[idx].revert != null) {
@@ -177,6 +192,7 @@ class SessionEventHandler @Inject constructor() : SseEventHandler {
     }
 
     fun setRevert(sessionId: String, messageId: String) {
+        locallyClearedReverts.remove(sessionId)
         _sessions.update { current ->
             val idx = current.indexOfFirst { it.id == sessionId }
             if (idx >= 0) {

@@ -293,15 +293,71 @@ class SseClient @Inject constructor(
      * Parse SSE event from raw JSON.
      * Global endpoint wraps events: {directory, payload: {type, properties}}
      * Per-instance endpoint sends directly: {type, properties}
+     *
+     * Also handles sync-wrapped events from the server's V2 event pipeline:
+     * {type: "sync", syncEvent: {type: "session.next.text.delta.1", data: {...}}}
+     * These are unwrapped and transformed into the V1 event format so that
+     * existing handlers process them without modification.
      */
     private fun parseEvent(data: String): SseEvent? {
         val root = json.parseToJsonElement(data).jsonObject
 
         val payload = root["payload"]?.jsonObject ?: root
-        val type = payload["type"]?.jsonPrimitive?.content ?: return null
-        val properties = payload["properties"]?.jsonObject ?: JsonObject(emptyMap())
+        val type = payload["type"]?.jsonPrimitive?.contentOrNull ?: return null
 
+        // Unwrap sync events: {type:"sync", syncEvent:{type, data}} or {type:"sync", name, data}
+        if (type == "sync") {
+            return parseSyncEvent(payload)
+        }
+
+        val properties = payload["properties"]?.jsonObject ?: JsonObject(emptyMap())
         return parseEventByType(type, properties)
+    }
+
+    /**
+     * Unwrap and transform sync-wrapped V2 events into V1 format.
+     *
+     * Server V2 pipeline wraps session.next.* events in a sync envelope.
+     * Text/reasoning deltas are transformed into [SseEvent.MessagePartDelta]
+     * to feed directly into the existing delta batching pipeline.
+     */
+    private fun parseSyncEvent(payload: JsonObject): SseEvent? {
+        val syncEvent = payload["syncEvent"]?.jsonObject
+        val innerType = (syncEvent?.get("type") ?: payload["name"])
+            ?.jsonPrimitive?.contentOrNull ?: return null
+        val innerData = (syncEvent?.get("data") ?: payload["data"])
+            ?.jsonObject ?: return null
+
+        // Strip version suffix (e.g., "session.next.text.delta.1" → "session.next.text.delta")
+        val baseType = innerType.substringBeforeLast('.').let {
+            // Only strip if suffix is numeric (avoid stripping "session.next" → "session")
+            val suffix = innerType.substringAfterLast('.')
+            if (suffix.all { c -> c.isDigit() }) it else innerType
+        }
+
+        // Transform streaming deltas into MessagePartDelta — feeds directly into
+        // the existing delta batching + flush pipeline, no handler changes needed.
+        return when (baseType) {
+            "session.next.text.delta", "session.next.reasoning.delta" -> {
+                val field = if (baseType.contains("reasoning")) "reasoning" else "text"
+                val sid = innerData["sessionID"]?.jsonPrimitive?.contentOrNull
+                val mid = innerData["messageID"]?.jsonPrimitive?.contentOrNull
+                val pid = innerData["partID"]?.jsonPrimitive?.contentOrNull
+                val delta = innerData["delta"]?.jsonPrimitive?.contentOrNull
+                if (sid != null && mid != null && pid != null && delta != null) {
+                    SseEvent.MessagePartDelta(sid, mid, pid, field, delta)
+                } else {
+                    Log.w(TAG, "Sync $baseType missing fields: sid=$sid mid=$mid pid=$pid deltaLen=${delta?.length}")
+                    null
+                }
+            }
+            else -> {
+                // Route other session.next.* sync events through the standard parser.
+                // Construct properties from innerData for compatibility.
+                if (BuildConfig.DEBUG) Log.d(TAG, "Sync event routed: $baseType")
+                parseEventByType(baseType, innerData)
+            }
+        }
     }
 
     private fun parseEventByType(type: String, props: JsonObject): SseEvent? {

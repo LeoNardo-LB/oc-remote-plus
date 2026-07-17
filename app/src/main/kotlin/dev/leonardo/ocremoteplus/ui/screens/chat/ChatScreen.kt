@@ -348,6 +348,21 @@ fun ChatScreen(
         }
     }
 
+    // Scroll to bottom when the last assistant message first gets text content.
+    // Without this, a zero-height assistant bubble (created before parts arrive)
+    // grows off-screen because messageCount doesn't change when parts are populated.
+    val lastMsgTextLen = remember(messageState.messages) {
+        messageState.messages.lastOrNull()?.let { msg ->
+            if (msg.isAssistant) msg.parts.filterIsInstance<Part.Text>().sumOf { it.text.length }
+            else -1  // Non-assistant → don't trigger
+        } ?: -1
+    }
+    LaunchedEffect(lastMsgTextLen) {
+        if (lastMsgTextLen > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
+            listState.scrollToItem(0)
+        }
+    }
+
     LaunchedEffect(forceScrollTick) {
         if (forceScrollTick > 0) {
             listState.snapToBottom()
@@ -377,6 +392,14 @@ fun ChatScreen(
         coroutineScope = coroutineScope,
     )
     val context = LocalContext.current
+
+    // Pre-warm WebView V8 engine on first ChatScreen entry so the first file
+    // open isn't slow. One-time per process; throwaway WebView auto-destroys.
+    // Delay 500ms to let initial composition + first scroll frame settle.
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(500)
+        dev.leonardo.ocremoteplus.ui.screens.viewer.WebViewWarmer.warm(context)
+    }
     val isAmoled = isAmoledTheme()
     val keyboardController = LocalSoftwareKeyboardController.current
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
@@ -708,14 +731,17 @@ fun ChatScreen(
                         }
 
                         // Filter: keep user messages + first assistant in each turn group
-                        // to avoid zero-height items creating blank gaps from spacedBy.
+                        // (first in reversed = newest in original order = the one with
+                        // the latest response text). Previous code checked nextMsg which
+                        // kept the OLDEST assistant (often empty/reasoning-only), hiding
+                        // the actual response text from the user.
                         val displayItems = remember(rawMessages) {
                             rawMessages.mapIndexedNotNull { index, msg ->
                                 when {
                                     msg.isUser -> index to msg
                                     msg.isAssistant -> {
-                                        val nextMsg = rawMessages.getOrNull(index + 1)
-                                        if (nextMsg?.isAssistant != true) index to msg else null
+                                        val prevMsg = rawMessages.getOrNull(index - 1)
+                                        if (prevMsg?.isAssistant != true) index to msg else null
                                     }
                                     else -> null
                                 }

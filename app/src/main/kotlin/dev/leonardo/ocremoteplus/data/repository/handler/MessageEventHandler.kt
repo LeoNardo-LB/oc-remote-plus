@@ -36,18 +36,18 @@ class MessageEventHandler @Inject constructor() {
     val parts: StateFlow<Map<String, List<Part>>> = _parts.asStateFlow()
 
     /**
-     * Inject an optimistic user message into the cache for immediate display.
-     * The message has a temp ID ("pending-*"). When SSE delivers the real
-     * message, [handleMessageUpdated] replaces it in-place (same list position).
+     * No-op: optimistic messages are now handled in MessageDataDelegate's combine layer.
+     *
+     * They are NOT injected into the shared [_messages]/[_parts] cache. The previous
+     * in-place injection caused message duplication, bubble jitter, and invisible
+     * agent replies because the temp ID ("pending-*") had to be reconciled with
+     * the real server ID across multiple SSE events.
+     *
+     * Signature retained for binary compatibility with [ChatRepository] /
+     * [EventDispatcher] / [FakeChatRepository].
      */
     fun addOptimisticMessage(sessionId: String, message: Message.User, optimisticParts: List<Part>) {
-        _messages.update { current ->
-            val sessionMsgs = current[sessionId] ?: emptyList()
-            current + (sessionId to (sessionMsgs + message))
-        }
-        if (optimisticParts.isNotEmpty()) {
-            _parts.update { it + (message.id to optimisticParts) }
-        }
+        // Intentionally empty.
     }
 
     /**
@@ -80,6 +80,14 @@ class MessageEventHandler @Inject constructor() {
     private val pendingLock = Any()
     private var batchJob: Job? = null
 
+    /**
+     * Tracks parts that have received at least one delta.
+     * When the first delta arrives for a part that has text from MessagePartUpdated,
+     * the snapshot text is cleared to prevent doubling. After the first delta,
+     * subsequent deltas append normally.
+     */
+    private val partsWithDelta = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     private fun scheduleFlush() {
         // Do NOT cancel an in-flight timer — that starves flushes when token
         // arrival rate > 1/48ms. Let deltas accumulate; the running timer will
@@ -108,10 +116,31 @@ class MessageEventHandler @Inject constructor() {
                     val part = messageParts[idx]
                     val newPart = when (part) {
                         is Part.Text -> {
-                            if (part.text.endsWith(entry.delta)) part  // dedup
-                            else part.copy(text = part.text + entry.delta)
+                            if (part.text.isNotEmpty() && entry.partId !in partsWithDelta) {
+                                // First delta for this part — clear snapshot text
+                                // from MessagePartUpdated to prevent doubling.
+                                partsWithDelta.add(entry.partId)
+                                part.copy(text = entry.delta)
+                            } else if (part.text.endsWith(entry.delta)) {
+                                partsWithDelta.add(entry.partId)
+                                part  // dedup
+                            } else {
+                                partsWithDelta.add(entry.partId)
+                                part.copy(text = part.text + entry.delta)
+                            }
                         }
-                        is Part.Reasoning -> part.copy(text = part.text + entry.delta)
+                        is Part.Reasoning -> {
+                            if (part.text.isNotEmpty() && entry.partId !in partsWithDelta) {
+                                partsWithDelta.add(entry.partId)
+                                part.copy(text = entry.delta)
+                            } else if (part.text.endsWith(entry.delta)) {
+                                partsWithDelta.add(entry.partId)
+                                part  // dedup
+                            } else {
+                                partsWithDelta.add(entry.partId)
+                                part.copy(text = part.text + entry.delta)
+                            }
+                        }
                         else -> part
                     }
                     messageParts[idx] = newPart
@@ -140,46 +169,38 @@ class MessageEventHandler @Inject constructor() {
     internal fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
         val role = when (event.info) { is Message.User -> "user"; is Message.Assistant -> "assistant" }
-        var replacedTempId: String? = null
         _messages.update { current ->
             val msgs = current[sessionId]?.toMutableList() ?: mutableListOf()
             val idx = msgs.indexOfFirst { it.id == event.info.id }
             val isUpdate = idx >= 0
+            // DIAG: log state before processing
+            val userMsgs = msgs.filter { it is Message.User }
+            Log.i("MsgDiag", "[MsgUpdated] ENTER role=$role eventId=${event.info.id.take(16)} " +
+                "session=${sessionId.take(8)} total=${msgs.size} " +
+                "userCount=${userMsgs.size} isUpdate=$isUpdate")
             if (idx >= 0) {
                 msgs[idx] = event.info
             } else {
-                // Check for optimistic ("pending-*") message to UPDATE in-place.
-                // Same position, same list slot — just replace content (ID, metadata)
-                // with the server's authoritative data. No new entry, no duplicate.
-                val tempIdx = msgs.indexOfFirst { it.id.startsWith("pending-") }
-                if (tempIdx >= 0 && event.info is Message.User) {
-                    replacedTempId = msgs[tempIdx].id
-                    msgs[tempIdx] = event.info
-                    Log.i(TAG, "[MsgUpdated] Updated optimistic ${replacedTempId} → ${event.info.id.take(20)} (in-place)")
-                } else {
-                    msgs.add(event.info)
-                    msgs.sortBy { it.time.created }
-                }
+                msgs.add(event.info)
+                msgs.sortBy { it.time.created }
             }
-            val total = msgs.size
-            Log.i(TAG, "[MsgUpdated] id=${event.info.id.take(12)} role=$role session=${sessionId.take(12)} " +
-                "${if (isUpdate) "UPDATE" else "NEW"} total=$total")
+            // DIAG: log state after processing
+            val afterUser = msgs.filter { it is Message.User }
+            // With optimistic messages removed from the cache, a single MessageUpdated
+            // for a user message legitimately increases the user count by 1. Warn only
+            // when it increases by more than 1 (indicates a logic regression).
+            if (afterUser.size > userMsgs.size + 1) {
+                Log.w("MsgDiag", "[MsgUpdated] ⚠️ unexpected user count increase: ${userMsgs.size}→${afterUser.size} " +
+                    "userIds=${afterUser.joinToString(",") { it.id.take(16) }}")
+            }
             current + (sessionId to msgs)
-        }
-        // Remove optimistic parts (don't move to real ID — SSE message_part_updated
-        // will provide the authoritative parts). Moving would cause duplicate text
-        // because the summary seeding below also creates parts.
-        replacedTempId?.let { tempId ->
-            _parts.update { current -> current - tempId }
         }
         if (event.info is Message.Assistant) {
             assistantMessageIds.add(event.info.id)
         }
-        // SSE MessageUpdated carries no parts; for User messages, seed parts map from summary
-        // so that consumers (notifications, UI) can read text without waiting for REST sync.
-        // Skip seeding when we just replaced an optimistic message — SSE will provide parts.
+        // Seed parts for User messages from summary text if no parts exist yet.
         val info = event.info
-        if (info is Message.User && replacedTempId == null) {
+        if (info is Message.User) {
             _parts.update { current ->
                 if (current.containsKey(info.id)) {
                     current
@@ -257,38 +278,14 @@ class MessageEventHandler @Inject constructor() {
                 }
                 messageParts[idx] = merged
             } else {
-                // New part arriving — strip text for assistant messages.
-                // Uses assistantMessageIds set (populated by handleMessageUpdated
-                // and REST sync) for O(1) lookup. More reliable than StateFlow
-                // snapshot reads which may miss recently created messages.
-                val isAssistantPart = messageId in assistantMessageIds
-                val partToAdd = if (isAssistantPart) {
-                    when (event.part) {
-                        is Part.Text -> {
-                            if (event.part.text.isNotEmpty()) {
-                                Log.w(TAG, "[PartUpdated] t=$thread msg=$messageId part=$partId " +
-                                    "stripping assistant text=${event.part.text.length}, " +
-                                    "will be re-accumulated by SSE deltas or REST sync")
-                                event.part.copy(text = "")
-                            } else {
-                                event.part
-                            }
-                        }
-                        is Part.Reasoning -> {
-                            if (event.part.text.isNotEmpty()) {
-                                Log.w(TAG, "[PartUpdated] t=$thread msg=$messageId part=$partId " +
-                                    "stripping assistant reasoning text=${event.part.text.length}")
-                                event.part.copy(text = "")
-                            } else {
-                                event.part
-                            }
-                        }
-                        else -> event.part
-                    }
-                } else {
-                    event.part
-                }
-                messageParts.add(partToAdd)
+                // New part arriving — keep text as-is for all message types.
+                // The old code stripped text for assistant messages (assuming SSE
+                // deltas would re-accumulate it). But if deltas are missed (SSE
+                // reconnect, network gap), the text is permanently lost — the user
+                // sees an empty bubble until manual refresh.
+                // The delta flush's endsWith() dedup + mergePart's "longer text wins"
+                // together handle potential overlap without data loss.
+                messageParts.add(event.part)
             }
             current + (messageId to messageParts)
         }
@@ -393,13 +390,6 @@ class MessageEventHandler @Inject constructor() {
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }
-            // Merge strategy:
-            // - Optimistic ("pending-*") messages: removed if REST has any user messages
-            //   (the real message replaces the temp)
-            // - Messages present in both: prefer SSE version (fresher) unless REST has completed=true
-            //   and SSE has completed=null (edge case: SSE missed the completion event)
-            // - Messages only in SSE: preserved (may be actively streaming)
-            // - Messages only in REST: added (missed by SSE)
             val hasRestUserMsgs = newMessages.any { it.info is Message.User }
             val filtered = if (hasRestUserMsgs) existing.filterNot { it.id.startsWith("pending-") } else existing
             val merged = (filtered + newMessages.map { it.info })
@@ -407,14 +397,23 @@ class MessageEventHandler @Inject constructor() {
                 .map { msg ->
                     val incoming = incomingById[msg.id]
                     if (incoming != null) {
-                        val sseVersion = msg
-                        val restVersion = incoming.info
-                        mergeMessageMeta(sseVersion, restVersion)
+                        mergeMessageMeta(msg, incoming.info)
                     } else {
                         msg
                     }
                 }
                 .sortedBy { it.time.created }
+            // DIAG: log merge result
+            val beforeUser = existing.filter { it is Message.User }.size
+            val afterUser = merged.filter { it is Message.User }.size
+            val beforePending = existing.count { it.id.startsWith("pending-") }
+            Log.i("MsgDiag", "[setMessages] session=${sessionId.take(8)} " +
+                "incoming=${newMessages.size} existing=${existing.size} merged=${merged.size} " +
+                "beforeUser=$beforeUser afterUser=$afterUser beforePending=$beforePending " +
+                "hasRestUserMsgs=$hasRestUserMsgs")
+            if (afterUser > beforeUser && beforePending == 0) {
+                Log.w("MsgDiag", "[setMessages] ⚠️ user count increased without pending: $beforeUser→$afterUser")
+            }
             current + (sessionId to merged)
         }
         newMessages.forEach { if (it.info is Message.Assistant) assistantMessageIds.add(it.info.id) }

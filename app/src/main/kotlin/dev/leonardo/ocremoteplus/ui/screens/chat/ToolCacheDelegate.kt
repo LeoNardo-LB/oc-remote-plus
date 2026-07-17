@@ -2,11 +2,14 @@ package dev.leonardo.ocremoteplus.ui.screens.chat
 
 import dev.leonardo.ocremoteplus.domain.model.Part
 import dev.leonardo.ocremoteplus.domain.model.ToolState
+import android.util.Log
 import dev.leonardo.ocremoteplus.domain.repository.ToolSnapshotCache
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
+
+private const val TAG = "FileViewerDiag"
 
 /**
  * Extracts and caches file snapshots from Tool parts for the file viewer.
@@ -26,7 +29,11 @@ class ToolCacheDelegate @Inject constructor(
             is ToolState.Error -> state.input
         }
         val filePath = input["filePath"]?.jsonPrimitive?.contentOrNull
-            ?: input["path"]?.jsonPrimitive?.contentOrNull ?: return
+            ?: input["path"]?.jsonPrimitive?.contentOrNull ?: run {
+                Log.w(TAG, "cacheToolPart: no filePath in input, tool=${part.tool}, " +
+                    "partId=${part.id.take(12)}, state=${state::class.simpleName}")
+                return
+            }
         val metadata = (state as? ToolState.Completed)?.metadata
         val filediff = metadata?.get("filediff") as? JsonObject
         val before = filediff?.get("before")?.jsonPrimitive?.contentOrNull
@@ -41,6 +48,16 @@ class ToolCacheDelegate @Inject constructor(
             "write" -> input["content"]?.jsonPrimitive?.contentOrNull
             "edit" -> after
             else -> null
+        }
+        // DIAG: log cache entry details for intermittent blank-file investigation
+        Log.d(TAG, "cacheToolPart: tool=${part.tool}, state=${state::class.simpleName}, " +
+            "partId=${part.id.take(12)}, file=${filePath.take(60)}, " +
+            "contentLen=${content?.length ?: -1}, beforeLen=${before?.length ?: -1}, " +
+            "afterLen=${after?.length ?: -1}, hasMetadata=${metadata != null}, " +
+            "hasFilediff=${filediff != null}")
+        if (content.isNullOrBlank() && before.isNullOrBlank() && after.isNullOrBlank()) {
+            Log.w(TAG, "cacheToolPart: ALL FIELDS BLANK for partId=${part.id.take(12)}, " +
+                "tool=${part.tool}, state=${state::class.simpleName} → will cause empty FileViewer!")
         }
         toolSnapshotCache.put(
             part.id,
