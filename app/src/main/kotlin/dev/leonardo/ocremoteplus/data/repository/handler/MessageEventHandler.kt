@@ -169,7 +169,7 @@ class MessageEventHandler @Inject constructor() {
     internal fun handleMessageUpdated(event: SseEvent.MessageUpdated) {
         val sessionId = event.info.sessionId
         val role = if (event.info is Message.User) "user" else "assistant"
-        Log.d("DeltaDiag", "msgUpdated sid=${sessionId.take(12)} mid=${event.info.id.take(12)} role=$role")
+        val beforeCount = _messages.value[sessionId]?.size ?: 0
         _messages.update { current ->
             val msgs = current[sessionId]?.toMutableList() ?: mutableListOf()
             val idx = msgs.indexOfFirst { it.id == event.info.id }
@@ -181,6 +181,7 @@ class MessageEventHandler @Inject constructor() {
             }
             current + (sessionId to msgs)
         }
+        val afterCount = _messages.value[sessionId]?.size ?: 0
         if (event.info is Message.Assistant) {
             assistantMessageIds.add(event.info.id)
         }
@@ -344,8 +345,6 @@ class MessageEventHandler @Inject constructor() {
     internal fun handleMessagePartDelta(event: SseEvent.MessagePartDelta) {
         // Buffer delta for batch flush (48ms window) — reduces recomposition
         // frequency from per-token to ~20/sec, eliminating layout jitter.
-        Log.d("DeltaDiag", "delta sid=${event.sessionId.take(12)} mid=${event.messageId.take(12)} " +
-            "pid=${event.partId.take(12)} field=${event.field} deltaLen=${event.delta.length}")
         val partType = when (_parts.value[event.messageId]
             ?.firstOrNull { it.id == event.partId }) {
             is Part.Reasoning -> "reasoning"
@@ -373,6 +372,7 @@ class MessageEventHandler @Inject constructor() {
     // ============ Batch Operations ============
 
     fun setMessages(sessionId: String, newMessages: List<MessageWithParts>) {
+        val beforeCount = _messages.value[sessionId]?.size ?: 0
         _messages.update { current ->
             val existing = current[sessionId] ?: emptyList()
             val incomingById = newMessages.associateBy { it.info.id }

@@ -367,7 +367,13 @@ fun ChatScreen(
         } ?: -1
     }
     LaunchedEffect(lastMsgContentLen) {
-        if (lastMsgContentLen > 0 && autoScrollEnabled && !listState.isScrollInProgress) {
+        // Removed !listState.isScrollInProgress check: during rapid SSE streaming
+        // (delta every ~50ms), the previous scrollToItem is cancelled by this
+        // LaunchedEffect's key change before it completes. The cancellation
+        // stops the scroll, but isScrollInProgress may still be true when the
+        // new effect checks it, causing every subsequent scroll to be skipped.
+        // This left the agent's reply bubble permanently off-screen.
+        if (lastMsgContentLen > 0 && autoScrollEnabled) {
             listState.scrollToItem(0)
         }
     }

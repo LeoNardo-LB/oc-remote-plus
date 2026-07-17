@@ -258,7 +258,13 @@ internal class MessageDataDelegate(
             val mergedChatMessages = if (activePending.isEmpty()) {
                 chatMessages
             } else {
-                chatMessages + activePending.map { ChatMessage(it.message, it.parts) }
+                // Merge optimistic messages into the chronological position by time.created.
+                // Appending at the end would place them AFTER the agent's response, pushing
+                // the agent bubble off-screen in reverseLayout.
+                val allMsgs = (chatMessages.asSequence() + activePending.asSequence().map {
+                    ChatMessage(it.message, it.parts)
+                }).sortedBy { it.message.time.created }.toList()
+                allMsgs
             }
 
 
