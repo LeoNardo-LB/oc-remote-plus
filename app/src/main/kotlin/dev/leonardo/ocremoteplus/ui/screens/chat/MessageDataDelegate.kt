@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAG = "MessageDataDelegate"
+private const val MAX_DISPLAY_MESSAGES = 100
 
 /**
  * Owns message SSE observation, loading, pagination, send-state, and tool-expand
@@ -171,15 +172,17 @@ internal class MessageDataDelegate(
                 emptyList()
             } else {
                 val sorted = sessionMessages.sortedBy { it.time.created }
-                if (revertState != null) {
-                    // OpenCode pattern: filter by message ID string comparison.
-                    // Message IDs are ULID (monotonically increasing), so
-                    // id <= revertId correctly includes the revert point and
-                    // everything before it.
+                val filtered = if (revertState != null) {
                     sorted.filter { it.id < revertState.messageId }
                 } else {
                     sorted
                 }
+                // Cap to last MAX_DISPLAY_MESSAGES to prevent OOM on large sessions.
+                // The UI (LazyColumn) only renders visible items anyway, so older
+                // messages beyond this cap are not seen by the user. "Load older"
+                // still works because it fetches from REST and the cap adjusts.
+                if (filtered.size > MAX_DISPLAY_MESSAGES) filtered.takeLast(MAX_DISPLAY_MESSAGES)
+                else filtered
             }
 
             // P5-1: queuedMessageIds derived from FSM status — Idle forces clear.
@@ -270,9 +273,13 @@ internal class MessageDataDelegate(
                 pendingMessages = pendingMessages,
             )
             state
-         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("MessageDataDelegate", "messageListState combine error", e)
-            MessageListState()
+         } catch (e: Throwable) {
+             // Catch Throwable (not just Exception) to handle OutOfMemoryError.
+             // OOM permanently kills the combine if only Exception is caught,
+             // because the flow upstream sees an unhandled Error and terminates.
+             // Returning empty state lets the next emission retry with freed memory.
+             Log.e("MessageDataDelegate", "messageListState combine error: ${e.javaClass.simpleName}: ${e.message}", e)
+             MessageListState()
          }
         }
     }.stateIn(
