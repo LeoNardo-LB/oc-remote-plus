@@ -175,8 +175,10 @@ internal fun MessageCardAssistant(
                     }
                 }
 
-                // Token/cost/duration footer — only on the last message of a turn
-                if (stepFinishes.isNotEmpty()) {
+                // Token/cost/duration footer — show for any completed assistant message.
+                // No longer gated on stepFinishes or isTurnLast — each displayed
+                // assistant message has its own metadata from Message.Assistant fields.
+                if (!isStreaming) {
                     val durationMs = renderableTurn.durationMs
                     val modelId = renderableTurn.modelId
 

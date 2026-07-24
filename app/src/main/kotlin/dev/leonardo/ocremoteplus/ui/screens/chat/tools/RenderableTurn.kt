@@ -67,20 +67,17 @@ fun computeRenderableTurn(
         formatError(am?.error)
     }
 
-    // Agent name from last message (only on turn-last display item)
-    val lastMsg = ordered.lastOrNull()?.message as? dev.leonardo.ocremoteplus.domain.model.Message.Assistant
-    val agentName = if (isTurnLast) lastMsg?.agent else null
-    val modelId = if (isTurnLast) lastMsg?.modelId else null
+    // Agent name and model from the current message — always extract regardless
+    // of isTurnLast, because the displayItems filter may select a non-last
+    // assistant as the turn representative.
+    val currentAssistant = currentMessage.message as? dev.leonardo.ocremoteplus.domain.model.Message.Assistant
+    val agentName = currentAssistant?.agent
+    val modelId = currentAssistant?.modelId
 
-    // Duration
-    val durationMs: Long? = if (isTurnLast && ordered.size > 0) {
-        val first = ordered.firstOrNull()?.message
-        val last = ordered.lastOrNull()?.message
-        if (first is dev.leonardo.ocremoteplus.domain.model.Message.Assistant &&
-            last is dev.leonardo.ocremoteplus.domain.model.Message.Assistant) {
-            last.time.completed?.let { end -> end - first.time.created }
-        } else null
-    } else null
+    // Duration — from current message's own time, not turn span
+    val durationMs: Long? = currentAssistant?.let { am ->
+        am.time.completed?.let { end -> end - am.time.created }
+    }
 
     // Step finishes for token stats
     val stepFinishes = if (isTurnLast) {
